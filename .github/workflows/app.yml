@@ -114,11 +114,15 @@ jobs:
           $probe = (Resolve-Path "$stage/measure/jfd-probe.lua").Path.Replace('\','/')
           $probeOut = (Join-Path (Resolve-Path build).Path 'package-probe.jsonl').Replace('\','/')
           $process = Start-Process -FilePath "$stage/jellyfin-desktop-next.exe" -PassThru -Wait `
-            -ArgumentList @('--smoke', '--mpv-option', "script=$probe", '--mpv-option', "script-opts=jfdprobe-out=$probeOut") `
+            -ArgumentList @('--smoke', '--mpv-option', "script=$probe", '--mpv-option', "script-opts=jfdprobe-out=$probeOut",
+              '--mpv-option', 'log-file=build/package-mpv.log') `
             -RedirectStandardOutput build/package-smoke.out -RedirectStandardError build/package-smoke.err
           Get-Content build/package-smoke.out, build/package-smoke.err
           if ($process.ExitCode -ne 0) { throw "packaged smoke test failed with exit code $($process.ExitCode)" }
-          if (-not (Select-String -Path $probeOut -Pattern '"kind":"probe-start"' -Quiet)) { throw 'the mpv probe script did not run' }
+          if (-not ((Test-Path $probeOut) -and (Select-String -Path $probeOut -Pattern '"kind":"probe-start"' -Quiet))) {
+            Select-String -Path build/package-mpv.log -Pattern 'lua|script|Configuration|features' | Select-Object -First 40 | ForEach-Object Line
+            throw 'the mpv probe script did not run'
+          }
           Get-Content $probeOut -TotalCount 3
 
       - name: Upload package (Windows)
