@@ -56,6 +56,18 @@ ctest --test-dir build --output-on-failure
 Requires CMake 3.24+ and a C++20 compiler (MSVC 2022, GCC 12+, Clang 15+ / Apple Clang 15+).
 
 The application also needs Qt 6 (Quick, OpenGL) and libmpv; add `-DJFD_BUILD_APP=ON`. On Windows it renders with Direct3D 11 when libmpv has the D3D11 render API (client API 2.6, as pinned), otherwise with OpenGL.
+### Modules and translations
+
+Each module is a directory under `src/` with its own `CMakeLists.txt`; the root
+file lists every planned module and adds the ones that exist
+([cmake/JfdModules.cmake](cmake/JfdModules.cmake)).
+
+Interface strings are English in the source and translated per module in
+`src/<module>/i18n/<module>_ru.ts` ([cmake/JfdTranslations.cmake](cmake/JfdTranslations.cmake)).
+After changing strings, run `cmake --build build --target update_translations`,
+translate the new entries and commit the `.ts` files. The `translations_check`
+test fails on any string that is missing, untranslated or no longer used.
+
 CI uses the versions pinned in [deps/versions.json](deps/versions.json) and passes
 `-DJFD_ENFORCE_PINS=ON` to reject any other.
 

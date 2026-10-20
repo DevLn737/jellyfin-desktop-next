@@ -8,7 +8,7 @@ file(READ "${PROJECT_SOURCE_DIR}/deps/versions.json" _jfd_versions)
 string(JSON JFD_PINNED_QT_VERSION GET "${_jfd_versions}" qt version)
 string(JSON JFD_PINNED_LINUX_LIBMPV GET "${_jfd_versions}" linux libmpvVersion)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui OpenGL Quick Qml)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui OpenGL Quick Qml QuickControls2)
 qt_standard_project_setup(REQUIRES 6.5)
 if(JFD_ENFORCE_PINS AND NOT Qt6_VERSION VERSION_EQUAL JFD_PINNED_QT_VERSION)
   message(FATAL_ERROR "Qt ${Qt6_VERSION} found, ${JFD_PINNED_QT_VERSION} pinned")
