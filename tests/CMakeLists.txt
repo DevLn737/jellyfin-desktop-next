@@ -125,6 +125,11 @@ if(TARGET jfd_jellyfin_api)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
+  if(TARGET jfd_settings)
+    jfd_add_qt_test(jfd_settings_tests settings/SettingsTest.cpp)
+    target_link_libraries(jfd_settings_tests PRIVATE jfd::settings)
+  endif()
+
   if(JFD_SERVER_TESTS)
     # Needs JFD_TEST_SERVER_URL and friends; see scripts/test-server/README.md.
     jfd_add_qt_test(jfd_server_tests server/ServerTest.cpp)
