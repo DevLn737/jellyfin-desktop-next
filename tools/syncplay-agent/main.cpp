@@ -1,45 +1,55 @@
-// A headless client built from the real core and syncplay libraries, for
-// SyncPlay checks against a live server. It plays a virtual file on the wall
-// clock (no decoding), and a driver process does the networking: the agent
-// speaks JSON lines on stdin and stdout.
+// A headless client for SyncPlay checks against a live server, built from
+// the app's own session runtime (src/session): the same core, group client,
+// API client, session WebSocket and launcher, with a virtual file in place of
+// mpv. The file plays on the clock (no decoding) with an adjustable speed
+// error, as an audio device clock has, so drift correction has work to do.
+// A driver process sends commands as JSON lines on stdin and reads events
+// as JSON lines on stdout.
+//
+//   jfd_syncplay_agent --server URL --user NAME --password PASS --device ID
+//                      [--no-rate] [--speed-error-ppm N] [--runtime-ms N]
+//                      [--load-latency-ms N] [--seek-latency-ms N]
 //
 // In (one JSON object per line):
-//   {"t":"start"}                                start polling server time
 //   {"t":"create","name":"..."} {"t":"join","group":"..."} {"t":"leave"}
-//   {"t":"intent","op":"play|pause|seek|rate|stop","positionMs":0,"rate":1.0}
-//   {"t":"ws","data":"<raw WebSocket message>"}
-//   {"t":"connection","state":"lost|restored"}
-//   {"t":"reply","id":1,"status":200,"body":"..."}
+//   {"t":"intent","op":"play|pause|seek|rate|stop|next|previous","positionMs":0,"rate":1.0}
 //   {"t":"sample","id":1}
-//   {"t":"quit"}
+//   {"t":"quit"}                        leaves the group as the app does on exit
 // Out:
-//   {"t":"http","id":1,"method":"GET|POST","path":"...","body":"..."}
+//   {"t":"ready","generation":1}        the session socket is up (again)
+//   {"t":"disconnected"}
+//   {"t":"resumed","sleptMs":20000}    the computer slept; reconnecting
+//   {"t":"ws","type":"SyncPlayCommand|SyncPlayGroupUpdate","data":{...}}
+//   {"t":"request","path":"SyncPlay/Join","status":204}
 //   {"t":"sample","id":1,"at":<unix ms>,"positionMs":0,"playing":false,"rate":1,...}
-//   {"t":"notice",...} {"t":"log","text":"..."}
-#include <jfd/core/PlaybackSession.h>
-#include <jfd/syncplay/GroupClient.h>
+//   {"t":"correction",...} {"t":"notice",...} {"t":"log","text":"..."}
+//   {"t":"fatal","text":"..."}         then the agent exits
+#include <jfd/api/DeviceProfile.h>
+#include <jfd/api/JellyfinClient.h>
+#include <jfd/api/SessionSocket.h>
+#include <jfd/core/MediaBackend.h>
+#include <jfd/session/SessionRuntime.h>
 
 #include <nlohmann/json.hpp>
 
-#include <poll.h>
+#include <QCoreApplication>
+#include <QJsonDocument>
+#include <QSocketNotifier>
+#include <QTimer>
+
 #include <unistd.h>
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <functional>
-#include <iostream>
-#include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
 
+using namespace jfd;
 using namespace jfd::core;
-using namespace std::chrono_literals;
 using json = nlohmann::json;
 
 namespace {
@@ -63,237 +73,59 @@ namespace {
         .count();
   }
 
-  // Scheduled work on one thread, ordered by due time and then by insertion.
-  class Loop final : public Clock {
-  public:
-    LocalInstant now() const override {
-      return LocalInstant::fromSinceOrigin(
-          std::chrono::duration_cast<WallTicks>(std::chrono::steady_clock::now().time_since_epoch()));
-    }
-
-    void at(LocalInstant due, std::function<void()> work) {
-      m_queue.emplace(Key{due, m_sequence++}, std::move(work));
-    }
-    void after(WallTicks delay, std::function<void()> work) { at(now() + delay, std::move(work)); }
-
-    // Runs due work; returns the time until the next item, capped.
-    std::chrono::milliseconds runDue() {
-      while (!m_queue.empty() && m_queue.begin()->first.due <= now()) {
-        auto work = std::move(m_queue.begin()->second);
-        m_queue.erase(m_queue.begin());
-        work();
-      }
-      if (m_queue.empty()) return 1000ms;
-      const auto wait = std::chrono::ceil<std::chrono::milliseconds>(m_queue.begin()->first.due - now());
-      return std::clamp(wait, 0ms, 1000ms);
-    }
-
-  private:
-    struct Key {
-      LocalInstant due;
-      std::uint64_t sequence;
-      bool operator<(const Key& other) const {
-        if (due != other.due) return due < other.due;
-        return sequence < other.sequence;
-      }
-    };
-    std::map<Key, std::function<void()>> m_queue;
-    std::uint64_t m_sequence = 0;
-  };
-
   struct Options {
-    // The virtual file's clock runs this much fast (positive) or slow, as an
-    // audio device clock does, so drift correction has work to do.
+    QString server;
+    QString user;
+    QString password;
+    QString device = QStringLiteral("jfd-syncplay-agent");
+    bool supportsRate = true;
+    // The virtual file's clock runs this much fast (positive) or slow.
     double speedErrorPpm = 0.0;
     std::int64_t runTimeMs = 600'000;
     std::int64_t loadLatencyMs = 250;
     std::int64_t seekLatencyMs = 120;
   };
 
-  class Agent final : public MediaBackend, public Timers, public SessionObserver,
-                      public jfd::syncplay::Transport {
+  // A media backend without decoding. Opens and seeks complete after short
+  // delays and progress arrives every 250 ms, as mpv's events do.
+  class VirtualFile final : public QObject, public MediaBackend {
   public:
-    explicit Agent(Options options)
-        : m_options(options),
-          m_group(*this, m_loop, [this](SessionInput input) { m_session->post(std::move(input)); }) {
-      m_session = std::make_unique<PlaybackSession>(SessionPorts{*this, m_loop, *this, m_group, *this});
+    using Post = session::SessionRuntime::Post;
+
+    VirtualFile(const Clock& clock, Post post, const Options& options)
+        : m_clock(clock), m_post(std::move(post)), m_options(options) {
+      m_tick.setInterval(250);
+      QObject::connect(&m_tick, &QTimer::timeout, this, [this] {
+        if (m_file && m_file->started) m_post(backend::Progress{m_file->epoch, sample()});
+      });
+      m_tick.start();
     }
 
-    int run() {
-      tick();
-      std::string buffer;
-      char chunk[65536];
-      while (!m_quit) {
-        const auto wait = m_loop.runDue();
-        pollfd fd{STDIN_FILENO, POLLIN, 0};
-        const int ready = ::poll(&fd, 1, static_cast<int>(wait.count()));
-        if (ready < 0) return 1;
-        if (ready == 0) continue;
-        const ssize_t got = ::read(STDIN_FILENO, chunk, sizeof chunk);
-        if (got <= 0) break;
-        buffer.append(chunk, static_cast<std::size_t>(got));
-        std::size_t newline;
-        while ((newline = buffer.find('\n')) != std::string::npos) {
-          const std::string line = buffer.substr(0, newline);
-          buffer.erase(0, newline + 1);
-          if (!line.empty()) handleLine(line);
-        }
-      }
-      return 0;
-    }
-
-  private:
-    // ---- Driver commands ---------------------------------------------------
-
-    void handleLine(const std::string& line) {
-      const json message = json::parse(line, nullptr, false);
-      if (message.is_discarded() || !message.is_object()) {
-        log("unparsable input");
-        return;
-      }
-      const std::string type = message.value("t", "");
-      if (type == "reply") {
-        const auto id = message.value("id", std::uint64_t{0});
-        const auto found = m_pending.find(id);
-        if (found == m_pending.end()) return;
-        auto reply = std::move(found->second);
-        m_pending.erase(found);
-        reply(message.value("status", 0), message.value("body", std::string()));
-      } else if (type == "ws") {
-        m_group.onMessage(message.value("data", std::string()));
-      } else if (type == "sample") {
-        emit(sample(message.value("id", std::uint64_t{0})));
-      } else if (type == "start") {
-        pollTime();
-      } else if (type == "create") {
-        m_group.createGroup(message.value("name", std::string("agent")));
-      } else if (type == "join") {
-        m_group.joinGroup(GroupId(message.value("group", std::string())));
-      } else if (type == "leave") {
-        m_group.leaveGroup();
-      } else if (type == "connection") {
-        if (message.value("state", "") == "lost")
-          m_group.onConnectionLost();
-        else
-          m_group.onConnectionRestored();
-      } else if (type == "intent") {
-        intent(message);
-      } else if (type == "quit") {
-        m_quit = true;
-      }
-    }
-
-    void intent(const json& message) {
-      const std::string op = message.value("op", "");
-      if (op == "play") {
-        m_session->post(intent::Play{});
-      } else if (op == "pause") {
-        m_session->post(intent::Pause{});
-      } else if (op == "seek") {
-        if (const auto position = MediaTicks::fromMilliseconds(message.value("positionMs", std::int64_t{0})))
-          m_session->post(intent::Seek{*position});
-      } else if (op == "rate") {
-        if (const auto rate = PlaybackRate::base(message.value("rate", 1.0)))
-          m_session->post(intent::SetRate{*rate});
-      } else if (op == "stop") {
-        m_session->post(intent::Stop{});
-      }
-    }
-
-    void pollTime() {
-      m_group.pollTime();
-      m_loop.after(m_group.nextPollDelay(), [this] { pollTime(); });
-    }
-
-    json sample(std::uint64_t id) {
-      progress();
-      const SessionSnapshot& snapshot = m_session->snapshot();
-      json out{{"t", "sample"},
-               {"id", id},
-               {"at", unixMilliseconds()},
-               {"positionMs", nullptr},
-               {"playing", false},
-               {"rate", 0.0},
-               {"baseRate", 1.0},
-               {"phase", static_cast<int>(snapshot.phase)},
-               {"inGroup", m_group.isInGroup()},
-               {"corrections", m_corrections},
-               {"skips", m_skips}};
-      if (m_file && m_file->started) {
-        const bool playing = !m_file->paused && !m_file->seeking;
-        out["positionMs"] = m_file->position * 1000.0;
-        out["playing"] = playing;
-        out["rate"] = playing ? m_file->rate * speedFactor() : 0.0;
-      }
-      if (snapshot.group) {
-        out["baseRate"] = snapshot.group->baseRate.value();
-        out["groupState"] = static_cast<int>(snapshot.group->state);
-        if (snapshot.group->driftMilliseconds) out["driftMs"] = *snapshot.group->driftMilliseconds;
-      }
-      return out;
-    }
-
-    // ---- Transport -----------------------------------------------------------
-
-    void request(const jfd::syncplay::HttpRequest& request, Reply reply) override {
-      const std::uint64_t id = ++m_requestSerial;
-      m_pending.emplace(id, std::move(reply));
-      emit({{"t", "http"},
-            {"id", id},
-            {"method", request.method == jfd::syncplay::HttpRequest::Method::Get ? "GET" : "POST"},
-            {"path", request.path},
-            {"body", request.body}});
-    }
-
-    // ---- Virtual file --------------------------------------------------------
-
-    struct File {
-      MediaEpoch epoch;
-      bool started = false;
-      bool paused = true;
-      bool seeking = false;
-      double position = 0.0;
-      double rate = 1.0;
-      LocalInstant updated;
-      RequestId latestSeek;
+    struct State {
+      std::optional<double> positionSeconds;
+      bool playing = false;
+      double rate = 0.0;
     };
 
-    double speedFactor() const { return 1.0 + m_options.speedErrorPpm / 1e6; }
-
-    void progress() {
-      if (!m_file) return;
-      const LocalInstant now = m_loop.now();
-      if (m_file->started && !m_file->paused && !m_file->seeking) {
-        m_file->position += std::chrono::duration<double>(now - m_file->updated).count() *
-                            m_file->rate * speedFactor();
-        m_file->position = std::min(m_file->position, static_cast<double>(m_options.runTimeMs) / 1000.0);
-      }
-      m_file->updated = now;
-    }
-
-    backend::Sample backendSample() {
+    State state() {
+      State out;
+      if (!m_file || !m_file->started) return out;
       progress();
-      return backend::Sample{BackendSeconds{m_file->position}, m_file->paused, m_file->seeking, false,
-                             m_loop.now()};
-    }
-
-    bool current(MediaEpoch epoch) const { return m_file && m_file->epoch == epoch; }
-
-    // Backend events reach the session a moment later, as mpv's do.
-    void later(std::int64_t milliseconds, std::function<void()> work) {
-      m_loop.after(std::chrono::milliseconds(milliseconds), std::move(work));
+      out.positionSeconds = m_file->position;
+      out.playing = !m_file->paused && !m_file->seeking;
+      out.rate = out.playing ? m_file->rate * speedFactor() : 0.0;
+      return out;
     }
 
     void load(MediaEpoch epoch, const BackendLoad& request) override {
       File file;
       file.epoch = epoch;
       file.paused = request.startPaused;
-      file.updated = m_loop.now();
+      file.updated = m_clock.now();
       m_file = file;
       later(m_options.loadLatencyMs, [this, epoch] {
         if (!current(epoch)) return;
-        m_session->post(backend::SourceOpened{epoch, 0.0,
-                                              static_cast<double>(m_options.runTimeMs) / 1000.0});
+        m_post(backend::SourceOpened{epoch, 0.0, static_cast<double>(m_options.runTimeMs) / 1000.0});
       });
     }
 
@@ -303,7 +135,7 @@ namespace {
         progress();
         m_file->position = position ? position->value : 0.0;
         m_file->started = true;
-        m_session->post(backend::PlaybackRestarted{epoch, backendSample()});
+        m_post(backend::PlaybackRestarted{epoch, sample()});
       });
     }
 
@@ -314,13 +146,13 @@ namespace {
         if (!current(epoch) || m_file->latestSeek != request) return;
         progress();
         m_file->seeking = true;
-        m_session->post(backend::SeekStarted{epoch});
+        m_post(backend::SeekStarted{epoch});
         later(m_options.seekLatencyMs, [this, epoch, request, target] {
           if (!current(epoch) || m_file->latestSeek != request) return;
           progress();
           m_file->position = target.value;
           m_file->seeking = false;
-          m_session->post(backend::PlaybackRestarted{epoch, backendSample()});
+          m_post(backend::PlaybackRestarted{epoch, sample()});
         });
       });
     }
@@ -330,7 +162,7 @@ namespace {
       progress();
       m_file->paused = paused;
       later(5, [this, epoch] {
-        if (current(epoch)) m_session->post(backend::Progress{epoch, backendSample()});
+        if (current(epoch)) m_post(backend::Progress{epoch, sample()});
       });
     }
 
@@ -344,28 +176,239 @@ namespace {
     void addExternalTrack(MediaEpoch, RequestId, const ExternalTrack&) override {}
 
     void stop(MediaEpoch epoch) override {
-      if (current(epoch)) m_file.reset();
+      if (!current(epoch)) return;
+      m_file.reset();
+      later(5, [this, epoch] { m_post(backend::Ended{epoch, backend::EndReason::Stopped, {}}); });
     }
 
-    void tick() {
-      if (m_file && m_file->started) m_session->post(backend::Progress{m_file->epoch, backendSample()});
-      m_loop.after(250ms, [this] { tick(); });
+  private:
+    struct File {
+      MediaEpoch epoch;
+      bool started = false;
+      bool paused = true;
+      bool seeking = false;
+      double position = 0.0;
+      double rate = 1.0;
+      LocalInstant updated;
+      RequestId latestSeek;
+    };
+
+    double speedFactor() const { return 1.0 + m_options.speedErrorPpm / 1e6; }
+    bool current(MediaEpoch epoch) const { return m_file && m_file->epoch == epoch; }
+
+    void progress() {
+      if (!m_file) return;
+      const LocalInstant now = m_clock.now();
+      if (m_file->started && !m_file->paused && !m_file->seeking) {
+        m_file->position +=
+            std::chrono::duration<double>(now - m_file->updated).count() * m_file->rate * speedFactor();
+        m_file->position = std::min(m_file->position, static_cast<double>(m_options.runTimeMs) / 1000.0);
+      }
+      m_file->updated = now;
     }
 
-    // ---- Timers --------------------------------------------------------------
+    backend::Sample sample() {
+      progress();
+      return backend::Sample{BackendSeconds{m_file->position}, m_file->paused, m_file->seeking, false,
+                             m_clock.now()};
+    }
 
-    void arm(TimerId id, LocalInstant due) override {
-      m_armed.insert(id.serial);
-      m_loop.at(due, [this, id] {
-        if (m_armed.erase(id.serial) > 0) m_session->post(TimerFired{id});
+    // Backend events reach the session a moment later, as mpv's do.
+    void later(std::int64_t milliseconds, std::function<void()> work) {
+      QTimer::singleShot(std::chrono::milliseconds(milliseconds), Qt::PreciseTimer, this, std::move(work));
+    }
+
+    const Clock& m_clock;
+    Post m_post;
+    Options m_options;
+    QTimer m_tick;
+    std::optional<File> m_file;
+  };
+
+  class Agent final : public QObject {
+  public:
+    explicit Agent(Options options)
+        : m_options(std::move(options)),
+          m_client(api::ClientIdentity{QStringLiteral("Jellyfin Desktop Next"), QStringLiteral("0.0.1"),
+                                       m_options.device, m_options.device}),
+          m_socket(m_client) {
+      // A lost network comes back within seconds in the checks; retry often.
+      m_socket.setReconnectDelaysMs(500, 2000);
+    }
+
+    void start() {
+      const auto url = api::JellyfinClient::normalizeServerUrl(m_options.server);
+      if (!url) return fatal("bad --server");
+      m_client.setServerUrl(*url);
+      m_client.signIn(m_options.user, m_options.password, this, [this](auto result) {
+        if (!result) return fatal("sign-in failed: " + result.error().message.toStdString());
+        api::SessionCapabilities capabilities;
+        capabilities.supportsSyncPlayPlaybackRate = m_options.supportsRate;
+        capabilities.deviceProfile = api::buildDeviceProfile({});
+        m_client.reportCapabilities(capabilities, this, [this, capabilities](auto reported) {
+          if (!reported) return fatal("capabilities failed: " + reported.error().message.toStdString());
+          startRuntime(capabilities.deviceProfile);
+        });
       });
     }
 
-    void cancel(TimerId id) override { m_armed.erase(id.serial); }
+  private:
+    void fatal(const std::string& text) {
+      emit({{"t", "fatal"}, {"text", text}});
+      QCoreApplication::exit(1);
+    }
 
-    // ---- Observer ------------------------------------------------------------
+    void startRuntime(const QJsonObject& deviceProfile) {
+      session::SessionRuntime::Settings settings;
+      settings.deviceProfile = deviceProfile;
+      const auto factory = [this](const Clock& clock, session::SessionRuntime::Post post) {
+        auto file = std::make_unique<VirtualFile>(clock, std::move(post), m_options);
+        m_file = file.get();
+        return file;
+      };
+      m_runtime = std::make_unique<session::SessionRuntime>(m_client, m_socket, factory, settings);
 
-    void snapshotChanged(const SessionSnapshot& snapshot) override {
+      connect(&m_runtime->transport(), &session::ApiTransport::replied, this,
+              [](const QString& path, int status) {
+                QString bare = path.startsWith(QLatin1Char('/')) ? path.mid(1) : path;
+                if (bare == QLatin1String("SyncPlay/Ping") || !bare.startsWith(QLatin1String("SyncPlay/")))
+                  return;
+                emit({{"t", "request"}, {"path", bare.toStdString()}, {"status", status}});
+              });
+      connect(&m_runtime->launcher(), &session::PlaybackLauncher::failed, this,
+              [](const QString& itemId, const QString& message) {
+                log("could not open " + itemId.toStdString() + ": " + message.toStdString());
+              });
+      connect(m_runtime.get(), &session::SessionRuntime::queueStepRequested, this,
+              [](bool forward) { emit({{"t", "notice"}, {"kind", "queueStep"}, {"forward", forward}}); });
+      connect(&m_socket, &api::SessionSocket::messageReceived, this,
+              [](const QString& type, const QJsonValue& data, const QString&) {
+                if (type != QLatin1String("SyncPlayCommand") && type != QLatin1String("SyncPlayGroupUpdate"))
+                  return;
+                const QByteArray text = QJsonDocument(data.toObject()).toJson(QJsonDocument::Compact);
+                emit({{"t", "ws"}, {"type", type.toStdString()}, {"data", json::parse(text.toStdString())}});
+              });
+      connect(&m_runtime->sleepDetector(), &session::SleepDetector::resumed, this,
+              [](qint64 sleptMs) { emit({{"t", "resumed"}, {"sleptMs", sleptMs}}); });
+      connect(&m_socket, &api::SessionSocket::ready, this,
+              [this](quint64 generation) {
+                emit({{"t", "ready"}, {"generation", generation}});
+                if (generation == 1) listen();
+              });
+      connect(&m_socket, &api::SessionSocket::disconnected, this,
+              [](const QString& reason) { emit({{"t", "disconnected"}, {"reason", reason.toStdString()}}); });
+      m_subscription = m_runtime->hub().subscribe(
+          [this](const SessionSnapshot& snapshot) { onSnapshot(snapshot); },
+          [](const SessionNotice& notice) { onNotice(notice); });
+      m_socket.start();
+    }
+
+    // ---- Driver commands ---------------------------------------------------
+
+    void listen() {
+      m_stdin = new QSocketNotifier(STDIN_FILENO, QSocketNotifier::Read, this);
+      connect(m_stdin, &QSocketNotifier::activated, this, [this] {
+        char chunk[65536];
+        const ssize_t got = ::read(STDIN_FILENO, chunk, sizeof chunk);
+        if (got <= 0) {
+          m_stdin->setEnabled(false);
+          quit();
+          return;
+        }
+        m_buffer.append(chunk, static_cast<std::size_t>(got));
+        std::size_t newline;
+        while ((newline = m_buffer.find('\n')) != std::string::npos) {
+          const std::string line = m_buffer.substr(0, newline);
+          m_buffer.erase(0, newline + 1);
+          if (!line.empty()) handleLine(line);
+        }
+      });
+    }
+
+    void handleLine(const std::string& line) {
+      const json message = json::parse(line, nullptr, false);
+      if (message.is_discarded() || !message.is_object()) {
+        log("unparsable input");
+        return;
+      }
+      const std::string type = message.value("t", "");
+      if (type == "sample") {
+        emit(sample(message.value("id", std::uint64_t{0})));
+      } else if (type == "create") {
+        m_runtime->createGroup(QString::fromStdString(message.value("name", std::string("agent"))));
+      } else if (type == "join") {
+        m_runtime->joinGroup(QString::fromStdString(message.value("group", std::string())));
+      } else if (type == "leave") {
+        m_runtime->leaveGroup();
+      } else if (type == "intent") {
+        intent(message);
+      } else if (type == "quit") {
+        quit();
+      }
+    }
+
+    void intent(const json& message) {
+      const std::string op = message.value("op", "");
+      if (op == "play") {
+        m_runtime->post(intent::Play{});
+      } else if (op == "pause") {
+        m_runtime->post(intent::Pause{});
+      } else if (op == "seek") {
+        if (const auto position = MediaTicks::fromMilliseconds(message.value("positionMs", std::int64_t{0})))
+          m_runtime->post(intent::Seek{*position});
+      } else if (op == "rate") {
+        if (const auto rate = PlaybackRate::base(message.value("rate", 1.0)))
+          m_runtime->post(intent::SetRate{*rate});
+      } else if (op == "stop") {
+        m_runtime->post(intent::Stop{});
+      } else if (op == "next") {
+        m_runtime->post(intent::Next{});
+      } else if (op == "previous") {
+        m_runtime->post(intent::Previous{});
+      }
+    }
+
+    // As the app does on exit: leave the group, then stop the socket.
+    void quit() {
+      if (m_quitting) return;
+      m_quitting = true;
+      m_runtime->leaveBeforeExit([this] {
+        m_socket.stop();
+        QCoreApplication::quit();
+      });
+    }
+
+    json sample(std::uint64_t id) const {
+      const SessionSnapshot& snapshot = m_runtime->snapshot();
+      json out{{"t", "sample"},
+               {"id", id},
+               {"at", unixMilliseconds()},
+               {"positionMs", nullptr},
+               {"playing", false},
+               {"rate", 0.0},
+               {"baseRate", 1.0},
+               {"phase", static_cast<int>(snapshot.phase)},
+               {"inGroup", m_runtime->group().isInGroup()},
+               {"participants", snapshot.group ? snapshot.group->participants : std::vector<std::string>{}},
+               {"corrections", m_corrections},
+               {"skips", m_skips}};
+      const VirtualFile::State file = m_file->state();
+      if (file.positionSeconds) {
+        out["positionMs"] = *file.positionSeconds * 1000.0;
+        out["playing"] = file.playing;
+        out["rate"] = file.rate;
+      }
+      if (snapshot.group) {
+        out["baseRate"] = snapshot.group->baseRate.value();
+        out["groupState"] = static_cast<int>(snapshot.group->state);
+        if (snapshot.group->driftMilliseconds) out["driftMs"] = *snapshot.group->driftMilliseconds;
+      }
+      return out;
+    }
+
+    // ---- Session state -------------------------------------------------------
+
+    void onSnapshot(const SessionSnapshot& snapshot) {
       const SyncCorrection correction = snapshot.group ? snapshot.group->correction : SyncCorrection::None;
       if (correction != m_lastCorrection) {
         if (correction == SyncCorrection::Speed) ++m_corrections;
@@ -378,73 +421,75 @@ namespace {
       m_lastCorrection = correction;
     }
 
-    void notify(const SessionNotice& notice) override {
+    static void onNotice(const SessionNotice& notice) {
       std::visit(Overloaded{
-                     [&](const notice::GroupItemRequested& requested) {
+                     [](const notice::GroupItemRequested& requested) {
                        emit({{"t", "notice"},
                              {"kind", "groupItemRequested"},
                              {"item", requested.item.value()},
                              {"positionMs", requested.position.milliseconds()}});
-                       open(requested);
                      },
-                     [&](const notice::GroupRateRejected& rejected) {
+                     [](const notice::GroupRateRejected& rejected) {
                        emit({{"t", "notice"},
                              {"kind", "groupRateRejected"},
                              {"status", rejected.httpStatus},
                              {"unsupportedParticipants", rejected.unsupportedParticipants}});
                      },
-                     [&](const notice::StreamReopenNeeded& reopen) {
+                     [](const notice::StreamReopenNeeded& reopen) {
                        emit({{"t", "notice"},
                              {"kind", "streamReopenNeeded"},
                              {"positionMs", reopen.position.milliseconds()}});
                      },
-                     [&](const notice::ReadyTimedOut& timedOut) {
+                     [](const notice::ReadyTimedOut& timedOut) {
                        emit({{"t", "notice"},
                              {"kind", "readyTimedOut"},
                              {"positionMs", timedOut.target.milliseconds()}});
                      },
-                     [&](const notice::QueueStepRequested& step) {
-                       emit({{"t", "notice"}, {"kind", "queueStep"}, {"forward", step.forward}});
-                     },
+                     // Reported by the runtime's queueStepRequested signal.
+                     [](const notice::QueueStepRequested&) {},
                  },
                  notice);
     }
 
-    // What the app does: resolve the item (here: the virtual file) and open it.
-    void open(const notice::GroupItemRequested& requested) {
-      MediaRequest media;
-      media.item = requested.item;
-      media.mediaSource = MediaSourceId(requested.item.value());
-      media.playlistItem = requested.playlistItem;
-      media.url = "virtual://" + requested.item.value();
-      media.start = requested.position;
-      media.runTime = MediaTicks::fromMilliseconds(m_options.runTimeMs);
-      media.startPaused = true;
-      later(50, [this, media] { m_session->post(intent::Open{media}); });
-    }
-
     Options m_options;
-    Loop m_loop;
-    jfd::syncplay::GroupClient m_group;
-    std::unique_ptr<PlaybackSession> m_session;
-    std::optional<File> m_file;
-    std::set<std::uint64_t> m_armed;
-    std::map<std::uint64_t, Reply> m_pending;
-    std::uint64_t m_requestSerial = 0;
+    api::JellyfinClient m_client;
+    api::SessionSocket m_socket;
+    std::unique_ptr<session::SessionRuntime> m_runtime;
+    session::SessionHub::Subscription m_subscription;
+    VirtualFile* m_file = nullptr;
+    QSocketNotifier* m_stdin = nullptr;
+    std::string m_buffer;
     SyncCorrection m_lastCorrection = SyncCorrection::None;
     std::uint64_t m_corrections = 0;
     std::uint64_t m_skips = 0;
-    bool m_quit = false;
+    bool m_quitting = false;
   };
 
 } // namespace
 
 int main(int argc, char** argv) {
+  QCoreApplication app(argc, argv);
   Options options;
-  for (int i = 1; i + 1 < argc; i += 2) {
+  for (int i = 1; i < argc; ++i) {
     const std::string name = argv[i];
-    const char* value = argv[i + 1];
-    if (name == "--speed-error-ppm")
+    if (name == "--no-rate") {
+      options.supportsRate = false;
+      continue;
+    }
+    if (i + 1 >= argc) {
+      std::fprintf(stderr, "%s needs a value\n", name.c_str());
+      return 2;
+    }
+    const char* value = argv[++i];
+    if (name == "--server")
+      options.server = QString::fromLocal8Bit(value);
+    else if (name == "--user")
+      options.user = QString::fromLocal8Bit(value);
+    else if (name == "--password")
+      options.password = QString::fromLocal8Bit(value);
+    else if (name == "--device")
+      options.device = QString::fromLocal8Bit(value);
+    else if (name == "--speed-error-ppm")
       options.speedErrorPpm = std::strtod(value, nullptr);
     else if (name == "--runtime-ms")
       options.runTimeMs = std::strtoll(value, nullptr, 10);
@@ -457,6 +502,11 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
-  Agent agent(options);
-  return agent.run();
+  if (options.server.isEmpty() || options.user.isEmpty()) {
+    std::fprintf(stderr, "--server and --user are required\n");
+    return 2;
+  }
+  Agent agent(std::move(options));
+  QTimer::singleShot(0, &agent, [&agent] { agent.start(); });
+  return app.exec();
 }

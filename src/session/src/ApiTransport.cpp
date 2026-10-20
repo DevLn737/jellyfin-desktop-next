@@ -13,9 +13,10 @@ namespace jfd::session {
     using Method = api::JellyfinClient::Method;
     const Method method =
         request.method == syncplay::HttpRequest::Method::Get ? Method::Get : Method::Post;
-    m_client.rawRequest(method, QString::fromStdString(request.path),
-                        QByteArray::fromStdString(request.body), this,
-                        [reply = std::move(reply)](int status, QByteArray body) {
+    const QString path = QString::fromStdString(request.path);
+    m_client.rawRequest(method, path, QByteArray::fromStdString(request.body), this,
+                        [this, path, reply = std::move(reply)](int status, QByteArray body) {
+                          Q_EMIT replied(path, status);
                           reply(status, body.toStdString());
                         });
   }

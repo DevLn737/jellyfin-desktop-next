@@ -62,6 +62,7 @@ for (const scenario of selected) {
     log(`ERROR ${e.message}`);
   }
   for (const fn of ctx.cleanup.reverse()) await fn().catch(() => {});
+  await writeRecordings(scenario, ctx, started);
   const passed = !error && ctx.checks.length > 0 && ctx.checks.every((c) => c.passed);
   results.push({ name: scenario.name, title: scenario.title, passed, error, durationMs: Date.now() - started, checks: ctx.checks, metrics: ctx.metrics });
   log(`${passed ? 'PASS' : 'FAIL'} ${scenario.name}`);
@@ -81,6 +82,29 @@ await writeFile(`${args.out}/drift-report.json`, JSON.stringify(report, null, 2)
 await writeFile(`${args.out}/drift-report.md`, renderMarkdown(report));
 log(`Report: ${args.out}/drift-report.md (${report.passed ? 'all passed' : 'FAILURES'})`);
 process.exit(report.passed ? 0 : 1);
+
+// What our client received from the server, in order: the stand's message
+// sequences for the simulator and the protocol tests (tests/syncplay/fixtures).
+async function writeRecordings(scenario, ctx, started) {
+  if (ctx.natives.length === 0) return;
+  await mkdir(`${args.out}/recordings`, { recursive: true });
+  const recording = {
+    scenario: scenario.name,
+    title: scenario.title,
+    server: { kind: args.server, version: server.serverVersion },
+    participants: ctx.natives.map((native) => ({
+      label: native.label,
+      events: native.events.flatMap((e) => {
+        const ms = e.at - started;
+        if (e.type === 'SyncPlayCommand' || e.type === 'SyncPlayGroupUpdate') return [{ ms, message: { MessageType: e.type, Data: e.data } }];
+        if (e.type === 'request') return [{ ms, request: e.data }];
+        if (e.type === 'ready' || e.type === 'disconnected' || e.type === 'resumed') return [{ ms, connection: e.type }];
+        return [];
+      }),
+    })),
+  };
+  await writeFile(`${args.out}/recordings/${scenario.name}.json`, `${JSON.stringify(recording, null, 1)}\n`);
+}
 
 function renderMarkdown(r) {
   const lines = [

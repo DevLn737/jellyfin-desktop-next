@@ -173,6 +173,11 @@ export const scenarios = [
       const playing = await waitUntil(group.all, allPlaying, THRESHOLDS.propagationMs * 2);
       check(ctx, 'resume from our client after a paused seek', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`);
       if (playing.ok) await measureDrift(ctx, group, 'after-seek', resumeAt);
+      // Quitting the app leaves the group, so the others do not wait for us.
+      const left = group.driver.waitFor((e) => e.data?.Type === 'UserLeft', 5_000, 'UserLeft').then(() => true, () => false);
+      const quitAt = Date.now();
+      await group.native.stop();
+      check(ctx, 'our client leaves the group when it quits', await left, `${Date.now() - quitAt} ms`);
     },
   },
   {
@@ -194,6 +199,32 @@ export const scenarios = [
       check(ctx, 'in sync after the network returned', synced.ok, `${synced.elapsedMs} ms; ${describe(synced.snapshot)}`);
       ctx.metrics.reconnectSyncMs = Date.now() - back;
       if (synced.ok) await measureDrift(ctx, group, 'after-reconnect', Date.now());
+      const s = await nativeStats(ctx, group);
+      check(ctx, 'our client stays a single group member', s.inGroup, `inGroup=${s.inGroup}`);
+    },
+  },
+  {
+    name: 'native-sleep',
+    title: 'The computer sleeps for 20 s while the group seeks; our client wakes to dead connections and comes back on its own',
+    async run(ctx) {
+      const group = await startGroup(ctx);
+      await sleep(5000);
+      const nap = group.native.sleepFor(20_000);
+      await sleep(3000);
+      await group.driver.seek(120_000);
+      await sleep(15_000);
+      const noticed = group.native.waitFor((e) => e.type === 'resumed', 25_000, 'wake').then(() => Date.now(), () => null);
+      const joined = group.native.waitFor((e) => e.type === 'SyncPlayGroupUpdate' && e.data?.Type === 'GroupJoined', 25_000 + THRESHOLDS.reconnectMs, 'GroupJoined after waking').then(() => Date.now(), () => null);
+      await nap;
+      const woke = Date.now();
+      const noticedAt = await noticed;
+      check(ctx, 'our client notices it slept', noticedAt != null, noticedAt ? `${noticedAt - woke} ms after waking` : 'no wake notice');
+      const joinedAt = await joined;
+      check(ctx, 'back in the group without user action', joinedAt != null, joinedAt ? `${joinedAt - woke} ms after waking` : 'not back in the group');
+      const synced = await waitUntil(group.all, (s) => allPlaying(s) && s.spreadMs < THRESHOLDS.driftMs, THRESHOLDS.reconnectMs);
+      check(ctx, 'in sync after waking', synced.ok, `${synced.elapsedMs} ms; ${describe(synced.snapshot)}`);
+      ctx.metrics.wakeSyncMs = Date.now() - woke;
+      if (synced.ok) await measureDrift(ctx, group, 'after-sleep', Date.now());
       const s = await nativeStats(ctx, group);
       check(ctx, 'our client stays a single group member', s.inGroup, `inGroup=${s.inGroup}`);
     },

@@ -105,6 +105,10 @@ namespace jfd::api {
     // Per-request timeout; 0 disables it.
     void setTimeoutMs(int timeoutMs) { m_timeoutMs = timeoutMs; }
 
+    // Forgets pooled connections, so the next requests open new ones. After
+    // the computer sleeps, the pooled ones are usually dead without knowing.
+    void dropConnections();
+
     QUrl url(const QString& path, const QUrlQuery& query = {}) const;
 
     // --- Server --------------------------------------------------------------

@@ -30,7 +30,8 @@ add_executable(jfd_syncplay_tests
   core/main.cpp
   syncplay/ProtocolTest.cpp
   syncplay/TimeSyncTest.cpp
-  syncplay/GroupClientTest.cpp)
+  syncplay/GroupClientTest.cpp
+  syncplay/RecordedTest.cpp)
 target_link_libraries(jfd_syncplay_tests PRIVATE jfd::syncplay jfd_test_support doctest nlohmann_json)
 target_compile_definitions(jfd_syncplay_tests PRIVATE
   JFD_SYNCPLAY_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/syncplay/fixtures")
@@ -117,6 +118,11 @@ if(TARGET jfd_jellyfin_api)
     jfd_add_qt_test(jfd_platform_dbus_tests platform/SleepInhibitorTest.cpp platform/MprisTest.cpp)
     target_link_libraries(jfd_platform_dbus_tests PRIVATE jfd::platform)
     set_target_properties(jfd_platform_dbus_tests PROPERTIES AUTOMOC ON)
+  endif()
+
+  if(TARGET jfd_session_runtime)
+    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp)
+    target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
   if(JFD_SERVER_TESTS)

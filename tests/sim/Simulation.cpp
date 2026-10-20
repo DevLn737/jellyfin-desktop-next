@@ -702,9 +702,12 @@ namespace jfd::sim {
       c->fromServer(queue);
       resume = wasPlaying;
       setState(GroupState::Waiting);
-      // Existing members wait paused for the new one.
+      // Existing members wait paused for the new one, which the server sends
+      // to the group's position when the group was playing (as recorded from
+      // 12.2: GroupJoined, PlayQueue, then Seek; tests/syncplay/fixtures/recorded).
       for (auto& other : members)
         if (other.client != c) sendCommand(other, GroupCommandType::Pause, world.now, position);
+      if (wasPlaying) sendCommand(members.back(), GroupCommandType::Seek, world.now, position);
     }
 
     void Server::leave(Client* c, bool lost) {
@@ -814,7 +817,8 @@ namespace jfd::sim {
                 const bool legacy = std::any_of(members.begin(), members.end(),
                                                 [](const Member& x) { return x.legacy; });
                 if (world.config.stockServer || (legacy && request.rate != PlaybackRate::normal())) {
-                  c->fromServer(group::RateChangeRejected{m->epoch, 409, 1});
+                  // Stock 12.2 has no rate endpoint (405); the fork refuses legacy groups (409).
+                  c->fromServer(group::RateChangeRejected{m->epoch, world.config.stockServer ? 405 : 409, 1});
                   return;
                 }
                 resume = state == GroupState::Playing || (state == GroupState::Waiting && resume);

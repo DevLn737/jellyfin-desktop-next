@@ -203,3 +203,44 @@ TEST_CASE("Playing alone resolves the item and reports Next to the app's queue")
   REQUIRE(waitFor([&] { return steps.count() == 1; }, 5000));
   CHECK(steps.front().front().toBool());
 }
+
+TEST_CASE("After the computer sleeps our client reconnects and rejoins its group") {
+  Connection host(device("sleep-host"));
+  Connection guest(device("sleep-guest"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  Backend backend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+  core::SessionSnapshot latest;
+  auto subscription = runtime.hub().subscribe([&](const core::SessionSnapshot& s) { latest = s; });
+  QSignalSpy ready(host.socket.get(), &SessionSocket::ready);
+
+  runtime.createGroup(device("sleep-group"));
+  REQUIRE(waitFor([&] { return latest.group.has_value(); }, 20000));
+  const QString groupId = QString::fromStdString(latest.group->group.value());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->joinGroup(groupId, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setIgnoreWait(true, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setNewQueue({movie.id}, 0, 0, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Paused; }, 30000));
+  runtime.post(core::intent::Play{});
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Playing &&
+                               latest.position.milliseconds() > 2'000; }, 20000));
+
+  // The group moves on while we sleep; on waking we reconnect and follow.
+  // (The test clip is 30 s long; the server keeps seeks inside it.)
+  runtime.resumeAfterSleep();
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->seek(20'000 * 10'000, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return ready.count() == 1; }, 20000));
+  CHECK(ready.front().front().toULongLong() > 1);
+  const bool followed = waitFor([&] { return latest.group && latest.phase == core::PlaybackPhase::Playing &&
+                                             latest.position.milliseconds() >= 20'000; }, 30000);
+  INFO("phase " << static_cast<int>(latest.phase) << ", position " << latest.position.milliseconds()
+                << " ms, in group " << latest.group.has_value() << ", participants "
+                << (latest.group ? latest.group->participants.size() : 0));
+  REQUIRE(followed);
+
+  bool left = false;
+  runtime.leaveBeforeExit([&] { left = true; });
+  REQUIRE(waitFor([&] { return left; }, 5000));
+}

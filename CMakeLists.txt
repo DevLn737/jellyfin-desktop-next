@@ -35,11 +35,6 @@ add_subdirectory(src/core)
 add_subdirectory(src/syncplay)
 add_subdirectory(src/diagnostics)
 
-# Headless SyncPlay client for the drift checks (POSIX only).
-if(UNIX)
-  add_subdirectory(tools/syncplay-agent)
-endif()
-
 if(JFD_REQUIRE_QT)
   find_package(Qt6 6.4 REQUIRED COMPONENTS Core Network WebSockets)
 else()
@@ -62,6 +57,12 @@ endif()
 
 # After the Qt modules: its runtime is built when jellyfin-api is.
 add_subdirectory(src/session)
+
+# Headless SyncPlay client for the drift checks, on the session runtime
+# (POSIX only).
+if(UNIX)
+  add_subdirectory(tools/syncplay-agent)
+endif()
 
 if(JFD_BUILD_APP)
   include(cmake/JfdDependencies.cmake)

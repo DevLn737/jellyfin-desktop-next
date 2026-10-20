@@ -1,6 +1,6 @@
 name: SyncPlay drift
 
-# Our client's SyncPlay logic (core + syncplay, headless agent) in a live group
+# Our client's session runtime (src/session with a virtual file, headless agent) in a live group
 # with the harness's reference participant and Jellyfin Web in Chromium, on the
 # forked 12.2 server and on stock 12.2. The report goes to the job summary and,
 # on pull requests, to one comment that is updated on every push.
@@ -36,9 +36,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read pinned versions
+        id: pins
+        run: |
+          echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
+
+      # The agent is the app's session runtime: Qt Core, Network and WebSockets.
+      - name: Install Qt ${{ steps.pins.outputs.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.pins.outputs.qt }}
+          arch: ${{ steps.pins.outputs.qt-arch }}
+          modules: qtwebsockets
+          cache: true
+
       - name: Build the agent
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_TESTS=OFF
+          sudo apt-get install -y --no-install-recommends ninja-build
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_TESTS=OFF -DJFD_REQUIRE_QT=ON
           cmake --build build --target jfd_syncplay_agent
 
       - uses: actions/setup-node@v4
