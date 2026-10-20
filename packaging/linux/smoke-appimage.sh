@@ -14,7 +14,7 @@ case "$ID" in
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq --no-install-recommends xvfb libgl1 libegl1 libopengl0 libgl1-mesa-dri libglx-mesa0 \
-      libfontconfig1 libfreetype6 libx11-xcb1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+      libfontconfig1 libfreetype6 libharfbuzz0b libx11-xcb1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
       libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
       libwayland-client0 libwayland-cursor0 libwayland-egl1 libdbus-1-3 \
       libva2 libva-drm2 libva-x11-2 libva-wayland2 libdrm2 libgbm1 libpulse0 libpipewire-0.3-0t64 libasound2t64 \
@@ -22,12 +22,12 @@ case "$ID" in
     ;;
   fedora)
     dnf install -y -q xorg-x11-server-Xvfb mesa-dri-drivers mesa-libEGL mesa-libGL libglvnd-opengl mesa-libgbm \
-      fontconfig freetype libxkbcommon libxkbcommon-x11 xcb-util-cursor xcb-util-wm xcb-util-image \
+      fontconfig freetype harfbuzz libxkbcommon libxkbcommon-x11 xcb-util-cursor xcb-util-wm xcb-util-image \
       xcb-util-keysyms xcb-util-renderutil libwayland-client libwayland-cursor libwayland-egl dbus-libs \
       libva libdrm pulseaudio-libs pipewire-libs alsa-lib gnutls ca-certificates >/dev/null
     ;;
   arch)
-    pacman -Syu --noconfirm --needed -q xorg-server-xvfb mesa libglvnd fontconfig freetype2 libxkbcommon-x11 \
+    pacman -Syu --noconfirm --needed -q xorg-server-xvfb mesa libglvnd fontconfig freetype2 harfbuzz libxkbcommon-x11 \
       xcb-util-cursor xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil wayland dbus \
       libva libdrm libpulse pipewire alsa-lib gnutls ca-certificates >/dev/null
     ;;
