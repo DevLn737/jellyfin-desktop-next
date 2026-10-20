@@ -1,8 +1,8 @@
-# Downloads the pinned Windows libmpv and Vulkan loader from deps/versions.json,
-# verifies their size and SHA256, and creates an MSVC import library for libmpv.
-# Run from a Visual Studio developer shell (dumpbin and lib are needed).
-# In GitHub Actions it also exports MPV_INCLUDE_DIR, MPV_LIBRARY and the runtime
-# directory (prepended to PATH).
+# Downloads the pinned Windows Qt, libmpv and Vulkan loader from
+# deps/versions.json, verifies their size and SHA256, and creates an MSVC import
+# library for libmpv. Run from a Visual Studio developer shell (dumpbin and lib
+# are needed). In GitHub Actions it also exports QT_ROOT_DIR, MPV_INCLUDE_DIR,
+# MPV_LIBRARY and JFD_RUNTIME_DIR, and puts the Qt and runtime directories on PATH.
 [CmdletBinding()]
 param(
     [string]$Destination = (Join-Path $PSScriptRoot '../build/deps')
@@ -42,6 +42,30 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     return $output
 }
 
+# Qt: official archives unpacked into one prefix. Already-unpacked archives are
+# remembered by hash, so a cached prefix is reused.
+$qtRoot = Join-Path $Destination "qt-$($pins.qt.version)"
+New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
+foreach ($archive in $pins.windows.qt.archives) {
+    $marker = Join-Path $qtRoot ".$($archive.sha256)"
+    if (Test-Path -LiteralPath $marker) { continue }
+    $file = Get-Pinned $archive
+    Invoke-Checked '7z' @('x', '-y', "-o$qtRoot", $file) | Out-Null
+    New-Item -ItemType File -Force -Path $marker | Out-Null
+}
+$qtCore = Get-ChildItem -LiteralPath $qtRoot -Recurse -Filter 'Qt6Core.dll' | Select-Object -First 1
+if (-not $qtCore) { throw 'Qt6Core.dll not found in the unpacked Qt archives' }
+$qtPrefix = Split-Path (Split-Path $qtCore.FullName)
+# The OpenGL software renderer and shader compiler archives hold bare DLLs.
+foreach ($dll in @('opengl32sw.dll', 'd3dcompiler_47.dll')) {
+    $found = Get-ChildItem -LiteralPath $qtRoot -Recurse -Filter $dll | Where-Object { $_.DirectoryName -ne (Join-Path $qtPrefix 'bin') } | Select-Object -First 1
+    if ($found) { Copy-Item -LiteralPath $found.FullName -Destination (Join-Path $qtPrefix 'bin') -Force }
+}
+[IO.File]::WriteAllText((Join-Path $qtPrefix 'bin/qt.conf'), "[Paths]`nPrefix=..`n")
+if (-not (Test-Path -LiteralPath (Join-Path $qtPrefix 'lib/cmake/Qt6Quick/Qt6QuickConfig.cmake'))) {
+    throw 'The unpacked Qt has no Qt Quick CMake package'
+}
+
 # libmpv (shinchiro build): headers, libmpv-2.dll.
 $mpvRoot = Join-Path $Destination 'mpv'
 $mpvArchive = Get-Pinned $pins.windows.mpv
@@ -76,9 +100,13 @@ New-Item -ItemType Directory -Force -Path $runtime | Out-Null
 Copy-Item -LiteralPath $mpvDll, $vulkanDll -Destination $runtime -Force
 
 $include = Join-Path $mpvRoot 'include'
+Write-Host "Qt $($pins.qt.version): $qtPrefix"
 Write-Host "libmpv $($pins.windows.mpv.version): $mpvLibrary"
 Write-Host "runtime: $runtime"
 if ($env:GITHUB_ENV) {
+    "QT_ROOT_DIR=$qtPrefix" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+    "CMAKE_PREFIX_PATH=$qtPrefix" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+    (Join-Path $qtPrefix 'bin') | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
     "MPV_INCLUDE_DIR=$include" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
     "MPV_LIBRARY=$mpvLibrary" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
     "JFD_RUNTIME_DIR=$runtime" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV

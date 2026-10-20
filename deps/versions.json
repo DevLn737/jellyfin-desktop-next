@@ -7,6 +7,59 @@
     "linuxArch": "linux_gcc_64"
   },
   "windows": {
+    "qt": {
+      "comment": "Official Qt archives for win64_msvc2022_64, the same files the 2.x client pins. install-qt-action (aqtinstall 3.3) cannot read the 6.11 Windows repository layout.",
+      "archives": [
+        {
+          "name": "qtshadertools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtshadertools.win64_msvc2022_64/6.11.3-0-202609240253qtshadertools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "b62c0637c34273491939f96f0e20f15ff43312c9770a68fcaa85649b8c25eb7f",
+          "bytes": 3287094
+        },
+        {
+          "name": "qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "3ddf0017b4b67cb56018ed5a6af6a54865a40bdc735111a50e5e169e893558e5",
+          "bytes": 39643659
+        },
+        {
+          "name": "qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "eca8f4cff2f5ba79808b68335e8799b4b875ad62d415c44ac8218048f1720b10",
+          "bytes": 680797
+        },
+        {
+          "name": "qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "8333fdd95fb619af7f320374055cf473c182950e3bebc88311fcf8b65e99d33c",
+          "bytes": 172649952
+        },
+        {
+          "name": "qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "476f7919617a89cce9823f4a6d85bb2442ce27345d2e3f1d87326eb2724230c8",
+          "bytes": 27045836
+        },
+        {
+          "name": "qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "a1433e5396e1544c503cc2cdef3548f5b0dd5f93b6a65e79d17df7be9b11ac21",
+          "bytes": 2014437
+        },
+        {
+          "name": "d3dcompiler_47-x64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253d3dcompiler_47-x64.7z",
+          "sha256": "88b32a5ca59428d0b229938e61df5aa387bcfdbf230ab7fa19e2d80b177e4fd3",
+          "bytes": 1380117
+        },
+        {
+          "name": "opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+          "sha256": "e26036c9d0655e4267da26d760fde7a7c6e5856b5e7bd20aaf82773d8f64012c",
+          "bytes": 5474526
+        }
+      ]
+    },
     "mpv": {
       "version": "20261011-git-accb7b2821",
       "commit": "accb7b2821ecf0cb04cf3579ccd98bc8f751f61f",

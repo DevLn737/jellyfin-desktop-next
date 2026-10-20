@@ -52,9 +52,9 @@ CI uses the versions pinned in [deps/versions.json](deps/versions.json) and pass
 
 - **Linux:** libmpv from the distribution (`libmpv-dev`), found through pkg-config.
 - **Windows:** from a Visual Studio developer PowerShell, `scripts/fetch-windows-deps.ps1`
-  downloads and verifies the pinned libmpv and Vulkan loader, then pass the
-  `MPV_INCLUDE_DIR` and `MPV_LIBRARY` it prints to CMake. `build/deps/runtime` must be on
-  `PATH` when running.
+  downloads and verifies the pinned Qt, libmpv and Vulkan loader; pass the Qt prefix
+  as `CMAKE_PREFIX_PATH` and the `MPV_INCLUDE_DIR` and `MPV_LIBRARY` it prints to CMake.
+  The Qt `bin` directory and `build/deps/runtime` must be on `PATH` when running.
 
 Any platform can point CMake at a specific libmpv with `-DMPV_INCLUDE_DIR=... -DMPV_LIBRARY=...`.
 
