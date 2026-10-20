@@ -32,12 +32,22 @@ namespace jfd::platform {
 
     class SecretServiceCredentialStore final : public CredentialStore {
     public:
+      // Available when the service runs and has a default collection to store
+      // into; a bare D-Bus service without one (headless sessions) cannot keep
+      // secrets.
       bool isAvailable() const override {
         GError* error = nullptr;
         SecretService* service = secret_service_get_sync(SECRET_SERVICE_NONE, nullptr, &error);
-        if (service) g_object_unref(service);
         if (error) g_error_free(error);
-        return service != nullptr;
+        if (!service) return false;
+        error = nullptr;
+        SecretCollection* collection = secret_collection_for_alias_sync(
+            service, SECRET_COLLECTION_DEFAULT, SECRET_COLLECTION_NONE, nullptr, &error);
+        if (error) g_error_free(error);
+        const bool available = collection != nullptr;
+        if (collection) g_object_unref(collection);
+        g_object_unref(service);
+        return available;
       }
 
       ReadResult read(const QString& key) const override {
