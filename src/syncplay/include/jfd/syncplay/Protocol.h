@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 // The SyncPlay wire format of the 12.2-syncplay.1 server (and stock 12.x):
 // WebSocket messages in, HTTP request bodies out. Pure functions, no I/O.
@@ -33,9 +34,19 @@ namespace jfd::syncplay {
       // Missing, null or out-of-range rates mean 1x.
       PlaybackRate baseRate = PlaybackRate::normal();
     };
+    // GroupInfoDto: Participants are user names, one per session.
     struct GroupJoined {
       GroupId group;
       std::optional<GroupState> state;
+      std::string name;
+      std::vector<std::string> participants;
+    };
+    // UserJoined and UserLeft carry the user name only.
+    struct UserJoined {
+      std::string name;
+    };
+    struct UserLeft {
+      std::string name;
     };
     struct GroupLeft {};
     struct StateUpdate {
@@ -55,14 +66,15 @@ namespace jfd::syncplay {
     struct Refused {
       std::string type;
     };
-    // Any other session message (KeepAlive, ForceKeepAlive, UserJoined, ...).
+    // Any other session message (KeepAlive, ForceKeepAlive, ...).
     struct Other {
       std::string messageType;
     };
   } // namespace wire
 
-  using WireMessage = std::variant<wire::Command, wire::GroupJoined, wire::GroupLeft,
-                                   wire::StateUpdate, wire::PlayQueue, wire::Refused, wire::Other>;
+  using WireMessage =
+      std::variant<wire::Command, wire::GroupJoined, wire::GroupLeft, wire::StateUpdate,
+                   wire::PlayQueue, wire::Refused, wire::Other, wire::UserJoined, wire::UserLeft>;
 
   // Empty when the text is not JSON or a SyncPlay message is malformed.
   std::optional<WireMessage> parseMessage(std::string_view json);

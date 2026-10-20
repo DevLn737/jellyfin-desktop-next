@@ -41,6 +41,8 @@ namespace jfd::core {
     // The SyncPlay queue occurrence; empty outside a group.
     PlaylistItemId playlistItem;
     std::string url;
+    // Shown by the UI and the media integrations (SMTC, MPRIS, Discord).
+    std::string title;
     StreamTimeline timeline;
     MediaTicks start;
     std::optional<MediaTicks> runTime;
@@ -61,6 +63,27 @@ namespace jfd::core {
       PlaybackRate rate = PlaybackRate::normal();
     };
     struct Stop {};
+
+    // Media-session commands (SMTC, MPRIS, Discord) that Play, Pause and
+    // Seek do not cover. In a group they ask the group; outside one the
+    // session passes them to the app's queue as notice::QueueStepRequested.
+    struct Next {};
+    struct Previous {};
+
+    // Track intents name the file they are meant for, so one posted for a
+    // file that has since been replaced is dropped like a stale backend event.
+    // Track ids are the backend's (mpv aid/sid); none disables the type.
+    struct SelectTrack {
+      MediaEpoch epoch;
+      TrackKind kind = TrackKind::Audio;
+      std::optional<int> trackId;
+    };
+    // Adds and selects an external audio or subtitle file. Progress is shown
+    // in SessionSnapshot::externalTracks.
+    struct AddExternalTrack {
+      MediaEpoch epoch;
+      ExternalTrack track;
+    };
   } // namespace intent
 
   namespace backend {
@@ -134,6 +157,7 @@ namespace jfd::core {
                    backend::RequestFailed, backend::TrackAdded, group::Joined, group::Left,
                    group::ConnectionLost, group::StateChanged, group::Command,
                    group::QueueChanged, group::RateChangeRejected, group::ClockSynced,
-                   TimerFired>;
+                   TimerFired, intent::Next, intent::Previous, intent::SelectTrack,
+                   intent::AddExternalTrack, group::ParticipantsChanged>;
 
 } // namespace jfd::core

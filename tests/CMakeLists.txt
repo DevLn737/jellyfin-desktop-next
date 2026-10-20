@@ -36,6 +36,10 @@ target_compile_definitions(jfd_syncplay_tests PRIVATE
   JFD_SYNCPLAY_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/syncplay/fixtures")
 add_test(NAME jfd_syncplay_tests COMMAND jfd_syncplay_tests)
 
+add_executable(jfd_session_tests core/main.cpp session/SessionHubTest.cpp)
+target_link_libraries(jfd_session_tests PRIVATE jfd::session doctest)
+add_test(NAME jfd_session_tests COMMAND jfd_session_tests)
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   # GCC reports false positives for std::variant copies of the recording fakes at -O2+.
   target_compile_options(jfd_core_tests PRIVATE -Wno-maybe-uninitialized)
@@ -49,6 +53,7 @@ add_test(NAME simulator_chaos COMMAND jfd_simulator --mode chaos --scenarios ${J
 add_test(NAME simulator_drift_1x COMMAND jfd_simulator --mode drift --scenarios 3 --duration 1830 --rate 1)
 add_test(NAME simulator_drift_1_25x COMMAND jfd_simulator --mode drift --scenarios 3 --duration 1830 --rate 1.25)
 add_test(NAME simulator_drift_1_5x COMMAND jfd_simulator --mode drift --scenarios 3 --duration 1830 --rate 1.5)
+add_test(NAME simulator_drift_external_audio COMMAND jfd_simulator --mode drift --scenarios 3 --duration 600 --rate 1.25 --external-audio)
 add_test(NAME simulator_stock_server COMMAND jfd_simulator --mode chaos --scenarios 200 --seed 500000 --stock-server)
 
 # Mutation check: each mutant is core with one injected bug. The simulator

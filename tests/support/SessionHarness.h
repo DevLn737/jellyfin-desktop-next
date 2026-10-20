@@ -69,7 +69,7 @@ namespace jfd::testing {
 
     void join(std::string playlistItem = "p1", PlaybackRate base = PlaybackRate::normal()) {
       group = groupEpochs.advance();
-      post(group::Joined{group, GroupId("g")});
+      post(group::Joined{group, GroupId("g"), {}, {}});
       group::QueueChanged queue;
       queue.epoch = group;
       queue.reason = QueueChangeReason::NewPlaylist;

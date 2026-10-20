@@ -67,6 +67,7 @@ namespace jfd::sim {
       void sendCommand(Member& m, GroupCommandType type, ServerInstant when, MediaTicks at);
       void changeItem();
       void resendLast();
+      std::vector<std::string> participants() const;
       bool allReady() const {
         return std::all_of(members.begin(), members.end(), [](const Member& m) { return m.ready; });
       }
@@ -190,6 +191,8 @@ namespace jfd::sim {
                 [&](const intent::Seek&) { return false; },
                 [&](const intent::SetRate&) { return false; },
                 [&](const intent::Stop&) { return false; },
+                [&](const intent::Next&) { return false; },
+                [&](const intent::Previous&) { return false; },
                 [&](const group::Joined&) { return false; },
                 [&](const group::ClockSynced&) { return false; },
                 [&](const TimerFired& fired) { return !armed.contains(fired.id.serial); },
@@ -221,7 +224,8 @@ namespace jfd::sim {
                                       "Restarted", "Progress",     "Ended",        "RequestFailed",
                                       "TrackAdded", "Joined",      "Left",         "ConnectionLost",
                                       "State",     "Command",      "Queue",        "RateRejected",
-                                      "ClockSynced", "Timer"};
+                                      "ClockSynced", "Timer",      "Next",         "Previous",
+                                      "SelectTrack", "AddTrack",   "Participants"};
         std::string text = names[input.index()];
         std::visit(Overloaded{
                        [&](const group::Command& c) {
@@ -303,8 +307,10 @@ namespace jfd::sim {
         return true;
       }
 
+      MediaEpoch previousMedia;
       void load(MediaEpoch epoch, const BackendLoad& request) override {
         ++commandsIssued;
+        if (file) previousMedia = file->epoch;
         if (file && world.chaos() && world.rng.chance(60)) {
           // A late event of the replaced file, as a queued mpv event would be.
           const MediaEpoch old = file->epoch;
@@ -405,11 +411,59 @@ namespace jfd::sim {
         });
       }
 
-      void selectTrack(MediaEpoch epoch, TrackKind, std::optional<int>) override {
-        checkEpoch(epoch, "selectTrack");
+      // Switching the audio track makes mpv reinitialise audio: it may do a
+      // refresh seek at the current position (SEEK, then PLAYBACK_RESTART,
+      // losing the time it takes), wait for data briefly, or neither.
+      // During a seek mpv repeats that seek instead (issue_refresh_seek), so
+      // nothing new is seen.
+      void switchTrack(MediaEpoch epoch, TrackKind kind) {
+        if (kind != TrackKind::Audio || !file->started || file->seeking) return;
+        const auto roll = world.rng.range(1, 10);
+        if (roll <= 5) {
+          progress();
+          file->seeking = true;
+          emit(backend::SeekStarted{epoch});
+          world.after(world.jitter(30, 300), [this, epoch] {
+            if (!file || file->epoch != epoch || !file->seeking) return;
+            progress();
+            file->seeking = false;
+            emit(backend::PlaybackRestarted{epoch, sample()});
+          });
+        } else if (roll <= 8 && !file->buffering) {
+          progress();
+          file->buffering = true;
+          emit(backend::Progress{epoch, sample()});
+          world.after(world.jitter(100, 800), [this, epoch] {
+            if (!file || file->epoch != epoch) return;
+            progress();
+            file->buffering = false;
+            emit(backend::Progress{epoch, sample()});
+          });
+        }
       }
-      void addExternalTrack(MediaEpoch epoch, RequestId, const ExternalTrack&) override {
-        checkEpoch(epoch, "addExternalTrack");
+
+      void selectTrack(MediaEpoch epoch, TrackKind kind, std::optional<int>) override {
+        if (!checkEpoch(epoch, "selectTrack")) return;
+        world.after(world.jitter(0, 30), [this, epoch, kind] {
+          if (file && file->epoch == epoch) switchTrack(epoch, kind);
+        });
+      }
+
+      int nextTrackId = 10;
+      void addExternalTrack(MediaEpoch epoch, RequestId request, const ExternalTrack& track) override {
+        if (!checkEpoch(epoch, "addExternalTrack")) return;
+        const TrackKind kind = track.kind;
+        world.after(world.jitter(100, 1500), [this, epoch, request, kind] {
+          if (!file || file->epoch != epoch) return;
+          if (world.chaos() && world.rng.chance(10)) {
+            emit(backend::RequestFailed{epoch, request, "cannot open"});
+            return;
+          }
+          // Added with "select": the switch follows at once.
+          switchTrack(epoch, kind);
+          ++world.result.tracksAdded;
+          emit(backend::TrackAdded{epoch, request, ++nextTrackId});
+        });
       }
 
       void stop(MediaEpoch epoch) override {
@@ -547,6 +601,12 @@ namespace jfd::sim {
         deliver(intent::Open{request});
       }
 
+      void addAudio(bool stale = false) {
+        const MediaEpoch epoch = stale ? previousMedia : session->snapshot().media;
+        deliver(intent::AddExternalTrack{
+            epoch, {TrackKind::Audio, "sim://audio-" + std::to_string(index), "Dub", "ru"}});
+      }
+
       MediaTicks truePosition() {
         progress();
         return mediaFromSeconds(file ? file->position : 0.0);
@@ -554,6 +614,12 @@ namespace jfd::sim {
     };
 
     // ---- Server implementation ---------------------------------------------
+
+    std::vector<std::string> Server::participants() const {
+      std::vector<std::string> names;
+      for (const auto& m : members) names.push_back("user" + std::to_string(m.client->index));
+      return names;
+    }
 
     Member* Server::member(Client* c) {
       for (auto& m : members)
@@ -621,7 +687,9 @@ namespace jfd::sim {
       const bool wasPlaying = state == GroupState::Playing || (state == GroupState::Waiting && resume);
       freeze();
       members.push_back(m);
-      c->fromServer(group::Joined{m.epoch, GroupId("group")});
+      c->fromServer(group::Joined{m.epoch, GroupId("group"), "group", participants()});
+      for (auto& other : members)
+        if (other.client != c) other.client->fromServer(group::ParticipantsChanged{other.epoch, participants()});
       group::QueueChanged queue;
       queue.epoch = m.epoch;
       queue.reason = QueueChangeReason::NewPlaylist;
@@ -644,6 +712,8 @@ namespace jfd::sim {
       if (it == members.end()) return;
       const GroupEpoch epoch = it->epoch;
       members.erase(it);
+      for (auto& other : members)
+        other.client->fromServer(group::ParticipantsChanged{other.epoch, participants()});
       if (lost) {
         c->fromServer(group::ConnectionLost{epoch});
       } else {
@@ -755,6 +825,12 @@ namespace jfd::sim {
                 broadcast(GroupCommandType::Seek);
               },
               [&](const outgoing::RequestStop&) {},
+              [&](const outgoing::RequestNextItem& next) {
+                if (next.playlistItem == item) changeItem();
+              },
+              [&](const outgoing::RequestPreviousItem& previous) {
+                if (previous.playlistItem == item) changeItem();
+              },
           },
           message);
     }
@@ -799,6 +875,14 @@ namespace jfd::sim {
           world.server.resendLast();
         } else if (roll <= 94) {
           world.server.changeItem();
+        } else if (roll <= 97) {
+          c.addAudio(world.rng.chance(20));
+        } else if (roll <= 99) {
+          // Sometimes for a file that has since been replaced.
+          const MediaEpoch epoch = world.rng.chance(20) ? c.previousMedia : c.session->snapshot().media;
+          c.deliver(intent::SelectTrack{epoch, TrackKind::Audio, static_cast<int>(world.rng.range(1, 3))});
+        } else {
+          c.deliver(intent::Next{});
         }
       } else {
         if (roll <= 30) {
@@ -897,6 +981,31 @@ namespace jfd::sim {
         });
       }
       world.after(5s, [&world] { sampleDrift(world); });
+
+      if (config.externalAudio) {
+        // Each client adds a dubbed audio track while the group plays: the
+        // first at 60 s, the cold ones 25 s after joining.
+        for (std::size_t i = 0; i < world.clients.size(); ++i) {
+          Client* client = world.clients[i].get();
+          const auto at = i == 0 ? 120s : std::chrono::seconds(30 + 20 * static_cast<int>(i - 1) + 25);
+          world.after(at, [&world, client] {
+            client->addAudio();
+            world.after(10s, [&world, client] {
+              const auto& tracks = client->session->snapshot().externalTracks;
+              if (tracks.empty() || tracks.back().status != ExternalTrackState::Status::Added)
+                world.violation("client " + std::to_string(client->index) +
+                                ": external audio not added 10 s after the request");
+              if (world.server.state != GroupState::Playing || !client->file || !client->file->started) {
+                world.violation("client " + std::to_string(client->index) +
+                                " not playing 10 s after adding external audio");
+                return;
+              }
+              const auto drift = (world.server.current(world.now) - client->truePosition()).milliseconds();
+              world.result.drift.afterTrackMs.push_back(drift < 0 ? -drift : drift);
+            });
+          });
+        }
+      }
     }
 
     runUntil(world, world.now + config.duration);
@@ -905,6 +1014,9 @@ namespace jfd::sim {
       for (const auto value : world.result.drift.coldJoinMs)
         if (value >= 400)
           world.violation("cold client drift " + std::to_string(value) + " ms at a checkpoint");
+      for (const auto value : world.result.drift.afterTrackMs)
+        if (value >= 400)
+          world.violation("drift " + std::to_string(value) + " ms 10 s after adding external audio");
       if (world.result.drift.p95() >= 400)
         world.violation("drift p95 " + std::to_string(world.result.drift.p95()) + " ms");
     }

@@ -11,7 +11,8 @@
 // - a seek or a new request invalidates any restart seen before it;
 // - readiness needs a fresh position and the backend no longer seeking;
 // - while paused, the position must be within 500 ms of the seek target, so an
-//   earlier restart is never relabelled as readiness for the latest request.
+//   earlier restart is never relabelled as readiness for the latest request;
+//   while playing it may be past the target but not more than 500 ms before it.
 namespace jfd::core {
 
   inline constexpr MediaDelta ReadyTolerance = MediaDelta::fromMilliseconds(500);

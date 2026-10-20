@@ -36,8 +36,11 @@ namespace jfd::core {
     // A restart queued before the latest seek began belongs to an earlier request.
     if (!m_request || m_awaitingSeekEvent || !position || seeking) return std::nullopt;
     // An unpaused file may have moved past the target before the sample was
-    // read, so the target only constrains paused readiness.
-    if (paused && m_target && (*position - *m_target).abs() > ReadyTolerance) return std::nullopt;
+    // read, but never back before it: a restart there is an earlier keyframe.
+    if (m_target) {
+      const MediaDelta offset = *position - *m_target;
+      if (paused ? offset.abs() > ReadyTolerance : offset < -ReadyTolerance) return std::nullopt;
+    }
     const auto request = m_request;
     m_request.reset();
     m_target.reset();

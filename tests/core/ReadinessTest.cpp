@@ -41,6 +41,17 @@ TEST_CASE("Paused readiness must be within 500 ms of the target") {
   CHECK(readiness.restarted(ms(30'500), false, true) == seek);
 }
 
+TEST_CASE("Playing readiness may be past the target but not before it") {
+  EpochCounter<RequestTag> requests;
+  Readiness readiness;
+  const auto seek = requests.advance();
+  readiness.begin(seek, ms(30'000), true);
+  readiness.seekStarted();
+  // An earlier keyframe, reported after the group unpaused mid-seek.
+  CHECK_FALSE(readiness.restarted(ms(28'300), false, false));
+  CHECK(readiness.restarted(ms(31'200), false, false) == seek);
+}
+
 TEST_CASE("A failed request never becomes ready") {
   EpochCounter<RequestTag> requests;
   Readiness readiness;

@@ -260,3 +260,130 @@ TEST_CASE("Snapshots are published only when they change") {
   CHECK(h.observer.snapshots.size() == count);
   CHECK(h.observer.snapshots.back().revision == h.snapshot().revision);
 }
+
+TEST_CASE("External tracks added before the file opens are issued once it opens") {
+  SessionHarness h;
+  h.post(intent::Open{h.media()});
+  const auto epoch = h.currentEpoch();
+  const ExternalTrack audio{TrackKind::Audio, "http://server/audio.mka", "Commentary", "en"};
+  h.post(intent::AddExternalTrack{epoch, audio});
+  CHECK(h.backend.all<command::AddTrack>().empty());
+  REQUIRE(h.snapshot().externalTracks.size() == 1);
+  CHECK(h.snapshot().externalTracks[0].status == ExternalTrackState::Status::Adding);
+
+  h.post(backend::SourceOpened{epoch, 0.0, 600.0});
+  const auto added = h.backend.all<command::AddTrack>();
+  REQUIRE(added.size() == 1);
+  CHECK(added[0].track == audio);
+
+  h.post(backend::TrackAdded{epoch, added[0].request, 3});
+  CHECK(h.snapshot().externalTracks[0].status == ExternalTrackState::Status::Added);
+  CHECK(h.snapshot().externalTracks[0].trackId == 3);
+}
+
+TEST_CASE("A failed external track is shown and does not touch readiness") {
+  SessionHarness h;
+  const auto epoch = h.open(h.media());
+  h.post(intent::Seek{SessionHarness::ms(20'000)});
+  const auto seek = h.backend.last<command::Seek>();
+  REQUIRE(seek);
+  h.post(intent::AddExternalTrack{epoch, {TrackKind::Subtitle, "http://server/missing.srt", {}, {}}});
+  const auto add = h.backend.last<command::AddTrack>();
+  REQUIRE(add);
+
+  h.post(backend::RequestFailed{epoch, add->request, "not found"});
+  CHECK(h.snapshot().externalTracks[0].status == ExternalTrackState::Status::Failed);
+  CHECK(h.snapshot().externalTracks[0].error == "not found");
+  // The seek is still pending and completes as usual.
+  CHECK(h.timers.isArmed(TimerPurpose::ReadyDeadline));
+  h.post(backend::SeekStarted{epoch});
+  h.post(backend::PlaybackRestarted{epoch, h.sample(20.0, false)});
+  CHECK_FALSE(h.timers.isArmed(TimerPurpose::ReadyDeadline));
+}
+
+TEST_CASE("Track intents for a replaced file are dropped") {
+  SessionHarness h;
+  const auto first = h.open(h.media());
+  h.open(h.media());
+  const auto dropped = h.session->droppedInputs();
+  h.post(intent::SelectTrack{first, TrackKind::Audio, 2});
+  h.post(intent::AddExternalTrack{first, {TrackKind::Audio, "http://server/a.mka", {}, {}}});
+  CHECK(h.session->droppedInputs() == dropped + 2);
+  CHECK(h.backend.all<command::SelectTrack>().empty());
+  CHECK(h.backend.all<command::AddTrack>().empty());
+  CHECK(h.snapshot().externalTracks.empty());
+}
+
+TEST_CASE("Selecting a track in a group stays local") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0));
+  h.outbox.sent.clear();
+  h.post(intent::SelectTrack{epoch, TrackKind::Subtitle, std::nullopt});
+  const auto select = h.backend.last<command::SelectTrack>();
+  REQUIRE(select);
+  CHECK(select->kind == TrackKind::Subtitle);
+  CHECK_FALSE(select->trackId);
+  CHECK(h.outbox.sent.empty());
+}
+
+TEST_CASE("Next and Previous go to the group, or to the app's queue outside one") {
+  SessionHarness h;
+  h.open(h.media());
+  h.post(intent::Next{});
+  h.post(intent::Previous{});
+  const auto steps = h.observer.all<notice::QueueStepRequested>();
+  REQUIRE(steps.size() == 2);
+  CHECK(steps[0].forward);
+  CHECK_FALSE(steps[1].forward);
+
+  h.join("p7");
+  h.post(intent::Next{});
+  h.post(intent::Previous{});
+  const auto next = h.outbox.all<outgoing::RequestNextItem>();
+  REQUIRE(next.size() == 1);
+  CHECK(next[0].playlistItem == PlaylistItemId("p7"));
+  CHECK(next[0].epoch == h.group);
+  CHECK(h.outbox.all<outgoing::RequestPreviousItem>().size() == 1);
+  CHECK(h.observer.all<notice::QueueStepRequested>().size() == 2);
+}
+
+TEST_CASE("The snapshot carries the title, the group name and its participants") {
+  SessionHarness h;
+  auto request = h.media("p1");
+  request.title = "Episode 3";
+  h.group = h.groupEpochs.advance();
+  h.post(group::Joined{h.group, GroupId("g"), "Movie night", {"anna", "boris"}});
+  CHECK(h.snapshot().group->name == "Movie night");
+  CHECK(h.snapshot().group->participants == std::vector<std::string>{"anna", "boris"});
+  h.post(group::ParticipantsChanged{h.group, {"anna", "boris", "anna"}});
+  CHECK(h.snapshot().group->participants.size() == 3);
+
+  h.post(intent::Open{request});
+  CHECK(h.snapshot().title == "Episode 3");
+}
+
+TEST_CASE("Buffering that ends during the group's pause seek is followed by Ready") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0));
+  h.advance(1000ms);
+  h.post(backend::Progress{epoch, h.sample(1.0, false, true)});
+  REQUIRE(h.outbox.all<outgoing::Buffering>().size() == 1);
+  h.outbox.sent.clear();
+
+  // The group pauses everyone; our buffering ends while that seek runs.
+  h.post(h.command(GroupCommandType::Pause, 1'000));
+  h.post(backend::Progress{epoch, h.sample(1.0, true, false)});
+  CHECK(h.outbox.all<outgoing::Ready>().empty());
+  h.post(backend::SeekStarted{epoch});
+  h.post(backend::PlaybackRestarted{epoch, h.sample(1.0, true)});
+  h.post(backend::Progress{epoch, h.sample(1.0, true)});
+  const auto ready = h.outbox.all<outgoing::Ready>();
+  REQUIRE(ready.size() == 1);
+  CHECK_FALSE(ready[0].isPlaying);
+  h.post(backend::Progress{epoch, h.sample(1.0, true)});
+  CHECK(h.outbox.all<outgoing::Ready>().size() == 1);
+}

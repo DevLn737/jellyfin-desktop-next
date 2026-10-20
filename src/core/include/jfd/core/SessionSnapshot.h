@@ -2,6 +2,7 @@
 
 #include <jfd/core/Epoch.h>
 #include <jfd/core/Ids.h>
+#include <jfd/core/MediaBackend.h>
 #include <jfd/core/SyncPlay.h>
 #include <jfd/core/Time.h>
 
@@ -9,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 // The read-only view of the playback session for the UI, integrations
 // (Discord) and diagnostics. Published after every input that changed it.
@@ -30,6 +32,9 @@ namespace jfd::core {
 
   struct GroupSnapshot {
     GroupId group;
+    std::string name;
+    // User names, one per session in the group (see group::Joined).
+    std::vector<std::string> participants;
     GroupState state = GroupState::Idle;
     PlaybackRate baseRate = PlaybackRate::normal();
     bool connected = true;
@@ -42,18 +47,32 @@ namespace jfd::core {
     bool operator==(const GroupSnapshot&) const = default;
   };
 
+  // An external audio or subtitle file added to the current file, in the
+  // order added. The app finds its own by URL; trackId is the backend's id
+  // for intent::SelectTrack once the backend added it.
+  struct ExternalTrackState {
+    enum class Status { Adding, Added, Failed };
+    ExternalTrack track;
+    Status status = Status::Adding;
+    std::optional<int> trackId;
+    std::string error;
+    bool operator==(const ExternalTrackState&) const = default;
+  };
+
   struct SessionSnapshot {
     std::uint64_t revision = 0;
     MediaEpoch media;
     PlaybackPhase phase = PlaybackPhase::Idle;
     ItemId item;
     MediaSourceId mediaSource;
+    std::string title;
     MediaTicks position;
     std::optional<MediaTicks> duration;
     // What the backend plays at: base (or personal) rate times any correction.
     PlaybackRate effectiveRate = PlaybackRate::normal();
     // The user's own rate, used outside a group and restored after leaving.
     PlaybackRate personalRate = PlaybackRate::normal();
+    std::vector<ExternalTrackState> externalTracks;
     std::optional<GroupSnapshot> group;
     std::string error;
     bool operator==(const SessionSnapshot&) const = default;
@@ -81,10 +100,16 @@ namespace jfd::core {
     struct ReadyTimedOut {
       MediaTicks target;
     };
+    // Next or Previous outside a group: the app's own queue decides what
+    // plays and opens it.
+    struct QueueStepRequested {
+      bool forward = true;
+    };
   } // namespace notice
 
-  using SessionNotice = std::variant<notice::GroupItemRequested, notice::GroupRateRejected,
-                                     notice::StreamReopenNeeded, notice::ReadyTimedOut>;
+  using SessionNotice =
+      std::variant<notice::GroupItemRequested, notice::GroupRateRejected,
+                   notice::StreamReopenNeeded, notice::ReadyTimedOut, notice::QueueStepRequested>;
 
   class SessionObserver {
   public:

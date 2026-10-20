@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // The client side of a SyncPlay group: turns server messages into
 // epoch-tagged session inputs and the session's outgoing messages into HTTP
@@ -73,6 +74,7 @@ namespace jfd::syncplay {
     // The session still holds this membership while the connection is lost.
     bool m_sessionHoldsGroup = false;
     std::optional<GroupId> m_desiredGroup;
+    std::vector<std::string> m_participants;
   };
 
 } // namespace jfd::syncplay

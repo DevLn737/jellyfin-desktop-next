@@ -1,5 +1,6 @@
 #include <jfd/syncplay/GroupClient.h>
 
+#include <algorithm>
 #include <utility>
 
 namespace jfd::syncplay {
@@ -53,7 +54,8 @@ namespace jfd::syncplay {
               m_inGroup = true;
               m_sessionHoldsGroup = true;
               m_desiredGroup = joined.group;
-              m_sink(group::Joined{m_epoch, joined.group});
+              m_participants = joined.participants;
+              m_sink(group::Joined{m_epoch, joined.group, joined.name, joined.participants});
               if (joined.state) m_sink(group::StateChanged{m_epoch, *joined.state});
             },
             [&](const wire::GroupLeft&) {
@@ -97,6 +99,19 @@ namespace jfd::syncplay {
               input.isPlaying = queue.isPlaying;
               input.baseRate = queue.baseRate;
               m_sink(input);
+            },
+            [&](const wire::UserJoined& user) {
+              if (!m_inGroup) return;
+              m_participants.push_back(user.name);
+              m_sink(group::ParticipantsChanged{m_epoch, m_participants});
+            },
+            [&](const wire::UserLeft& user) {
+              if (!m_inGroup) return;
+              // One session of that user left; the others stay.
+              const auto it = std::find(m_participants.begin(), m_participants.end(), user.name);
+              if (it == m_participants.end()) return;
+              m_participants.erase(it);
+              m_sink(group::ParticipantsChanged{m_epoch, m_participants});
             },
             [&](const wire::Other&) {},
         },

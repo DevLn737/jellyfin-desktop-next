@@ -31,6 +31,7 @@ target_include_directories(nlohmann_json SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/
 
 add_subdirectory(src/core)
 add_subdirectory(src/syncplay)
+add_subdirectory(src/session)
 add_subdirectory(src/diagnostics)
 
 # Headless SyncPlay client for the drift checks (POSIX only).
