@@ -160,6 +160,15 @@ namespace jfd::api {
                        const std::optional<QJsonDocument>& body, QObject* context,
                        Callback<Empty> done);
 
+    // For callers that build requests and parse answers themselves, such as
+    // the SyncPlay group client's transport. `pathAndQuery` is relative to the
+    // server URL ("/SyncPlay/Join", "/Items?ids=1"); a non-empty body is sent
+    // as JSON. `done` gets the HTTP status and body of any answer, errors
+    // included, or status 0 when no answer arrived (network error, timeout).
+    // A 401 on a signed-in client still clears the session.
+    void rawRequest(Method method, const QString& pathAndQuery, const QByteArray& jsonBody,
+                    QObject* context, std::function<void(int status, QByteArray body)> done);
+
     QByteArray authorizationHeader() const;
 
   Q_SIGNALS:
@@ -169,6 +178,8 @@ namespace jfd::api {
 
   private:
     void storeSession(const AuthenticationResult& result);
+    QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload);
+    void expireSessionOn401(int status, bool wasAuthenticated);
     QUrlQuery userQuery() const;
 
     ClientIdentity m_identity;

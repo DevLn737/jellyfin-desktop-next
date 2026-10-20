@@ -140,31 +140,53 @@ namespace jfd::api {
     return query;
   }
 
-  void JellyfinClient::send(Method method, const QString& path, const QUrlQuery& query,
-                            const std::optional<QJsonDocument>& body, QObject* context,
-                            Callback<RawResponse> done) {
-    QNetworkRequest request(url(path, query));
+  QNetworkReply* JellyfinClient::startRequest(Method method, const QUrl& target,
+                                              const QByteArray* payload) {
+    QNetworkRequest request(target);
     request.setRawHeader("Authorization", authorizationHeader());
     request.setRawHeader("Accept", "application/json");
     if (m_timeoutMs > 0) request.setTransferTimeout(m_timeoutMs);
-
-    QByteArray payload;
-    if (body) payload = body->toJson(QJsonDocument::Compact);
-    if (body || method == Method::Post)
+    if (payload || method == Method::Post)
       request.setHeader(QNetworkRequest::ContentTypeHeader, QByteArrayLiteral("application/json"));
 
+    const QByteArray empty;
     QNetworkReply* reply = nullptr;
     switch (method) {
     case Method::Get:
       reply = m_network->get(request);
       break;
     case Method::Post:
-      reply = m_network->post(request, payload);
+      reply = m_network->post(request, payload ? *payload : empty);
       break;
     case Method::Delete:
       reply = m_network->deleteResource(request);
       break;
     }
+    // A transfer timeout surfaces as OperationCanceledError; tell it apart from
+    // an abort on destruction by marking replies that ran out of time.
+    if (m_timeoutMs > 0) {
+      auto* timer = new QTimer(reply);
+      timer->setSingleShot(true);
+      connect(timer, &QTimer::timeout, reply,
+              [reply]() { reply->setProperty("jfdTimedOut", true); });
+      timer->start(m_timeoutMs > 50 ? m_timeoutMs - 50 : m_timeoutMs);
+    }
+    return reply;
+  }
+
+  void JellyfinClient::expireSessionOn401(int status, bool wasAuthenticated) {
+    if (status == 401 && wasAuthenticated && !m_accessToken.isEmpty()) {
+      clearSession();
+      Q_EMIT sessionExpired();
+    }
+  }
+
+  void JellyfinClient::send(Method method, const QString& path, const QUrlQuery& query,
+                            const std::optional<QJsonDocument>& body, QObject* context,
+                            Callback<RawResponse> done) {
+    QByteArray payload;
+    if (body) payload = body->toJson(QJsonDocument::Compact);
+    QNetworkReply* reply = startRequest(method, url(path, query), body ? &payload : nullptr);
 
     const bool authenticated = !m_accessToken.isEmpty();
     const QPointer<QObject> guard(context);
@@ -182,24 +204,39 @@ namespace jfd::api {
               const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
               const QByteArray data = reply->readAll();
               if (status < 200 || status > 299) {
-                if (status == 401 && authenticated && !m_accessToken.isEmpty()) {
-                  clearSession();
-                  Q_EMIT sessionExpired();
-                }
+                expireSessionOn401(status, authenticated);
                 done(httpError(status, data));
                 return;
               }
               done(RawResponse{status, data});
             });
-    // A transfer timeout surfaces as OperationCanceledError; tell it apart from
-    // an abort on destruction by marking replies that ran out of time.
-    if (m_timeoutMs > 0) {
-      auto* timer = new QTimer(reply);
-      timer->setSingleShot(true);
-      connect(timer, &QTimer::timeout, reply,
-              [reply]() { reply->setProperty("jfdTimedOut", true); });
-      timer->start(m_timeoutMs > 50 ? m_timeoutMs - 50 : m_timeoutMs);
-    }
+  }
+
+  void JellyfinClient::rawRequest(Method method, const QString& pathAndQuery,
+                                  const QByteArray& jsonBody, QObject* context,
+                                  std::function<void(int status, QByteArray body)> done) {
+    const qsizetype mark = pathAndQuery.indexOf(QLatin1Char('?'));
+    const QString path = mark < 0 ? pathAndQuery : pathAndQuery.left(mark);
+    const QUrlQuery query(mark < 0 ? QString() : pathAndQuery.mid(mark + 1));
+    QNetworkReply* reply =
+        startRequest(method, url(path, query), jsonBody.isEmpty() ? nullptr : &jsonBody);
+
+    const bool authenticated = !m_accessToken.isEmpty();
+    const QPointer<QObject> guard(context);
+    const bool hasContext = context != nullptr;
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, guard, hasContext, authenticated, done = std::move(done)]() {
+              reply->deleteLater();
+              if (hasContext && guard.isNull()) return;
+              const QVariant code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+              if (code.isNull()) {
+                done(0, {});
+                return;
+              }
+              const int status = code.toInt();
+              expireSessionOn401(status, authenticated);
+              done(status, reply->readAll());
+            });
   }
 
   void JellyfinClient::sendJson(Method method, const QString& path, const QUrlQuery& query,

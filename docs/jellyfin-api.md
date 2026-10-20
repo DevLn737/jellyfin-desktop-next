@@ -34,6 +34,10 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 - `SessionSocket` does not parse SyncPlay messages; the `syncplay` module
   turns them into `core::group` inputs. `connectionGeneration()` increases on
   every connect, so it can tell a reconnect (membership may be lost) from a repeat.
+- `JellyfinClient::rawRequest` is the authenticated call for code that builds
+  its own requests, such as the `syncplay` group client's `Transport`: it
+  passes the status and body of any answer through (the 409 included) and
+  reports status 0 when no answer arrived.
 
 Tests: `jfd_api_tests`, `jfd_library_tests`, `jfd_platform_tests` run offline
 against an in-process fake server; `jfd_server_tests` runs against Jellyfin

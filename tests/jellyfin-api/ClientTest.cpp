@@ -295,3 +295,48 @@ TEST_CASE("SyncPlay groups list and create") {
   REQUIRE(*created);
   CHECK((*created)->groupId == QStringLiteral("g2"));
 }
+
+TEST_CASE("Raw requests pass any answer through with the session's authorization") {
+  FakeServer server([](const HttpRequest& r) -> HttpResponse {
+    if (r.path == QLatin1String("/SyncPlay/SetPlaybackRate"))
+      return jfd::test::json(R"({"code": "SyncPlayPlaybackRateNotSupported"})", 409);
+    if (r.path == QLatin1String("/GetUtcTime"))
+      return jfd::test::json(R"({"RequestReceptionTime": "x"})");
+    return {404, {}, {}, 0};
+  });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("token1"), QStringLiteral("user1"));
+
+  struct Answer {
+    int status = -1;
+    QByteArray body;
+  };
+  auto raw = [&](JellyfinClient::Method method, const QString& path, const QByteArray& body) {
+    std::optional<Answer> out;
+    client.rawRequest(method, path, body, nullptr,
+                      [&out](int status, QByteArray data) { out = Answer{status, data}; });
+    REQUIRE(waitFor([&] { return out.has_value(); }));
+    return *out;
+  };
+
+  const Answer conflict =
+      raw(JellyfinClient::Method::Post, QStringLiteral("/SyncPlay/SetPlaybackRate"),
+          R"({"PlaybackRate":1.5})");
+  CHECK(conflict.status == 409);
+  CHECK(conflict.body.contains("SyncPlayPlaybackRateNotSupported"));
+  const HttpRequest& sent = server.requests().at(0);
+  CHECK(sent.method == "POST");
+  CHECK(sent.body == R"({"PlaybackRate":1.5})");
+  CHECK(sent.headers.value("content-type") == "application/json");
+  CHECK(sent.headers.value("authorization").contains("Token=\"token1\""));
+
+  const Answer time = raw(JellyfinClient::Method::Get, QStringLiteral("/GetUtcTime?a=1"), {});
+  CHECK(time.status == 200);
+  CHECK(time.body.contains("RequestReceptionTime"));
+  CHECK(server.requests().at(1).method == "GET");
+  CHECK(server.requests().at(1).query.queryItemValue(QStringLiteral("a")) == QStringLiteral("1"));
+
+  client.setServerUrl(QUrl(QStringLiteral("http://127.0.0.1:1")));
+  CHECK(raw(JellyfinClient::Method::Get, QStringLiteral("/GetUtcTime"), {}).status == 0);
+}
