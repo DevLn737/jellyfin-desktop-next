@@ -43,7 +43,32 @@ namespace jfd::api {
     bool recursive = true;
     int startIndex = 0;
     int limit = 50;
+    // Jellyfin ItemSortBy names, comma-separated: "SortName",
+    // "DateCreated", "PremiereDate", "CommunityRating", "Random", ...
     QString sortBy;
+    bool descending = false;
+    QStringList genres;
+    QList<int> years;
+    std::optional<bool> isPlayed;
+    std::optional<bool> isFavorite;
+    QStringList ids;
+  };
+
+  // Image types the server keeps per item: "Primary", "Backdrop", "Thumb",
+  // "Logo", "Banner". Sizes are in physical pixels; the server scales and
+  // crops to fill them, so a card asks for its own size and no more.
+  struct ImageRequest {
+    QString itemId;
+    QString type = QStringLiteral("Primary");
+    // Backdrops are numbered; other types have one image.
+    std::optional<int> index;
+    // The image's tag: changes when the image does, so the URL can be cached
+    // for as long as the tag stays the same.
+    QString tag;
+    int fillWidth = 0;
+    int fillHeight = 0;
+    int maxWidth = 0;
+    int quality = 90;
   };
 
   // HTTP client for one server and, once signed in, one user. Calls are
@@ -54,6 +79,11 @@ namespace jfd::api {
     Q_OBJECT
 
   public:
+    struct RawResponse {
+      int httpStatus = 0;
+      QByteArray body;
+    };
+
     explicit JellyfinClient(ClientIdentity identity, QObject* parent = nullptr);
     ~JellyfinClient() override;
 
@@ -123,6 +153,39 @@ namespace jfd::api {
                   Callback<ItemPage> done);
     // Primary image of an item; images need no authentication.
     QUrl primaryImageUrl(const Item& item, int maxWidth) const;
+    QUrl imageUrl(const ImageRequest& request) const;
+
+    // GET Items/{id} with the fields a detail page shows, trickplay included.
+    void itemDetails(const QString& itemId, QObject* context, Callback<Item> done);
+    // GET UserViews: the user's libraries, in the order the user set.
+    void views(QObject* context, Callback<ItemPage> done);
+    // GET UserItems/Resume: partly watched videos, most recent first.
+    // `parentId` limits it to one library.
+    void resumeItems(int limit, const QString& parentId, QObject* context, Callback<ItemPage> done);
+    // GET Shows/NextUp: the next episode of each series in progress.
+    void nextUp(int limit, const QString& parentId, QObject* context, Callback<ItemPage> done);
+    // GET Items/Latest for one library. Episodes are grouped into their
+    // series, as in Jellyfin Web.
+    void latestItems(const QString& parentId, int limit, QObject* context, Callback<ItemPage> done);
+    void similarItems(const QString& itemId, int limit, QObject* context, Callback<ItemPage> done);
+    // GET Items/Filters: genres, years and ratings present in a library.
+    void itemFilters(const QString& parentId, const QStringList& includeItemTypes, QObject* context,
+                     Callback<ItemFilters> done);
+    // POST/DELETE UserFavoriteItems/{id}; answers the item's new user data.
+    void setFavorite(const QString& itemId, bool favorite, QObject* context,
+                     Callback<UserItemData> done);
+
+    // GET MediaSegments/{id}: intros, recaps, outros, sorted by start. Empty
+    // when the server has no segment provider; an unknown item is NotFound.
+    void mediaSegments(const QString& itemId, QObject* context, Callback<QList<MediaSegment>> done);
+    // A trickplay tile (see TrickplayInfo). Unlike images, tiles need the
+    // session's authorization, so fetch them with authorizedGet() or a
+    // loader that sends authorizationHeader().
+    QUrl trickplayTileUrl(const QString& itemId, const QString& mediaSourceId, int width,
+                          int tileIndex) const;
+    // GET of an absolute URL on this server (an image or a trickplay tile)
+    // with the session's authorization; the body is returned as is.
+    void authorizedGet(const QUrl& target, QObject* context, Callback<RawResponse> done);
 
     // --- Playback ------------------------------------------------------------
 
@@ -142,11 +205,6 @@ namespace jfd::api {
     // --- Raw requests --------------------------------------------------------
 
     enum class Method { Get, Post, Delete };
-
-    struct RawResponse {
-      int httpStatus = 0;
-      QByteArray body;
-    };
 
     // Sends a request with this client's authorization. Non-2xx answers fail
     // with an Http error carrying ProblemDetails when the body has them.
@@ -177,6 +235,7 @@ namespace jfd::api {
     void sessionChanged();
 
   private:
+    void finishRaw(QNetworkReply* reply, QObject* context, Callback<RawResponse> done);
     void storeSession(const AuthenticationResult& result);
     QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload);
     void expireSessionOn401(int status, bool wasAuthenticated);

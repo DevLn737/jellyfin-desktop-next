@@ -92,12 +92,20 @@ up() {
   log "adding libraries"
   api POST "/Library/VirtualFolders?name=Movies&collectionType=movies&paths=%2Fmedia%2FMovies&refreshLibrary=false" \
     '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
+  # Trickplay tiles for the episodes, for the seek-bar preview tests.
   api POST "/Library/VirtualFolders?name=Shows&collectionType=tvshows&paths=%2Fmedia%2FShows&refreshLibrary=false" \
-    '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
+    '{"LibraryOptions":{"EnableRealtimeMonitor":false,"EnableTrickplayImageExtraction":true}}' "$token" >/dev/null
   api POST /Library/Refresh '' "$token" >/dev/null
   # Quick Connect is on by default in 12.x; make sure for the tests.
   wait_for "the library scan" 180 bash -c \
     "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Movie,Episode' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 3 ]]"
+  log "generating trickplay tiles"
+  local task
+  task=$(api GET /ScheduledTasks '' "$token" | jq -r '.[] | select(.Key == "RefreshTrickplayImages") | .Id')
+  api POST "/ScheduledTasks/Running/$task" '' "$token" >/dev/null
+  sleep 2
+  wait_for "trickplay tiles" 180 bash -c \
+    "[[ \$(curl -fsS '$URL/ScheduledTasks/$task' -H 'Authorization: $AUTH, Token=\"$token\"' | jq -r .State) == Idle ]]"
   api POST /Sessions/Logout '' "$token" >/dev/null || true
 
   log "ready"

@@ -81,6 +81,7 @@ if(TARGET jfd_jellyfin_api)
     jellyfin-api/ValuesTest.cpp
     jellyfin-api/PlaybackTest.cpp
     jellyfin-api/ClientTest.cpp
+    jellyfin-api/LibraryApiTest.cpp
     jellyfin-api/SessionSocketTest.cpp)
   target_link_libraries(jfd_api_tests PRIVATE jfd::jellyfin_api)
 

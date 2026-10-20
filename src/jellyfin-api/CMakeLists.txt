@@ -4,6 +4,7 @@ add_library(jfd_jellyfin_api STATIC
   src/JellyfinClient.cpp
   src/Models.cpp
   src/Playback.cpp
+  src/ServerDiscovery.cpp
   src/ServerTime.cpp
   src/ServerVersion.cpp
   src/SessionSocket.cpp
@@ -14,6 +15,7 @@ add_library(jfd_jellyfin_api STATIC
   include/jfd/api/Models.h
   include/jfd/api/Playback.h
   include/jfd/api/Result.h
+  include/jfd/api/ServerDiscovery.h
   include/jfd/api/ServerTime.h
   include/jfd/api/ServerVersion.h
   include/jfd/api/SessionSocket.h

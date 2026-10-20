@@ -8,6 +8,8 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | Header | What it gives |
 | --- | --- |
 | `JellyfinClient.h` | One server and user: sign-in (password, Quick Connect), server version check, session capabilities, items, `PlaybackInfo`, playback reports, watched state, raw requests |
+| `JellyfinClient.h` (library) | Libraries (`UserViews`), "Continue watching" (`UserItems/Resume`), "Next up" (`Shows/NextUp`), latest per library (`Items/Latest`), filtered and sorted pages, filter values (`Items/Filters`), similar items, favorites, image URLs, item details with trickplay, media segments, trickplay tile URLs and authorized fetches |
+| `ServerDiscovery.h` | Servers on the local network (UDP broadcast to port 7359) |
 | `SessionSocket.h` | The `/socket` connection: keep-alives, reconnect with backoff, capabilities re-reported on every connect, raw `SyncPlayCommand` and `SyncPlayGroupUpdate` |
 | `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, and `GetUtcTime` samples |
 | `Playback.h` | `PlaybackInfo` to mpv URLs (direct play, static stream, transcode), external subtitles and audio, mpv track ids, report bodies |
@@ -17,6 +19,14 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model |
 
 ## Conventions
+
+- Images (`Items/{id}/Images/...`) need no authentication; trickplay tiles
+  (`Videos/{id}/Trickplay/{width}/{index}.jpg`) do, so they are fetched with
+  `authorizedGet`, which sends the token only to this server. A tile holds
+  `TileWidth` x `TileHeight` thumbnails row by row; `trickplayFrame()` maps a
+  position to the tile and rectangle.
+- `mediaSegments` is an empty list on a server without a segment provider
+  (a stock server has none); the server tests check that.
 
 - Every call takes a context `QObject*` and a callback with `Result<T>`. The
   callback never runs after the context is destroyed. A 401 on a signed-in

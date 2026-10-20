@@ -15,7 +15,22 @@ namespace jfd::api {
     const QString UserId = QStringLiteral("userId");
 
     // Fields every item list asks for; Jellyfin omits most of them otherwise.
-    const QString ItemFields = QStringLiteral("Overview,MediaSourceCount,ProductionYear");
+    const QString ItemFields = QStringLiteral(
+        "Overview,MediaSourceCount,ProductionYear,Genres,PrimaryImageAspectRatio,ChildCount");
+    // A detail page also needs trickplay for the seek bar.
+    const QString DetailFields = ItemFields + QStringLiteral(",Trickplay");
+    const QString Fields = QStringLiteral("fields");
+
+    QString joinNumbers(const QList<int>& numbers) {
+      QStringList out;
+      for (int n : numbers)
+        out.append(QString::number(n));
+      return out.join(QLatin1Char(','));
+    }
+
+    QString boolText(bool value) {
+      return value ? QStringLiteral("true") : QStringLiteral("false");
+    }
 
     ApiError httpError(int status, const QByteArray& body) {
       ApiError error;
@@ -188,6 +203,25 @@ namespace jfd::api {
     if (body) payload = body->toJson(QJsonDocument::Compact);
     QNetworkReply* reply = startRequest(method, url(path, query), body ? &payload : nullptr);
 
+    finishRaw(reply, context, std::move(done));
+  }
+
+  void JellyfinClient::authorizedGet(const QUrl& target, QObject* context,
+                                     Callback<RawResponse> done) {
+    // Only this server gets the token.
+    if (target.scheme() != m_serverUrl.scheme() || target.host() != m_serverUrl.host() ||
+        target.port() != m_serverUrl.port()) {
+      ApiError error;
+      error.kind = ApiError::Kind::Unsupported;
+      error.message = QStringLiteral("Not a URL of this server");
+      done(error);
+      return;
+    }
+    finishRaw(startRequest(Method::Get, target, nullptr), context, std::move(done));
+  }
+
+  void JellyfinClient::finishRaw(QNetworkReply* reply, QObject* context,
+                                 Callback<RawResponse> done) {
     const bool authenticated = !m_accessToken.isEmpty();
     const QPointer<QObject> guard(context);
     const bool hasContext = context != nullptr;
@@ -436,9 +470,18 @@ namespace jfd::api {
       query.addQueryItem(QStringLiteral("includeItemTypes"),
                          q.includeItemTypes.join(QLatin1Char(',')));
     if (!q.parentId.isEmpty()) query.addQueryItem(QStringLiteral("parentId"), q.parentId);
-    if (!q.sortBy.isEmpty()) query.addQueryItem(QStringLiteral("sortBy"), q.sortBy);
-    query.addQueryItem(QStringLiteral("recursive"),
-                       q.recursive ? QStringLiteral("true") : QStringLiteral("false"));
+    if (!q.sortBy.isEmpty()) {
+      query.addQueryItem(QStringLiteral("sortBy"), q.sortBy);
+      query.addQueryItem(QStringLiteral("sortOrder"),
+                         q.descending ? QStringLiteral("Descending") : QStringLiteral("Ascending"));
+    }
+    if (!q.genres.isEmpty())
+      query.addQueryItem(QStringLiteral("genres"), q.genres.join(QLatin1Char('|')));
+    if (!q.years.isEmpty()) query.addQueryItem(QStringLiteral("years"), joinNumbers(q.years));
+    if (q.isPlayed) query.addQueryItem(QStringLiteral("isPlayed"), boolText(*q.isPlayed));
+    if (q.isFavorite) query.addQueryItem(QStringLiteral("isFavorite"), boolText(*q.isFavorite));
+    if (!q.ids.isEmpty()) query.addQueryItem(QStringLiteral("ids"), q.ids.join(QLatin1Char(',')));
+    query.addQueryItem(QStringLiteral("recursive"), boolText(q.recursive));
     query.addQueryItem(QStringLiteral("startIndex"), QString::number(q.startIndex));
     query.addQueryItem(QStringLiteral("limit"), QString::number(q.limit));
     query.addQueryItem(QStringLiteral("fields"), ItemFields);
@@ -475,6 +518,124 @@ namespace jfd::api {
     query.addQueryItem(QStringLiteral("maxWidth"), QString::number(maxWidth));
     query.addQueryItem(QStringLiteral("quality"), QStringLiteral("90"));
     return url(QStringLiteral("Items/%1/Images/Primary").arg(item.id), query);
+  }
+
+  QUrl JellyfinClient::imageUrl(const ImageRequest& r) const {
+    if (r.itemId.isEmpty() || r.type.isEmpty()) return {};
+    QUrlQuery query;
+    if (!r.tag.isEmpty()) query.addQueryItem(QStringLiteral("tag"), r.tag);
+    if (r.fillWidth > 0)
+      query.addQueryItem(QStringLiteral("fillWidth"), QString::number(r.fillWidth));
+    if (r.fillHeight > 0)
+      query.addQueryItem(QStringLiteral("fillHeight"), QString::number(r.fillHeight));
+    if (r.maxWidth > 0) query.addQueryItem(QStringLiteral("maxWidth"), QString::number(r.maxWidth));
+    query.addQueryItem(QStringLiteral("quality"), QString::number(r.quality));
+    QString path = QStringLiteral("Items/%1/Images/%2").arg(r.itemId, r.type);
+    if (r.index) path += QLatin1Char('/') + QString::number(*r.index);
+    return url(path, query);
+  }
+
+  void JellyfinClient::itemDetails(const QString& itemId, QObject* context, Callback<Item> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(Fields, DetailFields);
+    sendJson(Method::Get, QStringLiteral("Items/") + itemId, query, std::nullopt, context,
+             parsed<Item>(std::move(done), json::item));
+  }
+
+  void JellyfinClient::views(QObject* context, Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(Fields, QStringLiteral("PrimaryImageAspectRatio,ChildCount"));
+    sendJson(Method::Get, QStringLiteral("UserViews"), query, std::nullopt, context,
+             parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
+  void JellyfinClient::resumeItems(int limit, const QString& parentId, QObject* context,
+                                   Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+    query.addQueryItem(QStringLiteral("mediaTypes"), QStringLiteral("Video"));
+    if (!parentId.isEmpty()) query.addQueryItem(QStringLiteral("parentId"), parentId);
+    query.addQueryItem(Fields, ItemFields);
+    query.addQueryItem(QStringLiteral("enableTotalRecordCount"), QStringLiteral("false"));
+    sendJson(Method::Get, QStringLiteral("UserItems/Resume"), query, std::nullopt, context,
+             parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
+  void JellyfinClient::nextUp(int limit, const QString& parentId, QObject* context,
+                              Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+    if (!parentId.isEmpty()) query.addQueryItem(QStringLiteral("parentId"), parentId);
+    query.addQueryItem(Fields, ItemFields);
+    // Episodes already in "Continue watching" are not repeated here.
+    query.addQueryItem(QStringLiteral("enableResumable"), QStringLiteral("false"));
+    query.addQueryItem(QStringLiteral("enableTotalRecordCount"), QStringLiteral("false"));
+    sendJson(Method::Get, QStringLiteral("Shows/NextUp"), query, std::nullopt, context,
+             parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
+  void JellyfinClient::latestItems(const QString& parentId, int limit, QObject* context,
+                                   Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    if (!parentId.isEmpty()) query.addQueryItem(QStringLiteral("parentId"), parentId);
+    query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+    query.addQueryItem(Fields, ItemFields);
+    send(Method::Get, QStringLiteral("Items/Latest"), query, std::nullopt, context,
+         [done = std::move(done)](Result<RawResponse> result) {
+           if (!result) {
+             done(result.error());
+             return;
+           }
+           const auto document = QJsonDocument::fromJson(result->body);
+           if (!document.isArray()) {
+             done(invalidResponse(QStringLiteral("Items/Latest is not a JSON array")));
+             return;
+           }
+           done(json::itemArray(document.array()));
+         });
+  }
+
+  void JellyfinClient::similarItems(const QString& itemId, int limit, QObject* context,
+                                    Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+    query.addQueryItem(Fields, ItemFields);
+    sendJson(Method::Get, QStringLiteral("Items/%1/Similar").arg(itemId), query, std::nullopt,
+             context, parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
+  void JellyfinClient::itemFilters(const QString& parentId, const QStringList& includeItemTypes,
+                                   QObject* context, Callback<ItemFilters> done) {
+    QUrlQuery query = userQuery();
+    if (!parentId.isEmpty()) query.addQueryItem(QStringLiteral("parentId"), parentId);
+    if (!includeItemTypes.isEmpty())
+      query.addQueryItem(QStringLiteral("includeItemTypes"),
+                         includeItemTypes.join(QLatin1Char(',')));
+    sendJson(Method::Get, QStringLiteral("Items/Filters"), query, std::nullopt, context,
+             parsed<ItemFilters>(std::move(done), json::itemFilters));
+  }
+
+  void JellyfinClient::setFavorite(const QString& itemId, bool favorite, QObject* context,
+                                   Callback<UserItemData> done) {
+    sendJson(favorite ? Method::Post : Method::Delete,
+             QStringLiteral("UserFavoriteItems/") + itemId, userQuery(), std::nullopt, context,
+             parsed<UserItemData>(std::move(done), json::userItemData));
+  }
+
+  void JellyfinClient::mediaSegments(const QString& itemId, QObject* context,
+                                     Callback<QList<MediaSegment>> done) {
+    sendJson(Method::Get, QStringLiteral("MediaSegments/") + itemId, {}, std::nullopt, context,
+             parsed<QList<MediaSegment>>(std::move(done), json::mediaSegments));
+  }
+
+  QUrl JellyfinClient::trickplayTileUrl(const QString& itemId, const QString& mediaSourceId,
+                                        int width, int tileIndex) const {
+    QUrlQuery query;
+    if (!mediaSourceId.isEmpty())
+      query.addQueryItem(QStringLiteral("mediaSourceId"), mediaSourceId);
+    return url(
+        QStringLiteral("Videos/%1/Trickplay/%2/%3.jpg").arg(itemId).arg(width).arg(tileIndex),
+        query);
   }
 
   // --- Playback --------------------------------------------------------------
