@@ -97,6 +97,11 @@ if(TARGET jfd_jellyfin_api)
     playback/StreamPlanTest.cpp)
   target_link_libraries(jfd_playback_tests PRIVATE jfd::playback)
 
+  if(TARGET jfd_integrations)
+    jfd_add_qt_test(jfd_integrations_tests integrations/DiscordTest.cpp integrations/UpdateCheckerTest.cpp)
+    target_link_libraries(jfd_integrations_tests PRIVATE jfd::integrations Qt6::WebSockets)
+  endif()
+
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
   find_package(Qt6 QUIET COMPONENTS DBus)
