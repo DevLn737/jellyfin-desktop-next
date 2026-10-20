@@ -1,0 +1,6 @@
+/build*/
+/out/
+.vs/
+.vscode/
+*.user
+compile_commands.json
