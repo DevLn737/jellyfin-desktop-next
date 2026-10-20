@@ -15,6 +15,10 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror)
 endif()
 
+if(JFD_BUILD_TESTS)
+  enable_testing()
+endif()
+
 add_subdirectory(src/core)
 
 if(JFD_BUILD_APP)
@@ -23,6 +27,5 @@ if(JFD_BUILD_APP)
 endif()
 
 if(JFD_BUILD_TESTS)
-  enable_testing()
   add_subdirectory(tests)
 endif()
