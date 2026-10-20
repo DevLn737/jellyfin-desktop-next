@@ -82,21 +82,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # install-qt-action cannot read the 6.11 Windows repository layout, so
-      # this job compiles and tests the modules with MSVC on the 6.8 LTS until
-      # the app workflow's pinned Qt archives include Qt WebSockets.
-      - name: Install Qt 6.8.3
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: 6.8.3
-          arch: win64_msvc2022_64
-          modules: qtwebsockets
-          cache: true
-
+      # The same pinned Qt as the app workflow (deps/versions.json), which
+      # includes Qt WebSockets.
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      - name: Cache pinned downloads
+        uses: actions/cache@v4
+        with:
+          path: build/deps
+          key: windows-deps-${{ hashFiles('deps/versions.json') }}
+
+      - name: Fetch pinned Qt
+        shell: pwsh
+        run: ./scripts/fetch-windows-deps.ps1
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_REQUIRE_QT=ON
