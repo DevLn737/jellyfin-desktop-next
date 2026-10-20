@@ -21,6 +21,8 @@ param(
     [string[]]$Scenarios = @('frames-1080','frames-2160','cpu-1080','cpu-2160','first-frame-seek','fullscreen-50','shutdown','memory-hour','recording'),
     # auto-safe is the app's default (direct decoding where safe); auto-copy matches the fork's default mode.
     [string[]]$HardwareDecoding = @('auto-safe','auto-copy'),
+    # Video renderer of the app: 'auto' is Direct3D 11 on Windows; 'gl' is the OpenGL fallback.
+    [ValidateSet('auto','d3d11','gl')][string]$Renderer = 'auto',
     [int]$MemoryMeasureSeconds = 3600,
     [int]$MemoryWarmupSeconds = 120,
     [string]$PresentMonPath,
@@ -138,7 +140,7 @@ $script:requestId = 0; $script:pending = $null; $script:events = New-Object 'Sys
 function Start-Client([string]$Hwdec, [bool]$RenderLog, [string]$RunDir, [string]$Overlay, [string]$File, [string[]]$Extra = @()) {
     $probe = $probeScript.Replace('\','/'); $probeOut = (Join-Path $RunDir 'mpv-probe.jsonl').Replace('\','/')
     $pipeName = "jfd-measure-$PID-$(Get-Random)"
-    $arguments = @('--maximized', '--overlay', $Overlay, '--hwdec', $Hwdec, '--log-file', ('"' + (Join-Path $RunDir 'client.log') + '"'),
+    $arguments = @('--maximized', '--renderer', $Renderer, '--overlay', $Overlay, '--hwdec', $Hwdec, '--log-file', ('"' + (Join-Path $RunDir 'client.log') + '"'),
         '--mpv-option', 'mute=yes', '--mpv-option', 'loop-file=inf',
         '--mpv-option', ('"scripts=' + $probe + '"'), '--mpv-option', ('"script-opts=jfdprobe-out=' + $probeOut + '"'),
         '--mpv-option', "input-ipc-server=\\.\pipe\$pipeName") + $Extra + @(('"' + $File + '"'))
@@ -571,7 +573,7 @@ $null = [JfdWin]::SetThreadExecutionState([uint32]'0x80000003')
 $inventory = Get-Inventory
 $primary = $inventory.screens | Where-Object { $_.primary } | Select-Object -First 1
 $report = [ordered]@{
-    schemaVersion = 1; protocol = 'architecture/measurement-protocol.md rev. 2'; client = 'prototype'
+    schemaVersion = 1; protocol = 'architecture/measurement-protocol.md rev. 2'; client = 'prototype'; renderer = $Renderer
     startedAt = (Get-Date).ToString('o'); harnessSha256 = Sha256 $PSCommandPath; probeSha256 = Sha256 $probeScript
     exeSha256 = Sha256 $appExe
     appBuild = $(if (Test-Path -LiteralPath (Join-Path $appRoot 'build-info.json')) { Get-Content -LiteralPath (Join-Path $appRoot 'build-info.json') -Raw | ConvertFrom-Json } else { $null })

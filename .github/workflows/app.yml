@@ -84,7 +84,7 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a -s "-screen 0 1920x1080x24" ctest --test-dir build --output-on-failure
 
-      - name: Test (Windows, software OpenGL)
+      - name: Test (Windows, software OpenGL and Direct3D 11 WARP)
         if: runner.os == 'Windows'
         env:
           QT_OPENGL: software
@@ -124,6 +124,12 @@ jobs:
             throw 'the mpv probe script did not run'
           }
           Get-Content $probeOut -TotalCount 3
+          # The OpenGL fallback must run from the package too.
+          $process = Start-Process -FilePath "$stage/jellyfin-desktop-next.exe" -PassThru -Wait `
+            -ArgumentList @('--smoke', '--renderer', 'gl') `
+            -RedirectStandardOutput build/package-smoke-gl.out -RedirectStandardError build/package-smoke-gl.err
+          Get-Content build/package-smoke-gl.out, build/package-smoke-gl.err
+          if ($process.ExitCode -ne 0) { throw "packaged OpenGL smoke test failed with exit code $($process.ExitCode)" }
 
       - name: Upload package (Windows)
         if: runner.os == 'Windows'
