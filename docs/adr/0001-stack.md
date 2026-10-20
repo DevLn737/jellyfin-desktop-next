@@ -27,24 +27,41 @@ through the OpenGL render API into a reusable FBO drawn below QML
 
 - **Language:** C++20 for the whole client.
 - **UI:** Qt 6 Quick/QML. Qt WebEngine is not used.
-- **Video:** libmpv through its render API, drawn below the QML scene.
+- **Video:** libmpv through its render API, drawn below the QML scene: Direct3D 11 on
+  Windows, OpenGL on Linux. The OpenGL renderer is also the Windows fallback.
 - **Build:** CMake. CI builds and tests on Windows, Linux and macOS from the first commit.
 - **Server admin and rarely used pages** open in the system browser instead of being reimplemented.
-- **Platforms:** Windows first, Linux in CI from the start, macOS later. The Qt-free core
-  keeps building on all three.
+- **Platforms:** Windows and Linux as equal targets from the start. macOS is not planned
+  while nobody in the group uses it; the Qt-free core keeps building there.
 
-## Cost of this choice
+## Rendering path and HDR
 
-libmpv's render API supports only OpenGL and software rendering, so the whole
-Qt Quick scene runs on OpenGL on every platform (the 2.x client already forces
-it with `QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL)`). Qt 6
-would otherwise use D3D11 on Windows and Metal on macOS. As a result:
+Revised 2026-10-20: HDR is wanted, and the group uses Windows and Linux with
+AMD and NVIDIA GPUs.
 
-- there is no HDR output;
-- on Windows, hardware decoding often copies frames back (`d3d11va-copy`) instead of zero-copy;
-- on macOS, OpenGL is deprecated.
+mpv's main branch has a Direct3D 11 render API (`MPV_RENDER_API_TYPE_D3D11`,
+`include/mpv/render_d3d11.h`, client API 2.6, planned for mpv 0.42.0, not yet
+tagged). mpv renders into a D3D11 texture on the application's device,
+`d3d11va` decodes on the same device, and 10-bit and FP16 formats are supported.
+The only other render APIs are OpenGL and software.
 
-HDR is out of scope for the prototype.
+- **Windows:** Qt Quick on its default D3D11 backend, mpv through the D3D11
+  render API into a texture below QML. This gives zero-copy `d3d11va` and a
+  path to HDR: an HDR10 or scRGB swap chain with the interface composited at
+  SDR white. Whether `QQuickWindow` can provide that swap chain or a custom one
+  through `QQuickRenderControl` is needed is the first experiment of phase 1.
+- **Linux:** Qt Quick on OpenGL (EGL), mpv through the OpenGL render API, with
+  VA-API or NVDEC interop. Wayland and X11. No HDR: the OpenGL render API has no
+  HDR output, and mpv's window cannot be embedded on Wayland (`--wid` is X11
+  and Windows only). If HDR on Linux is needed later, the option is a separate
+  fullscreen mode where mpv draws into its own window (Vulkan with Wayland
+  color management) and the controls are drawn with mpv's OSD.
+
+Costs:
+
+- two renderers (D3D11 and OpenGL) behind one video item interface, with shared composition tests;
+- an unreleased mpv on Windows: libmpv is built from a pinned main-branch commit until 0.42.0 ships;
+- the Linux interface runs on OpenGL and has no HDR.
 
 ## Reasons
 
@@ -81,5 +98,6 @@ HDR is out of scope for the prototype.
   client on frame pacing and memory on the group's hardware. The first fallback
   is a native player screen inside the 2.x client (Jellyfin Web hidden during
   playback); the second is comparing mpv in its own window (`--wid`) and other stacks;
-- HDR passthrough or zero-copy hardware decoding on Windows becomes a requirement;
+- the D3D11 path fails to deliver HDR or stable frame pacing on Windows in weeks 1–2:
+  Windows then uses the OpenGL renderer (SDR) and HDR moves to a separate mpv-window mode;
 - the long-term maintainers are substantially more fluent in Rust than in C++.
