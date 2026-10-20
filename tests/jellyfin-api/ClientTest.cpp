@@ -150,6 +150,9 @@ TEST_CASE("Unreachable servers and timeouts are told apart") {
   REQUIRE_FALSE(*slow);
   CHECK(slow->error().kind == ApiError::Kind::Timeout);
 
+  // Windows retries a refused localhost connection for about two seconds, so
+  // the short timeout above would win there.
+  client.setTimeoutMs(30'000);
   client.setServerUrl(QUrl(QStringLiteral("http://127.0.0.1:1")));
   auto refused = run<UserInfo>([&](auto done) { client.currentUser(nullptr, done); });
   REQUIRE_FALSE(*refused);
