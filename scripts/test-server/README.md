@@ -19,7 +19,10 @@ down` removes the container.
 
 For a server with the SyncPlay playback-rate extension, set `JFD_TEST_IMAGE`
 to the fork image and `JFD_TEST_SERVER_FORK=1`; the playback-rate test then
-expects the extension's 409 answers instead of a missing route.
+expects the extension's 409 answers instead of a missing route. The fork image
+is the SyncPlay harness's (`tools/syncplay-harness`): `PAYLOAD=release
+tools/syncplay-harness/scripts/server-up.sh` builds it as
+`jellyfin-syncplay-test:local`, and the API workflow builds it the same way.
 
 Never point these tests at a real server: they create groups, change watched
 state and sign sessions out.

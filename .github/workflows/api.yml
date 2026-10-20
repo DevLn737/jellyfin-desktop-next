@@ -1,8 +1,9 @@
 name: Jellyfin API
 
 # Builds and tests the Qt modules that talk to the server (platform,
-# jellyfin-api, library). On Linux the tests also run against a stock
-# Jellyfin 12.2 in Docker (scripts/test-server/stock-server.sh).
+# jellyfin-api, library). On Linux the tests also run in Docker against a stock
+# Jellyfin 12.2 and against the 12.2 fork with the SyncPlay playback-rate
+# extension (scripts/test-server/stock-server.sh).
 
 on:
   push:
@@ -14,8 +15,16 @@ permissions:
 
 jobs:
   linux:
-    name: API (ubuntu-24.04, Jellyfin 12.2 in Docker)
+    name: API (ubuntu-24.04, ${{ matrix.server.name }} in Docker)
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        server:
+          - { name: Jellyfin 12.2, fork: '0' }
+          - { name: SyncPlay fork 12.2, fork: '1' }
+    env:
+      JFD_TEST_SERVER_FORK: ${{ matrix.server.fork }}
     steps:
       - uses: actions/checkout@v5
 
@@ -31,8 +40,22 @@ jobs:
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build libsecret-1-dev jq gnome-keyring dbus
 
-      - name: Start Jellyfin 12.2
-        id: server
+      # The fork image is the SyncPlay harness's, built from the server and Web
+      # payloads its workflow publishes to the syncplay-test-server release.
+      - name: Build the fork server image
+        if: matrix.server.fork == '1'
+        run: |
+          for part in server web; do
+            mkdir -p "payload/$part"
+            curl -fsSL "https://github.com/${{ github.repository }}/releases/download/syncplay-test-server/$part.tar.gz" \
+              | tar -xz -C "payload/$part"
+          done
+          docker buildx build --load --target runtime -t jellyfin-syncplay-test:local \
+            --build-context server-dist=payload/server --build-context web-dist=payload/web \
+            tools/syncplay-harness/server
+          echo "JFD_TEST_IMAGE=jellyfin-syncplay-test:local" >> "$GITHUB_ENV"
+
+      - name: Start the server
         run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
 
       - name: Configure
