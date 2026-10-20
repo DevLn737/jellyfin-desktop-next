@@ -20,11 +20,10 @@ export async function bootstrap(baseUrl, { log = console.log } = {}) {
   }
   await http.login(ADMIN.name, ADMIN.password);
 
-  // Jellyfin 12.2 turns legacy authorization off on upgrade and for new servers,
-  // but Jellyfin Web 12.2 (jellyfin-apiclient 1.11.0) still opens its WebSocket
-  // with ?api_key=, which then gets HTTP 403: no WebSocket, no SyncPlay in Web.
-  // Production servers that work with Web must have it enabled, so mirror that.
-  const legacyAuthorization = process.env.HARNESS_LEGACY_AUTH !== '0';
+  // Jellyfin 12.2 turns legacy authorization off on upgrade and for new servers.
+  // Web gets SyncPlay through the SDK socket (?ApiKey=), so it works without it;
+  // run with the 12.2 default. HARNESS_LEGACY_AUTH=1 turns it on for old clients.
+  const legacyAuthorization = process.env.HARNESS_LEGACY_AUTH === '1';
   const config = await http.get('System/Configuration');
   if (config.EnableLegacyAuthorization !== legacyAuthorization) {
     log(`Setting EnableLegacyAuthorization=${legacyAuthorization}`);

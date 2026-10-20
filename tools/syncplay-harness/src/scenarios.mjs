@@ -22,13 +22,10 @@ export const THRESHOLDS = {
 // report but do not fail the run, so the harness can gate PRs today; when one
 // starts passing, the report says so and the entry should be removed.
 export const KNOWN_ISSUES = {
-  pausedSeekBuffering: 'Web 12.2: Chromium fires "waiting" on a seek while paused; SyncPlay HtmlVideoPlayer '
-    + 'reports Buffering 3 s later and only clears it on "playing", so the group stays in Waiting and Unpause is ignored.',
-  webSocketLegacyAuth: 'Server 12.2 sets EnableLegacyAuthorization=false (migration DisableLegacyAuthorization), but '
-    + 'Web 12.2 uses jellyfin-apiclient 1.11.0, which opens the WebSocket with ?api_key= and gets HTTP 403. '
-    + 'Web SyncPlay only works on servers where legacy authorization is turned back on.',
-  rejoinIgnoresQueue: 'Web 12.2: after Leave and Join in the same page, QueueCore drops the group\'s PlayQueue as '
-    + '"ignoring old update" (same LastUpdate as before leaving), never reports Ready, and the whole group stays in Waiting.',
+  webSocketLegacyAuth: 'Server 12.2 sets EnableLegacyAuthorization=false (migration DisableLegacyAuthorization), so a socket '
+    + 'opened with ?api_key= gets HTTP 403. Web 12.2 still opens one such socket (jellyfin-apiclient 1.11.0), but its SyncPlay '
+    + 'and other notifications come through the SDK socket with ?ApiKey=, so Web is not affected. Clients that only use '
+    + '?api_key= (Fathom 0.13.1) get no SyncPlay commands unless legacy authorization is turned back on.',
 };
 
 function check(ctx, name, passed, detail, knownIssue = null) {
@@ -98,7 +95,7 @@ async function changeRate(ctx, group, rate) {
 export const scenarios = [
   {
     name: 'websocket-auth',
-    title: 'WebSocket authentication as Jellyfin Web 12.2 does it (?api_key=) with legacy authorization off and on',
+    title: 'WebSocket authentication with ?ApiKey= and the legacy ?api_key=, legacy authorization off and on',
     async run(ctx) {
       const admin = new JellyfinHttp(ctx.baseUrl, { device: 'harness-admin' });
       await admin.login(ADMIN.name, ADMIN.password);
@@ -113,10 +110,10 @@ export const scenarios = [
       try {
         await admin.post('System/Configuration', { ...config, EnableLegacyAuthorization: false });
         check(ctx, 'ApiKey= opens the socket with legacy authorization off', await tryOpen('ApiKey'), '12.2 default configuration');
-        check(ctx, 'api_key= (what Web 12.2 sends) opens the socket with legacy authorization off', await tryOpen('api_key'),
-          'without a socket Web receives no SyncPlay commands', KNOWN_ISSUES.webSocketLegacyAuth);
+        check(ctx, 'api_key= (old clients) opens the socket with legacy authorization off', await tryOpen('api_key'),
+          'clients that only use api_key= get no SyncPlay commands; Web uses ApiKey=', KNOWN_ISSUES.webSocketLegacyAuth);
         await admin.post('System/Configuration', { ...config, EnableLegacyAuthorization: true });
-        check(ctx, 'api_key= opens the socket with legacy authorization on', await tryOpen('api_key'), 'the harness runs with this setting');
+        check(ctx, 'api_key= opens the socket with legacy authorization on', await tryOpen('api_key'), 'what old clients need');
       } finally {
         await admin.post('System/Configuration', config);
       }
@@ -176,8 +173,8 @@ export const scenarios = [
       const resumeAt = Date.now();
       await group.driver.unpause();
       const playing = await waitUntil(group.all, (s) => allPlaying(s) && s.samples.every((x) => Math.abs(x.rate - 1.5) < 0.15), 20_000);
-      // A rate change is a group Seek, so it hits the same Web buffering bug as a paused seek.
-      check(ctx, 'resume at 1.5x after paused rate change', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`, KNOWN_ISSUES.pausedSeekBuffering);
+      // A rate change is a group Seek: Web must report Ready again after it.
+      check(ctx, 'resume at 1.5x after paused rate change', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`);
       if (playing.ok) {
         ctx.metrics.unpauseLatencyMs = playing.elapsedMs;
         await measureDrift(ctx, group.all, 'after-paused-rate-1.5x', resumeAt);
@@ -200,7 +197,7 @@ export const scenarios = [
       const resumeAt = Date.now();
       await group.driver.unpause();
       const playing = await waitUntil(group.all, allPlaying, 15_000);
-      check(ctx, 'group resumes after a paused seek', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`, KNOWN_ISSUES.pausedSeekBuffering);
+      check(ctx, 'group resumes after a paused seek', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`);
       if (playing.ok) await measureDrift(ctx, group.all, 'after-paused-seek', resumeAt);
     },
   },
@@ -217,7 +214,7 @@ export const scenarios = [
       check(ctx, 'rejoin accepted', status === 204, `HTTP ${status}`);
       const rejoinAt = Date.now();
       const playing = await waitUntil(group.all, allPlaying, 30_000);
-      check(ctx, 'rejoined participant plays with the group', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`, KNOWN_ISSUES.rejoinIgnoresQueue);
+      check(ctx, 'rejoined participant plays with the group', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`);
       if (playing.ok) await measureDrift(ctx, group.all, 'after-rejoin', rejoinAt);
     },
   },
