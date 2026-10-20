@@ -15,7 +15,12 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror)
 endif()
 
+# nlohmann/json 3.11.3 single header, vendored in third_party/nlohmann (MIT).
+add_library(nlohmann_json INTERFACE)
+target_include_directories(nlohmann_json SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/nlohmann)
+
 add_subdirectory(src/core)
+add_subdirectory(src/syncplay)
 
 if(JFD_BUILD_TESTS)
   enable_testing()

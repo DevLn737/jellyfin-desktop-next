@@ -17,9 +17,21 @@ add_executable(jfd_core_tests
   core/PlaybackSessionTest.cpp)
 target_link_libraries(jfd_core_tests PRIVATE jfd::core jfd_test_support doctest)
 add_test(NAME jfd_core_tests COMMAND jfd_core_tests)
+
+add_executable(jfd_syncplay_tests
+  core/main.cpp
+  syncplay/ProtocolTest.cpp
+  syncplay/TimeSyncTest.cpp
+  syncplay/GroupClientTest.cpp)
+target_link_libraries(jfd_syncplay_tests PRIVATE jfd::syncplay jfd_test_support doctest nlohmann_json)
+target_compile_definitions(jfd_syncplay_tests PRIVATE
+  JFD_SYNCPLAY_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/syncplay/fixtures")
+add_test(NAME jfd_syncplay_tests COMMAND jfd_syncplay_tests)
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   # GCC reports false positives for std::variant copies of the recording fakes at -O2+.
   target_compile_options(jfd_core_tests PRIVATE -Wno-maybe-uninitialized)
+  target_compile_options(jfd_syncplay_tests PRIVATE -Wno-maybe-uninitialized)
 endif()
 
 # Deterministic simulator (see tests/sim/Simulation.h).
