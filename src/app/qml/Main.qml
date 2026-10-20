@@ -41,44 +41,57 @@ Window {
         onClicked: (mouse) => { if (root.menuOpen && !root.app.animateMenu) root.menuOpen = false }
     }
 
-    ProtocolOverlay {
+    // Everything drawn over the video. With an HDR10 swap chain the layer
+    // encodes it to PQ at the SDR white level, so the menu keeps its SDR
+    // brightness while the video uses the display's HDR range.
+    Item {
+        id: ui
         anchors.fill: parent
-        video: video
-        visible: root.app.overlay === "protocol"
-    }
+        layer.enabled: video.hdrActive && root.app.hdrShader.length > 0
+        layer.effect: ShaderEffect {
+            property real sdrWhiteNits: video.sdrWhiteNits
+            fragmentShader: root.app.hdrShader
+        }
 
-    OsdBar {
-        visible: root.playerOverlay && opacity > 0
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        player: root.player
-        shown: root.osdVisible || root.app.animateMenu
-        onMenuRequested: root.menuOpen = !root.menuOpen
-    }
+        ProtocolOverlay {
+            anchors.fill: parent
+            video: video
+            visible: root.app.overlay === "protocol"
+        }
 
-    PlayerMenu {
-        id: menu
-        video: video
-        open: root.menuOpen && root.playerOverlay
-        animate: root.app.animateMenu
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.topMargin: 24
-        anchors.bottomMargin: 120
-    }
+        OsdBar {
+            visible: root.playerOverlay && opacity > 0
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            player: root.player
+            shown: root.osdVisible || root.app.animateMenu
+            onMenuRequested: root.menuOpen = !root.menuOpen
+        }
 
-    Text {
-        visible: root.app.statsVisible
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 16
-        color: "white"
-        style: Text.Outline
-        styleColor: "black"
-        font.pixelSize: 15
-        font.family: "monospace"
-        text: root.app.statsText
+        PlayerMenu {
+            id: menu
+            video: video
+            open: root.menuOpen && root.playerOverlay
+            animate: root.app.animateMenu
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.topMargin: 24
+            anchors.bottomMargin: 120
+        }
+
+        Text {
+            visible: root.app.statsVisible
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: 16
+            color: "white"
+            style: Text.Outline
+            styleColor: "black"
+            font.pixelSize: 15
+            font.family: "monospace"
+            text: root.app.statsText
+        }
     }
 
     Item {

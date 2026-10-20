@@ -53,6 +53,11 @@ Renderer: `-Renderer auto` (the default) measures the app's default, Direct3D
 11 on Windows; `-Renderer gl` measures the OpenGL fallback. The report records
 which one ran, and `client.log` names the adapter (`video renderer: ...`).
 
+HDR experiment: `-Hdr hdr10` asks for an HDR10 swap chain (Windows HDR must be
+on for the screen). `client.log` then has `HDR10 output: SDR white ... nits,
+display peak ... nits`, or Qt's warning that it fell back to SDR, and each
+frames result records mpv's `targetParams` (primaries, transfer, peak).
+
 Hardware decoding: `auto-safe` is the app's default (direct decoding where mpv
 considers it safe) and `auto-copy` matches the 2.x client's default copy mode;
 frames and CPU run once in each.
