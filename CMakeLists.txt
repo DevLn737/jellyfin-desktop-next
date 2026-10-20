@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(JFD_BUILD_TESTS "Build unit tests" ON)
+option(JFD_BUILD_APP "Build the Qt application (needs Qt 6 and libmpv)" OFF)
 # The Qt-based modules are built when Qt 6 is found. CI sets JFD_REQUIRE_QT so
 # a missing Qt fails the build instead of silently skipping them.
 option(JFD_REQUIRE_QT "Fail when Qt 6 is not found" OFF)
@@ -20,12 +21,17 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror)
 endif()
 
+if(JFD_BUILD_TESTS)
+  enable_testing()
+endif()
+
 # nlohmann/json 3.11.3 single header, vendored in third_party/nlohmann (MIT).
 add_library(nlohmann_json INTERFACE)
 target_include_directories(nlohmann_json SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/nlohmann)
 
 add_subdirectory(src/core)
 add_subdirectory(src/syncplay)
+add_subdirectory(src/diagnostics)
 
 # Headless SyncPlay client for the drift checks (POSIX only).
 if(UNIX)
@@ -43,10 +49,15 @@ if(Qt6_FOUND)
   add_subdirectory(src/jellyfin-api)
   add_subdirectory(src/library)
 else()
-  message(STATUS "Qt 6 not found: building only the Qt-free core")
+  message(STATUS "Qt 6 with WebSockets not found: skipping the Qt network modules")
+endif()
+
+if(JFD_BUILD_APP)
+  include(cmake/JfdDependencies.cmake)
+  add_subdirectory(src/media-backend)
+  add_subdirectory(src/app)
 endif()
 
 if(JFD_BUILD_TESTS)
-  enable_testing()
   add_subdirectory(tests)
 endif()

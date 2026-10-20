@@ -3,7 +3,7 @@
 A cross-platform Jellyfin desktop client designed around watching together.
 SyncPlay is part of the playback state model from the start, not an add-on.
 
-**Status:** early development (phase 0: Qt and libmpv are not in CI yet). Nothing here is usable yet. The
+**Status:** early development (phase 1 prototype). Nothing here is usable yet. The
 current Windows client is [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop).
 
 ## Goals
@@ -54,6 +54,18 @@ ctest --test-dir build --output-on-failure
 ```
 
 Requires CMake 3.24+ and a C++20 compiler (MSVC 2022, GCC 12+, Clang 15+ / Apple Clang 15+).
+
+The application also needs Qt 6 (Quick, OpenGL) and libmpv; add `-DJFD_BUILD_APP=ON`.
+CI uses the versions pinned in [deps/versions.json](deps/versions.json) and passes
+`-DJFD_ENFORCE_PINS=ON` to reject any other.
+
+- **Linux:** libmpv from the distribution (`libmpv-dev`), found through pkg-config.
+- **Windows:** from a Visual Studio developer PowerShell, `scripts/fetch-windows-deps.ps1`
+  downloads and verifies the pinned Qt, libmpv and Vulkan loader; pass the Qt prefix
+  as `CMAKE_PREFIX_PATH` and the `MPV_INCLUDE_DIR` and `MPV_LIBRARY` it prints to CMake.
+  The Qt `bin` directory and `build/deps/runtime` must be on `PATH` when running.
+
+Any platform can point CMake at a specific libmpv with `-DMPV_INCLUDE_DIR=... -DMPV_LIBRARY=...`.
 
 ## License
 

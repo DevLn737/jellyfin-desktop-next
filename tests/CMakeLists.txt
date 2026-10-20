@@ -18,6 +18,14 @@ add_executable(jfd_core_tests
 target_link_libraries(jfd_core_tests PRIVATE jfd::core jfd_test_support doctest)
 add_test(NAME jfd_core_tests COMMAND jfd_core_tests)
 
+add_executable(jfd_diagnostics_tests
+  core/main.cpp
+  diagnostics/FrameStatsTest.cpp
+  diagnostics/ProcessStatsTest.cpp)
+target_link_libraries(jfd_diagnostics_tests PRIVATE jfd::diagnostics doctest)
+add_test(NAME jfd_diagnostics_tests COMMAND jfd_diagnostics_tests)
+
+
 add_executable(jfd_syncplay_tests
   core/main.cpp
   syncplay/ProtocolTest.cpp
@@ -87,4 +95,8 @@ if(TARGET jfd_jellyfin_api)
     jfd_add_qt_test(jfd_server_tests server/ServerTest.cpp)
     target_link_libraries(jfd_server_tests PRIVATE jfd::jellyfin_api jfd::library)
   endif()
+endif()
+
+if(JFD_BUILD_APP)
+  add_subdirectory(render)
 endif()

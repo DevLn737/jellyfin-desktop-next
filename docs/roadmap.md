@@ -8,8 +8,8 @@ sometimes a TV, and a laptop with Intel Iris Xe as the second machine.
 
 - [x] Repository, license, ADRs 0001–0003.
 - [x] CMake layout with the Qt-free `core` library and unit tests on Windows, Linux and macOS.
-- [ ] CI on Windows and Linux builds an empty Qt Quick window linked with libmpv,
-      with pinned Qt and libmpv versions.
+- [x] CI on Windows and Linux builds an empty Qt Quick window linked with libmpv,
+      with pinned Qt and libmpv versions ([deps/versions.json](../deps/versions.json)).
 
 Phase 0 is not complete until the last item is done.
 

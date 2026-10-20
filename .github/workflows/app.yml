@@ -1,0 +1,134 @@
+name: App
+
+# Builds the Qt application with the pinned Qt and libmpv from deps/versions.json
+# and runs its tests on Windows and Linux. The Qt-free core is in ci.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: App (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            qt-arch-key: windowsArch
+          - os: ubuntu-24.04
+            qt-arch-key: linuxArch
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read pinned versions
+        id: pins
+        shell: bash
+        run: |
+          echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "qt-arch=$(jq -r '.qt.${{ matrix.qt-arch-key }}' deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "libmpv-deb=$(jq -r '.linux.libmpvPackage + "=" + .linux.libmpvPackageVersion' deps/versions.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Qt ${{ steps.pins.outputs.qt }} (Linux)
+        if: runner.os == 'Linux'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.pins.outputs.qt }}
+          arch: ${{ steps.pins.outputs.qt-arch }}
+          cache: true
+
+      - name: Install libmpv and display libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ${{ steps.pins.outputs.libmpv-deb }} ninja-build xvfb xauth \
+            libgl1-mesa-dev libegl1 libgl1-mesa-dri libfontconfig1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
+
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache pinned downloads (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: build/deps
+          key: windows-deps-${{ hashFiles('deps/versions.json') }}
+
+      - name: Fetch pinned Qt, libmpv and Vulkan loader (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/fetch-windows-deps.ps1
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $mpv = if ($env:MPV_LIBRARY) { @("-DMPV_INCLUDE_DIR=$env:MPV_INCLUDE_DIR", "-DMPV_LIBRARY=$env:MPV_LIBRARY") } else { @() }
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_ENFORCE_PINS=ON @mpv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test (Linux, Xvfb with Mesa)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" ctest --test-dir build --output-on-failure
+
+      - name: Test (Windows, software OpenGL)
+        if: runner.os == 'Windows'
+        env:
+          QT_OPENGL: software
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = 'build/package/jellyfin-desktop-next'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          # Qt's project setup puts Windows executables at the build root.
+          $exe = Get-ChildItem build -Recurse -Filter jellyfin-desktop-next.exe |
+            Where-Object { $_.FullName -notlike '*package*' } | Select-Object -First 1
+          if (-not $exe) { throw 'jellyfin-desktop-next.exe was not built' }
+          Copy-Item $exe.FullName $stage
+          windeployqt --release --compiler-runtime --qmldir src/app/qml --no-translations "$stage/jellyfin-desktop-next.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
+          Copy-Item -Recurse scripts/measure "$stage/measure"
+          @{ commit = '${{ github.sha }}'; ref = '${{ github.ref_name }}'; run = '${{ github.run_id }}' } |
+            ConvertTo-Json | Set-Content -Encoding ASCII "$stage/build-info.json"
+          # The package must run on its own: only Windows itself on PATH.
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $env:QT_OPENGL = 'software'
+          # Also loads the measurement probe: the pinned libmpv must run Lua scripts.
+          $probe = (Resolve-Path "$stage/measure/jfd-probe.lua").Path.Replace('\','/')
+          $probeOut = (Join-Path (Resolve-Path build).Path 'package-probe.jsonl').Replace('\','/')
+          $process = Start-Process -FilePath "$stage/jellyfin-desktop-next.exe" -PassThru -Wait `
+            -ArgumentList @('--smoke', '--mpv-option', "scripts=$probe", '--mpv-option', "script-opts=jfdprobe-out=$probeOut",
+              '--mpv-option', 'log-file=build/package-mpv.log') `
+            -RedirectStandardOutput build/package-smoke.out -RedirectStandardError build/package-smoke.err
+          Get-Content build/package-smoke.out, build/package-smoke.err
+          if ($process.ExitCode -ne 0) { throw "packaged smoke test failed with exit code $($process.ExitCode)" }
+          if (-not ((Test-Path $probeOut) -and (Select-String -Path $probeOut -Pattern '"kind":"probe-start"' -Quiet))) {
+            Select-String -Path build/package-mpv.log -Pattern 'lua|script|Configuration|features' | Select-Object -First 40 | ForEach-Object Line
+            throw 'the mpv probe script did not run'
+          }
+          Get-Content $probeOut -TotalCount 3
+
+      - name: Upload package (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jellyfin-desktop-next-windows
+          path: build/package/jellyfin-desktop-next
+          retention-days: 30
