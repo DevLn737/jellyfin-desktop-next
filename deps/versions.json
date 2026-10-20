@@ -17,6 +17,12 @@
           "bytes": 3287094
         },
         {
+          "name": "qtwebsockets-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtwebsockets.win64_msvc2022_64/6.11.3-0-202609240253qtwebsockets-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "aa418c5ca7d0643d61e30f72a4ff1e6dbfb4ca59a153b022a5903d028d7c5b1e",
+          "bytes": 319756
+        },
+        {
           "name": "qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
           "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
           "sha256": "3ddf0017b4b67cb56018ed5a6af6a54865a40bdc735111a50e5e169e893558e5",
