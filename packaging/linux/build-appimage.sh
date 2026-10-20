@@ -54,6 +54,15 @@ for pattern in 'libva.so*' 'libva-*.so*' 'libvdpau*.so*' 'libdrm*.so*' 'libgbm.s
   excludes+=(--exclude-library "$pattern")
 done
 
+# The AppImage excludelist drops FriBiDi, but many systems (Arch without a GTK
+# desktop, minimal KDE installs) do not have it; libass needs it, so it ships.
+forced=()
+for lib in libfribidi.so.0; do
+  path=$(LD_LIBRARY_PATH="$mpv_prefix/lib" ldd "$mpv_prefix/lib/libass.so" | awk -v l="$lib" '$1 == l {print $3}')
+  test -f "$path" || { echo "cannot find $lib" >&2; exit 1; }
+  forced+=(--library "$path")
+done
+
 export APPIMAGE_EXTRACT_AND_RUN=1
 # linuxdeploy finds its plugins on PATH.
 export PATH="$tools:$PATH"
@@ -67,9 +76,10 @@ cd "$work"
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
   --desktop-file "$here/$app_id.desktop" \
   --icon-file "$root/packaging/icons/$name.png" --icon-filename "$name" \
-  "${excludes[@]}" \
+  "${excludes[@]}" "${forced[@]}" \
   --plugin qt --output appimage
 
 # The image must carry the pinned libmpv, not a system one.
 test -n "$(find "$appdir/usr/lib" -name 'libmpv.so*' -print -quit)"
+test -n "$(find "$appdir/usr/lib" -name 'libfribidi.so*' -print -quit)"
 echo "AppImage: $LDAI_OUTPUT ($(du -h "$LDAI_OUTPUT" | cut -f1))"

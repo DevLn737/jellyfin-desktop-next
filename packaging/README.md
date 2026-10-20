@@ -36,10 +36,15 @@ organization name; keep them in step if the application's names change.
    and its Qt plugin (X11 and Wayland). Libraries that must match the running
    system stay out: Mesa/GL/EGL/Vulkan, VA-API and VDPAU, libdrm/gbm, PipeWire,
    PulseAudio, ALSA, GnuTLS (it knows the distribution's CA store), Wayland,
-   D-Bus.
+   D-Bus. The AppImage excludelist also leaves fontconfig, FreeType and
+   HarfBuzz to the system; FriBiDi, which it lists too, ships in the image,
+   because systems without a GTK desktop often lack it. The GL dispatch
+   library (libOpenGL.so.0 from libglvnd) must be installed; every desktop
+   has it.
 4. [linux/smoke-appimage.sh](linux/smoke-appimage.sh) runs the AppImage's smoke
    test (a generated video on Xvfb with Mesa's software renderer) in Ubuntu
-   24.04, Fedora and Arch containers.
+   24.04, Fedora and Arch containers. First it lists every library the
+   program needs from the system and is missing, so one run shows them all.
 
 Build dependencies on Ubuntu 24.04 are in [linux/build-deps.txt](linux/build-deps.txt).
 
