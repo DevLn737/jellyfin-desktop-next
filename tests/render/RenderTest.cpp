@@ -1,15 +1,20 @@
 #include "MpvPlayer.h"
 #include "MpvVideoItem.h"
+#ifdef JFD_HAVE_D3D11_VIDEO
+#include "MpvD3D11VideoItem.h"
+#endif
 
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QImage>
 #include <QQmlApplicationEngine>
+#include <QQuickItem>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QTimer>
 
 #include <cstdio>
+#include <cstring>
 #include <memory>
 
 using jfd::media::MpvPlayer;
@@ -66,13 +71,47 @@ bool waitFor(const std::function<bool()>& condition, int timeoutMs)
   return true;
 }
 
+// Both video items have the same signals.
+template<typename VideoItem>
+void connectVideo(QQuickItem* item, QObject* context, bool& ready, QString& error)
+{
+  if (auto* video = qobject_cast<VideoItem*>(item))
+  {
+    QObject::connect(video, &VideoItem::renderContextReady, context, [&ready](const QString& name) {
+      std::printf("     renderer: %s\n", qPrintable(name));
+      ready = true;
+    }, Qt::QueuedConnection);
+    QObject::connect(video, &VideoItem::renderError, context, [&error](const QString& e) { error = e; }, Qt::QueuedConnection);
+    // Already created before the connection (non-threaded render loop).
+    if (!video->rendererName().isEmpty())
+      ready = true;
+    if (!video->renderFailure().isEmpty())
+      error = video->renderFailure();
+  }
 }
 
+}
+
+// "jfd_render_test d3d11" tests the Direct3D 11 item; without an argument the
+// OpenGL one.
 int main(int argc, char* argv[])
 {
-  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+  const bool d3d11 = argc > 1 && std::strcmp(argv[1], "d3d11") == 0;
+#ifndef JFD_HAVE_D3D11_VIDEO
+  if (d3d11)
+  {
+    std::printf("FAIL this build has no Direct3D 11 video item\n");
+    return 1;
+  }
+#endif
+  QQuickWindow::setGraphicsApi(d3d11 ? QSGRendererInterface::Direct3D11 : QSGRendererInterface::OpenGL);
   QGuiApplication app(argc, argv);
-  qmlRegisterType<MpvVideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
+#ifdef JFD_HAVE_D3D11_VIDEO
+  if (d3d11)
+    qmlRegisterType<jfd::media::MpvD3D11VideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
+  else
+#endif
+    qmlRegisterType<MpvVideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
   qmlRegisterUncreatableType<MpvPlayer>("JellyfinDesktop.Media", 1, 0, "MpvPlayer", QStringLiteral("test"));
 
   MpvPlayer::Options options;
@@ -96,12 +135,17 @@ int main(int argc, char* argv[])
   check(window != nullptr, "scene loads");
   if (!window)
     return 1;
-  auto* video = window->findChild<MpvVideoItem*>(QStringLiteral("video"));
+  auto* video = window->findChild<QQuickItem*>(QStringLiteral("video"));
+  check(video != nullptr, "video item exists");
+  if (!video)
+    return 1;
 
   bool contextReady = false;
   QString renderError;
-  QObject::connect(video, &MpvVideoItem::renderContextReady, &app, [&] { contextReady = true; }, Qt::QueuedConnection);
-  QObject::connect(video, &MpvVideoItem::renderError, &app, [&](const QString& e) { renderError = e; }, Qt::QueuedConnection);
+  connectVideo<MpvVideoItem>(video, &app, contextReady, renderError);
+#ifdef JFD_HAVE_D3D11_VIDEO
+  connectVideo<jfd::media::MpvD3D11VideoItem>(video, &app, contextReady, renderError);
+#endif
   check(waitFor([&] { return contextReady || !renderError.isEmpty(); }, 20000), "render context is created");
   check(renderError.isEmpty(), "no render error");
 

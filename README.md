@@ -55,7 +55,7 @@ ctest --test-dir build --output-on-failure
 
 Requires CMake 3.24+ and a C++20 compiler (MSVC 2022, GCC 12+, Clang 15+ / Apple Clang 15+).
 
-The application also needs Qt 6 (Quick, OpenGL) and libmpv; add `-DJFD_BUILD_APP=ON`.
+The application also needs Qt 6 (Quick, OpenGL) and libmpv; add `-DJFD_BUILD_APP=ON`. On Windows it renders with Direct3D 11 when libmpv has the D3D11 render API (client API 2.6, as pinned), otherwise with OpenGL.
 CI uses the versions pinned in [deps/versions.json](deps/versions.json) and passes
 `-DJFD_ENFORCE_PINS=ON` to reject any other.
 

@@ -22,4 +22,9 @@ if(JFD_BUILD_TESTS)
   # closes the window and exits with code 0.
   add_test(NAME app_smoke COMMAND jellyfin-desktop-next --smoke)
   set_tests_properties(app_smoke PROPERTIES TIMEOUT 60)
+  if(WIN32)
+    # The default on Windows is Direct3D 11; OpenGL stays available.
+    add_test(NAME app_smoke_gl COMMAND jellyfin-desktop-next --smoke --renderer gl)
+    set_tests_properties(app_smoke_gl PROPERTIES TIMEOUT 60)
+  endif()
 endif()

@@ -61,12 +61,19 @@
       ]
     },
     "mpv": {
-      "version": "20261011-git-accb7b2821",
-      "commit": "accb7b2821ecf0cb04cf3579ccd98bc8f751f61f",
-      "name": "mpv-dev-x86_64-20261011-git-accb7b2821.7z",
-      "url": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261011/mpv-dev-x86_64-20261011-git-accb7b2821.7z",
-      "sha256": "cf63b4ce66e03e5e70acf2648cbc3177656c77c5b9583e16d83efc58801182b7",
-      "bytes": 31547972
+      "version": "20261018-git-01e2533f31",
+      "commit": "01e2533f3143b8940857ca419b0b367f583e05ca",
+      "name": "mpv-dev-x86_64-20261018-git-01e2533f31.7z",
+      "url": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261018/mpv-dev-x86_64-20261018-git-01e2533f31.7z",
+      "sha256": "d7f5621f42b6e161fe032df914a10bdece28a89df3e57c6c3e16a5a250929b5e",
+      "bytes": 31595598,
+      "clientApi": "2.6",
+      "d3d11Header": {
+        "comment": "The package omits render_d3d11.h; this is mpv's own header at the pinned commit, kept in the repository and copied into the unpacked include directory.",
+        "path": "deps/mpv/render_d3d11.h",
+        "source": "https://raw.githubusercontent.com/mpv-player/mpv/01e2533f3143b8940857ca419b0b367f583e05ca/include/mpv/render_d3d11.h",
+        "sha256": "7b880453ee3c780b0d0f1c3f8ecaa1d23b289522f4c687e6857c8475f4a3f6fb"
+      }
     },
     "vulkanRuntime": {
       "version": "1.4.363.0",

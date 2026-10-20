@@ -75,6 +75,13 @@ $mpvDll = Join-Path $mpvRoot 'libmpv-2.dll'
 if (-not (Test-Path -LiteralPath (Join-Path $mpvRoot 'include/mpv/render_gl.h')) -or -not (Test-Path -LiteralPath $mpvDll)) {
     throw 'The libmpv archive does not have the expected layout'
 }
+# The package omits the D3D11 render API header; add mpv's own from the repository.
+$d3d11Header = $pins.windows.mpv.d3d11Header
+$d3d11Source = Join-Path $root $d3d11Header.path
+if ((Get-FileHash -LiteralPath $d3d11Source -Algorithm SHA256).Hash.ToLowerInvariant() -ne $d3d11Header.sha256) {
+    throw "$($d3d11Header.path) differs from its pin"
+}
+Copy-Item -LiteralPath $d3d11Source -Destination (Join-Path $mpvRoot 'include/mpv/render_d3d11.h') -Force
 
 # MSVC cannot link the MinGW import library; build one from the DLL exports.
 $exports = Invoke-Checked 'dumpbin.exe' @('/nologo', '/exports', $mpvDll) |

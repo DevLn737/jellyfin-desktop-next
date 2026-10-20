@@ -1,5 +1,6 @@
 #include "MpvVideoItem.h"
 #include "MpvPlayer.h"
+#include "RepaintRequest.h"
 
 #include <QOpenGLContext>
 #include <QOpenGLExtraFunctions>
@@ -11,7 +12,6 @@
 #include <mpv/render_gl.h>
 
 #include <algorithm>
-#include <atomic>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -35,28 +35,6 @@ void* getProcAddress(void*, const char* name)
 #endif
   return result;
 }
-
-// mpv's update callback may come from any thread; it only queues a coalesced
-// repaint request for the item on the GUI thread.
-class RepaintRequest
-{
-public:
-  explicit RepaintRequest(QQuickItem* item) : m_item(item) {}
-  void request()
-  {
-    if (m_pending.exchange(true))
-      return;
-    QMetaObject::invokeMethod(m_item, [this, item = m_item] {
-      m_pending.store(false);
-      if (item)
-        item->update();
-    }, Qt::QueuedConnection);
-  }
-
-private:
-  QPointer<QQuickItem> m_item;
-  std::atomic<bool> m_pending {false};
-};
 
 class MpvRenderer : public QObject, public QQuickFramebufferObject::Renderer
 {
@@ -160,7 +138,7 @@ private:
     {
       m_failed = true;
       m_context = nullptr;
-      emit item->renderError(QString::fromUtf8(mpv_error_string(error)));
+      item->reportRenderError(QString::fromUtf8(mpv_error_string(error)));
       return;
     }
     m_repaint = new RepaintRequest(item);
@@ -170,7 +148,7 @@ private:
     QString glRenderer;
     if (const auto* name = context->functions()->glGetString(GL_RENDERER))
       glRenderer = QString::fromUtf8(reinterpret_cast<const char*>(name));
-    emit item->renderContextReady(glRenderer);
+    item->reportRenderContextReady(glRenderer);
   }
 
   QQuickWindow* m_window = nullptr;
@@ -214,6 +192,18 @@ MpvHandle MpvVideoItem::handle() const
 QQuickFramebufferObject::Renderer* MpvVideoItem::createRenderer() const
 {
   return new MpvRenderer();
+}
+
+void MpvVideoItem::reportRenderContextReady(const QString& renderer)
+{
+  m_status.setReady(renderer);
+  emit renderContextReady(renderer);
+}
+
+void MpvVideoItem::reportRenderError(const QString& message)
+{
+  m_status.setFailed(message);
+  emit renderError(message);
 }
 
 }

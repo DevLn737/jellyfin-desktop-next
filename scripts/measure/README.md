@@ -49,6 +49,10 @@ request.
 | `shutdown` | 1080p60 with overlay for 5 s, then WM_CLOSE; 5 times | time until the process tree exits, exit code |
 | `recording` | the app's menu over 1080p60, the protocol overlay, fullscreen | `recording.mp4` (gdigrab), not a measurement |
 
+Renderer: `-Renderer auto` (the default) measures the app's default, Direct3D
+11 on Windows; `-Renderer gl` measures the OpenGL fallback. The report records
+which one ran, and `client.log` names the adapter (`video renderer: ...`).
+
 Hardware decoding: `auto-safe` is the app's default (direct decoding where mpv
 considers it safe) and `auto-copy` matches the 2.x client's default copy mode;
 frames and CPU run once in each.
@@ -62,6 +66,6 @@ and `jfd-quit`.
 
 - First frame and seek are measured on a local file, not over the network.
 - SyncPlay drift and network loss are measured by the core and test-server workstreams.
-- In the cloud CI (software OpenGL, llvmpipe) mpv's default lanczos scaler
+- In the cloud CI (software OpenGL, llvmpipe; WARP for Direct3D 11) mpv's default lanczos scaler
   sometimes draws black; bilinear never does. That is a Mesa software
   renderer issue and does not affect the measurements on a real GPU.

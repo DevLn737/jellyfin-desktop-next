@@ -3,6 +3,9 @@
 #include "Measurement.h"
 #include "MpvPlayer.h"
 #include "MpvVideoItem.h"
+#ifdef JFD_HAVE_D3D11_VIDEO
+#include "MpvD3D11VideoItem.h"
+#endif
 
 #include <QCommandLineParser>
 #include <QDateTime>
@@ -12,11 +15,13 @@
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QQuickItem>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QTimer>
 
 #include <cstdio>
+#include <cstring>
 #ifdef _WIN32
 #include <share.h>
 #endif
@@ -53,6 +58,46 @@ void installLogFile(const QString& path)
   });
 }
 
+// The video renderer has to be chosen before QGuiApplication exists, so
+// --renderer is read straight from argv: "gl", "d3d11" or "auto" (Direct3D 11
+// where the build supports it, otherwise OpenGL).
+bool useD3D11(int argc, char* argv[])
+{
+  const char* value = "auto";
+  for (int i = 1; i < argc; ++i)
+  {
+    if (std::strcmp(argv[i], "--renderer") == 0 && i + 1 < argc)
+      value = argv[i + 1];
+    else if (std::strncmp(argv[i], "--renderer=", 11) == 0)
+      value = argv[i] + 11;
+  }
+#ifdef JFD_HAVE_D3D11_VIDEO
+  return std::strcmp(value, "gl") != 0;
+#else
+  if (std::strcmp(value, "d3d11") == 0)
+    std::fprintf(stderr, "This build has no Direct3D 11 video renderer; using OpenGL\n");
+  return false;
+#endif
+}
+
+// Both video items have the same signals; the app handles either. The render
+// context may already exist (the non-threaded render loop draws the first
+// frame while QML loads), so the recorded outcome is delivered too; both
+// handlers tolerate being called twice.
+template<typename VideoItem, typename Ready, typename Error>
+void connectVideo(QQuickItem* item, QObject* context, Ready ready, Error error)
+{
+  auto* video = qobject_cast<VideoItem*>(item);
+  if (!video)
+    return;
+  QObject::connect(video, &VideoItem::renderContextReady, context, ready, Qt::QueuedConnection);
+  QObject::connect(video, &VideoItem::renderError, context, error, Qt::QueuedConnection);
+  if (const QString name = video->rendererName(); !name.isEmpty())
+    QMetaObject::invokeMethod(context, [ready, name] { ready(name); }, Qt::QueuedConnection);
+  if (const QString message = video->renderFailure(); !message.isEmpty())
+    QMetaObject::invokeMethod(context, [error, message] { error(message); }, Qt::QueuedConnection);
+}
+
 QString toUrl(const QString& value)
 {
   if (value.contains(QLatin1String("://")))
@@ -65,8 +110,10 @@ int main(int argc, char* argv[])
 {
   // Unbuffered, so CI logs keep everything printed before a crash.
   std::setvbuf(stdout, nullptr, _IONBF, 0);
-  // libmpv renders only through OpenGL, so the whole scene uses it (ADR 0001).
-  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+  // The whole scene uses the API mpv draws with (ADR 0001): Direct3D 11 on
+  // Windows, OpenGL elsewhere and as the Windows fallback.
+  const bool d3d11 = useD3D11(argc, argv);
+  QQuickWindow::setGraphicsApi(d3d11 ? QSGRendererInterface::Direct3D11 : QSGRendererInterface::OpenGL);
   QGuiApplication app(argc, argv);
   QGuiApplication::setApplicationName(QStringLiteral("Jellyfin Desktop Next"));
   QGuiApplication::setApplicationVersion(QStringLiteral(JFD_VERSION));
@@ -94,9 +141,10 @@ int main(int argc, char* argv[])
   const QCommandLineOption maximized(QStringLiteral("maximized"), QStringLiteral("Start maximized."));
   const QCommandLineOption overlay(QStringLiteral("overlay"), QStringLiteral("menu, protocol or none."), QStringLiteral("name"), QStringLiteral("menu"));
   const QCommandLineOption mpvOption(QStringLiteral("mpv-option"), QStringLiteral("Extra mpv option, repeatable."), QStringLiteral("name=value"));
+  const QCommandLineOption renderer(QStringLiteral("renderer"), QStringLiteral("Video renderer: auto, d3d11 or gl."), QStringLiteral("name"), QStringLiteral("auto"));
   const QCommandLineOption logFile(QStringLiteral("log-file"), QStringLiteral("Write Qt and mpv messages with timestamps."), QStringLiteral("path"));
   parser.addOptions({fullscreen, animate, stats, hwdec, ao, loop, scenario, report, duration, warmup,
-                     sample, replace, toggles, seeks, smoke, maximized, overlay, mpvOption, logFile});
+                     sample, replace, toggles, seeks, smoke, maximized, overlay, mpvOption, renderer, logFile});
   parser.process(app);
 
   if (parser.isSet(logFile))
@@ -128,7 +176,12 @@ int main(int argc, char* argv[])
   controller.setStatsVisible(parser.isSet(stats));
   controller.setOverlay(parser.value(overlay));
 
-  qmlRegisterType<MpvVideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
+#ifdef JFD_HAVE_D3D11_VIDEO
+  if (d3d11)
+    qmlRegisterType<jfd::media::MpvD3D11VideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
+  else
+#endif
+    qmlRegisterType<MpvVideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
   qmlRegisterUncreatableType<MpvPlayer>("JellyfinDesktop.Media", 1, 0, "MpvPlayer", QStringLiteral("Provided by the application"));
 
   auto engine = std::make_unique<QQmlApplicationEngine>();
@@ -143,7 +196,7 @@ int main(int argc, char* argv[])
 
   FrameRecorder frames(window);
   controller.attachWindow(window, &frames);
-  auto* video = window->findChild<MpvVideoItem*>(QStringLiteral("video"));
+  auto* video = window->findChild<QQuickItem*>(QStringLiteral("video"));
   std::unique_ptr<Measurement> measurement;
   if (parser.isSet(scenario))
   {
@@ -159,27 +212,31 @@ int main(int argc, char* argv[])
     options.reportPath = parser.value(report);
     measurement = std::make_unique<Measurement>(options, player.get(), window, &frames);
   }
-  if (video)
-  {
-    QObject::connect(video, &MpvVideoItem::renderContextReady, &controller, [&](const QString& renderer) {
-      controller.setGlRenderer(renderer);
-      if (measurement)
-        measurement->setGlRenderer(renderer);
-    }, Qt::QueuedConnection);
-    QObject::connect(video, &MpvVideoItem::renderError, &app, [](const QString& message) {
-      std::fprintf(stderr, "Video renderer failed: %s\n", qPrintable(message));
-      QCoreApplication::exit(3);
-    }, Qt::QueuedConnection);
-  }
+  // mpv opens its video output only once the render context exists, so
+  // playback starts after the first scene graph frame has created it.
+  std::function<void()> startPlayback;
+  const auto contextReady = [&](const QString& name) {
+    qInfo("video renderer: %s", qPrintable(name));
+    controller.setGlRenderer(name);
+    if (measurement)
+      measurement->setGlRenderer(name);
+    if (startPlayback)
+      std::exchange(startPlayback, nullptr)();
+  };
+  const auto renderFailed = [](const QString& message) {
+    std::fprintf(stderr, "Video renderer failed: %s\n", qPrintable(message));
+    QCoreApplication::exit(3);
+  };
+  connectVideo<MpvVideoItem>(video, &controller, contextReady, renderFailed);
+#ifdef JFD_HAVE_D3D11_VIDEO
+  connectVideo<jfd::media::MpvD3D11VideoItem>(video, &controller, contextReady, renderFailed);
+#endif
 
   if (parser.isSet(fullscreen))
     window->showFullScreen();
   else if (parser.isSet(maximized))
     window->showMaximized();
 
-  // mpv opens its video output only once the render context exists, so
-  // playback starts after the first scene graph frame has created it.
-  std::function<void()> startPlayback;
   int smokeResult = 0;
   if (parser.isSet(smoke))
   {
@@ -194,7 +251,7 @@ int main(int argc, char* argv[])
       frames.restart();
       QTimer::singleShot(1000, window, [&] {
         const auto summary = frames.measurement().summary();
-        std::printf("frame intervals in 1 s: %zu, mean %.1f ms, GL: %s\n", summary.frames,
+        std::printf("frame intervals in 1 s: %zu, mean %.1f ms, renderer: %s\n", summary.frames,
                     summary.meanUs / 1000.0, qPrintable(controller.glRenderer()));
         smokeResult = summary.frames >= 3 && !controller.glRenderer().isEmpty() ? 0 : 5;
         window->close();
@@ -206,11 +263,11 @@ int main(int argc, char* argv[])
     startPlayback = [&] { measurement->start(); };
   else if (!files.isEmpty())
     startPlayback = [&] { player->load(files.first()); };
-  if (video)
-    QObject::connect(video, &MpvVideoItem::renderContextReady, &app, [&] {
-      if (startPlayback)
-        std::exchange(startPlayback, nullptr)();
-    }, Qt::QueuedConnection);
+  // Playback waits for the render context; say so instead of idling silently.
+  QTimer::singleShot(15000, &app, [&] {
+    if (startPlayback)
+      qWarning("no video render context after 15 s; playback has not started");
+  });
 
   QElapsedTimer shutdown;
   QObject::connect(&app, &QCoreApplication::aboutToQuit, [&] { shutdown.start(); });

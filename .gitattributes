@@ -1,0 +1,2 @@
+# Pinned third-party file, checked by SHA256: keep its bytes on every platform.
+deps/mpv/render_d3d11.h -text
