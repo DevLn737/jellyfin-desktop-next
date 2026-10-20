@@ -89,3 +89,30 @@ jobs:
         env:
           QT_OPENGL: software
         run: ctest --test-dir build --output-on-failure
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = 'build/package/jellyfin-desktop-next'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item build/src/app/jellyfin-desktop-next.exe $stage
+          windeployqt --release --compiler-runtime --qmldir src/app/qml --no-translations "$stage/jellyfin-desktop-next.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
+          Copy-Item -Recurse scripts/measure "$stage/measure"
+          # The package must run on its own: only Windows itself on PATH.
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $env:QT_OPENGL = 'software'
+          $process = Start-Process -FilePath "$stage/jellyfin-desktop-next.exe" -ArgumentList '--smoke' -PassThru -Wait `
+            -RedirectStandardOutput build/package-smoke.out -RedirectStandardError build/package-smoke.err
+          Get-Content build/package-smoke.out, build/package-smoke.err
+          if ($process.ExitCode -ne 0) { throw "packaged smoke test failed with exit code $($process.ExitCode)" }
+
+      - name: Upload package (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jellyfin-desktop-next-windows
+          path: build/package/jellyfin-desktop-next
+          retention-days: 30

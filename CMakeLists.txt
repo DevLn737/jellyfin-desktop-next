@@ -20,9 +20,11 @@ if(JFD_BUILD_TESTS)
 endif()
 
 add_subdirectory(src/core)
+add_subdirectory(src/diagnostics)
 
 if(JFD_BUILD_APP)
   include(cmake/JfdDependencies.cmake)
+  add_subdirectory(src/media-backend)
   add_subdirectory(src/app)
 endif()
 
