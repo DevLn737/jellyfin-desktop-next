@@ -66,7 +66,7 @@ public:
   using EventListener = std::function<void(const mpv_event&)>;
   void setEventListener(EventListener listener) { m_listener = std::move(listener); }
 
-signals:
+Q_SIGNALS:
   void pausedChanged();
   void positionChanged();
   void durationChanged();

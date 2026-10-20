@@ -33,7 +33,6 @@ include(cmake/JfdModules.cmake)
 
 add_subdirectory(src/core)
 add_subdirectory(src/syncplay)
-add_subdirectory(src/session)
 add_subdirectory(src/diagnostics)
 
 # Headless SyncPlay client for the drift checks (POSIX only).
@@ -60,6 +59,9 @@ if(Qt6_FOUND)
 else()
   message(STATUS "Qt 6 with WebSockets not found: skipping the Qt network modules")
 endif()
+
+# After the Qt modules: its runtime is built when jellyfin-api is.
+add_subdirectory(src/session)
 
 if(JFD_BUILD_APP)
   include(cmake/JfdDependencies.cmake)

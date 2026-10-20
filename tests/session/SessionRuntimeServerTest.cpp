@@ -1,0 +1,205 @@
+#include "../support/DoctestQt.h"
+#include "../support/FakeServer.h"
+#include "../support/VirtualBackend.h"
+
+#include <jfd/api/DeviceProfile.h>
+#include <jfd/api/JellyfinClient.h>
+#include <jfd/api/SessionSocket.h>
+#include <jfd/api/SyncPlayApi.h>
+#include <jfd/session/SessionRuntime.h>
+
+#ifdef JFD_SESSION_TEST_MPV
+#include "MpvMediaBackend.h"
+#include "MpvPlayer.h"
+#endif
+
+#include <QSignalSpy>
+
+#include <memory>
+#include <optional>
+
+// The session runtime on a live server (scripts/test-server): our client
+// creates a group, plays the group's item and follows another member. Built
+// with a virtual backend, and with headless mpv when the app is built
+// (JFD_SESSION_TEST_MPV), which then plays the server's real stream.
+
+using namespace jfd;
+using namespace jfd::api;
+using jfd::session::SessionRuntime;
+using jfd::test::waitFor;
+
+namespace {
+  QString env(const char* name) { return qEnvironmentVariable(name); }
+
+  template <class T> Result<T> run(std::function<void(Callback<T>)> call, int timeoutMs = 20000) {
+    std::optional<Result<T>> out;
+    call([&out](Result<T> r) { out.emplace(std::move(r)); });
+    if (!waitFor([&] { return out.has_value(); }, timeoutMs)) {
+      ApiError error;
+      error.kind = ApiError::Kind::Timeout;
+      return error;
+    }
+    return std::move(*out);
+  }
+
+  std::unique_ptr<JellyfinClient> signedIn(const QString& deviceId) {
+    auto client = std::make_unique<JellyfinClient>(
+        ClientIdentity{QStringLiteral("Jellyfin Desktop Next Tests"), QStringLiteral("0.0.1"),
+                       QStringLiteral("CI ") + deviceId, deviceId});
+    const auto url = JellyfinClient::normalizeServerUrl(env("JFD_TEST_SERVER_URL"));
+    REQUIRE_MESSAGE(url.has_value(), "Set JFD_TEST_SERVER_URL (scripts/test-server/stock-server.sh up)");
+    client->setServerUrl(*url);
+    auto auth = run<AuthenticationResult>([&](auto done) {
+      client->signIn(env("JFD_TEST_USER"), env("JFD_TEST_PASSWORD"), nullptr, done);
+    });
+    REQUIRE(auth.ok());
+    return client;
+  }
+
+  Item findItem(JellyfinClient& client, const QString& type) {
+    ItemQuery query;
+    query.includeItemTypes = {type};
+    auto page = run<ItemPage>([&](auto done) { client.items(query, nullptr, done); });
+    REQUIRE(page.ok());
+    REQUIRE_FALSE(page->items.isEmpty());
+    return page->items.front();
+  }
+
+  SessionCapabilities capabilities() {
+    SessionCapabilities c;
+    c.supportsSyncPlayPlaybackRate = true;
+    c.deviceProfile = buildDeviceProfile({});
+    return c;
+  }
+
+  // A signed-in client with its session socket ready.
+  struct Connection {
+    std::unique_ptr<JellyfinClient> client;
+    std::unique_ptr<SessionSocket> socket;
+    std::unique_ptr<SyncPlayApi> syncPlay;
+
+    explicit Connection(const QString& deviceId) : client(signedIn(deviceId)) {
+      REQUIRE(run<Empty>([&](auto done) { client->reportCapabilities(capabilities(), nullptr, done); }).ok());
+      socket = std::make_unique<SessionSocket>(*client);
+      syncPlay = std::make_unique<SyncPlayApi>(*client);
+      QSignalSpy ready(socket.get(), &SessionSocket::ready);
+      socket->start();
+      REQUIRE(waitFor([&] { return ready.count() == 1; }, 20000));
+    }
+  };
+
+#ifdef JFD_SESSION_TEST_MPV
+  struct Backend {
+    media::MpvPlayer player{[] {
+      media::MpvPlayer::Options options;
+      options.audioOutput = QStringLiteral("null");
+      options.extra = {{"vo", "null"}, {"hr-seek", "yes"}};
+      return options;
+    }()};
+    SessionRuntime::BackendFactory factory() {
+      return [this](const core::Clock& clock, SessionRuntime::Post post) {
+        return std::make_unique<media::MpvMediaBackend>(player, clock, std::move(post));
+      };
+    }
+  };
+#else
+  struct Backend {
+    SessionRuntime::BackendFactory factory() {
+      return [](const core::Clock& clock, SessionRuntime::Post post) {
+        return std::make_unique<testing::VirtualBackend>(clock, std::move(post));
+      };
+    }
+  };
+#endif
+
+  // The virtual and mpv builds may run at the same time: separate sessions.
+  QString device(const char* name) {
+#ifdef JFD_SESSION_TEST_MPV
+    return QStringLiteral("jfd-runtime-mpv-") + QLatin1String(name);
+#else
+    return QStringLiteral("jfd-runtime-") + QLatin1String(name);
+#endif
+  }
+
+  bool contains(const std::vector<std::string>& names, const QString& name) {
+    return std::find(names.begin(), names.end(), name.toStdString()) != names.end();
+  }
+} // namespace
+
+TEST_CASE("Our client creates a group, plays its item and follows another member") {
+  Connection host(device("host"));
+  Connection guest(device("guest"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  const Item episode = findItem(*host.client, QStringLiteral("Episode"));
+
+  Backend backend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+  core::SessionSnapshot latest;
+  auto subscription = runtime.hub().subscribe([&](const core::SessionSnapshot& s) { latest = s; });
+  const auto& user = env("JFD_TEST_USER");
+
+  runtime.createGroup(device("group"));
+  REQUIRE(waitFor([&] { return latest.group.has_value(); }, 20000));
+  CHECK(latest.group->name == device("group").toStdString());
+  CHECK(contains(latest.group->participants, user));
+  const QString groupId = QString::fromStdString(latest.group->group.value());
+
+  // The group's item reaches the launcher, which opens the server's stream.
+  REQUIRE(run<Empty>([&](auto done) { host.syncPlay->setNewQueue({movie.id, episode.id}, 0, 0, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return latest.item.value() == movie.id.toStdString() &&
+                               latest.phase == core::PlaybackPhase::Paused; }, 30000));
+  CHECK(latest.title == movie.name.toStdString());
+
+  // Play through the session: the group unpauses everyone, us included.
+  runtime.post(core::intent::Play{});
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Playing &&
+                               latest.group->state == core::GroupState::Playing; }, 20000));
+  REQUIRE(waitFor([&] { return latest.position.milliseconds() > 2'000 && latest.group->driftMilliseconds; }, 20000));
+  MESSAGE("drift while playing: " << *latest.group->driftMilliseconds << " ms");
+  CHECK(std::abs(*latest.group->driftMilliseconds) < 400);
+
+  // Another member joins (without holding the group back) and leaves.
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->joinGroup(groupId, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setIgnoreWait(true, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return latest.group && latest.group->participants.size() == 2; }, 20000));
+
+  // A seek by the other member moves us too.
+  const std::int64_t target = 15'000;
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->seek(target * 10'000, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Playing &&
+                               latest.position.milliseconds() >= target &&
+                               latest.position.milliseconds() < target + 5'000; }, 20000));
+
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->leaveGroup(nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return latest.group && latest.group->participants.size() == 1; }, 20000));
+
+  // Next from the media keys moves the group to the episode.
+  runtime.post(core::intent::Next{});
+  REQUIRE(waitFor([&] { return latest.item.value() == episode.id.toStdString() && latest.phase != core::PlaybackPhase::Loading; }, 30000));
+  CHECK(latest.title == (episode.seriesName + QStringLiteral(" – ") + episode.name).toStdString());
+
+  bool left = false;
+  runtime.leaveBeforeExit([&] { left = true; });
+  REQUIRE(waitFor([&] { return left; }, 5000));
+  REQUIRE(waitFor([&] { return !latest.group.has_value(); }, 10000));
+}
+
+TEST_CASE("Playing alone resolves the item and reports Next to the app's queue") {
+  Connection host(device("solo"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  Backend backend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+  QSignalSpy steps(&runtime, &SessionRuntime::queueStepRequested);
+
+  runtime.play(movie.id, 5'000 * 10'000);
+  REQUIRE(waitFor([&] { return runtime.snapshot().phase == core::PlaybackPhase::Playing &&
+                               runtime.snapshot().position.milliseconds() >= 5'000; }, 30000));
+  CHECK_FALSE(runtime.snapshot().group);
+  runtime.post(core::intent::Next{});
+  REQUIRE(waitFor([&] { return steps.count() == 1; }, 5000));
+  CHECK(steps.front().front().toBool());
+}
