@@ -157,7 +157,16 @@ namespace jfd::syncplay {
         if (id.empty()) id = stringField(data, "GroupId");
         joined.group = GroupId(id);
         joined.state = parseState(stringField(data, "State"));
+        joined.name = stringField(data, "GroupName");
+        if (const Json* participants = field(data, "Participants"); participants && participants->is_array())
+          for (const Json& participant : *participants)
+            if (participant.is_string()) joined.participants.push_back(participant.get<std::string>());
         return joined;
+      }
+      if (type == "UserJoined" || type == "UserLeft") {
+        const std::string name = inner && inner->is_string() ? inner->get<std::string>() : std::string();
+        if (type == "UserJoined") return wire::UserJoined{name};
+        return wire::UserLeft{name};
       }
       if (type == "GroupLeft") return wire::GroupLeft{};
       if (type == "StateUpdate") {
@@ -170,6 +179,12 @@ namespace jfd::syncplay {
           type == "JoinGroupDenied" || type == "LibraryAccessDenied")
         return wire::Refused{type};
       return wire::Other{"SyncPlayGroupUpdate/" + type};
+    }
+
+    std::string itemBody(const PlaylistItemId& item) {
+      Json body = Json::object();
+      body["PlaylistItemId"] = item.value();
+      return body.dump();
     }
 
     std::string positionBody(const char* name, MediaTicks position) {
@@ -297,9 +312,13 @@ namespace jfd::syncplay {
             Json body = Json::object();
             body["PlaybackRate"] = m.rate.value();
             return {HttpRequest::Method::Post, "/SyncPlay/SetPlaybackRate", body.dump()};
-          } else {
-            static_assert(std::is_same_v<T, outgoing::RequestStop>);
+          } else if constexpr (std::is_same_v<T, outgoing::RequestStop>) {
             return {HttpRequest::Method::Post, "/SyncPlay/Stop", {}};
+          } else if constexpr (std::is_same_v<T, outgoing::RequestNextItem>) {
+            return {HttpRequest::Method::Post, "/SyncPlay/NextItem", itemBody(m.playlistItem)};
+          } else {
+            static_assert(std::is_same_v<T, outgoing::RequestPreviousItem>);
+            return {HttpRequest::Method::Post, "/SyncPlay/PreviousItem", itemBody(m.playlistItem)};
           }
         },
         message);

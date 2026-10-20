@@ -4,7 +4,9 @@
 #include <jfd/core/Ids.h>
 #include <jfd/core/Time.h>
 
+#include <string>
 #include <variant>
+#include <vector>
 
 // SyncPlay as the playback session sees it: typed group messages coming in
 // (decoded and epoch-tagged by the syncplay module) and the messages the
@@ -35,9 +37,21 @@ namespace jfd::core {
 
     // Membership began: on join, on create, or again after a reconnect. The
     // syncplay module issues a new epoch each time.
+    // Participants are user names as the server lists them: one entry per
+    // session, so a user in the group from two devices appears twice.
+    // SyncPlay 12.2 has no per-participant ready or buffering state; the
+    // group state (Waiting) is the only sign that someone is not ready.
     struct Joined {
       GroupEpoch epoch;
       GroupId group;
+      std::string name;
+      std::vector<std::string> participants;
+    };
+
+    // UserJoined or UserLeft: the full list after the change.
+    struct ParticipantsChanged {
+      GroupEpoch epoch;
+      std::vector<std::string> participants;
     };
 
     struct Left {
@@ -144,12 +158,28 @@ namespace jfd::core {
       bool operator==(const RequestStop&) const = default;
     };
 
+    // POST SyncPlay/NextItem and SyncPlay/PreviousItem. The server ignores
+    // the request unless the item is still the current one, so a repeated
+    // press skips only once.
+    struct RequestNextItem {
+      GroupEpoch epoch;
+      PlaylistItemId playlistItem;
+      bool operator==(const RequestNextItem&) const = default;
+    };
+
+    struct RequestPreviousItem {
+      GroupEpoch epoch;
+      PlaylistItemId playlistItem;
+      bool operator==(const RequestPreviousItem&) const = default;
+    };
+
   } // namespace outgoing
 
   using SyncPlayMessage =
       std::variant<outgoing::Ready, outgoing::Buffering, outgoing::RequestPause,
                    outgoing::RequestUnpause, outgoing::RequestSeek,
-                   outgoing::RequestPlaybackRate, outgoing::RequestStop>;
+                   outgoing::RequestPlaybackRate, outgoing::RequestStop,
+                   outgoing::RequestNextItem, outgoing::RequestPreviousItem>;
 
   // Implemented by the syncplay module. Messages whose epoch is no longer the
   // current group epoch are dropped there, not sent.

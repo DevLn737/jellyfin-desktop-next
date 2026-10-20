@@ -33,6 +33,7 @@ include(cmake/JfdModules.cmake)
 
 add_subdirectory(src/core)
 add_subdirectory(src/syncplay)
+add_subdirectory(src/session)
 add_subdirectory(src/diagnostics)
 
 # Headless SyncPlay client for the drift checks (POSIX only).

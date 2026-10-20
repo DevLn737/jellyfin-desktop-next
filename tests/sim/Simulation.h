@@ -55,6 +55,9 @@ namespace jfd::sim {
     // The server has no playback-rate extension: every rate request is
     // refused with 409 and commands carry no rate.
     bool stockServer = false;
+    // Drift: every client adds an external audio track while the group
+    // plays (mpv then restarts or waits for data); checks drift after it.
+    bool externalAudio = false;
     // Prints the inputs, backend commands and messages of one client.
     int traceClient = -1;
   };
@@ -63,6 +66,8 @@ namespace jfd::sim {
     std::vector<std::int64_t> samplesMs;
     // Absolute drift of the cold client 10, 15 and 20 s after it joined.
     std::vector<std::int64_t> coldJoinMs;
+    // Absolute drift 10 s after a client added external audio.
+    std::vector<std::int64_t> afterTrackMs;
     std::int64_t p95() const;
     std::int64_t max() const;
   };
@@ -74,6 +79,7 @@ namespace jfd::sim {
     std::uint64_t staleInputs = 0;
     std::uint64_t readyReports = 0;
     std::uint64_t corrections = 0;
+    std::uint64_t tracksAdded = 0;
   };
 
   ScenarioResult runScenario(const ScenarioConfig& config);

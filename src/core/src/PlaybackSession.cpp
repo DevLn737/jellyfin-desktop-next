@@ -68,6 +68,8 @@ namespace jfd::core {
             [&](const intent::Seek&) { return true; },
             [&](const intent::SetRate&) { return true; },
             [&](const intent::Stop&) { return true; },
+            [&](const intent::Next&) { return true; },
+            [&](const intent::Previous&) { return true; },
             [&](const group::Joined& joined) {
               return joined.epoch.isValid() && joined.epoch > m_latestGroupEpoch;
             },
@@ -174,6 +176,46 @@ namespace jfd::core {
     stopMedia(PlaybackPhase::Idle);
   }
 
+  void PlaybackSession::on(const intent::Next&) { stepQueue(true); }
+
+  void PlaybackSession::on(const intent::Previous&) { stepQueue(false); }
+
+  void PlaybackSession::stepQueue(bool forward) {
+    if (!m_group) {
+      m_ports.observer.notify(notice::QueueStepRequested{forward});
+      return;
+    }
+    if (m_group->playlistItem.isEmpty()) return;
+    if (forward)
+      m_ports.syncPlay.send(outgoing::RequestNextItem{m_group->epoch, m_group->playlistItem});
+    else
+      m_ports.syncPlay.send(outgoing::RequestPreviousItem{m_group->epoch, m_group->playlistItem});
+  }
+
+  // A track switch is local: it changes neither the position nor readiness,
+  // and the group is not told. mpv may still restart playback or wait for
+  // data after it; those arrive as ordinary backend events.
+  void PlaybackSession::on(const intent::SelectTrack& select) {
+    m_ports.backend.selectTrack(m_media->epoch, select.kind, select.trackId);
+  }
+
+  void PlaybackSession::on(const intent::AddExternalTrack& add) {
+    ExternalTrackRequest track;
+    track.request = m_requests.advance();
+    track.state.track = add.track;
+    m_media->tracks.push_back(std::move(track));
+    // Before the file is open the backend has nothing to add a track to.
+    if (m_media->opened) issueExternalTracks();
+  }
+
+  void PlaybackSession::issueExternalTracks() {
+    for (auto& track : m_media->tracks) {
+      if (track.issued) continue;
+      track.issued = true;
+      m_ports.backend.addExternalTrack(m_media->epoch, track.request, track.state.track);
+    }
+  }
+
   // ---- Backend events ------------------------------------------------------
 
   void PlaybackSession::on(const backend::SourceOpened& opened) {
@@ -192,6 +234,7 @@ namespace jfd::core {
     media.target = target;
     media.readiness.begin(m_requests.advance(), target, false);
     m_ports.backend.start(media.epoch, start);
+    issueExternalTracks();
   }
 
   void PlaybackSession::on(const backend::SeekStarted&) {
@@ -217,10 +260,16 @@ namespace jfd::core {
     const bool wasBuffering = m_media->buffering;
     applySample(progress.sample);
     if (!m_group || !mediaFollowsGroup() || !m_media->started) return;
-    if (m_media->purpose == ReadyPurpose::None && m_media->buffering != wasBuffering) {
-      // Leaving any correction while the backend waits for data, as Web does.
-      if (m_media->buffering) clearCorrection();
-      reportReady(!m_media->buffering);
+    if (m_media->purpose == ReadyPurpose::None) {
+      if (m_media->buffering != wasBuffering) {
+        // Leaving any correction while the backend waits for data, as Web does.
+        if (m_media->buffering) clearCorrection();
+        reportReady(!m_media->buffering);
+      } else if (!m_media->buffering && m_group->reportedBuffering) {
+        // Buffering ended during a seek (the group's Pause answers our
+        // Buffering with one): the group waits for our Ready until we send it.
+        reportReady(true);
+      }
     }
     synchronize();
   }
@@ -241,6 +290,12 @@ namespace jfd::core {
 
   void PlaybackSession::on(const backend::RequestFailed& failed) {
     Media& media = *m_media;
+    for (auto& track : media.tracks) {
+      if (track.request != failed.request) continue;
+      track.state.status = ExternalTrackState::Status::Failed;
+      track.state.error = failed.error.empty() ? "The track could not be added." : failed.error;
+      return;
+    }
     if (media.readiness.pending() != failed.request) return;
     media.readiness.failed(failed.request);
     media.purpose = ReadyPurpose::None;
@@ -248,7 +303,14 @@ namespace jfd::core {
     cancel(media.readyDeadline);
   }
 
-  void PlaybackSession::on(const backend::TrackAdded&) {}
+  void PlaybackSession::on(const backend::TrackAdded& added) {
+    for (auto& track : m_media->tracks) {
+      if (track.request != added.request) continue;
+      track.state.status = ExternalTrackState::Status::Added;
+      track.state.trackId = added.trackId;
+      return;
+    }
+  }
 
   // ---- Group messages ------------------------------------------------------
 
@@ -258,11 +320,17 @@ namespace jfd::core {
     Group group;
     group.epoch = joined.epoch;
     group.id = joined.group;
+    group.name = joined.name;
+    group.participants = joined.participants;
     m_group = std::move(group);
     applyEffectiveRate();
   }
 
   void PlaybackSession::on(const group::Left&) { leaveGroup(); }
+
+  void PlaybackSession::on(const group::ParticipantsChanged& changed) {
+    m_group->participants = changed.participants;
+  }
 
   void PlaybackSession::on(const group::ConnectionLost&) {
     clearScheduledCommand();
@@ -677,6 +745,8 @@ namespace jfd::core {
       s.media = m_media->epoch;
       s.item = m_media->request.item;
       s.mediaSource = m_media->request.mediaSource;
+      s.title = m_media->request.title;
+      for (const auto& track : m_media->tracks) s.externalTracks.push_back(track.state);
       s.position = m_media->position.value_or(m_media->request.start);
       s.duration = m_media->duration;
       if (!m_media->started)
@@ -691,6 +761,8 @@ namespace jfd::core {
     if (m_group) {
       GroupSnapshot g;
       g.group = m_group->id;
+      g.name = m_group->name;
+      g.participants = m_group->participants;
       g.state = m_group->state;
       g.baseRate = m_group->baseRate;
       g.connected = m_group->connected;

@@ -80,6 +80,31 @@ TEST_CASE("Joining issues a new epoch and tags group messages with it") {
   CHECK(commands[0].playlistItem == PlaylistItemId("p1"));
 }
 
+TEST_CASE("Participants come with the join and follow UserJoined and UserLeft") {
+  Fixture f;
+  f.client.onMessage(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"GroupId":"g1",
+    "Type":"GroupJoined","Data":{"GroupId":"g1","GroupName":"Movie night","State":"Idle",
+    "Participants":["anna"]}}})");
+  const auto joined = f.all<group::Joined>();
+  REQUIRE(joined.size() == 1);
+  CHECK(joined[0].name == "Movie night");
+  CHECK(joined[0].participants == std::vector<std::string>{"anna"});
+
+  const auto user = [&](const char* type, const char* name) {
+    f.client.onMessage(std::string(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"GroupId":"g1","Type":")") +
+                       type + R"(","Data":")" + name + R"("}})");
+  };
+  user("UserJoined", "boris");
+  user("UserJoined", "anna");
+  user("UserLeft", "anna");
+  user("UserLeft", "nobody");
+  const auto changes = f.all<group::ParticipantsChanged>();
+  REQUIRE(changes.size() == 3);
+  CHECK(changes[0].participants == std::vector<std::string>{"anna", "boris"});
+  CHECK(changes[2].participants == std::vector<std::string>{"boris", "anna"});
+  CHECK(changes[2].epoch == joined[0].epoch);
+}
+
 TEST_CASE("Outgoing messages of an earlier membership are not sent") {
   Fixture f;
   f.joined();

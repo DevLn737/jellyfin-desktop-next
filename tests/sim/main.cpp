@@ -7,7 +7,7 @@
 
 // Usage: jfd_simulator [--mode chaos|drift] [--scenarios N] [--seed S]
 //                      [--duration SECONDS] [--clients N] [--rate R] [--stock-server]
-//                      [--trace CLIENT]
+//                      [--external-audio] [--trace CLIENT]
 // Exits with 1 when any invariant or threshold is violated.
 int main(int argc, char** argv) {
   using namespace jfd::sim;
@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
     else if (arg == "--clients") base.clients = std::stoi(value());
     else if (arg == "--rate") base.baseRate = PlaybackRate::base(std::stod(value())).value_or(PlaybackRate::normal());
     else if (arg == "--stock-server") base.stockServer = true;
+    else if (arg == "--external-audio") base.externalAudio = true;
     else if (arg == "--trace") base.traceClient = std::stoi(value());
     else {
       std::cerr << "unknown argument " << arg << "\n";
@@ -30,8 +31,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::uint64_t violations = 0, inputs = 0, stale = 0, ready = 0, corrections = 0;
-  std::int64_t worstP95 = 0, worstMax = 0, worstCold = 0;
+  std::uint64_t violations = 0, inputs = 0, stale = 0, ready = 0, corrections = 0, tracks = 0;
+  std::int64_t worstP95 = 0, worstMax = 0, worstCold = 0, worstTrack = 0;
   for (int n = 0; n < scenarios; ++n) {
     ScenarioConfig config = base;
     config.seed = base.seed + static_cast<std::uint64_t>(n);
@@ -41,9 +42,11 @@ int main(int argc, char** argv) {
     stale += result.staleInputs;
     ready += result.readyReports;
     corrections += result.corrections;
+    tracks += result.tracksAdded;
     worstP95 = std::max(worstP95, result.drift.p95());
     worstMax = std::max(worstMax, result.drift.max());
     for (const auto v : result.drift.coldJoinMs) worstCold = std::max(worstCold, v);
+    for (const auto v : result.drift.afterTrackMs) worstTrack = std::max(worstTrack, v);
     if (!result.violations.empty()) {
       if (violations < 10)
         for (std::size_t k = 0; k < std::min<std::size_t>(result.violations.size(), 3); ++k)
@@ -53,10 +56,11 @@ int main(int argc, char** argv) {
   }
   std::cout << "scenarios=" << scenarios << " inputs=" << inputs << " stale_inputs=" << stale
             << " ready_reports=" << ready << " corrections=" << corrections
-            << " violations=" << violations;
+            << " tracks_added=" << tracks << " violations=" << violations;
   if (base.mode == Mode::Drift)
     std::cout << " drift_p95_ms=" << worstP95 << " drift_max_ms=" << worstMax
               << " cold_join_max_ms=" << worstCold;
+  if (base.mode == Mode::Drift && base.externalAudio) std::cout << " after_track_max_ms=" << worstTrack;
   std::cout << "\n";
   return violations == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

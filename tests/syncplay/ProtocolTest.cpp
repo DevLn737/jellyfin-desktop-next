@@ -76,6 +76,21 @@ TEST_CASE("Group updates decode") {
   REQUIRE(std::holds_alternative<wire::GroupJoined>(*joined));
   CHECK(std::get<wire::GroupJoined>(*joined).group == GroupId("abc"));
   CHECK(std::get<wire::GroupJoined>(*joined).state == GroupState::Paused);
+  CHECK(std::get<wire::GroupJoined>(*joined).name == "x");
+  CHECK(std::get<wire::GroupJoined>(*joined).participants.empty());
+
+  auto withParticipants = parseMessage(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"GroupId":"abc",
+    "Type":"GroupJoined","Data":{"GroupId":"abc","GroupName":"x","State":"Idle",
+    "Participants":["anna","boris"],"LastUpdatedAt":"2026-10-20T07:00:00.0000000Z"}}})");
+  CHECK(std::get<wire::GroupJoined>(*withParticipants).participants ==
+        std::vector<std::string>{"anna", "boris"});
+
+  auto userJoined = parseMessage(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"GroupId":"abc",
+    "Type":"UserJoined","Data":"boris"}})");
+  CHECK(std::get<wire::UserJoined>(*userJoined).name == "boris");
+  auto userLeft = parseMessage(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"GroupId":"abc",
+    "Type":"UserLeft","Data":"boris"}})");
+  CHECK(std::get<wire::UserLeft>(*userLeft).name == "boris");
 
   auto state = parseMessage(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"Type":"StateUpdate",
     "Data":{"State":"Waiting","Reason":"Buffer"}}})");
@@ -138,6 +153,11 @@ TEST_CASE("Outgoing messages become the documented requests") {
         R"({"PositionTicks":10000})");
   CHECK(requestFor(outgoing::RequestPause{}).path == "/SyncPlay/Pause");
   CHECK(requestFor(outgoing::RequestUnpause{}).path == "/SyncPlay/Unpause");
+  request = requestFor(outgoing::RequestNextItem{{}, PlaylistItemId("p1")});
+  CHECK(request.path == "/SyncPlay/NextItem");
+  CHECK(request.body == R"({"PlaylistItemId":"p1"})");
+  CHECK(requestFor(outgoing::RequestPreviousItem{{}, PlaylistItemId("p1")}).path ==
+        "/SyncPlay/PreviousItem");
   CHECK(joinGroupRequest(GroupId("g")).body == R"({"GroupId":"g"})");
   CHECK(utcTimeRequest().method == HttpRequest::Method::Get);
 }

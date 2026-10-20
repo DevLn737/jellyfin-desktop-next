@@ -35,6 +35,7 @@ namespace jfd::core {
     std::string url;
     std::string title;
     std::string language;
+    bool operator==(const ExternalTrack&) const = default;
   };
 
   class MediaBackend {

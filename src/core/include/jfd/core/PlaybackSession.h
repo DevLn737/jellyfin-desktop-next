@@ -14,6 +14,8 @@
 #include <deque>
 #include <map>
 #include <optional>
+#include <string>
+#include <vector>
 
 // The single owner of playback state (ADR 0003). One queue of inputs; stale
 // inputs are dropped on entry; only the session commands the backend and
@@ -53,6 +55,12 @@ namespace jfd::core {
   private:
     enum class ReadyPurpose { None, Local, GroupOpen, GroupSeek, Sync };
 
+    struct ExternalTrackRequest {
+      RequestId request;
+      ExternalTrackState state;
+      bool issued = false;
+    };
+
     struct Media {
       MediaEpoch epoch;
       MediaRequest request;
@@ -70,11 +78,14 @@ namespace jfd::core {
       LocalInstant sampledAt;
       std::optional<MediaTicks> duration;
       std::optional<PlaybackRate> appliedRate;
+      std::vector<ExternalTrackRequest> tracks;
     };
 
     struct Group {
       GroupEpoch epoch;
       GroupId id;
+      std::string name;
+      std::vector<std::string> participants;
       GroupState state = GroupState::Idle;
       PlaybackRate baseRate = PlaybackRate::normal();
       bool connected = true;
@@ -102,6 +113,10 @@ namespace jfd::core {
     void on(const intent::Seek&);
     void on(const intent::SetRate&);
     void on(const intent::Stop&);
+    void on(const intent::Next&);
+    void on(const intent::Previous&);
+    void on(const intent::SelectTrack&);
+    void on(const intent::AddExternalTrack&);
     void on(const backend::SourceOpened&);
     void on(const backend::SeekStarted&);
     void on(const backend::PlaybackRestarted&);
@@ -111,6 +126,7 @@ namespace jfd::core {
     void on(const backend::TrackAdded&);
     void on(const group::Joined&);
     void on(const group::Left&);
+    void on(const group::ParticipantsChanged&);
     void on(const group::ConnectionLost&);
     void on(const group::StateChanged&);
     void on(const group::Command&);
@@ -127,6 +143,8 @@ namespace jfd::core {
     void applyEffectiveRate();
     PlaybackRate effectiveRate() const;
     void readyConfirmed(ReadyPurpose purpose);
+    void issueExternalTracks();
+    void stepQueue(bool forward);
     bool mediaFollowsGroup() const;
     bool mediaFollowsGroupItem(const PlaylistItemId& item) const;
 

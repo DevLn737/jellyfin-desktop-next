@@ -403,6 +403,9 @@ namespace {
                              {"kind", "readyTimedOut"},
                              {"positionMs", timedOut.target.milliseconds()}});
                      },
+                     [&](const notice::QueueStepRequested& step) {
+                       emit({{"t", "notice"}, {"kind", "queueStep"}, {"forward", step.forward}});
+                     },
                  },
                  notice);
     }
