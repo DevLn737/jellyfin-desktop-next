@@ -28,7 +28,7 @@ namespace {
   const char* AuthJson = R"({
     "AccessToken": "token1", "ServerId": "server1",
     "SessionInfo": {"Id": "session1"},
-    "User": {"Id": "user1", "Name": "ruslan", "ServerId": "server1",
+    "User": {"Id": "user1", "Name": "alice", "ServerId": "server1",
              "Policy": {"SyncPlayAccess": "CreateAndJoinGroups"}}
   })";
 
@@ -69,7 +69,7 @@ TEST_CASE("Sign-in sends the identity, stores the token and uses it afterwards")
   FakeServer server([](const HttpRequest& r) -> HttpResponse {
     if (r.path == QLatin1String("/Users/AuthenticateByName")) return jfd::test::json(AuthJson);
     if (r.path == QLatin1String("/Users/Me"))
-      return jfd::test::json(R"({"Id": "user1", "Name": "ruslan"})");
+      return jfd::test::json(R"({"Id": "user1", "Name": "alice"})");
     return {404, {}, {}, 0};
   });
   JellyfinClient client(identity());
@@ -77,7 +77,7 @@ TEST_CASE("Sign-in sends the identity, stores the token and uses it afterwards")
   QSignalSpy changed(&client, &JellyfinClient::sessionChanged);
 
   auto auth = run<AuthenticationResult>([&](auto done) {
-    client.signIn(QStringLiteral("ruslan"), QStringLiteral("pw"), nullptr, done);
+    client.signIn(QStringLiteral("alice"), QStringLiteral("pw"), nullptr, done);
   });
   REQUIRE(*auth);
   CHECK((*auth)->accessToken == QStringLiteral("token1"));
@@ -91,7 +91,7 @@ TEST_CASE("Sign-in sends the identity, stores the token and uses it afterwards")
   CHECK_FALSE(signInRequest.headers.value("authorization").contains("Token="));
   CHECK(signInRequest.headers.value("authorization").contains("DeviceId=\"device1\""));
   const auto body = QJsonDocument::fromJson(signInRequest.body).object();
-  CHECK(body.value(QStringLiteral("Username")).toString() == QStringLiteral("ruslan"));
+  CHECK(body.value(QStringLiteral("Username")).toString() == QStringLiteral("alice"));
   CHECK(body.value(QStringLiteral("Pw")).toString() == QStringLiteral("pw"));
 
   auto me = run<UserInfo>([&](auto done) { client.currentUser(nullptr, done); });
@@ -275,7 +275,7 @@ TEST_CASE("SyncPlay groups list and create") {
   FakeServer server([](const HttpRequest& r) -> HttpResponse {
     if (r.path == QLatin1String("/SyncPlay/List"))
       return jfd::test::json(R"([{"GroupId": "g1", "GroupName": "Movie night", "State": "Idle",
-        "Participants": ["ruslan"], "LastUpdatedAt": "2026-10-20T07:00:00Z"}])");
+        "Participants": ["alice"], "LastUpdatedAt": "2026-10-20T07:00:00Z"}])");
     if (r.path == QLatin1String("/SyncPlay/New"))
       return jfd::test::json(
           R"({"GroupId": "g2", "GroupName": "New", "State": "Idle", "Participants": []})");

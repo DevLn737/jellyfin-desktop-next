@@ -13,14 +13,14 @@ using namespace jfd::api;
 
 TEST_CASE("Authorization header carries the identity and percent-encodes values") {
   ClientIdentity identity{QStringLiteral("Jellyfin Desktop Next"), QStringLiteral("0.0.1"),
-                          QStringLiteral("Ruslan's PC + \"Test\""), QStringLiteral("abc123")};
+                          QStringLiteral("Alice's PC + \"Test\""), QStringLiteral("abc123")};
   const QByteArray header = authorizationHeader(identity, QStringLiteral("tok"));
   CHECK(header == "MediaBrowser Client=\"Jellyfin%20Desktop%20Next\", "
-                  "Device=\"Ruslan%27s%20PC%20%2B%20%22Test%22\", "
+                  "Device=\"Alice%27s%20PC%20%2B%20%22Test%22\", "
                   "DeviceId=\"abc123\", Version=\"0.0.1\", Token=\"tok\"");
   // The server URL-decodes every value; decoding must give the original back.
-  CHECK(QUrl::fromPercentEncoding("Ruslan%27s%20PC%20%2B%20%22Test%22") ==
-        QStringLiteral("Ruslan's PC + \"Test\""));
+  CHECK(QUrl::fromPercentEncoding("Alice%27s%20PC%20%2B%20%22Test%22") ==
+        QStringLiteral("Alice's PC + \"Test\""));
   CHECK_FALSE(authorizationHeader(identity, {}).contains("Token"));
 }
 
