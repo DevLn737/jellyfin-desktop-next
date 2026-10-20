@@ -5,13 +5,21 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
 #include <jfd/api/SyncPlayApi.h>
+#include <jfd/library/HomeModel.h>
+#include <jfd/library/ImageCache.h>
 #include <jfd/library/ItemBrowser.h>
+#include <jfd/library/ItemDetails.h>
+#include <jfd/library/LibraryModel.h>
+#include <jfd/library/SearchModel.h>
+#include <jfd/library/SignIn.h>
+#include <jfd/platform/CredentialStore.h>
 
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 
 #include <memory>
 #include <optional>
@@ -342,6 +350,96 @@ TEST_CASE("Favorites, details with trickplay, tiles and media segments") {
       [&](auto done) { client->mediaSegments(episode.id, nullptr, done); });
   REQUIRE(segments.ok());
   CHECK(segments->isEmpty());
+}
+
+TEST_CASE("Sign-in, home, series, season, episode and Play through the library models") {
+  auto client = makeClient(QStringLiteral("jfd-screens"));
+  QTemporaryDir dir;
+  library::ServerStore servers(dir.filePath(QStringLiteral("servers.ini")));
+  platform::MemoryCredentialStore tokens;
+  library::SignIn signIn(*client, servers, tokens);
+  signIn.connectToServer(env("JFD_TEST_SERVER_URL"));
+  REQUIRE(waitFor([&] { return signIn.step() == library::SignIn::Step::Credentials; }, 20000));
+  // Quick Connect is on by default in 12.x.
+  CHECK(signIn.quickConnectAvailable());
+  signIn.signIn(env("JFD_TEST_USER"), env("JFD_TEST_PASSWORD"));
+  REQUIRE(waitFor([&] { return signIn.step() == library::SignIn::Step::SignedIn; }, 20000));
+
+  // A second start restores the session without the password.
+  auto restarted = makeClient(QStringLiteral("jfd-screens"));
+  library::SignIn again(*restarted, servers, tokens);
+  REQUIRE(again.restore());
+  CHECK(restarted->accessToken() == client->accessToken());
+
+  library::HomeModel home(*client);
+  home.reload();
+  REQUIRE(waitFor([&] { return !home.loading(); }, 20000));
+  REQUIRE_MESSAGE(home.errorText().isEmpty(), home.errorText().toStdString());
+  int showsRow = -1;
+  for (int row = 0; row < home.count(); ++row)
+    if (home.rowKind(row) == QLatin1String("latest") &&
+        home.rowItems(row)->entry(0)->item.type == QLatin1String("Series"))
+      showsRow = row;
+  REQUIRE(showsRow >= 0);
+  const api::Item series = home.rowItems(showsRow)->entry(0)->item;
+
+  // The card's image loads at the card's size.
+  library::ImageCache cache(*client, dir.filePath(QStringLiteral("images")));
+  QImage poster;
+  const QUrl posterUrl = home.rowItems(showsRow)->entry(0)->imageUrl;
+  if (!posterUrl.isEmpty()) {
+    cache.request(posterUrl, QSize(200, 300), nullptr, [&](const QImage& i) { poster = i; });
+    REQUIRE(waitFor([&] { return !poster.isNull(); }, 20000));
+    CHECK(poster.width() <= 200);
+  }
+
+  library::ItemDetails page(*client);
+  QSignalSpy play(&page, &library::ItemDetails::playRequested);
+  page.setItemId(series.id);
+  REQUIRE(waitFor([&] { return page.loaded() && !page.loading() && page.episodes()->count() == 2; },
+                  20000));
+  CHECK(page.seasons()->count() == 1);
+  REQUIRE_FALSE(page.playTargetId().isEmpty());
+
+  // Into the season, then the episode, then Play.
+  library::ItemDetails season(*client);
+  season.setItemId(page.seasonId());
+  REQUIRE(waitFor([&] { return season.loaded() && !season.loading(); }, 20000));
+  REQUIRE(season.episodes()->count() == 2);
+  library::ItemDetails episode(*client);
+  QSignalSpy episodePlay(&episode, &library::ItemDetails::playRequested);
+  episode.setItemId(season.episodes()->entry(1)->item.id);
+  REQUIRE(waitFor([&] { return episode.loaded() && !episode.loading(); }, 20000));
+  CHECK(episode.subtitle() == QStringLiteral("S1:E2"));
+  episode.play();
+  REQUIRE(episodePlay.count() == 1);
+  CHECK(episodePlay[0][0].toString() == season.episodes()->entry(1)->item.id);
+  CHECK(episodePlay[0][1].toLongLong() == 0);
+}
+
+TEST_CASE("Library grid and search through the library models") {
+  auto client = signedIn(QStringLiteral("jfd-grid"));
+  auto views = run<ItemPage>([&](auto done) { client->views(nullptr, done); });
+  REQUIRE(views.ok());
+  QString movies;
+  for (const Item& view : views->items)
+    if (view.collectionType == QLatin1String("movies")) movies = view.id;
+  REQUIRE_FALSE(movies.isEmpty());
+
+  library::LibraryModel grid(*client);
+  grid.setCollectionType(QStringLiteral("movies"));
+  grid.setLibraryId(movies);
+  REQUIRE(waitFor([&] { return grid.count() >= 1 && !grid.loading(); }, 20000));
+  REQUIRE(grid.item(0) != nullptr);
+  CHECK(grid.item(0)->type == QStringLiteral("Movie"));
+  grid.setPlayedFilter(library::LibraryModel::PlayedFilter::Played);
+  grid.setFavoritesOnly(true);
+  REQUIRE(waitFor([&] { return !grid.loading() && grid.count() == 0; }, 20000));
+  CHECK(grid.errorText().isEmpty());
+
+  library::SearchModel search(*client);
+  search.setText(QStringLiteral("Test"));
+  REQUIRE(waitFor([&] { return search.results()->count() > 0 && !search.loading(); }, 20000));
 }
 
 TEST_CASE("PlaybackInfo resolves to streams mpv can open") {

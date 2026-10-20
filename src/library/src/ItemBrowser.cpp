@@ -6,70 +6,7 @@ namespace jfd::library {
 
   namespace {
     constexpr int ImageWidth = 400;
-
-    QString subtitleFor(const api::Item& item) {
-      if (item.type == QLatin1String("Episode") && item.indexNumber) {
-        if (item.parentIndexNumber)
-          return QStringLiteral("S%1:E%2").arg(*item.parentIndexNumber).arg(*item.indexNumber);
-        return QStringLiteral("E%1").arg(*item.indexNumber);
-      }
-      if (item.productionYear) return QString::number(*item.productionYear);
-      return {};
-    }
   } // namespace
-
-  int ItemListModel::rowCount(const QModelIndex& parent) const {
-    return parent.isValid() ? 0 : count();
-  }
-
-  QVariant ItemListModel::data(const QModelIndex& index, int role) const {
-    const Entry* e = entry(index.row());
-    if (!e || index.parent().isValid()) return {};
-    const api::Item& item = e->item;
-    switch (role) {
-    case Qt::DisplayRole:
-    case NameRole:
-      return item.name;
-    case IdRole:
-      return item.id;
-    case TypeRole:
-      return item.type;
-    case SubtitleRole:
-      return subtitleFor(item);
-    case ImageUrlRole:
-      return e->imageUrl;
-    case RunTimeTicksRole:
-      return item.runTimeTicks ? QVariant::fromValue<qint64>(*item.runTimeTicks) : QVariant();
-    case PlayedRole:
-      return item.userData.played;
-    case PlaybackPositionTicksRole:
-      return QVariant::fromValue<qint64>(item.userData.playbackPositionTicks);
-    case IsFolderRole:
-      return item.isFolder;
-    default:
-      return {};
-    }
-  }
-
-  QHash<int, QByteArray> ItemListModel::roleNames() const {
-    return {{IdRole, "itemId"},         {NameRole, "name"},
-            {TypeRole, "type"},         {SubtitleRole, "subtitle"},
-            {ImageUrlRole, "imageUrl"}, {RunTimeTicksRole, "runTimeTicks"},
-            {PlayedRole, "played"},     {PlaybackPositionTicksRole, "playbackPositionTicks"},
-            {IsFolderRole, "isFolder"}};
-  }
-
-  const ItemListModel::Entry* ItemListModel::entry(int row) const {
-    if (row < 0 || row >= count()) return nullptr;
-    return &m_entries[row];
-  }
-
-  void ItemListModel::setEntries(QList<Entry> entries) {
-    beginResetModel();
-    m_entries = std::move(entries);
-    endResetModel();
-    Q_EMIT countChanged();
-  }
 
   ItemBrowser::ItemBrowser(api::JellyfinClient& client, QObject* parent)
       : QObject(parent), m_client(client) {}

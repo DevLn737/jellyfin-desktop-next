@@ -574,6 +574,17 @@ namespace jfd::api {
              parsed<ItemPage>(std::move(done), json::itemPage));
   }
 
+  void JellyfinClient::nextUpForSeries(const QString& seriesId, QObject* context,
+                                       Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("seriesId"), seriesId);
+    query.addQueryItem(QStringLiteral("limit"), QStringLiteral("1"));
+    query.addQueryItem(Fields, ItemFields);
+    query.addQueryItem(QStringLiteral("enableTotalRecordCount"), QStringLiteral("false"));
+    sendJson(Method::Get, QStringLiteral("Shows/NextUp"), query, std::nullopt, context,
+             parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
   void JellyfinClient::latestItems(const QString& parentId, int limit, QObject* context,
                                    Callback<ItemPage> done) {
     QUrlQuery query = userQuery();

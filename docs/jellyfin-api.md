@@ -16,7 +16,14 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `DeviceProfile.h` | The 2.x client's device profile and its options |
 | `ServerTime.h` | ISO 8601 with seven fractional digits to and from `core::ServerInstant` |
 | `platform/CredentialStore.h` | Tokens in Windows Credential Manager or the Secret Service |
-| `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model |
+| `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model (the measurement prototype's) |
+| `library/SignIn.h`, `ServerStore.h` | The login flow: servers on the network and saved ones, version check, password and Quick Connect, token in the credential store, restore at start-up, sign-out, expired sessions |
+| `library/HomeModel.h` | Home rows: Continue watching, Next up, latest per video library; reloads keep rows on screen |
+| `library/LibraryModel.h` | A library as a grid with every row from the first page and pages loaded as rows are shown; sort and filters |
+| `library/ItemDetails.h` | A movie, series, season or episode page: seasons, episodes, similar, what Play starts, favorite and watched toggles; emits `playRequested` for the session's launcher |
+| `library/SearchModel.h` | Search as you type, stale answers dropped |
+| `library/ImageCache.h` | Images decoded at card size; memory limit (128 MiB), disk cache in the profile, newest requests first, cancellation |
+| `library/LibraryUpdates.h` | `UserDataChanged` and `LibraryChanged` from the socket, and local changes, to every model |
 
 ## Conventions
 

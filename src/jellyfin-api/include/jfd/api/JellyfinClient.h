@@ -164,6 +164,9 @@ namespace jfd::api {
     void resumeItems(int limit, const QString& parentId, QObject* context, Callback<ItemPage> done);
     // GET Shows/NextUp: the next episode of each series in progress.
     void nextUp(int limit, const QString& parentId, QObject* context, Callback<ItemPage> done);
+    // GET Shows/NextUp for one series, resumable episodes included: the
+    // episode "Play" on the series page starts.
+    void nextUpForSeries(const QString& seriesId, QObject* context, Callback<ItemPage> done);
     // GET Items/Latest for one library. Episodes are grouped into their
     // series, as in Jellyfin Web.
     void latestItems(const QString& parentId, int limit, QObject* context, Callback<ItemPage> done);
