@@ -90,6 +90,7 @@ public static class JfdWin {
     [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr hwnd);
     [DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool EnumDisplaySettings(string name, int mode, ref DEVMODE dm);
+    [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     public static IntPtr Find(int pid) {
         IntPtr best = IntPtr.Zero; long bestArea = 0;
         EnumWindows((h, p) => {
@@ -111,6 +112,10 @@ public static class JfdWin {
 }
 '@
 }
+# Screen bounds and window rects in physical pixels on every monitor: without
+# this, a 125 % display reports its logical size (2048x1152 for 2560x1440).
+# -4 is DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2; it fails if already set.
+if (-not [JfdWin]::SetProcessDpiAwarenessContext([IntPtr]-4)) { Log 'DPI awareness was already set for this process' }
 Add-Type -AssemblyName System.Windows.Forms
 
 function Get-Inventory {
