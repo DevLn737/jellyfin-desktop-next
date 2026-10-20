@@ -2,10 +2,12 @@
 # Jellyfin stream, playback reports, media segments. No UI, no mpv.
 add_library(jfd_playback STATIC
   src/PlaybackReporter.cpp
+  src/SegmentSkipper.cpp
   src/StreamPlan.cpp
   src/TrackController.cpp
   src/TrackTable.cpp
   include/jfd/playback/PlaybackReporter.h
+  include/jfd/playback/SegmentSkipper.h
   include/jfd/playback/StreamPlan.h
   include/jfd/playback/TrackController.h
   include/jfd/playback/TrackTable.h)
