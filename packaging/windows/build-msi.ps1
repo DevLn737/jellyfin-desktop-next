@@ -43,11 +43,11 @@ $arguments = @('build', (Join-Path $PSScriptRoot 'jellyfin-desktop-next.wxs'),
     '-bindpath', "Deployment=$Deployment",
     '-d', "Version=$Version", '-d', "ExeName=$ExeName",
     '-d', "IconFile=$(Join-Path $root 'packaging/icons/jellyfin-desktop-next.ico')",
-    # Per-user files under LocalAppData have file key paths; the uninstall
-    # removes the folder itself (util:RemoveFolderEx), so these ICEs about
-    # per-user components do not apply.
-    '-sice', 'ICE38', '-sice', 'ICE64', '-sice', 'ICE91',
     '-o', $outputPath)
 foreach ($extension in $wix.extensions) { $arguments += @('-ext', $extension) }
 Invoke-Checked $wixExe $arguments
+# Windows Installer's own consistency checks. Per-user files under LocalAppData
+# have file key paths and the uninstall removes the folder itself
+# (util:RemoveFolderEx), so the ICEs about per-user components do not apply.
+Invoke-Checked $wixExe @('msi', 'validate', '-sice', 'ICE38', '-sice', 'ICE64', '-sice', 'ICE91', $outputPath)
 Write-Host "MSI: $outputPath ($([Math]::Round((Get-Item $outputPath).Length / 1MB, 1)) MiB)"
