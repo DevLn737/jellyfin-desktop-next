@@ -1,0 +1,28 @@
+name: Package
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Discover upstream versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          git ls-remote --tags https://github.com/FFmpeg/FFmpeg 'refs/tags/n[0-9]*' | grep -v '\^{}' | grep -v dev | awk '{print $2, $1}' | sort -V | tail -12
+          git ls-remote --tags https://github.com/haasn/libplacebo | grep -v '\^{}' | awk '{print $2, $1}' | sort -V | tail -6
+          git ls-remote --tags https://github.com/libass/libass | grep -v '\^{}' | awk '{print $2, $1}' | sort -V | tail -3
+          gh api repos/mpv-player/mpv/commits/01e2533f3143b8940857ca419b0b367f583e05ca --jq '.commit.committer.date + " " + .commit.message' | head -3
+          for r in linuxdeploy/linuxdeploy linuxdeploy/linuxdeploy-plugin-qt; do
+            gh api repos/$r/releases --jq '.[0:4][] | .tag_name + " " + .published_at + " " + ([.assets[] | select(.name|test("x86_64")) | .name + "|" + (.size|tostring) + "|" + (.digest // "")] | join(", "))'
+          done
+          gh api repos/wixtoolset/wix/releases --jq '.[0:3][] | .tag_name + " " + .published_at'
+          gh api repos/shinchiro/mpv-winbuild-cmake/releases/tags/20261018 --jq '.body' | head -40
+          git clone -q --filter=blob:none --no-checkout https://github.com/mpv-player/mpv mpv && cd mpv && git checkout -q 01e2533f3143b8940857ca419b0b367f583e05ca -- meson.build && grep -n -E "libplacebo|libavcodec|libass|ffmpeg" meson.build | head -30
