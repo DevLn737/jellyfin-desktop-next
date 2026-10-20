@@ -49,3 +49,47 @@ TEST_CASE("PlaybackRate corrections may go below the minimum base rate") {
   CHECK_FALSE(PlaybackRate::effective(0.19));
   CHECK(PlaybackRate::normal().value() == doctest::Approx(1.0));
 }
+
+TEST_CASE("MediaDelta is signed and rounds to milliseconds once") {
+  const auto a = *MediaTicks::fromMilliseconds(1'000);
+  const auto b = *MediaTicks::fromMilliseconds(1'400);
+  CHECK((a - b).ticks() == -4'000'000);
+  CHECK((a - b).milliseconds() == -400);
+  CHECK(MediaDelta::fromTicks(5'000).milliseconds() == 1);
+  CHECK(MediaDelta::fromTicks(-5'000).milliseconds() == -1);
+  CHECK(MediaDelta::fromTicks(4'999).milliseconds() == 0);
+  CHECK(MediaDelta::fromTicks(-7).abs().ticks() == 7);
+}
+
+TEST_CASE("advance fails before the start of the timeline") {
+  const auto a = *MediaTicks::fromMilliseconds(100);
+  CHECK(advance(a, MediaDelta::fromMilliseconds(50))->milliseconds() == 150);
+  CHECK(advance(a, MediaDelta::fromMilliseconds(-100))->ticks() == 0);
+  CHECK_FALSE(advance(a, MediaDelta::fromMilliseconds(-101)));
+}
+
+TEST_CASE("Rates scale wall time to media time and back") {
+  const auto rate = *PlaybackRate::base(1.5);
+  const WallTicks twoSeconds = std::chrono::seconds(2);
+  CHECK(mediaElapsed(twoSeconds, rate).milliseconds() == 3'000);
+  CHECK(mediaElapsed(-twoSeconds, rate).milliseconds() == -3'000);
+  CHECK(wallElapsed(MediaDelta::fromMilliseconds(3'000), rate) == twoSeconds);
+  CHECK(wallElapsed(MediaDelta::fromMilliseconds(-3'000), rate) == -twoSeconds);
+  // round(1 tick * 1.25) = 1, round(3 ticks * 1.25) = 4: rounding, not truncation.
+  CHECK(mediaElapsed(WallTicks(3), *PlaybackRate::base(1.25)).ticks() == 4);
+}
+
+TEST_CASE("ClockOffset converts between local and server instants") {
+  const ClockOffset offset{WallTicks(std::chrono::seconds(10))};
+  const auto local = LocalInstant::fromSinceOrigin(std::chrono::seconds(5));
+  const auto server = offset.toServer(local);
+  CHECK(server.sinceOrigin() == std::chrono::seconds(15));
+  CHECK(offset.toLocal(server) == local);
+}
+
+TEST_CASE("PlaybackRate per-mille constructors keep the two ranges apart") {
+  CHECK(PlaybackRate::basePerMille(250));
+  CHECK_FALSE(PlaybackRate::basePerMille(249));
+  CHECK(PlaybackRate::effectivePerMille(200));
+  CHECK_FALSE(PlaybackRate::effectivePerMille(5001));
+}
