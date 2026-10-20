@@ -19,6 +19,8 @@ if(TARGET jfd_jellyfin_api)
     add_executable(${name} support/QtTestMain.cpp ${ARGN})
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(${name} PRIVATE doctest Qt6::Test)
+    # See src/jellyfin-api/CMakeLists.txt: C4702 from inlined Qt headers.
+    target_compile_options(${name} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME ${name} COMMAND ${name})
   endfunction()
 

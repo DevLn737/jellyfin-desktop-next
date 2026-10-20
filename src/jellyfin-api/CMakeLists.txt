@@ -23,3 +23,6 @@ target_include_directories(jfd_jellyfin_api PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/i
 target_link_libraries(jfd_jellyfin_api PUBLIC jfd::core Qt6::Core Qt6::Network Qt6::WebSockets)
 set_target_properties(jfd_jellyfin_api PROPERTIES AUTOMOC ON)
 target_compile_definitions(jfd_jellyfin_api PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
+# MSVC reports C4702 (unreachable code) from inlined Qt string helpers at
+# code generation, where /external:W0 no longer applies.
+target_compile_options(jfd_jellyfin_api PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
