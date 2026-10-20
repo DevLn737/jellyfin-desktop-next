@@ -20,7 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: syncplay-drift-${{ github.ref }}
+  # Long runs (dispatch, schedule) must not be cancelled by pushes to main.
+  group: syncplay-drift-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
