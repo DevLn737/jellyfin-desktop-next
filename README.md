@@ -36,7 +36,9 @@ The plan and its exit criteria are in [docs/roadmap.md](docs/roadmap.md).
 
 ## Building
 
-Only the Qt-free core library and its tests exist so far.
+The Qt-free core always builds. The Qt modules (`platform`, `jellyfin-api`,
+`library`) build when Qt 6.4+ with Qt WebSockets is found; see
+[docs/jellyfin-api.md](docs/jellyfin-api.md).
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
