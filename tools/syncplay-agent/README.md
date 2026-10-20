@@ -21,8 +21,9 @@ as one PR comment that is updated on every push.
 - **`NativeParticipant`** ([nativeParticipant.mjs](nativeParticipant.mjs))
   starts the agent against a local TCP proxy to the server and reads
   positions from it in the harness's `sample()` shape. A network drop cuts
-  every proxied connection and refuses new ones; the agent's own reconnect
-  brings it back.
+  every proxied connection and refuses new ones; a sleep freezes the agent
+  and leaves its connections open but dead. The agent's own reconnect and
+  wake detection bring it back.
 - **Scenarios** ([scenarios.mjs](scenarios.mjs)) and the runner
   ([run.mjs](run.mjs)), which writes `drift-report.md` and `drift-report.json`.
 
@@ -32,6 +33,7 @@ as one PR comment that is updated on every push.
 | `native-cold-join` | fork | our client joins a group that already plays, then 1.5x | in sync after the join; spread < 400 ms at 10/15/20 s |
 | `native-controls` | both | our client pauses, seeks while paused, resumes, quits | everyone follows; paused positions agree; drift after resume; it leaves the group on quit |
 | `native-network-drop` | both | our client loses the network for 10 s while the group seeks | back in the group and in sync without user action |
+| `native-sleep` | both | the computer sleeps 20 s (agent frozen, its connections left dead) while the group seeks | our client notices on waking, rejoins and is in sync without user action |
 | `stock-server` | stock | 1x group; our client asks for 1.5x | SyncPlay works at 1x; the refusal reaches the app; nobody changes rate |
 | `native-long` | with `--long N` | N minutes, 1x / 1.25x / 1.5x in turn | p95 of the spread, sampled every second, < 400 ms |
 

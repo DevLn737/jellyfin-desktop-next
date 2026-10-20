@@ -18,6 +18,7 @@
 // Out:
 //   {"t":"ready","generation":1}        the session socket is up (again)
 //   {"t":"disconnected"}
+//   {"t":"resumed","sleptMs":20000}    the computer slept; reconnecting
 //   {"t":"ws","type":"SyncPlayCommand|SyncPlayGroupUpdate","data":{...}}
 //   {"t":"request","path":"SyncPlay/Join","status":204}
 //   {"t":"sample","id":1,"at":<unix ms>,"positionMs":0,"playing":false,"rate":1,...}
@@ -287,6 +288,8 @@ namespace {
                 const QByteArray text = QJsonDocument(data.toObject()).toJson(QJsonDocument::Compact);
                 emit({{"t", "ws"}, {"type", type.toStdString()}, {"data", json::parse(text.toStdString())}});
               });
+      connect(&m_runtime->sleepDetector(), &session::SleepDetector::resumed, this,
+              [](qint64 sleptMs) { emit({{"t", "resumed"}, {"sleptMs", sleptMs}}); });
       connect(&m_socket, &api::SessionSocket::ready, this,
               [this](quint64 generation) {
                 emit({{"t", "ready"}, {"generation", generation}});

@@ -123,6 +123,8 @@ namespace jfd::api {
     m_serverUrl = url;
   }
 
+  void JellyfinClient::dropConnections() { m_network->clearConnectionCache(); }
+
   void JellyfinClient::setSession(const QString& accessToken, const QString& userId) {
     m_accessToken = accessToken;
     m_userId = userId;

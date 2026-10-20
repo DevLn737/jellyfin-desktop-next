@@ -100,6 +100,11 @@ if(TARGET jfd_jellyfin_api)
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
 
+  if(TARGET jfd_session_runtime)
+    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp)
+    target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
+  endif()
+
   if(JFD_SERVER_TESTS)
     # Needs JFD_TEST_SERVER_URL and friends; see scripts/test-server/README.md.
     jfd_add_qt_test(jfd_server_tests server/ServerTest.cpp)

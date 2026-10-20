@@ -40,6 +40,9 @@ namespace jfd::session {
       m_group->onConnectionLost();
     });
 
+    m_sleep = new SleepDetector(this);
+    connect(m_sleep, &SleepDetector::resumed, this, [this] { resumeAfterSleep(); });
+
     m_timePoll.setSingleShot(true);
     connect(&m_timePoll, &QTimer::timeout, this, &SessionRuntime::pollTime);
     if (socket.state() == api::SessionSocket::State::Ready) pollTime();
@@ -65,6 +68,17 @@ namespace jfd::session {
     // with the old session, and capabilities were reported again.
     if (generation > 1) m_group->onConnectionRestored();
     pollTime();
+  }
+
+  void SessionRuntime::resumeAfterSleep() {
+    if (m_socket.state() == api::SessionSocket::State::Stopped) return;
+    m_timePoll.stop();
+    m_group->onConnectionLost();
+    m_client.dropConnections();
+    // stop() does not report a disconnect; the next ready() is a later
+    // generation, which rejoins the group.
+    m_socket.stop();
+    m_socket.start();
   }
 
   void SessionRuntime::pollTime() {

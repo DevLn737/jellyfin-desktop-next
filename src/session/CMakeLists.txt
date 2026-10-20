@@ -14,11 +14,13 @@ if(TARGET jfd_playback)
     src/PlaybackLauncher.cpp
     src/QtTimers.cpp
     src/SessionRuntime.cpp
+    src/SleepDetector.cpp
     include/jfd/session/ApiTransport.h
     include/jfd/session/InputQueue.h
     include/jfd/session/PlaybackLauncher.h
     include/jfd/session/QtTimers.h
     include/jfd/session/SessionRuntime.h
+    include/jfd/session/SleepDetector.h
     include/jfd/session/SteadyClock.h)
   add_library(jfd::session_runtime ALIAS jfd_session_runtime)
   target_link_libraries(jfd_session_runtime PUBLIC jfd::session jfd::syncplay jfd::jellyfin_api jfd::playback Qt6::Core Qt6::Network)

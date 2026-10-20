@@ -6,6 +6,7 @@
 #include <jfd/session/PlaybackLauncher.h>
 #include <jfd/session/QtTimers.h>
 #include <jfd/session/SessionHub.h>
+#include <jfd/session/SleepDetector.h>
 #include <jfd/session/SteadyClock.h>
 #include <jfd/syncplay/GroupClient.h>
 
@@ -56,6 +57,12 @@ namespace jfd::session {
     void createGroup(const QString& name);
     void joinGroup(const QString& groupId);
     void leaveGroup();
+    // After the computer slept (noticed by the runtime itself, or reported
+    // by the platform): pooled connections and the session socket are
+    // likely dead without knowing, and the server has dropped the session.
+    // Reconnects at once; the group client rejoins the group it was in.
+    void resumeAfterSleep();
+
     // Leaves the group before the app quits: done runs once the server
     // answered, or after timeoutMs.
     void leaveBeforeExit(std::function<void()> done, int timeoutMs = 1500);
@@ -66,6 +73,7 @@ namespace jfd::session {
     syncplay::GroupClient& group() { return *m_group; }
     PlaybackLauncher& launcher() { return *m_launcher; }
     ApiTransport& transport() { return *m_transport; }
+    SleepDetector& sleepDetector() { return *m_sleep; }
     core::MediaBackend& backend() { return *m_backend; }
 
   Q_SIGNALS:
@@ -91,6 +99,7 @@ namespace jfd::session {
     PlaybackLauncher* m_launcher;
     SessionHub::Subscription m_notices;
     QTimer m_timePoll;
+    SleepDetector* m_sleep;
   };
 
 } // namespace jfd::session

@@ -8,11 +8,14 @@ import net from 'node:net';
 import { createInterface } from 'node:readline';
 import { sleep } from '../syncplay-harness/src/jellyfin.mjs';
 
-// Forwards TCP to the server; `down` cuts and refuses connections.
+// Forwards TCP to the server. `setDown` cuts and refuses connections, as a
+// lost network does. `freeze` is what a sleeping computer leaves behind: the
+// server side of every connection is gone, while our side stays open and
+// silent until our client notices on its own.
 class Proxy {
   constructor(target) {
     this.target = new URL(target);
-    this.sockets = new Set();
+    this.pairs = new Set();
     this.down = false;
     this.server = net.createServer((client) => this.accept(client));
   }
@@ -32,20 +35,34 @@ class Proxy {
     }
     const port = Number(this.target.port || (this.target.protocol === 'https:' ? 443 : 80));
     const upstream = net.connect(port, this.target.hostname);
-    for (const socket of [client, upstream]) {
-      this.sockets.add(socket);
-      socket.on('close', () => this.sockets.delete(socket));
-      socket.on('error', () => {});
-    }
+    const pair = { client, upstream, frozen: false };
+    this.pairs.add(pair);
+    for (const socket of [client, upstream]) socket.on('error', () => {});
     client.pipe(upstream);
     upstream.pipe(client);
-    client.on('close', () => upstream.destroy());
-    upstream.on('close', () => client.destroy());
+    client.on('close', () => {
+      this.pairs.delete(pair);
+      upstream.destroy();
+    });
+    upstream.on('close', () => {
+      if (!pair.frozen) client.destroy();
+    });
   }
 
   setDown(down) {
     this.down = down;
-    if (down) for (const socket of this.sockets) socket.destroy();
+    if (down) for (const { client } of this.pairs) client.destroy();
+  }
+
+  freeze() {
+    for (const pair of this.pairs) {
+      if (pair.frozen) continue;
+      pair.frozen = true;
+      pair.client.unpipe(pair.upstream);
+      pair.upstream.unpipe(pair.client);
+      pair.client.pause();
+      pair.upstream.destroy();
+    }
   }
 
   close() {
@@ -104,6 +121,17 @@ export class NativeParticipant {
     this.proxy.setDown(false);
   }
 
+  /**
+   * The computer sleeps for `ms`: the agent is frozen, and when it wakes its
+   * connections are dead without knowing (the network itself works again).
+   */
+  async sleepFor(ms) {
+    this.proxy.freeze();
+    this.agent.kill('SIGSTOP');
+    await sleep(ms);
+    this.agent.kill('SIGCONT');
+  }
+
   toAgent(obj) {
     if (this.agent?.exitCode == null) this.agent.stdin.write(`${JSON.stringify(obj)}\n`);
   }
@@ -132,6 +160,10 @@ export class NativeParticipant {
       case 'disconnected':
         this.connected = false;
         this.record({ type: 'disconnected', data: msg });
+        break;
+      case 'resumed':
+        this.log(`woke after ${msg.sleptMs} ms`);
+        this.record({ type: 'resumed', data: msg });
         break;
       case 'fatal':
         this.log(`fatal: ${msg.text}`);
