@@ -1,0 +1,80 @@
+name: Jellyfin API
+
+# Builds and tests the Qt modules that talk to the server (platform,
+# jellyfin-api, library). On Linux the tests also run against a stock
+# Jellyfin 12.2 in Docker (scripts/test-server/stock-server.sh).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: API (ubuntu-24.04, Jellyfin 12.2 in Docker)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same Qt as the application pin (deps/versions.json in the app workflow).
+      - name: Install Qt 6.11.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.11.3
+          arch: linux_gcc_64
+          modules: qtwebsockets
+          cache: true
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build libsecret-1-dev jq
+
+      - name: Start Jellyfin 12.2
+        id: server
+        run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Server log on failure
+        if: failure()
+        run: docker logs --tail 200 jfd-test-server || true
+
+  windows:
+    name: API (windows-2022)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      # install-qt-action cannot read the 6.11 Windows repository layout, so
+      # this job compiles and tests the modules with MSVC on the 6.8 LTS until
+      # the app workflow's pinned Qt archives include Qt WebSockets.
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          arch: win64_msvc2022_64
+          modules: qtwebsockets
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_REQUIRE_QT=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
