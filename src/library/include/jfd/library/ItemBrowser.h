@@ -1,8 +1,8 @@
 #pragma once
 
 #include <jfd/api/Models.h>
+#include <jfd/library/ItemListModel.h>
 
-#include <QAbstractListModel>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -16,47 +16,6 @@ namespace jfd::api {
 // its seasons and episodes, and pick something to play. Screens bind to
 // ItemBrowser and its model from QML.
 namespace jfd::library {
-
-  class ItemListModel : public QAbstractListModel {
-    Q_OBJECT
-    Q_PROPERTY(int count READ count NOTIFY countChanged)
-
-  public:
-    enum Role {
-      IdRole = Qt::UserRole + 1,
-      NameRole,
-      TypeRole,
-      // "S1:E2", the production year, or empty.
-      SubtitleRole,
-      ImageUrlRole,
-      RunTimeTicksRole,
-      PlayedRole,
-      PlaybackPositionTicksRole,
-      IsFolderRole,
-    };
-    Q_ENUM(Role)
-
-    struct Entry {
-      api::Item item;
-      QUrl imageUrl;
-    };
-
-    using QAbstractListModel::QAbstractListModel;
-
-    int rowCount(const QModelIndex& parent = {}) const override;
-    QVariant data(const QModelIndex& index, int role) const override;
-    QHash<int, QByteArray> roleNames() const override;
-
-    int count() const { return static_cast<int>(m_entries.size()); }
-    const Entry* entry(int row) const;
-    void setEntries(QList<Entry> entries);
-
-  Q_SIGNALS:
-    void countChanged();
-
-  private:
-    QList<Entry> m_entries;
-  };
 
   class ItemBrowser : public QObject {
     Q_OBJECT

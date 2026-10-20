@@ -90,7 +90,13 @@ if(TARGET jfd_jellyfin_api)
     jellyfin-api/SessionSocketTest.cpp)
   target_link_libraries(jfd_api_tests PRIVATE jfd::jellyfin_api)
 
-  jfd_add_qt_test(jfd_library_tests library/ItemBrowserTest.cpp)
+  jfd_add_qt_test(jfd_library_tests
+    library/ItemBrowserTest.cpp
+    library/HomeModelTest.cpp
+    library/LibraryModelTest.cpp
+    library/DetailsSearchTest.cpp
+    library/ImageCacheTest.cpp
+    library/SignInTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
 
   jfd_add_qt_test(jfd_playback_tests playback/TrackTableTest.cpp playback/PlaybackReporterTest.cpp

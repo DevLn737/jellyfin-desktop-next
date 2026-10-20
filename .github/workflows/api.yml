@@ -38,7 +38,7 @@ jobs:
           cache: true
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build libsecret-1-dev jq gnome-keyring dbus
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build libsecret-1-dev libgl1-mesa-dev jq gnome-keyring dbus
 
       # The fork image is the SyncPlay harness's, built from the server and Web
       # payloads its workflow publishes to the syncplay-test-server release.
