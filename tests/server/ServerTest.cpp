@@ -254,6 +254,96 @@ TEST_CASE("Search, series, seasons and episodes through the library model") {
   REQUIRE(play.count() == 1);
 }
 
+TEST_CASE("Home rows, library listings, filters and similar items") {
+  auto client = signedIn(QStringLiteral("jfd-home"));
+  auto views = run<ItemPage>([&](auto done) { client->views(nullptr, done); });
+  REQUIRE(views.ok());
+  QString shows;
+  QString movies;
+  for (const Item& view : views->items) {
+    if (view.collectionType == QLatin1String("tvshows")) shows = view.id;
+    if (view.collectionType == QLatin1String("movies")) movies = view.id;
+  }
+  REQUIRE_FALSE(shows.isEmpty());
+  REQUIRE_FALSE(movies.isEmpty());
+
+  auto latest = run<ItemPage>([&](auto done) { client->latestItems(shows, 16, nullptr, done); });
+  REQUIRE(latest.ok());
+  REQUIRE(latest->items.size() == 1);
+  // Episodes are grouped into their series.
+  CHECK(latest->items[0].type == QStringLiteral("Series"));
+  CHECK(latest->items[0].userData.unplayedItemCount == 2);
+
+  CHECK(run<ItemPage>([&](auto done) { client->resumeItems(12, {}, nullptr, done); }).ok());
+  CHECK(run<ItemPage>([&](auto done) { client->nextUp(12, {}, nullptr, done); }).ok());
+
+  ItemQuery query;
+  query.parentId = movies;
+  query.includeItemTypes = {QStringLiteral("Movie")};
+  query.sortBy = QStringLiteral("SortName");
+  query.isPlayed = false;
+  query.limit = 1;
+  auto page = run<ItemPage>([&](auto done) { client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  CHECK(page->totalRecordCount >= 1);
+  CHECK(page->items.size() == 1);
+  query.years = {1900};
+  page = run<ItemPage>([&](auto done) { client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  CHECK(page->totalRecordCount == 0);
+
+  auto filters = run<ItemFilters>(
+      [&](auto done) { client->itemFilters(movies, {QStringLiteral("Movie")}, nullptr, done); });
+  CHECK(filters.ok());
+  CHECK(run<ItemPage>([&](auto done) {
+          client->similarItems(latest->items[0].id, 6, nullptr, done);
+        }).ok());
+}
+
+TEST_CASE("Favorites, details with trickplay, tiles and media segments") {
+  auto client = signedIn(QStringLiteral("jfd-details"));
+  const Item episode = findItem(*client, QStringLiteral("Episode"));
+
+  auto on =
+      run<UserItemData>([&](auto done) { client->setFavorite(episode.id, true, nullptr, done); });
+  REQUIRE(on.ok());
+  CHECK(on->isFavorite);
+  auto details = run<Item>([&](auto done) { client->itemDetails(episode.id, nullptr, done); });
+  REQUIRE(details.ok());
+  CHECK(details->userData.isFavorite);
+  auto off =
+      run<UserItemData>([&](auto done) { client->setFavorite(episode.id, false, nullptr, done); });
+  REQUIRE(off.ok());
+  CHECK_FALSE(off->isFavorite);
+
+  // scripts/test-server generates trickplay tiles for the episodes.
+  REQUIRE(details->trickplay.size() == 1);
+  const QString source = details->trickplay.keys().front();
+  const TrickplayInfo info = details->trickplay.value(source).front();
+  CHECK(info.intervalMs > 0);
+  CHECK(info.thumbnailCount >= 30);
+  const auto frame = trickplayFrame(info, 200'000);
+  REQUIRE(frame);
+  const QUrl tile = client->trickplayTileUrl(episode.id, source, info.width, frame->tileIndex);
+  auto jpeg = run<JellyfinClient::RawResponse>(
+      [&](auto done) { client->authorizedGet(tile, nullptr, done); });
+  REQUIRE(jpeg.ok());
+  CHECK(jpeg->body.startsWith("\xFF\xD8"));
+
+  ImageRequest image;
+  image.itemId = episode.id;
+  image.tag = episode.primaryImageTag;
+  image.fillWidth = 200;
+  const QByteArray poster = fetch(client->imageUrl(image), 1 << 20);
+  CHECK(poster.startsWith("\xFF\xD8"));
+
+  // A stock server has no segment provider: an empty list, not an error.
+  auto segments = run<QList<MediaSegment>>(
+      [&](auto done) { client->mediaSegments(episode.id, nullptr, done); });
+  REQUIRE(segments.ok());
+  CHECK(segments->isEmpty());
+}
+
 TEST_CASE("PlaybackInfo resolves to streams mpv can open") {
   auto client = signedIn(QStringLiteral("jfd-playback"));
   const Item movie = findItem(*client, QStringLiteral("Movie"));

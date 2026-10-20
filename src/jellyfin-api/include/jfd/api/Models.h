@@ -4,6 +4,8 @@
 #include <jfd/api/ServerTime.h>
 #include <jfd/api/ServerVersion.h>
 
+#include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
 #include <QString>
@@ -48,10 +50,49 @@ namespace jfd::api {
   };
 
   struct UserItemData {
+    // Set on the copies the server sends alone (favorite answers, the
+    // UserDataChanged message); empty inside an item.
+    QString itemId;
     std::int64_t playbackPositionTicks = 0;
     bool played = false;
     int playCount = 0;
+    bool isFavorite = false;
+    // Folders only: episodes or items not yet watched.
+    std::optional<int> unplayedItemCount;
+    std::optional<double> playedPercentage;
   };
+
+  // One trickplay resolution of a media source: tiles of `tileWidth` x
+  // `tileHeight` thumbnails, one thumbnail every `intervalMs`. Tile `n` holds
+  // thumbnails n * tileWidth * tileHeight onwards, row by row.
+  struct TrickplayInfo {
+    int width = 0;
+    int height = 0;
+    int tileWidth = 0;
+    int tileHeight = 0;
+    int thumbnailCount = 0;
+    int intervalMs = 0;
+    int bandwidth = 0;
+
+    int thumbnailsPerTile() const { return tileWidth * tileHeight; }
+    int tileCount() const {
+      const int perTile = thumbnailsPerTile();
+      return perTile > 0 ? (thumbnailCount + perTile - 1) / perTile : 0;
+    }
+  };
+
+  // Where the thumbnail for a playback position sits: tile image `tileIndex`,
+  // and the pixel rectangle inside it.
+  struct TrickplayFrame {
+    int tileIndex = 0;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+  };
+
+  // The frame shown at `positionMs`; nullopt when the info is empty.
+  std::optional<TrickplayFrame> trickplayFrame(const TrickplayInfo& info, std::int64_t positionMs);
 
   struct Item {
     QString id;
@@ -69,7 +110,28 @@ namespace jfd::api {
     std::optional<int> productionYear;
     std::optional<std::int64_t> runTimeTicks;
     QString overview;
+    QStringList genres;
+    std::optional<double> communityRating;
+    QString officialRating;
+    // Views only: "movies", "tvshows", "music", "boxsets", ...
+    QString collectionType;
+    std::optional<int> childCount;
+    // Series only: "Continuing" or "Ended".
+    QString status;
+    std::optional<double> primaryImageAspectRatio;
+    // Image tags by type ("Primary", "Thumb", "Logo", "Banner"); backdrops
+    // are a list of their own.
+    QHash<QString, QString> imageTags;
+    QStringList backdropImageTags;
     QString primaryImageTag;
+    // Images an episode or season borrows from its series.
+    QString seriesPrimaryImageTag;
+    QString parentBackdropItemId;
+    QStringList parentBackdropImageTags;
+    QString parentThumbItemId;
+    QString parentThumbImageTag;
+    // Asked for with the Trickplay field: resolutions by media source id.
+    QHash<QString, QList<TrickplayInfo>> trickplay;
     UserItemData userData;
   };
 
@@ -77,6 +139,22 @@ namespace jfd::api {
     QList<Item> items;
     int totalRecordCount = 0;
     int startIndex = 0;
+  };
+
+  struct ItemFilters {
+    QStringList genres;
+    QList<int> years;
+    QStringList officialRatings;
+  };
+
+  // A skippable part of an item (MediaSegments API, Jellyfin 10.10+).
+  struct MediaSegment {
+    QString id;
+    QString itemId;
+    // "Intro", "Outro", "Recap", "Preview", "Commercial", "Unknown".
+    QString type;
+    std::int64_t startTicks = 0;
+    std::int64_t endTicks = 0;
   };
 
   struct MediaStream {
@@ -157,6 +235,11 @@ namespace jfd::api {
     Result<QuickConnectState> quickConnectState(const QJsonObject& object);
     Result<Item> item(const QJsonObject& object);
     Result<ItemPage> itemPage(const QJsonObject& object);
+    // A bare JSON array of items, as Items/Latest answers.
+    Result<ItemPage> itemArray(const QJsonArray& array);
+    Result<UserItemData> userItemData(const QJsonObject& object);
+    Result<ItemFilters> itemFilters(const QJsonObject& object);
+    Result<QList<MediaSegment>> mediaSegments(const QJsonObject& object);
     Result<MediaStream> mediaStream(const QJsonObject& object);
     Result<MediaSource> mediaSource(const QJsonObject& object);
     Result<PlaybackInfo> playbackInfo(const QJsonObject& object);
