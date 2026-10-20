@@ -1,0 +1,285 @@
+{
+ "scenario": "native-network-drop",
+ "title": "Our client loses the network for 10 s while the group seeks; it comes back on its own",
+ "server": {
+  "kind": "stock",
+  "version": "12.2.0"
+ },
+ "participants": [
+  {
+   "label": "bob-native",
+   "events": [
+    {
+     "ms": 675,
+     "connection": "ready"
+    },
+    {
+     "ms": 715,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+        "GroupName": "native-native-network-drop-1792530209664",
+        "LastUpdatedAt": "2026-10-20T21:03:30.0417509Z",
+        "Participants": [
+         "alice",
+         "bob"
+        ],
+        "State": "Idle"
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "GroupJoined"
+      }
+     }
+    },
+    {
+     "ms": 715,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Stop",
+       "EmittedAt": "2026-10-20T21:03:30.0419499Z",
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "PlaylistItemId": "00000000000000000000000000000000",
+       "PositionTicks": 0,
+       "When": "2026-10-20T21:03:29.6958316Z"
+      }
+     }
+    },
+    {
+     "ms": 716,
+     "request": {
+      "path": "SyncPlay/Join",
+      "status": 204
+     }
+    },
+    {
+     "ms": 760,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "IsPlaying": false,
+        "LastUpdate": "2026-10-20T21:03:30.0863172Z",
+        "PlayingItemIndex": 0,
+        "Playlist": [
+         {
+          "ItemId": "655b685285b1d90370eefcff0d4b3a1c",
+          "PlaylistItemId": "8910689c5fa24939a7b662eba80f4ba0"
+         }
+        ],
+        "Reason": "NewPlaylist",
+        "RepeatMode": "RepeatNone",
+        "ShuffleMode": "Sorted",
+        "StartPositionTicks": 0
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "PlayQueue"
+      }
+     }
+    },
+    {
+     "ms": 1221,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Unpause",
+       "EmittedAt": "2026-10-20T21:03:30.547175Z",
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "PlaylistItemId": "8910689c5fa24939a7b662eba80f4ba0",
+       "PositionTicks": 0,
+       "When": "2026-10-20T21:03:31.5471185Z"
+      }
+     }
+    },
+    {
+     "ms": 1221,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Playing"
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 1221,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 7227,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 7703,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 8687,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 10687,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 12687,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 14687,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 16687,
+     "connection": "disconnected"
+    },
+    {
+     "ms": 18724,
+     "connection": "ready"
+    },
+    {
+     "ms": 18764,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+        "GroupName": "native-native-network-drop-1792530209664",
+        "LastUpdatedAt": "2026-10-20T21:03:48.0906875Z",
+        "Participants": [
+         "alice",
+         "bob"
+        ],
+        "State": "Playing"
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "GroupJoined"
+      }
+     }
+    },
+    {
+     "ms": 18764,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "IsPlaying": false,
+        "LastUpdate": "2026-10-20T21:03:30.0863172Z",
+        "PlayingItemIndex": 0,
+        "Playlist": [
+         {
+          "ItemId": "655b685285b1d90370eefcff0d4b3a1c",
+          "PlaylistItemId": "8910689c5fa24939a7b662eba80f4ba0"
+         }
+        ],
+        "Reason": "NewPlaylist",
+        "RepeatMode": "RepeatNone",
+        "ShuffleMode": "Sorted",
+        "StartPositionTicks": 1278647915
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "PlayQueue"
+      }
+     }
+    },
+    {
+     "ms": 18764,
+     "request": {
+      "path": "SyncPlay/Join",
+      "status": 204
+     }
+    },
+    {
+     "ms": 18796,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Seek",
+       "EmittedAt": "2026-10-20T21:03:48.1227446Z",
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "PlaylistItemId": "8910689c5fa24939a7b662eba80f4ba0",
+       "PositionTicks": 1278647915,
+       "When": "2026-10-20T21:03:48.0910768Z"
+      }
+     }
+    },
+    {
+     "ms": 18796,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Waiting"
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 18796,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 18970,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Unpause",
+       "EmittedAt": "2026-10-20T21:03:48.2972026Z",
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "PlaylistItemId": "8910689c5fa24939a7b662eba80f4ba0",
+       "PositionTicks": 1278647915,
+       "When": "2026-10-20T21:03:49.2971025Z"
+      }
+     }
+    },
+    {
+     "ms": 18971,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Playing"
+       },
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 18971,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 40018,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": "112753f8-3ab8-4cc1-9e7c-75ad2a5a84c5",
+       "GroupId": "112753f83ab84cc19e7c75ad2a5a84c5",
+       "Type": "GroupLeft"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

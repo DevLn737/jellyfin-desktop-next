@@ -30,7 +30,8 @@ add_executable(jfd_syncplay_tests
   core/main.cpp
   syncplay/ProtocolTest.cpp
   syncplay/TimeSyncTest.cpp
-  syncplay/GroupClientTest.cpp)
+  syncplay/GroupClientTest.cpp
+  syncplay/RecordedTest.cpp)
 target_link_libraries(jfd_syncplay_tests PRIVATE jfd::syncplay jfd_test_support doctest nlohmann_json)
 target_compile_definitions(jfd_syncplay_tests PRIVATE
   JFD_SYNCPLAY_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/syncplay/fixtures")

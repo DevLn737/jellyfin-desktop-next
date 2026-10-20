@@ -1,0 +1,138 @@
+{
+ "scenario": "stock-server",
+ "title": "Stock Jellyfin 12.2 without the rate extension: SyncPlay at 1x works, a rate change is refused",
+ "server": {
+  "kind": "stock",
+  "version": "12.2.0"
+ },
+ "participants": [
+  {
+   "label": "bob-native",
+   "events": [
+    {
+     "ms": 706,
+     "connection": "ready"
+    },
+    {
+     "ms": 745,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+        "GroupName": "native-stock-server-1792530298574",
+        "LastUpdatedAt": "2026-10-20T21:04:58.9789898Z",
+        "Participants": [
+         "alice",
+         "bob"
+        ],
+        "State": "Idle"
+       },
+       "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+       "Type": "GroupJoined"
+      }
+     }
+    },
+    {
+     "ms": 747,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Stop",
+       "EmittedAt": "2026-10-20T21:04:58.9791516Z",
+       "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+       "PlaylistItemId": "00000000000000000000000000000000",
+       "PositionTicks": 0,
+       "When": "2026-10-20T21:04:58.6058611Z"
+      }
+     }
+    },
+    {
+     "ms": 747,
+     "request": {
+      "path": "SyncPlay/Join",
+      "status": 204
+     }
+    },
+    {
+     "ms": 787,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "IsPlaying": false,
+        "LastUpdate": "2026-10-20T21:04:59.0208918Z",
+        "PlayingItemIndex": 0,
+        "Playlist": [
+         {
+          "ItemId": "655b685285b1d90370eefcff0d4b3a1c",
+          "PlaylistItemId": "defd6b29021443c2af82a5a7f9e3e792"
+         }
+        ],
+        "Reason": "NewPlaylist",
+        "RepeatMode": "RepeatNone",
+        "ShuffleMode": "Sorted",
+        "StartPositionTicks": 0
+       },
+       "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+       "Type": "PlayQueue"
+      }
+     }
+    },
+    {
+     "ms": 1269,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Unpause",
+       "EmittedAt": "2026-10-20T21:04:59.503041Z",
+       "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+       "PlaylistItemId": "defd6b29021443c2af82a5a7f9e3e792",
+       "PositionTicks": 0,
+       "When": "2026-10-20T21:05:00.5030005Z"
+      }
+     }
+    },
+    {
+     "ms": 1269,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Playing"
+       },
+       "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 1270,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 21300,
+     "request": {
+      "path": "SyncPlay/SetPlaybackRate",
+      "status": 405
+     }
+    },
+    {
+     "ms": 43358,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": "c419c2c4-707d-47ee-947f-b7ec4aea643e",
+       "GroupId": "c419c2c4707d47ee947fb7ec4aea643e",
+       "Type": "GroupLeft"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

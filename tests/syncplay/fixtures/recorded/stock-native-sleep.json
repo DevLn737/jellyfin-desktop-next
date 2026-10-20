@@ -1,0 +1,261 @@
+{
+ "scenario": "native-sleep",
+ "title": "The computer sleeps for 20 s while the group seeks; our client wakes to dead connections and comes back on its own",
+ "server": {
+  "kind": "stock",
+  "version": "12.2.0"
+ },
+ "participants": [
+  {
+   "label": "bob-native",
+   "events": [
+    {
+     "ms": 648,
+     "connection": "ready"
+    },
+    {
+     "ms": 714,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+        "GroupName": "native-native-sleep-1792530249745",
+        "LastUpdatedAt": "2026-10-20T21:04:10.1560035Z",
+        "Participants": [
+         "alice",
+         "bob"
+        ],
+        "State": "Idle"
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "GroupJoined"
+      }
+     }
+    },
+    {
+     "ms": 714,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Stop",
+       "EmittedAt": "2026-10-20T21:04:10.156257Z",
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "PlaylistItemId": "00000000000000000000000000000000",
+       "PositionTicks": 0,
+       "When": "2026-10-20T21:04:09.7756359Z"
+      }
+     }
+    },
+    {
+     "ms": 715,
+     "request": {
+      "path": "SyncPlay/Join",
+      "status": 204
+     }
+    },
+    {
+     "ms": 787,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "IsPlaying": false,
+        "LastUpdate": "2026-10-20T21:04:10.2286062Z",
+        "PlayingItemIndex": 0,
+        "Playlist": [
+         {
+          "ItemId": "655b685285b1d90370eefcff0d4b3a1c",
+          "PlaylistItemId": "8f66adcfb71f463b8a28341e03342b6a"
+         }
+        ],
+        "Reason": "NewPlaylist",
+        "RepeatMode": "RepeatNone",
+        "ShuffleMode": "Sorted",
+        "StartPositionTicks": 0
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "PlayQueue"
+      }
+     }
+    },
+    {
+     "ms": 1243,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Unpause",
+       "EmittedAt": "2026-10-20T21:04:10.6848106Z",
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "PlaylistItemId": "8f66adcfb71f463b8a28341e03342b6a",
+       "PositionTicks": 0,
+       "When": "2026-10-20T21:04:11.684771Z"
+      }
+     }
+    },
+    {
+     "ms": 1243,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Playing"
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 1243,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 27324,
+     "connection": "resumed"
+    },
+    {
+     "ms": 27363,
+     "connection": "ready"
+    },
+    {
+     "ms": 27407,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+        "GroupName": "native-native-sleep-1792530249745",
+        "LastUpdatedAt": "2026-10-20T21:04:36.8489778Z",
+        "Participants": [
+         "alice",
+         "bob"
+        ],
+        "State": "Playing"
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "GroupJoined"
+      }
+     }
+    },
+    {
+     "ms": 27407,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "IsPlaying": false,
+        "LastUpdate": "2026-10-20T21:04:10.2286062Z",
+        "PlayingItemIndex": 0,
+        "Playlist": [
+         {
+          "ItemId": "655b685285b1d90370eefcff0d4b3a1c",
+          "PlaylistItemId": "8f66adcfb71f463b8a28341e03342b6a"
+         }
+        ],
+        "Reason": "NewPlaylist",
+        "RepeatMode": "RepeatNone",
+        "ShuffleMode": "Sorted",
+        "StartPositionTicks": 1364789754
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "PlayQueue"
+      }
+     }
+    },
+    {
+     "ms": 27408,
+     "request": {
+      "path": "SyncPlay/Join",
+      "status": 204
+     }
+    },
+    {
+     "ms": 27450,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Seek",
+       "EmittedAt": "2026-10-20T21:04:36.8917393Z",
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "PlaylistItemId": "8f66adcfb71f463b8a28341e03342b6a",
+       "PositionTicks": 1364789754,
+       "When": "2026-10-20T21:04:36.8493759Z"
+      }
+     }
+    },
+    {
+     "ms": 27450,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Waiting"
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 27450,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 27605,
+     "message": {
+      "MessageType": "SyncPlayCommand",
+      "Data": {
+       "Command": "Unpause",
+       "EmittedAt": "2026-10-20T21:04:37.0467371Z",
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "PlaylistItemId": "8f66adcfb71f463b8a28341e03342b6a",
+       "PositionTicks": 1364789754,
+       "When": "2026-10-20T21:04:38.0467049Z"
+      }
+     }
+    },
+    {
+     "ms": 27605,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": {
+        "Reason": "Ready",
+        "State": "Playing"
+       },
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "StateUpdate"
+      }
+     }
+    },
+    {
+     "ms": 27605,
+     "request": {
+      "path": "SyncPlay/Ready",
+      "status": 204
+     }
+    },
+    {
+     "ms": 48676,
+     "message": {
+      "MessageType": "SyncPlayGroupUpdate",
+      "Data": {
+       "Data": "d7ebd528-74b3-40b3-bc12-ef75916977c7",
+       "GroupId": "d7ebd52874b340b3bc12ef75916977c7",
+       "Type": "GroupLeft"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
