@@ -97,8 +97,15 @@ if(TARGET jfd_jellyfin_api)
     playback/StreamPlanTest.cpp)
   target_link_libraries(jfd_playback_tests PRIVATE jfd::playback)
 
-  jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp)
+  jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
+  find_package(Qt6 QUIET COMPONENTS DBus)
+  if(Qt6DBus_FOUND AND NOT WIN32 AND NOT APPLE)
+    # Against fake portal, screen saver and MPRIS clients on a private dbus-daemon.
+    jfd_add_qt_test(jfd_platform_dbus_tests platform/SleepInhibitorTest.cpp platform/MprisTest.cpp)
+    target_link_libraries(jfd_platform_dbus_tests PRIVATE jfd::platform)
+    set_target_properties(jfd_platform_dbus_tests PROPERTIES AUTOMOC ON)
+  endif()
 
   if(JFD_SERVER_TESTS)
     # Needs JFD_TEST_SERVER_URL and friends; see scripts/test-server/README.md.
