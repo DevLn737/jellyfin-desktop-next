@@ -114,7 +114,7 @@ jobs:
           $probe = (Resolve-Path "$stage/measure/jfd-probe.lua").Path.Replace('\','/')
           $probeOut = (Join-Path (Resolve-Path build).Path 'package-probe.jsonl').Replace('\','/')
           $process = Start-Process -FilePath "$stage/jellyfin-desktop-next.exe" -PassThru -Wait `
-            -ArgumentList @('--smoke', '--mpv-option', "script=$probe", '--mpv-option', "script-opts=jfdprobe-out=$probeOut",
+            -ArgumentList @('--smoke', '--mpv-option', "scripts=$probe", '--mpv-option', "script-opts=jfdprobe-out=$probeOut",
               '--mpv-option', 'log-file=build/package-mpv.log') `
             -RedirectStandardOutput build/package-smoke.out -RedirectStandardError build/package-smoke.err
           Get-Content build/package-smoke.out, build/package-smoke.err

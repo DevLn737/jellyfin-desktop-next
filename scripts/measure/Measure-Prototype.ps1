@@ -140,7 +140,7 @@ function Start-Client([string]$Hwdec, [bool]$RenderLog, [string]$RunDir, [string
     $pipeName = "jfd-measure-$PID-$(Get-Random)"
     $arguments = @('--maximized', '--overlay', $Overlay, '--hwdec', $Hwdec, '--log-file', ('"' + (Join-Path $RunDir 'client.log') + '"'),
         '--mpv-option', 'mute=yes', '--mpv-option', 'loop-file=inf',
-        '--mpv-option', ('"script=' + $probe + '"'), '--mpv-option', ('"script-opts=jfdprobe-out=' + $probeOut + '"'),
+        '--mpv-option', ('"scripts=' + $probe + '"'), '--mpv-option', ('"script-opts=jfdprobe-out=' + $probeOut + '"'),
         '--mpv-option', "input-ipc-server=\\.\pipe\$pipeName") + $Extra + @(('"' + $File + '"'))
     $env:QT_LOGGING_RULES = if ($RenderLog) { 'qt.scenegraph.time.renderloop=true' } else { $null }
     $script:app = Start-Process -FilePath $appExe -WorkingDirectory $appRoot -PassThru -ArgumentList $arguments `
