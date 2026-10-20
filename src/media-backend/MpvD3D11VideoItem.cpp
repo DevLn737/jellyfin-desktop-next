@@ -142,8 +142,8 @@ private:
     description.SampleDesc.Count = 1;
     description.Usage = D3D11_USAGE_DEFAULT;
     description.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-    ComPtr<ID3D11Texture2D> texture;
-    if (const HRESULT result = m_device->CreateTexture2D(&description, nullptr, &texture); FAILED(result))
+    ComPtr<ID3D11Texture2D> created;
+    if (const HRESULT result = m_device->CreateTexture2D(&description, nullptr, &created); FAILED(result))
     {
       fail(item, QStringLiteral("could not create a %1x%2 video texture (0x%3)")
                    .arg(size.width()).arg(size.height())
@@ -152,11 +152,11 @@ private:
     }
     // The scene graph texture wraps the native one without owning it; both
     // are replaced together when the item's size in pixels changes.
-    QSGTexture* wrapped = QNativeInterface::QSGD3D11Texture::fromNative(texture.Get(), m_window, size);
-    QSGTexture* previous = this->texture();
+    QSGTexture* wrapped = QNativeInterface::QSGD3D11Texture::fromNative(created.Get(), m_window, size);
+    QSGTexture* previous = texture();
     setTexture(wrapped);
     delete previous;
-    m_texture = texture;
+    m_texture = created;
     m_size = size;
     return true;
   }

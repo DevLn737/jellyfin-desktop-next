@@ -21,6 +21,9 @@ class MpvPlayer;
 class MpvD3D11VideoItem : public QQuickItem
 {
   Q_OBJECT
+  // moc needs the complete type for the property; this header sorts before
+  // MpvPlayer.h in the combined moc file.
+  Q_MOC_INCLUDE("MpvPlayer.h")
   Q_PROPERTY(jfd::media::MpvPlayer* player READ player WRITE setPlayer NOTIFY playerChanged)
 
 public:
