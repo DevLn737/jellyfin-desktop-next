@@ -69,3 +69,57 @@ converts them with the latest `ClockOffset` from `TimeSync`. Media time elapsed
 over a wall interval is `round(wallTicks × baseRate)` (`mediaElapsed`); the
 wall time to cover a media distance is `round(mediaTicks ÷ baseRate)`
 (`wallElapsed`). Absolute instants are never scaled by a rate.
+
+## Playback session
+
+`PlaybackSession` (`PlaybackSession.h`) takes the five ports in
+`SessionPorts` and handles one `SessionInput` at a time.
+
+- **Readiness** (`Readiness.h`, ported from the 2.x `PlaybackReadiness`): a load
+  or seek is ready only on a `PlaybackRestarted` after the latest request, after
+  the backend reported that seek, with a fresh position, and while paused
+  within 500 ms of the target.
+- **Ready and Buffering** are sent only after confirmed readiness: when a group
+  item finishes loading (paused, `IsPlaying=false`), when a group `Seek` or rate
+  change completes, on rejoin with the item already open, and when buffering
+  starts and ends while the group plays. A playing position is moved to the
+  report's instant.
+- **Commands** run at their `When`, converted with the latest `ClockOffset`.
+  A late `Unpause` joins at the projected group position. A repeated command is
+  re-applied only when the local state no longer matches it.
+- **Drift** (`Reconciler.h`) is a pure function of the last `Unpause`, the
+  sample's server instant and the sample's position. Defaults follow Jellyfin
+  Web: speed correction between 60 ms and 3 s over 1 s, relative to the group
+  base rate and clamped to 0.2–5×; a skip from 400 ms, or when the correction
+  would take longer than 5 s. Correction pauses for 1.5 s after a command or skip.
+- **Rates**: effective = group base rate, or the temporary correction. Outside a
+  group the personal rate applies. Leaving cancels every group timer before the
+  personal rate is restored.
+
+## Simulator
+
+`tests/sim` runs real `PlaybackSession`s against a modelled mpv (latencies,
+keyframe restarts, buffering, a slightly fast or slow clock), a modelled
+network (ordered WebSocket, reordering HTTP) and a modelled SyncPlay server
+(waiting, buffering, seek, rate, 409 for unsupported rates, join while
+playing). Seeds are portable.
+
+Invariants checked on every input:
+
+- a stale input (earlier file, earlier group, cancelled timer) changes nothing
+  and issues no command or message;
+- every backend command is for the current file;
+- every Ready names the loaded queue item and a position within 500 ms of
+  where the backend really is;
+- outside a group the backend rate is always the personal rate.
+
+`ctest` runs 10,000 chaos scenarios, 30-minute drift runs at 1×, 1.25× and
+1.5× with a cold second client, and a stock-server run. Three mutants of
+`core` (no epoch check, Ready from an earlier restart, a correction timer that
+outlives its group) must each be caught.
+
+```sh
+build/tests/jfd_simulator --mode chaos --scenarios 1000 --seed 1
+build/tests/jfd_simulator --mode drift --duration 1830 --rate 1.25
+build/tests/jfd_simulator --scenarios 1 --seed 2919 --trace 0   # one client's inputs
+```
