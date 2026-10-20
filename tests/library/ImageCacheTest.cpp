@@ -135,12 +135,18 @@ TEST_CASE("The disk cache survives a restart and stays under its limit") {
   const int fileSize = static_cast<int>(png(800, 1200).size());
   ImageCache::Limits limits;
   limits.diskBytes = fileSize * 3 + 10;
+  // Downloads run newest first; the file written last is the one trimming
+  // keeps for sure.
+  int last = -1;
   {
     ImageCache cache(f.client, dir.path(), limits);
     int done = 0;
     for (int i = 0; i < 6; ++i)
       cache.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(i)), QSize(20, 30),
-                    nullptr, [&](const QImage&) { ++done; });
+                    nullptr, [&done, &last, i](const QImage&) {
+                      ++done;
+                      last = i;
+                    });
     REQUIRE(waitFor([&] { return done == 6; }, 10000));
     CHECK(cache.diskBytes() <= limits.diskBytes);
   }
@@ -148,8 +154,8 @@ TEST_CASE("The disk cache survives a restart and stays under its limit") {
   ImageCache again(f.client, dir.path(), limits);
   CHECK(again.diskBytes() > 0);
   QImage image;
-  again.request(at(f, QStringLiteral("/Items/5/Images/Primary")), QSize(20, 30), nullptr,
-                [&](const QImage& i) { image = i; });
+  again.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(last)), QSize(20, 30),
+                nullptr, [&](const QImage& i) { image = i; });
   // Read from disk, synchronously.
   CHECK_FALSE(image.isNull());
   CHECK(f.server.requests().size() == requests);
