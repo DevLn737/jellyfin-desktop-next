@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Jellyfin Desktop Next
+GenericName=Media player
+Comment=Jellyfin client for watching together
+Comment[ru]=Клиент Jellyfin для совместного просмотра
+Exec=jellyfin-desktop-next %U
+Icon=jellyfin-desktop-next
+Terminal=false
+Categories=AudioVideo;Video;Player;TV;
+Keywords=jellyfin;media;video;syncplay;
+StartupWMClass=jellyfin-desktop-next
+SingleMainWindow=true

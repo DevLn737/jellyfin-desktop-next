@@ -89,12 +89,61 @@
       "bytes": 18211191,
       "dll": "VulkanRT-X64-1.4.363.0-Components/x64/vulkan-1.dll",
       "dllSha256": "e1fcfc9489beefa6a6d9d11d6c7517f6a2b7f16e0d3fb8f4103bee0210f314a3"
+    },
+    "wix": {
+      "comment": "WiX from NuGet as a .NET tool, as in the 2.x client; its binary EULA (OSMF) is accepted with -acceptEula wix7.",
+      "version": "7.0.0",
+      "eulaId": "wix7",
+      "extensions": [
+        "WixToolset.Util.wixext"
+      ]
     }
   },
   "linux": {
     "runner": "ubuntu-24.04",
     "libmpvPackage": "libmpv-dev",
     "libmpvPackageVersion": "0.37.0-1ubuntu4",
-    "libmpvVersion": "2.2.0"
+    "libmpvVersion": "2.2.0",
+    "comment": "libmpvPackage is the distribution libmpv the app CI builds against. The AppImage bundles its own libmpv from the sources below: the same mpv commit as Windows, with its own FFmpeg (packaging/linux/build-libmpv.sh). Tags are pinned to the object ls-remote reports for them.",
+    "sources": {
+      "mpv": {
+        "repository": "https://github.com/mpv-player/mpv",
+        "commit": "01e2533f3143b8940857ca419b0b367f583e05ca"
+      },
+      "ffmpeg": {
+        "repository": "https://github.com/FFmpeg/FFmpeg",
+        "tag": "n9.0.2",
+        "object": "ce8f11b9fac4cd7ccfb41ca7c01bc17f5cda8cc3"
+      },
+      "libplacebo": {
+        "repository": "https://github.com/haasn/libplacebo",
+        "tag": "v7.360.1",
+        "object": "719cc95244a1f1d648dd72459822e026e6530f22"
+      },
+      "libass": {
+        "repository": "https://github.com/libass/libass",
+        "tag": "0.17.5",
+        "object": "64ebcac709d949e6059bdacf5356c3af7848e8e5"
+      },
+      "nvCodecHeaders": {
+        "repository": "https://github.com/FFmpeg/nv-codec-headers",
+        "tag": "n12.2.72.0",
+        "object": "157becbf51c8b813425572b75c06c370bd43d8fd",
+        "comment": "SDK 12.2: NVIDIA driver 550 or newer."
+      }
+    },
+    "linuxdeploy": {
+      "name": "linuxdeploy-x86_64.AppImage",
+      "url": "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage",
+      "sha256": "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d",
+      "bytes": 19421688
+    },
+    "linuxdeployPluginQt": {
+      "comment": "Only a continuous build supports Qt 6.11; the hash fails loudly when upstream replaces it.",
+      "name": "linuxdeploy-plugin-qt-x86_64.AppImage",
+      "url": "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage",
+      "sha256": "cfc1055b2b9dbc08412b579f20990b7b41a17b61beaa5847dc9477c96c9e9617",
+      "bytes": 12704248
+    }
   }
 }
