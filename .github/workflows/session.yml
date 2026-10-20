@@ -1,0 +1,82 @@
+name: Session
+
+# The playback session runtime with headless mpv in a SyncPlay group on a
+# Jellyfin 12.2 server in Docker, stock and with the SyncPlay fork: our client
+# creates a group, plays the server's stream, follows another member's seek
+# and moves to the next item. The same test on a virtual backend runs in the
+# API workflow.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  session:
+    name: Session with mpv (${{ matrix.server.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        server:
+          - { name: Jellyfin 12.2, fork: '0' }
+          - { name: SyncPlay fork 12.2, fork: '1' }
+    env:
+      JFD_TEST_SERVER_FORK: ${{ matrix.server.fork }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read pinned versions
+        id: pins
+        run: |
+          echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "libmpv-deb=$(jq -r '.linux.libmpvPackage + "=" + .linux.libmpvPackageVersion' deps/versions.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Qt ${{ steps.pins.outputs.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.pins.outputs.qt }}
+          arch: ${{ steps.pins.outputs.qt-arch }}
+          modules: qtwebsockets
+          cache: true
+
+      - name: Install libmpv and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ${{ steps.pins.outputs.libmpv-deb }} ninja-build libsecret-1-dev \
+            libgl1-mesa-dev libegl1 libfontconfig1 libxkbcommon-x11-0
+
+      - name: Build the fork server image
+        if: matrix.server.fork == '1'
+        run: |
+          for part in server web; do
+            mkdir -p "payload/$part"
+            curl -fsSL "https://github.com/${{ github.repository }}/releases/download/syncplay-test-server/$part.tar.gz" \
+              | tar -xz -C "payload/$part"
+          done
+          docker buildx build --load --target runtime -t jellyfin-syncplay-test:local \
+            --build-context server-dist=payload/server --build-context web-dist=payload/web \
+            tools/syncplay-harness/server
+          echo "JFD_TEST_IMAGE=jellyfin-syncplay-test:local" >> "$GITHUB_ENV"
+
+      - name: Start the server
+        run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel --target jfd_session_mpv_server_tests
+
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure -V -R jfd_session_mpv_server_tests
+
+      - name: Server log on failure
+        if: failure()
+        run: docker logs --tail 200 jfd-test-server || true

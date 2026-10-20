@@ -17,9 +17,9 @@ ask for changes through the project coordinator.
 
 ## Threading
 
-`PlaybackSession` runs on the Qt main thread. Adapters in `app` move mpv
-events and network replies onto that thread with queued connections and post
-them as `SessionInput`. Inputs posted while the session is handling another
+`PlaybackSession` runs on the Qt main thread. `session::InputQueue` moves mpv
+events, network replies, timers and intents onto that thread with queued
+calls and posts them as `SessionInput`, in the order they were posted. Inputs posted while the session is handling another
 input are queued and handled afterwards, in order.
 
 ## Epochs
@@ -128,6 +128,15 @@ wall time to cover a media distance is `round(mediaTicks ÷ baseRate)`
 Core has one `SessionObserver`. `jfd::session::SessionHub` (`src/session`) is
 that observer in the app and the agent; the UI, the media integrations and
 diagnostics subscribe to it. A new subscriber gets the latest snapshot at once.
+
+`jfd::session::SessionRuntime` (`src/session`, built with the Qt network
+modules) wires one session to a signed-in server: the input queue, Qt timers
+on the steady clock, the SyncPlay `GroupClient` on `JellyfinClient::rawRequest`
+and the session WebSocket (rejoining after a reconnect and polling server
+time), and `PlaybackLauncher`, which resolves an item through PlaybackInfo
+and `playback::mediaRequest` into `intent::Open`, alone or for the group's
+item (`notice::GroupItemRequested`) and again on `StreamReopenNeeded`. The
+media backend comes from a factory: mpv in the app, a virtual file in tests.
 
 ## Simulator
 

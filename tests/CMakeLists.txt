@@ -104,6 +104,13 @@ if(TARGET jfd_jellyfin_api)
     # Needs JFD_TEST_SERVER_URL and friends; see scripts/test-server/README.md.
     jfd_add_qt_test(jfd_server_tests server/ServerTest.cpp)
     target_link_libraries(jfd_server_tests PRIVATE jfd::jellyfin_api jfd::library)
+
+    # The session runtime in a live group, on a virtual backend.
+    jfd_add_qt_test(jfd_session_server_tests session/SessionRuntimeServerTest.cpp)
+    target_link_libraries(jfd_session_server_tests PRIVATE jfd::session_runtime)
+    # One live server: these tests do not run at the same time as each other.
+    set_tests_properties(jfd_server_tests jfd_session_server_tests PROPERTIES RESOURCE_LOCK jellyfin_server)
+    set_tests_properties(jfd_session_server_tests PROPERTIES TIMEOUT 300)
   endif()
 endif()
 
@@ -115,4 +122,12 @@ if(JFD_BUILD_APP)
   target_link_libraries(jfd_media_backend_tests PRIVATE jfd::media_backend doctest)
   add_test(NAME jfd_media_backend_tests COMMAND jfd_media_backend_tests)
   set_tests_properties(jfd_media_backend_tests PROPERTIES TIMEOUT 120)
+
+  if(JFD_SERVER_TESTS AND TARGET jfd_session_runtime)
+    # The same on headless mpv, playing the server's stream.
+    jfd_add_qt_test(jfd_session_mpv_server_tests session/SessionRuntimeServerTest.cpp)
+    target_link_libraries(jfd_session_mpv_server_tests PRIVATE jfd::session_runtime jfd::media_backend)
+    target_compile_definitions(jfd_session_mpv_server_tests PRIVATE JFD_SESSION_TEST_MPV)
+    set_tests_properties(jfd_session_mpv_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+  endif()
 endif()

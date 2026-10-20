@@ -53,7 +53,7 @@ public:
   // Render thread: the swap chain is HDR10; applied on the GUI thread.
   void reportHdr(double sdrWhiteNits, double displayPeakNits);
 
-signals:
+Q_SIGNALS:
   void playerChanged();
   // Emitted on the render thread after the first mpv render context is ready.
   void renderContextReady(QString renderer);

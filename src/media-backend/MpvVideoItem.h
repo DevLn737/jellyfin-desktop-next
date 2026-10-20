@@ -42,7 +42,7 @@ public:
 
   Renderer* createRenderer() const override;
 
-signals:
+Q_SIGNALS:
   void playerChanged();
   // Emitted on the render thread after the first mpv render context is ready.
   void renderContextReady(QString glRenderer);
