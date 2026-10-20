@@ -3,7 +3,7 @@
 A cross-platform Jellyfin desktop client designed around watching together.
 SyncPlay is part of the playback state model from the start, not an add-on.
 
-**Status:** early development (phase 0). Nothing here is usable yet. The
+**Status:** early development (phase 0: Qt and libmpv are not in CI yet). Nothing here is usable yet. The
 current Windows client is [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop).
 
 ## Goals
