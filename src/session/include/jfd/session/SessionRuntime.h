@@ -65,6 +65,7 @@ namespace jfd::session {
     const core::Clock& clock() const { return m_clock; }
     syncplay::GroupClient& group() { return *m_group; }
     PlaybackLauncher& launcher() { return *m_launcher; }
+    ApiTransport& transport() { return *m_transport; }
     core::MediaBackend& backend() { return *m_backend; }
 
   Q_SIGNALS:

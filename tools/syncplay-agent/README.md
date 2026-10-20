@@ -1,7 +1,8 @@
 # SyncPlay drift checks for our client
 
-Our client's SyncPlay logic, the real `core` and `syncplay` libraries, in a
-live group on a Jellyfin 12.2 server together with the
+Our client's SyncPlay stack, the app's own session runtime (`src/session`:
+`core`, `syncplay`, the `jellyfin-api` client and session WebSocket, the
+launcher), in a live group on a Jellyfin 12.2 server together with the
 [harness](../syncplay-harness/README.md) reference participant and Jellyfin
 Web in headless Chromium. CI runs it on every pull request against the forked
 server (playback-rate extension) and against stock 12.2, and posts the report
@@ -10,15 +11,18 @@ as one PR comment that is updated on every push.
 ## Pieces
 
 - **`jfd_syncplay_agent`** ([main.cpp](main.cpp)) is a headless client:
-  `PlaybackSession` + `GroupClient` on a real monotonic clock, with a virtual
-  file instead of mpv. The file plays on the wall clock and runs fast by
-  `--speed-error-ppm` (as an audio device clock does), so drift correction has
-  real work to do. No decoding: what it checks is the sync logic, not the
-  video pipeline.
+  `SessionRuntime`, exactly as the app builds it, with a virtual file instead
+  of mpv. It signs in, reports capabilities, keeps the session WebSocket,
+  resolves the group's items through PlaybackInfo and leaves the group when
+  it quits. The file plays on the wall clock and runs fast by
+  `--speed-error-ppm` (as an audio device clock does), so drift correction
+  has real work to do. No decoding: what it checks is the sync logic and its
+  wiring, not the video pipeline (the Session workflow covers mpv).
 - **`NativeParticipant`** ([nativeParticipant.mjs](nativeParticipant.mjs))
-  carries the agent's HTTP requests and the session WebSocket (the job the Qt
-  app's `jellyfin-api` module does) and reads positions from it in the
-  harness's `sample()` shape. It can drop the network for a while.
+  starts the agent against a local TCP proxy to the server and reads
+  positions from it in the harness's `sample()` shape. A network drop cuts
+  every proxied connection and refuses new ones; the agent's own reconnect
+  brings it back.
 - **Scenarios** ([scenarios.mjs](scenarios.mjs)) and the runner
   ([run.mjs](run.mjs)), which writes `drift-report.md` and `drift-report.json`.
 
@@ -26,7 +30,7 @@ as one PR comment that is updated on every push.
 | --- | --- | --- | --- |
 | `native-drift` | fork | group plays at 1x, then our client asks for 1.25x and 1.5x | spread < 400 ms at 10/15/20 s at each rate |
 | `native-cold-join` | fork | our client joins a group that already plays, then 1.5x | in sync after the join; spread < 400 ms at 10/15/20 s |
-| `native-controls` | both | our client pauses, seeks while paused, resumes | everyone follows; paused positions agree; drift after resume |
+| `native-controls` | both | our client pauses, seeks while paused, resumes, quits | everyone follows; paused positions agree; drift after resume; it leaves the group on quit |
 | `native-network-drop` | both | our client loses the network for 10 s while the group seeks | back in the group and in sync without user action |
 | `stock-server` | stock | 1x group; our client asks for 1.5x | SyncPlay works at 1x; the refusal reaches the app; nobody changes rate |
 | `native-long` | with `--long N` | N minutes, 1x / 1.25x / 1.5x in turn | p95 of the spread, sampled every second, < 400 ms |
@@ -40,7 +44,8 @@ resume after a paused seek (harness known issue 2), which is not ours to test.
 ## Run it locally
 
 ```sh
-cmake -S . -B build -G Ninja && cmake --build build --target jfd_syncplay_agent
+# Needs Qt 6 with WebSockets
+cmake -S . -B build -G Ninja -DJFD_REQUIRE_QT=ON && cmake --build build --target jfd_syncplay_agent
 (cd tools/syncplay-harness && npm ci)
 
 # Forked server (see the harness README; PAYLOAD=release in sandboxes)
@@ -61,8 +66,11 @@ The long run is not part of pull requests: it runs weekly and on demand
 
 ## Agent protocol
 
-One JSON object per line. The driver sends `start`, `create`, `join`,
-`leave`, `intent` (`play`, `pause`, `seek`, `rate`, `stop`), `ws` (a raw
-WebSocket message), `connection` (`lost`, `restored`), `reply` (to an `http`
-request) and `sample`. The agent sends `http`, `sample`, `notice`,
-`correction` and `log`. The header of [main.cpp](main.cpp) has the fields.
+`jfd_syncplay_agent --server URL --user NAME --password PASS --device ID
+[--no-rate] [--speed-error-ppm N]`, then one JSON object per line. The driver
+sends `create`, `join`, `leave`, `intent` (`play`, `pause`, `seek`, `rate`,
+`stop`, `next`, `previous`), `sample` and `quit`. The agent sends `ready`
+(socket up, again after a reconnect), `disconnected`, `ws` (SyncPlay
+messages), `request` (SyncPlay HTTP statuses), `sample`, `notice`,
+`correction`, `log` and `fatal`. The header of [main.cpp](main.cpp) has the
+fields.

@@ -21,6 +21,10 @@ namespace jfd::session {
 
     void request(const syncplay::HttpRequest& request, Reply reply) override;
 
+  Q_SIGNALS:
+    // Every answer, for diagnostics; status 0 when none arrived.
+    void replied(const QString& path, int status);
+
   private:
     api::JellyfinClient& m_client;
   };

@@ -1,10 +1,58 @@
-// Our client's SyncPlay logic (core + syncplay libraries, in the
-// jfd_syncplay_agent process) as a harness participant. The agent decides
-// everything; this class only carries its HTTP requests and the session
-// WebSocket, the parts the Qt app's jellyfin-api module will own.
+// Our client as a harness participant: the jfd_syncplay_agent process runs
+// the app's session runtime (core, group client, API client, session
+// WebSocket) against the server through a local TCP proxy. The proxy is how a
+// network drop is simulated: it cuts every connection and refuses new ones,
+// so the agent's own reconnect logic is what brings it back.
 import { spawn } from 'node:child_process';
+import net from 'node:net';
 import { createInterface } from 'node:readline';
-import { JellyfinHttp, sleep } from '../syncplay-harness/src/jellyfin.mjs';
+import { sleep } from '../syncplay-harness/src/jellyfin.mjs';
+
+// Forwards TCP to the server; `down` cuts and refuses connections.
+class Proxy {
+  constructor(target) {
+    this.target = new URL(target);
+    this.sockets = new Set();
+    this.down = false;
+    this.server = net.createServer((client) => this.accept(client));
+  }
+
+  async listen() {
+    await new Promise((resolve) => this.server.listen(0, '127.0.0.1', resolve));
+    const url = new URL(this.target);
+    url.hostname = '127.0.0.1';
+    url.port = String(this.server.address().port);
+    return url.toString().replace(/\/$/, '');
+  }
+
+  accept(client) {
+    if (this.down) {
+      client.destroy();
+      return;
+    }
+    const port = Number(this.target.port || (this.target.protocol === 'https:' ? 443 : 80));
+    const upstream = net.connect(port, this.target.hostname);
+    for (const socket of [client, upstream]) {
+      this.sockets.add(socket);
+      socket.on('close', () => this.sockets.delete(socket));
+      socket.on('error', () => {});
+    }
+    client.pipe(upstream);
+    upstream.pipe(client);
+    client.on('close', () => upstream.destroy());
+    upstream.on('close', () => client.destroy());
+  }
+
+  setDown(down) {
+    this.down = down;
+    if (down) for (const socket of this.sockets) socket.destroy();
+  }
+
+  close() {
+    this.setDown(true);
+    this.server.close();
+  }
+}
 
 export class NativeParticipant {
   /**
@@ -17,12 +65,11 @@ export class NativeParticipant {
     this.kind = 'native';
     this.label = label;
     this.user = user;
+    this.baseUrl = baseUrl;
     this.agentPath = agent;
     this.supportsRate = supportsRate;
     this.speedErrorPpm = speedErrorPpm;
     this.log = (msg) => log(`[${this.label}] ${msg}`);
-    this.http = new JellyfinHttp(baseUrl, { client: 'JellyfinDesktopNext', device: label });
-    this.ws = null;
     this.serial = 0;
     this.samples = new Map();
     this.waiters = [];
@@ -31,78 +78,38 @@ export class NativeParticipant {
   }
 
   async start() {
-    await this.http.login(this.user.name, this.user.password);
-    this.agent = spawn(this.agentPath, ['--speed-error-ppm', String(this.speedErrorPpm)], { stdio: ['pipe', 'pipe', 'inherit'] });
+    this.proxy = new Proxy(this.baseUrl);
+    const url = await this.proxy.listen();
+    const args = ['--server', url, '--user', this.user.name, '--password', this.user.password,
+      '--device', `jfd-agent-${this.label}`, '--speed-error-ppm', String(this.speedErrorPpm)];
+    if (!this.supportsRate) args.push('--no-rate');
+    this.agent = spawn(this.agentPath, args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      env: { ...process.env, LC_ALL: process.env.LC_ALL || 'C.UTF-8' },
+    });
+    this.exited = new Promise((resolve) => this.agent.on('exit', resolve));
     this.agent.on('exit', (code, signal) => {
       if (!this.stopping) this.log(`agent exited (${code ?? signal})`);
     });
     createInterface({ input: this.agent.stdout }).on('line', (line) => this.onAgent(JSON.parse(line)));
-    await this.connect();
-    this.toAgent({ t: 'start' });
+    const ready = this.waitFor((e) => e.type === 'ready' || e.type === 'fatal', 30_000, 'session socket');
+    const first = await ready;
+    if (first.type === 'fatal') throw new Error(`${this.label}: ${first.data.text}`);
   }
 
-  // Capabilities, then the WebSocket, as the app does after login or a reconnect.
-  async connect() {
-    await this.http.post('Sessions/Capabilities/Full', {
-      PlayableMediaTypes: ['Video', 'Audio'],
-      SupportedCommands: [],
-      SupportsMediaControl: true,
-      SupportsSyncPlayPlaybackRate: this.supportsRate,
-    });
-    const wsUrl = `${this.http.baseUrl.replace(/^http/, 'ws')}/socket?ApiKey=${this.http.token}&deviceId=${this.http.deviceId}`;
-    const ws = new WebSocket(wsUrl);
-    await new Promise((resolve, reject) => {
-      ws.addEventListener('open', resolve, { once: true });
-      ws.addEventListener('error', reject, { once: true });
-    });
-    this.ws = ws;
-    this.connected = true;
-    ws.addEventListener('message', (event) => this.onSocket(String(event.data)));
-    ws.addEventListener('close', () => {
-      if (this.ws !== ws) return;
-      this.ws = null;
-      this.connected = false;
-      if (!this.stopping) this.toAgent({ t: 'connection', state: 'lost' });
-    });
-  }
-
-  onSocket(text) {
-    const msg = JSON.parse(text);
-    if (msg.MessageType === 'ForceKeepAlive') {
-      this.ws?.send(JSON.stringify({ MessageType: 'KeepAlive' }));
-      clearInterval(this.keepAlive);
-      this.keepAlive = setInterval(() => this.ws?.send(JSON.stringify({ MessageType: 'KeepAlive' })), Math.max(5, (msg.Data ?? 60) / 2) * 1000);
-      return;
-    }
-    if (msg.MessageType === 'SyncPlayCommand' || msg.MessageType === 'SyncPlayGroupUpdate') {
-      this.record({ type: msg.MessageType, data: msg.Data });
-    }
-    this.toAgent({ t: 'ws', data: text });
-  }
-
-  /** Drops the WebSocket as a lost network would, then reconnects after `downMs`. */
+  /** Cuts the network for `downMs`; resolves once it is back (the agent reconnects by itself). */
   async dropConnection(downMs) {
-    const ws = this.ws;
-    this.ws = null;
-    this.connected = false;
-    ws?.close();
-    this.toAgent({ t: 'connection', state: 'lost' });
-    this.offline = true;
+    this.proxy.setDown(true);
     await sleep(downMs);
-    this.offline = false;
-    await this.connect();
-    this.toAgent({ t: 'connection', state: 'restored' });
+    this.proxy.setDown(false);
   }
 
   toAgent(obj) {
-    this.agent.stdin.write(`${JSON.stringify(obj)}\n`);
+    if (this.agent?.exitCode == null) this.agent.stdin.write(`${JSON.stringify(obj)}\n`);
   }
 
   onAgent(msg) {
     switch (msg.t) {
-      case 'http':
-        this.forward(msg);
-        break;
       case 'sample': {
         const resolve = this.samples.get(msg.id);
         this.samples.delete(msg.id);
@@ -112,30 +119,28 @@ export class NativeParticipant {
       case 'log':
         this.log(msg.text);
         break;
+      case 'ws':
+        this.record({ type: msg.type, data: msg.data });
+        break;
+      case 'request':
+        this.record({ type: 'request', data: { path: msg.path, status: msg.status } });
+        break;
+      case 'ready':
+        this.connected = true;
+        this.record({ type: 'ready', data: msg });
+        break;
+      case 'disconnected':
+        this.connected = false;
+        this.record({ type: 'disconnected', data: msg });
+        break;
+      case 'fatal':
+        this.log(`fatal: ${msg.text}`);
+        this.record({ type: 'fatal', data: msg });
+        break;
       default:
         this.record({ type: msg.t, data: msg });
         break;
     }
-  }
-
-  async forward({ id, method, path, body }) {
-    let status = 0;
-    let text = '';
-    if (!this.offline) {
-      try {
-        const res = await fetch(`${this.http.baseUrl}/${path.replace(/^\//, '')}`, {
-          method,
-          headers: { Authorization: this.http.authorization(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
-          body: method === 'GET' ? undefined : body || undefined,
-        });
-        status = res.status;
-        text = await res.text();
-      } catch (e) {
-        this.log(`${method} ${path} failed: ${e.message}`);
-      }
-    }
-    if (path.startsWith('SyncPlay/') && path !== 'SyncPlay/Ping') this.record({ type: 'request', data: { path, status } });
-    this.toAgent({ t: 'reply', id, status, body: text });
   }
 
   record(event) {
@@ -176,7 +181,7 @@ export class NativeParticipant {
     const joined = this.waitFor((e) => e.type === 'SyncPlayGroupUpdate' && e.data?.Type === 'GroupJoined', 15_000, 'GroupJoined');
     const refused = this.waitFor((e) => e.type === 'request' && e.data.path === 'SyncPlay/Join' && e.data.status >= 300, 15_000, 'refusal');
     this.toAgent({ t: 'join', group: groupId });
-    const first = await Promise.race([joined, refused]).catch((e) => { throw e; });
+    const first = await Promise.race([joined, refused]);
     joined.catch(() => {});
     refused.catch(() => {});
     return first.type === 'request' ? first.data.status : 204;
@@ -194,15 +199,15 @@ export class NativeParticipant {
   seek(positionMs) { this.toAgent({ t: 'intent', op: 'seek', positionMs: Math.round(positionMs) }); }
   setRate(rate) { this.toAgent({ t: 'intent', op: 'rate', rate }); }
 
+  /** Quits as the app does on exit: the agent leaves the group first. */
   async stop() {
+    if (this.stopping) return;
     this.stopping = true;
-    clearInterval(this.keepAlive);
     if (this.agent && this.agent.exitCode == null) {
-      this.toAgent({ t: 'leave' });
-      await sleep(200);
       this.toAgent({ t: 'quit' });
+      await Promise.race([this.exited, sleep(5_000)]);
+      if (this.agent.exitCode == null) this.agent.kill();
     }
-    this.ws?.close();
-    await sleep(50);
+    this.proxy?.close();
   }
 }

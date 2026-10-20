@@ -173,6 +173,11 @@ export const scenarios = [
       const playing = await waitUntil(group.all, allPlaying, THRESHOLDS.propagationMs * 2);
       check(ctx, 'resume from our client after a paused seek', playing.ok, `${playing.elapsedMs} ms; ${describe(playing.snapshot)}`);
       if (playing.ok) await measureDrift(ctx, group, 'after-seek', resumeAt);
+      // Quitting the app leaves the group, so the others do not wait for us.
+      const left = group.driver.waitFor((e) => e.data?.Type === 'UserLeft', 5_000, 'UserLeft').then(() => true, () => false);
+      const quitAt = Date.now();
+      await group.native.stop();
+      check(ctx, 'our client leaves the group when it quits', await left, `${Date.now() - quitAt} ms`);
     },
   },
   {
