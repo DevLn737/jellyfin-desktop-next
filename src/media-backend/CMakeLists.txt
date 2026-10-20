@@ -1,7 +1,7 @@
-# mpv playback and the Qt Quick video items. The adapter to core::MediaBackend
-# follows once the core interfaces exist.
+# mpv playback, its core::MediaBackend adapter and the Qt Quick video items.
 qt_add_library(jfd_media_backend STATIC
   MpvHandle.h
+  MpvMediaBackend.cpp MpvMediaBackend.h
   MpvPlayer.cpp MpvPlayer.h
   MpvVideoItem.cpp MpvVideoItem.h
   RenderStatus.h
@@ -9,7 +9,7 @@ qt_add_library(jfd_media_backend STATIC
 add_library(jfd::media_backend ALIAS jfd_media_backend)
 target_include_directories(jfd_media_backend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(jfd_media_backend
-  PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::OpenGL mpv::mpv
+  PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::OpenGL mpv::mpv jfd::core
   PRIVATE jfd::diagnostics)
 
 # Windows: the Direct3D 11 video item needs libmpv's D3D11 render API (client

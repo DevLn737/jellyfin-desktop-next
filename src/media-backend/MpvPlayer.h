@@ -10,6 +10,8 @@
 #include <QString>
 #include <QVariant>
 
+#include <functional>
+
 namespace jfd::media {
 
 // Owns the mpv core and is its only client-event consumer. Lives on the GUI
@@ -57,6 +59,13 @@ public:
   // Reads any mpv property synchronously (diagnostics only).
   QVariant property(const char* name) const;
 
+  // Sees every mpv event after this object has handled it, then an
+  // MPV_EVENT_NONE once the queue is drained. For the core::MediaBackend
+  // adapter, which owns the command replies, hooks and properties it
+  // registered with a nonzero reply_userdata.
+  using EventListener = std::function<void(const mpv_event&)>;
+  void setEventListener(EventListener listener) { m_listener = std::move(listener); }
+
 signals:
   void pausedChanged();
   void positionChanged();
@@ -79,6 +88,7 @@ private:
   void command(std::initializer_list<const char*> arguments);
 
   MpvHandle m_mpv;
+  EventListener m_listener;
   bool m_paused = false;
   double m_position = 0;
   double m_duration = 0;
