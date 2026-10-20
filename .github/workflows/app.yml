@@ -32,7 +32,6 @@ jobs:
         run: |
           echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
           echo "qt-arch=$(jq -r '.qt.${{ matrix.qt-arch-key }}' deps/versions.json)" >> "$GITHUB_OUTPUT"
-          echo "libmpv-deb=$(jq -r '.linux.libmpvPackage + "=" + .linux.libmpvPackageVersion' deps/versions.json)" >> "$GITHUB_OUTPUT"
 
       - name: Install Qt ${{ steps.pins.outputs.qt }} (Linux)
         if: runner.os == 'Linux'
@@ -42,13 +41,15 @@ jobs:
           arch: ${{ steps.pins.outputs.qt-arch }}
           cache: true
 
-      - name: Install libmpv and display libraries (Linux)
+      - name: Pinned libmpv (Linux)
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-libmpv
+
+      - name: Install display libraries (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ${{ steps.pins.outputs.libmpv-deb }} ninja-build xvfb xauth \
-            libgl1-mesa-dev libegl1 libgl1-mesa-dri libfontconfig1 libxkbcommon-x11-0 \
+            xvfb xauth libgl1-mesa-dri libfontconfig1 libxkbcommon-x11-0 \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
 

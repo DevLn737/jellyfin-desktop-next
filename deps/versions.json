@@ -103,8 +103,8 @@
     "runner": "ubuntu-24.04",
     "libmpvPackage": "libmpv-dev",
     "libmpvPackageVersion": "0.37.0-1ubuntu4",
-    "libmpvVersion": "2.2.0",
-    "comment": "libmpvPackage is the distribution libmpv the app CI builds against. The AppImage bundles its own libmpv from the sources below: the same mpv commit as Windows, with its own FFmpeg (packaging/linux/build-libmpv.sh). Tags are pinned to the object ls-remote reports for them.",
+    "libmpvVersion": "2.6.0",
+    "comment": "libmpvVersion is the client API of libmpv built from the sources below: the same mpv commit as Windows, with its own FFmpeg (packaging/linux/build-libmpv.sh, .github/actions/linux-libmpv). The app CI and the AppImage use it. libmpvPackage is the distribution libmpv that session.yml still installs. Tags are pinned to the object ls-remote reports for them.",
     "sources": {
       "mpv": {
         "repository": "https://github.com/mpv-player/mpv",
