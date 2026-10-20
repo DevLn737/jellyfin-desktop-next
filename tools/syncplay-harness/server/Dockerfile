@@ -10,7 +10,7 @@
 ARG SERVER_REPO=https://github.com/DevLn737/jellyfin.git
 ARG SERVER_REF=494362e6b354385a00b7ae879814e2908c23f725
 ARG WEB_REPO=https://github.com/DevLn737/jellyfin-web.git
-ARG WEB_REF=b2a97d40c6898726b030b0233a0c9dc89734d3e3
+ARG WEB_REF=ab2d76bd762338592774a20acbc8fca11ccc905d
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS server-build
 ARG SERVER_REPO

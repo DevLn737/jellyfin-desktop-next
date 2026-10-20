@@ -52,7 +52,8 @@ and places them on top of the official `jellyfin/jellyfin` 12.2 image, which
 supplies the runtime, jellyfin-ffmpeg and fonts. It is a test image: no GPU
 runtimes, no persistent volumes.
 
-The bootstrap turns `EnableLegacyAuthorization` on. See the first known issue.
+The server runs with the 12.2 default, `EnableLegacyAuthorization` off;
+`HARNESS_LEGACY_AUTH=1` turns it on. See the first known issue.
 
 ### Test clip
 
@@ -93,21 +94,17 @@ These are reported as ⚠️ and do not fail the run (see `KNOWN_ISSUES` in
 [src/scenarios.mjs](src/scenarios.mjs)). When one stops reproducing, the
 report says so; remove it then.
 
-1. **Web 12.2 WebSocket is rejected by a default 12.2 server.** The server's
-   `DisableLegacyAuthorization` migration turns legacy authorization off, but
-   Web 12.2 still uses `jellyfin-apiclient` 1.11.0, which opens the socket
-   with `?api_key=`. The server answers 403, so Web receives no SyncPlay
-   commands. Web SyncPlay works only where `EnableLegacyAuthorization` is
+1. **Old clients' WebSocket is rejected by a default 12.2 server.** The
+   server's `DisableLegacyAuthorization` migration turns legacy authorization
+   off, so a socket opened with `?api_key=` gets 403. Web 12.2 is not
+   affected: its SyncPlay commands come through the SDK socket, which uses
+   `?ApiKey=` (the extra `jellyfin-apiclient` socket it also opens is
+   rejected harmlessly). Clients that only use `?api_key=`, such as Fathom
+   0.13.1, get no SyncPlay commands unless `EnableLegacyAuthorization` is
    turned back on.
-2. **A seek while paused can freeze the group.** Observed: about 3 s after a
-   paused seek both Web clients report Buffering and never Ready. Likely cause
-   from the code: Web's SyncPlay seek briefly
-   unpauses, seeks and pauses again. The `<video>` element's `waiting` event
-   starts a 3 s timer in `ui/players/HtmlVideoPlayer.js` that is cleared only
-   by `playing`, which never comes while paused. Web then reports Buffering
-   and never Ready, the group stays in Waiting, and Unpause does nothing. A
-   group rate change is a seek, so it is affected too.
-3. **Leave and rejoin in the same page freezes the group.** After leaving,
-   Web keeps the last play-queue update; on rejoin `QueueCore` drops the
-   group's queue as "ignoring old update" (same `LastUpdate`), never reports
-   Ready, and the group stays in Waiting.
+
+Fixed in Web (fork PR [#1](https://github.com/DevLn737/jellyfin-web/pull/1)):
+a seek or rate change while paused left Web reporting Buffering forever, and
+leaving and rejoining a group in the same page dropped the group's queue.
+Both froze the whole group; the `pause-seek`, `seek-paused-resume` and
+`leave-rejoin` scenarios now check them.
