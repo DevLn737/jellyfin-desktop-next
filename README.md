@@ -12,7 +12,7 @@ current Windows client is [DevLn737/jellyfin-desktop](https://github.com/DevLn73
 - SyncPlay with synchronized position and speed, with each participant choosing
   their own audio and subtitles.
 - A native Qt Quick interface. No embedded Jellyfin Web and no Chromium.
-- Windows, Linux and macOS from the first build.
+- Windows and Linux from the first build, with HDR on Windows.
 - Discord Rich Presence and other integrations behind a small, stable interface.
 
 ## Architecture
