@@ -99,4 +99,10 @@ endif()
 
 if(JFD_BUILD_APP)
   add_subdirectory(render)
+
+  # core::MediaBackend on a headless mpv (no video output, null audio).
+  add_executable(jfd_media_backend_tests support/QtTestMain.cpp media/MpvMediaBackendTest.cpp)
+  target_link_libraries(jfd_media_backend_tests PRIVATE jfd::media_backend doctest)
+  add_test(NAME jfd_media_backend_tests COMMAND jfd_media_backend_tests)
+  set_tests_properties(jfd_media_backend_tests PROPERTIES TIMEOUT 120)
 endif()

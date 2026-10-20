@@ -191,6 +191,8 @@ void MpvPlayer::drainEvents()
     switch (event->event_id)
     {
     case MPV_EVENT_NONE:
+      if (m_listener)
+        m_listener(*event);
       return;
     case MPV_EVENT_PROPERTY_CHANGE:
       handleProperty(*static_cast<const mpv_event_property*>(event->data));
@@ -234,6 +236,8 @@ void MpvPlayer::drainEvents()
     default:
       break;
     }
+    if (m_listener)
+      m_listener(*event);
   }
 }
 
