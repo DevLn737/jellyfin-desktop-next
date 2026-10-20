@@ -88,6 +88,10 @@ if(TARGET jfd_jellyfin_api)
   jfd_add_qt_test(jfd_library_tests library/ItemBrowserTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
 
+  jfd_add_qt_test(jfd_playback_tests playback/TrackTableTest.cpp playback/PlaybackReporterTest.cpp
+    playback/StreamPlanTest.cpp)
+  target_link_libraries(jfd_playback_tests PRIVATE jfd::playback)
+
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
 
