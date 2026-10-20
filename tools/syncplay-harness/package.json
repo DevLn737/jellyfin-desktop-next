@@ -1,0 +1,17 @@
+{
+  "name": "jfd-syncplay-harness",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Automated SyncPlay checks against the forked Jellyfin 12.2 test server",
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "bootstrap": "node src/bootstrap.mjs",
+    "test": "node src/run.mjs",
+    "check": "node --check src/*.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}
