@@ -79,6 +79,11 @@ int main(int argc, char* argv[])
   options.hwdec = QStringLiteral("no");
   options.audioOutput = QStringLiteral("null");
   options.loopFile = true;
+  // CI renders with Mesa llvmpipe, where mpv's LUT-based scalers (the lanczos
+  // default) sometimes output black. This test checks orientation, blending
+  // and containment, not scaling quality, so it uses the plain scalers.
+  for (const char* scaler : {"scale", "dscale", "cscale"})
+    options.extra.append({QByteArray(scaler), QByteArrayLiteral("bilinear")});
   auto player = std::make_unique<MpvPlayer>(options);
   check(player->isValid(), "mpv core starts");
   if (!player->isValid())
