@@ -61,7 +61,6 @@ public:
       mpv_render_context_free(m_context);
     }
     delete texture();
-    m_rhiTexture.reset();
     delete m_repaint;
   }
 
@@ -182,8 +181,9 @@ private:
       return false;
     }
     // Qt wraps the native texture without owning it, in a QRhiTexture of the
-    // same format (fromNative() would assume RGBA8); all three are replaced
-    // together when the item's size in pixels changes.
+    // same format (fromNative() would assume RGBA8). The scene graph texture
+    // owns that QRhiTexture; both are replaced, and the native texture with
+    // them, when the item's size in pixels changes.
     auto* rhi = static_cast<QRhi*>(
       m_window->rendererInterface()->getResource(m_window, QSGRendererInterface::RhiResource));
     std::unique_ptr<QRhiTexture> rhiTexture(rhi ? rhi->newTexture(
@@ -193,11 +193,10 @@ private:
       fail(item, QStringLiteral("Qt Quick could not use the video texture"));
       return false;
     }
-    QSGTexture* wrapped = m_window->createTextureFromRhiTexture(rhiTexture.get(), QQuickWindow::TextureIsOpaque);
+    QSGTexture* wrapped = m_window->createTextureFromRhiTexture(rhiTexture.release(), QQuickWindow::TextureIsOpaque);
     QSGTexture* previous = texture();
     setTexture(wrapped);
     delete previous;
-    m_rhiTexture = std::move(rhiTexture);
     m_texture = created;
     m_size = size;
     return true;
@@ -214,7 +213,6 @@ private:
   ComPtr<ID3D11Device> m_device;
   ComPtr<ID3D11DeviceContext> m_deviceContext;
   ComPtr<ID3D11Texture2D> m_texture;
-  std::unique_ptr<QRhiTexture> m_rhiTexture;
   QSize m_size;
   DXGI_FORMAT m_format = DXGI_FORMAT_R8G8B8A8_UNORM;
   mpv_render_context* m_context = nullptr;
