@@ -9,7 +9,7 @@ qt_add_qml_module(jellyfin-desktop-next
   URI JellyfinDesktop
   VERSION 1.0
   NO_PLUGIN
-  QML_FILES qml/Main.qml qml/PlayerMenu.qml qml/OsdBar.qml)
+  QML_FILES qml/Main.qml qml/PlayerMenu.qml qml/OsdBar.qml qml/ProtocolOverlay.qml)
 
 target_link_libraries(jellyfin-desktop-next PRIVATE
   Qt6::Core Qt6::Gui Qt6::OpenGL Qt6::Quick Qt6::Qml

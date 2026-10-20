@@ -5,7 +5,9 @@
 #include "MpvVideoItem.h"
 
 #include <QCommandLineParser>
+#include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -15,14 +17,42 @@
 #include <QTimer>
 
 #include <cstdio>
+#ifdef _WIN32
+#include <share.h>
+#endif
 #include <functional>
 #include <utility>
 #include <memory>
+#include <mutex>
 
 using jfd::media::MpvPlayer;
 using jfd::media::MpvVideoItem;
 
 namespace {
+FILE* logOutput = nullptr;
+
+// Timestamped lines in the format the baseline harness parses for both
+// clients ("yyyy-MM-dd HH:mm:ss.zzz [category] message"), for example the
+// qt.scenegraph.time.renderloop frame lines.
+void installLogFile(const QString& path)
+{
+#ifdef Q_OS_WIN
+  logOutput = _wfsopen(reinterpret_cast<const wchar_t*>(path.utf16()), L"a", _SH_DENYNO);
+#else
+  logOutput = std::fopen(QFile::encodeName(path).constData(), "a");
+#endif
+  if (!logOutput)
+    return;
+  static std::mutex mutex;
+  qInstallMessageHandler([](QtMsgType, const QMessageLogContext& context, const QString& message) {
+    const QByteArray line = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")).toUtf8()
+      + " [" + QByteArray(context.category ? context.category : "default") + "] " + message.toUtf8() + '\n';
+    std::lock_guard lock(mutex);
+    std::fwrite(line.constData(), 1, static_cast<std::size_t>(line.size()), logOutput);
+    std::fflush(logOutput);
+  });
+}
+
 QString toUrl(const QString& value)
 {
   if (value.contains(QLatin1String("://")))
@@ -61,9 +91,16 @@ int main(int argc, char* argv[])
   const QCommandLineOption toggles(QStringLiteral("toggles"), QStringLiteral("Fullscreen round trips."), QStringLiteral("count"), QStringLiteral("50"));
   const QCommandLineOption seeks(QStringLiteral("seeks"), QStringLiteral("Seeks to time."), QStringLiteral("count"), QStringLiteral("20"));
   const QCommandLineOption smoke(QStringLiteral("smoke"), QStringLiteral("Start, render a few frames and exit (CI)."));
+  const QCommandLineOption maximized(QStringLiteral("maximized"), QStringLiteral("Start maximized."));
+  const QCommandLineOption overlay(QStringLiteral("overlay"), QStringLiteral("menu, protocol or none."), QStringLiteral("name"), QStringLiteral("menu"));
+  const QCommandLineOption mpvOption(QStringLiteral("mpv-option"), QStringLiteral("Extra mpv option, repeatable."), QStringLiteral("name=value"));
+  const QCommandLineOption logFile(QStringLiteral("log-file"), QStringLiteral("Write Qt and mpv messages with timestamps."), QStringLiteral("path"));
   parser.addOptions({fullscreen, animate, stats, hwdec, ao, loop, scenario, report, duration, warmup,
-                     sample, replace, toggles, seeks, smoke});
+                     sample, replace, toggles, seeks, smoke, maximized, overlay, mpvOption, logFile});
   parser.process(app);
+
+  if (parser.isSet(logFile))
+    installLogFile(parser.value(logFile));
 
   QStringList files;
   for (const QString& file : parser.positionalArguments())
@@ -74,6 +111,11 @@ int main(int argc, char* argv[])
   playerOptions.audioOutput = parser.value(ao);
   // Measurements loop their file so a run never ends at the end of the file.
   playerOptions.loopFile = parser.isSet(loop) || parser.isSet(scenario);
+  for (const QString& option : parser.values(mpvOption))
+  {
+    const qsizetype equals = option.indexOf(QLatin1Char('='));
+    playerOptions.extra.append({option.left(equals).toUtf8(), equals < 0 ? QByteArray("yes") : option.mid(equals + 1).toUtf8()});
+  }
   // Declared before the engine: QML is destroyed first, the render thread
   // frees the render context, then the mpv core is terminated.
   auto player = std::make_unique<MpvPlayer>(playerOptions);
@@ -84,6 +126,7 @@ int main(int argc, char* argv[])
   }
   AppController controller(player.get(), parser.isSet(animate));
   controller.setStatsVisible(parser.isSet(stats));
+  controller.setOverlay(parser.value(overlay));
 
   qmlRegisterType<MpvVideoItem>("JellyfinDesktop.Media", 1, 0, "MpvVideo");
   qmlRegisterUncreatableType<MpvPlayer>("JellyfinDesktop.Media", 1, 0, "MpvPlayer", QStringLiteral("Provided by the application"));
@@ -131,6 +174,8 @@ int main(int argc, char* argv[])
 
   if (parser.isSet(fullscreen))
     window->showFullScreen();
+  else if (parser.isSet(maximized))
+    window->showMaximized();
 
   // mpv opens its video output only once the render context exists, so
   // playback starts after the first scene graph frame has created it.

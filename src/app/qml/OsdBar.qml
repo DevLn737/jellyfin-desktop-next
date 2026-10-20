@@ -11,7 +11,6 @@ Item {
 
     height: 150
     opacity: shown ? 1 : 0
-    visible: opacity > 0
     Behavior on opacity { NumberAnimation { duration: 200 } }
 
     function format(seconds) {

@@ -10,6 +10,29 @@ AppController::AppController(jfd::media::MpvPlayer* player, bool animateMenu, QO
 {
   m_statsTimer.setInterval(1000);
   connect(&m_statsTimer, &QTimer::timeout, this, &AppController::updateStats);
+  connect(player, &jfd::media::MpvPlayer::clientMessage, this, &AppController::onClientMessage);
+}
+
+void AppController::setOverlay(const QString& overlay)
+{
+  if (overlay == m_overlay)
+    return;
+  m_overlay = overlay;
+  emit overlayChanged();
+}
+
+// Commands from the measurement harness over mpv's IPC server, so it drives
+// this client the way it drives the 2.x client: "script-message jfd-fullscreen"
+// and "script-message jfd-overlay <menu|protocol|none>".
+void AppController::onClientMessage(const QStringList& arguments)
+{
+  const QString command = arguments.value(0);
+  if (command == QLatin1String("jfd-fullscreen"))
+    toggleFullscreen();
+  else if (command == QLatin1String("jfd-overlay") && arguments.size() > 1)
+    setOverlay(arguments.at(1));
+  else if (command == QLatin1String("jfd-quit"))
+    quit();
 }
 
 void AppController::attachWindow(QQuickWindow* window, FrameRecorder* frames)

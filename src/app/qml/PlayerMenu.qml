@@ -41,9 +41,11 @@ Item {
 
     // The video under the sheet, blurred like CSS backdrop-filter. Sampled at
     // half resolution: the blur hides the difference and saves fill rate.
+    // MultiEffect does not render a hidden ShaderEffectSource, so the copy
+    // stays visible under the blur.
     ShaderEffectSource {
         id: backdrop
-        visible: false
+        anchors.fill: parent
         sourceItem: menu.video
         sourceRect: Qt.rect(menu.x, menu.y, menu.width, menu.height)
         textureSize: Qt.size(Math.max(1, menu.width / 2), Math.max(1, menu.height / 2))
@@ -52,24 +54,15 @@ Item {
     MultiEffect {
         anchors.fill: parent
         source: backdrop
+        autoPaddingEnabled: false
         blurEnabled: true
         blur: 1.0
-        blurMax: 48
+        blurMax: 32
         saturation: 0.1
-        maskEnabled: true
-        maskSource: shape
-    }
-    Rectangle {
-        id: shape
-        anchors.fill: parent
-        radius: 12
-        visible: false
-        layer.enabled: true
     }
 
     Rectangle {
         anchors.fill: parent
-        radius: 12
         color: Qt.rgba(0.11, 0.11, 0.11, 0.62)
         border.color: Qt.rgba(1, 1, 1, 0.08)
     }

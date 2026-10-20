@@ -3,6 +3,9 @@
 #include "MpvHandle.h"
 
 #include <QElapsedTimer>
+#include <QList>
+#include <QPair>
+#include <QStringList>
 #include <QObject>
 #include <QString>
 #include <QVariant>
@@ -26,6 +29,8 @@ public:
     QString hwdec = QStringLiteral("auto-safe");
     QString audioOutput; // empty: mpv default
     bool loopFile = false;
+    // Any other mpv options (name, value), applied last so they win.
+    QList<QPair<QByteArray, QByteArray>> extra;
   };
 
   explicit MpvPlayer(const Options& options, QObject* parent = nullptr);
@@ -63,6 +68,9 @@ signals:
   // Time from a seek command to its playback-restart.
   void seekCompleted(double milliseconds);
   void endOfFile(QString reason);
+  // A "script-message" sent to all mpv clients, for example over mpv's IPC
+  // server (input-ipc-server) by the measurement harness.
+  void clientMessage(QStringList arguments);
   void error(QString message);
 
 private:

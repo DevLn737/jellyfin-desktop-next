@@ -2,6 +2,7 @@
 #include "MpvPlayer.h"
 
 #include <QOpenGLContext>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
 #include <QQuickOpenGLUtils>
@@ -9,6 +10,7 @@
 
 #include <mpv/render_gl.h>
 
+#include <algorithm>
 #include <atomic>
 
 #ifdef Q_OS_WIN
@@ -112,14 +114,43 @@ public:
       {MPV_RENDER_PARAM_OPENGL_FBO, &target},
       {MPV_RENDER_PARAM_FLIP_Y, &flip},
       {MPV_RENDER_PARAM_INVALID, nullptr}};
+    // Qt's state must not leak into mpv's drawing: blending, scissor and
+    // above all sampler objects, which resetOpenGLState() leaves bound. A Qt
+    // sampler that asks for mipmaps makes mpv's single-level textures
+    // incomplete and the video renders black (seen with llvmpipe).
+    QQuickOpenGLUtils::resetOpenGLState();
+    unbindSamplers();
     m_rendered = mpv_render_context_render(m_context, params) >= 0;
     // mpv leaves its own GL state (programs, textures, blending) bound.
     QQuickOpenGLUtils::resetOpenGLState();
   }
 
 private:
+  void unbindSamplers()
+  {
+    if (m_samplerUnits == 0)
+      return;
+    auto* gl = QOpenGLContext::currentContext()->extraFunctions();
+    for (GLuint unit = 0; unit < m_samplerUnits; ++unit)
+      gl->glBindSampler(unit, 0);
+  }
+
   void createContext(MpvVideoItem* item)
   {
+    auto* context = QOpenGLContext::currentContext();
+    const auto format = context->format();
+    const bool samplerObjects = context->isOpenGLES()
+      ? format.majorVersion() >= 3
+      : format.majorVersion() > 3 || (format.majorVersion() == 3 && format.minorVersion() >= 3)
+        || context->hasExtension(QByteArrayLiteral("GL_ARB_sampler_objects"));
+    if (samplerObjects)
+    {
+      GLint units = 0;
+      context->functions()->glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &units);
+      // mpv binds at most a handful of textures; Qt Quick fewer still.
+      m_samplerUnits = static_cast<GLuint>(std::clamp(units, 0, 32));
+    }
+
     mpv_opengl_init_params glParams {getProcAddress, nullptr};
     mpv_render_param params[] {
       {MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(MPV_RENDER_API_TYPE_OPENGL)},
@@ -137,9 +168,8 @@ private:
       static_cast<RepaintRequest*>(request)->request();
     }, m_repaint);
     QString glRenderer;
-    if (auto* context = QOpenGLContext::currentContext())
-      if (const auto* name = context->functions()->glGetString(GL_RENDERER))
-        glRenderer = QString::fromUtf8(reinterpret_cast<const char*>(name));
+    if (const auto* name = context->functions()->glGetString(GL_RENDERER))
+      glRenderer = QString::fromUtf8(reinterpret_cast<const char*>(name));
     emit item->renderContextReady(glRenderer);
   }
 
@@ -147,6 +177,7 @@ private:
   MpvHandle m_handle;
   mpv_render_context* m_context = nullptr;
   RepaintRequest* m_repaint = nullptr;
+  GLuint m_samplerUnits = 0;
   bool m_rendered = false;
   bool m_failed = false;
 };

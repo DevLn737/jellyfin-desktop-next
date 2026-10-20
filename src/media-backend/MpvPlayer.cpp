@@ -82,6 +82,9 @@ MpvPlayer::MpvPlayer(const Options& options, QObject* parent)
       qWarning() << "mpv option rejected:" << name << value;
   if (!options.audioOutput.isEmpty())
     mpv_set_option_string(mpv, "ao", options.audioOutput.toUtf8().constData());
+  for (const auto& [name, value] : options.extra)
+    if (mpv_set_option_string(mpv, name.constData(), value.constData()) < 0)
+      qWarning() << "mpv option rejected:" << name << value;
 
   if (mpv_initialize(mpv) < 0)
   {
@@ -211,6 +214,15 @@ void MpvPlayer::drainEvents()
       if (end->reason == MPV_END_FILE_REASON_ERROR)
         emit error(QString::fromUtf8(mpv_error_string(end->error)));
       emit endOfFile(end->reason == MPV_END_FILE_REASON_EOF ? QStringLiteral("eof") : QStringLiteral("other"));
+      break;
+    }
+    case MPV_EVENT_CLIENT_MESSAGE:
+    {
+      const auto* message = static_cast<const mpv_event_client_message*>(event->data);
+      QStringList arguments;
+      for (int i = 0; i < message->num_args; ++i)
+        arguments.append(QString::fromUtf8(message->args[i]));
+      emit clientMessage(arguments);
       break;
     }
     case MPV_EVENT_LOG_MESSAGE:

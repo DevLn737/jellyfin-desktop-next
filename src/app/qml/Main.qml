@@ -14,6 +14,7 @@ Window {
     title: player.title.length > 0 ? player.title + " — Jellyfin Desktop Next" : "Jellyfin Desktop Next"
 
     property bool menuOpen: app.animateMenu
+    readonly property bool playerOverlay: app.overlay === "menu"
     property bool osdVisible: true
 
     MpvVideo {
@@ -40,7 +41,14 @@ Window {
         onClicked: (mouse) => { if (root.menuOpen && !root.app.animateMenu) root.menuOpen = false }
     }
 
+    ProtocolOverlay {
+        anchors.fill: parent
+        video: video
+        visible: root.app.overlay === "protocol"
+    }
+
     OsdBar {
+        visible: root.playerOverlay && opacity > 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -52,7 +60,7 @@ Window {
     PlayerMenu {
         id: menu
         video: video
-        open: root.menuOpen
+        open: root.menuOpen && root.playerOverlay
         animate: root.app.animateMenu
         anchors.top: parent.top
         anchors.bottom: parent.bottom
