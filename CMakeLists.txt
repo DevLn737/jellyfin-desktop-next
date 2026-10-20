@@ -12,6 +12,7 @@ option(JFD_BUILD_TESTS "Build unit tests" ON)
 option(JFD_REQUIRE_QT "Fail when Qt 6 is not found" OFF)
 # Tests against a live Jellyfin server (see scripts/test-server).
 option(JFD_SERVER_TESTS "Build tests that need a Jellyfin server" OFF)
+set(JFD_SIM_SCENARIOS 10000 CACHE STRING "Randomized simulator scenarios run by ctest")
 
 if(MSVC)
   add_compile_options(/W4 /WX /permissive- /utf-8)

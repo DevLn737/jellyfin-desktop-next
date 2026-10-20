@@ -39,6 +39,7 @@ namespace jfd::core {
     std::optional<std::int64_t> driftMilliseconds;
     SyncCorrection correction = SyncCorrection::None;
     std::uint32_t correctionsSinceSynced = 0;
+    bool operator==(const GroupSnapshot&) const = default;
   };
 
   struct SessionSnapshot {
@@ -55,6 +56,7 @@ namespace jfd::core {
     PlaybackRate personalRate = PlaybackRate::normal();
     std::optional<GroupSnapshot> group;
     std::string error;
+    bool operator==(const SessionSnapshot&) const = default;
   };
 
   namespace notice {
