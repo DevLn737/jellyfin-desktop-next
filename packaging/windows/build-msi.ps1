@@ -49,5 +49,5 @@ Invoke-Checked $wixExe $arguments
 # Windows Installer's own consistency checks. Per-user files under LocalAppData
 # have file key paths and the uninstall removes the folder itself
 # (util:RemoveFolderEx), so the ICEs about per-user components do not apply.
-Invoke-Checked $wixExe @('msi', 'validate', '-sice', 'ICE38', '-sice', 'ICE64', '-sice', 'ICE91', $outputPath)
+Invoke-Checked $wixExe @('msi', 'validate', '-acceptEula', $wix.eulaId, '-sice', 'ICE38', '-sice', 'ICE64', '-sice', 'ICE91', $outputPath)
 Write-Host "MSI: $outputPath ($([Math]::Round((Get-Item $outputPath).Length / 1MB, 1)) MiB)"
