@@ -2,6 +2,7 @@
 #include "MpvPlayer.h"
 #include "RepaintRequest.h"
 
+#include <QGuiApplication>
 #include <QOpenGLContext>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLFramebufferObject>
@@ -15,6 +16,10 @@
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#endif
+
+#ifdef Q_OS_LINUX
+#include <qguiapplication_platform.h>
 #endif
 
 namespace jfd::media {
@@ -130,9 +135,21 @@ private:
     }
 
     mpv_opengl_init_params glParams {getProcAddress, nullptr};
+    // mpv needs the window system's display for VA-API zero-copy (and VDPAU)
+    // interop; without it hardware decoding falls back to copying frames.
+    mpv_render_param display {MPV_RENDER_PARAM_INVALID, nullptr};
+#if defined(Q_OS_LINUX) && QT_CONFIG(xcb)
+    if (auto* x11 = qGuiApp->nativeInterface<QNativeInterface::QX11Application>())
+      display = {MPV_RENDER_PARAM_X11_DISPLAY, x11->display()};
+#endif
+#if defined(Q_OS_LINUX) && QT_CONFIG(wayland)
+    if (auto* wayland = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>())
+      display = {MPV_RENDER_PARAM_WL_DISPLAY, wayland->display()};
+#endif
     mpv_render_param params[] {
       {MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(MPV_RENDER_API_TYPE_OPENGL)},
       {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &glParams},
+      display,
       {MPV_RENDER_PARAM_INVALID, nullptr}};
     if (const int error = mpv_render_context_create(&m_context, m_handle.get(), params); error < 0)
     {
