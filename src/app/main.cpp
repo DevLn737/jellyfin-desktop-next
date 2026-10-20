@@ -80,15 +80,22 @@ bool useD3D11(int argc, char* argv[])
 #endif
 }
 
-// Both video items have the same signals; the app handles either.
+// Both video items have the same signals; the app handles either. The render
+// context may already exist (the non-threaded render loop draws the first
+// frame while QML loads), so the recorded outcome is delivered too; both
+// handlers tolerate being called twice.
 template<typename VideoItem, typename Ready, typename Error>
 void connectVideo(QQuickItem* item, QObject* context, Ready ready, Error error)
 {
-  if (auto* video = qobject_cast<VideoItem*>(item))
-  {
-    QObject::connect(video, &VideoItem::renderContextReady, context, ready, Qt::QueuedConnection);
-    QObject::connect(video, &VideoItem::renderError, context, error, Qt::QueuedConnection);
-  }
+  auto* video = qobject_cast<VideoItem*>(item);
+  if (!video)
+    return;
+  QObject::connect(video, &VideoItem::renderContextReady, context, ready, Qt::QueuedConnection);
+  QObject::connect(video, &VideoItem::renderError, context, error, Qt::QueuedConnection);
+  if (const QString name = video->rendererName(); !name.isEmpty())
+    QMetaObject::invokeMethod(context, [ready, name] { ready(name); }, Qt::QueuedConnection);
+  if (const QString message = video->renderFailure(); !message.isEmpty())
+    QMetaObject::invokeMethod(context, [error, message] { error(message); }, Qt::QueuedConnection);
 }
 
 QString toUrl(const QString& value)
@@ -256,6 +263,11 @@ int main(int argc, char* argv[])
     startPlayback = [&] { measurement->start(); };
   else if (!files.isEmpty())
     startPlayback = [&] { player->load(files.first()); };
+  // Playback waits for the render context; say so instead of idling silently.
+  QTimer::singleShot(15000, &app, [&] {
+    if (startPlayback)
+      qWarning("no video render context after 15 s; playback has not started");
+  });
 
   QElapsedTimer shutdown;
   QObject::connect(&app, &QCoreApplication::aboutToQuit, [&] { shutdown.start(); });

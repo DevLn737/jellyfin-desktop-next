@@ -4,6 +4,7 @@ qt_add_library(jfd_media_backend STATIC
   MpvHandle.h
   MpvPlayer.cpp MpvPlayer.h
   MpvVideoItem.cpp MpvVideoItem.h
+  RenderStatus.h
   RepaintRequest.h)
 add_library(jfd::media_backend ALIAS jfd_media_backend)
 target_include_directories(jfd_media_backend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

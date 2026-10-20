@@ -138,7 +138,7 @@ private:
     {
       m_failed = true;
       m_context = nullptr;
-      emit item->renderError(QString::fromUtf8(mpv_error_string(error)));
+      item->reportRenderError(QString::fromUtf8(mpv_error_string(error)));
       return;
     }
     m_repaint = new RepaintRequest(item);
@@ -148,7 +148,7 @@ private:
     QString glRenderer;
     if (const auto* name = context->functions()->glGetString(GL_RENDERER))
       glRenderer = QString::fromUtf8(reinterpret_cast<const char*>(name));
-    emit item->renderContextReady(glRenderer);
+    item->reportRenderContextReady(glRenderer);
   }
 
   QQuickWindow* m_window = nullptr;
@@ -192,6 +192,18 @@ MpvHandle MpvVideoItem::handle() const
 QQuickFramebufferObject::Renderer* MpvVideoItem::createRenderer() const
 {
   return new MpvRenderer();
+}
+
+void MpvVideoItem::reportRenderContextReady(const QString& renderer)
+{
+  m_status.setReady(renderer);
+  emit renderContextReady(renderer);
+}
+
+void MpvVideoItem::reportRenderError(const QString& message)
+{
+  m_status.setFailed(message);
+  emit renderError(message);
 }
 
 }

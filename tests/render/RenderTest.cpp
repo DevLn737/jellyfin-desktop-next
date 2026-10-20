@@ -82,6 +82,11 @@ void connectVideo(QQuickItem* item, QObject* context, bool& ready, QString& erro
       ready = true;
     }, Qt::QueuedConnection);
     QObject::connect(video, &VideoItem::renderError, context, [&error](const QString& e) { error = e; }, Qt::QueuedConnection);
+    // Already created before the connection (non-threaded render loop).
+    if (!video->rendererName().isEmpty())
+      ready = true;
+    if (!video->renderFailure().isEmpty())
+      error = video->renderFailure();
   }
 }
 

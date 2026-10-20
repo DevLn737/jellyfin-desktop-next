@@ -1,7 +1,7 @@
 # Generates the test videos both clients are measured with (measurement
 # protocol rev. 2): 60-second loops of a moving test pattern with a tone,
 # 1080p60 and 2160p60, each in H.264 and HEVC (8-bit SDR), so hardware decoding
-# is exercised. Writes SHA256SUMS next to them. Needs ffmpeg (path or on PATH).
+# is exercised. Adds their lines to SHA256SUMS next to them. Needs ffmpeg (path or on PATH).
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string]$OutDir,
@@ -33,5 +33,12 @@ foreach ($f in $fixtures) {
 $sums = Get-ChildItem -LiteralPath $OutDir -Filter 'pattern-*.mkv' | Sort-Object Name | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
 }
-[IO.File]::WriteAllText((Join-Path $OutDir 'SHA256SUMS'), (($sums -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
+# Keep the lines of other files in the folder (for example clips the 2.x
+# harness added); replace only the pattern files' lines.
+$sumsPath = Join-Path $OutDir 'SHA256SUMS'
+$others = @()
+if (Test-Path -LiteralPath $sumsPath) {
+    $others = @(Get-Content -LiteralPath $sumsPath | Where-Object { $_ -and $_ -notmatch '^[0-9a-f]{64}  pattern-[^ ]*\.mkv$' })
+}
+[IO.File]::WriteAllText($sumsPath, ((@($others) + @($sums)) -join "`n") + "`n", (New-Object Text.UTF8Encoding $false))
 $sums

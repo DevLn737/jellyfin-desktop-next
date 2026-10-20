@@ -125,7 +125,7 @@ private:
     mpv_render_context_set_update_callback(m_context, [](void* request) {
       static_cast<RepaintRequest*>(request)->request();
     }, m_repaint);
-    emit item->renderContextReady(QStringLiteral("Direct3D 11 (feature level %1.%2): %3")
+    item->reportRenderContextReady(QStringLiteral("Direct3D 11 (feature level %1.%2): %3")
                                     .arg(m_device->GetFeatureLevel() >> 12)
                                     .arg((m_device->GetFeatureLevel() >> 8) & 0xf)
                                     .arg(adapterName(m_device.Get())));
@@ -164,7 +164,7 @@ private:
   void fail(MpvD3D11VideoItem* item, const QString& message)
   {
     m_failed = true;
-    emit item->renderError(message);
+    item->reportRenderError(message);
   }
 
   QQuickWindow* m_window;
@@ -229,6 +229,18 @@ void MpvD3D11VideoItem::geometryChange(const QRectF& newGeometry, const QRectF& 
   QQuickItem::geometryChange(newGeometry, oldGeometry);
   if (newGeometry.size() != oldGeometry.size())
     update();
+}
+
+void MpvD3D11VideoItem::reportRenderContextReady(const QString& renderer)
+{
+  m_status.setReady(renderer);
+  emit renderContextReady(renderer);
+}
+
+void MpvD3D11VideoItem::reportRenderError(const QString& message)
+{
+  m_status.setFailed(message);
+  emit renderError(message);
 }
 
 }
