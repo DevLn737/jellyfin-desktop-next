@@ -30,6 +30,21 @@ through the OpenGL render API into a reusable FBO drawn below QML
 - **Video:** libmpv through its render API, drawn below the QML scene.
 - **Build:** CMake. CI builds and tests on Windows, Linux and macOS from the first commit.
 - **Server admin and rarely used pages** open in the system browser instead of being reimplemented.
+- **Platforms:** Windows first, Linux in CI from the start, macOS later. The Qt-free core
+  keeps building on all three.
+
+## Cost of this choice
+
+libmpv's render API supports only OpenGL and software rendering, so the whole
+Qt Quick scene runs on OpenGL on every platform (the 2.x client already forces
+it with `QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL)`). Qt 6
+would otherwise use D3D11 on Windows and Metal on macOS. As a result:
+
+- there is no HDR output;
+- on Windows, hardware decoding often copies frames back (`d3d11va-copy`) instead of zero-copy;
+- on macOS, OpenGL is deprecated.
+
+HDR is out of scope for the prototype.
 
 ## Reasons
 
@@ -43,6 +58,14 @@ through the OpenGL render API into a reusable FBO drawn below QML
 
 ## Rejected for now
 
+- **Fathom** (Flutter, media_kit/libmpv, SyncPlay, AGPL-3.0) as a base: young,
+  no macOS, no playback-rate extension, and AGPL-3.0 code cannot come back into
+  a GPL-2.0-or-later client. A separate check of it against the 12.2 server is
+  under way; its results will be added here.
+- **Flutter with media_kit** as a stack: the proven code to port is C++/Qt, and
+  a second stack would mean rewriting what already works. Fladder (Flutter,
+  GPL-3.0) is a useful reference for media segments and trickplay.
+
 - **Rust (with Slint, iced/egui or cxx-qt):** none of the observed problems is a
   memory-safety problem. Rust would add a second language or require a new,
   unproven mpv composition path.
@@ -54,6 +77,9 @@ through the OpenGL render API into a reusable FBO drawn below QML
 
 ## Revisit when
 
-- the phase 1 prototype misses its frame-pacing, memory or fullscreen targets with Qt Quick;
+- weeks 1–2 of phase 1 show that Qt Quick with mpv is not better than the 2.x
+  client on frame pacing and memory on the group's hardware. The first fallback
+  is a native player screen inside the 2.x client (Jellyfin Web hidden during
+  playback); the second is comparing mpv in its own window (`--wid`) and other stacks;
 - HDR passthrough or zero-copy hardware decoding on Windows becomes a requirement;
 - the long-term maintainers are substantially more fluent in Rust than in C++.
