@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(JFD_BUILD_TESTS "Build unit tests" ON)
+set(JFD_SIM_SCENARIOS 10000 CACHE STRING "Randomized simulator scenarios run by ctest")
 
 if(MSVC)
   add_compile_options(/W4 /WX /permissive- /utf-8)

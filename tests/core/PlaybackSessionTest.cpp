@@ -1,0 +1,262 @@
+#include "SessionHarness.h"
+
+#include <doctest/doctest.h>
+
+using namespace jfd::core;
+using namespace jfd::testing;
+using namespace std::chrono_literals;
+
+TEST_CASE("Local playback loads, starts at the requested position and plays") {
+  SessionHarness h;
+  h.post(intent::Open{h.media({}, 30'000)});
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+  const auto load = h.backend.last<command::Load>();
+  REQUIRE(load);
+  CHECK_FALSE(load->request.startPaused);
+
+  h.post(backend::SourceOpened{load->epoch, 0.0, 600.0});
+  const auto start = h.backend.last<command::Start>();
+  REQUIRE(start);
+  CHECK(start->position->value == doctest::Approx(30.0));
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+
+  h.post(backend::PlaybackRestarted{load->epoch, h.sample(30.0, false)});
+  CHECK(h.snapshot().phase == PlaybackPhase::Playing);
+  CHECK(h.snapshot().position.milliseconds() == 30'000);
+  CHECK(h.snapshot().duration->milliseconds() == 600'000);
+  CHECK_FALSE(h.timers.isArmed(TimerPurpose::ReadyDeadline));
+}
+
+TEST_CASE("Events of an earlier file are dropped on entry") {
+  SessionHarness h;
+  const auto first = h.open(h.media());
+  h.post(intent::Open{h.media({}, 5'000)});
+  const auto second = h.currentEpoch();
+  CHECK(first != second);
+  CHECK(h.backend.last<command::Stop>()->epoch == first);
+
+  const auto before = h.session->droppedInputs();
+  h.post(backend::PlaybackRestarted{first, h.sample(100.0, false)});
+  h.post(backend::Ended{first, backend::EndReason::EndOfFile, {}});
+  CHECK(h.session->droppedInputs() == before + 2);
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+  CHECK(h.snapshot().media == second);
+}
+
+TEST_CASE("A preserved stream without a start time fails visibly") {
+  SessionHarness h;
+  auto request = h.media();
+  request.timeline.kind = StreamTimeline::Kind::PreservedMusic;
+  h.post(intent::Open{request});
+  CHECK(h.backend.last<command::Load>()->request.rebaseStartTime);
+  h.post(backend::SourceOpened{h.currentEpoch(), std::nullopt, 100.0});
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+  CHECK_FALSE(h.snapshot().error.empty());
+  CHECK(h.backend.last<command::Stop>());
+}
+
+TEST_CASE("Personal rate applies outside a group and returns after leaving") {
+  SessionHarness h;
+  const auto epoch = h.open(h.media());
+  h.post(intent::SetRate{*PlaybackRate::base(1.5)});
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1500);
+
+  h.join("p1", *PlaybackRate::base(1.25));
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1250);
+  CHECK(h.snapshot().personalRate.perMille() == 1500);
+
+  h.post(group::Left{h.group});
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1500);
+  CHECK(h.backend.last<command::SetRate>()->epoch == epoch);
+  CHECK_FALSE(h.snapshot().group);
+}
+
+TEST_CASE("Joining asks the app for the group's item and reports Ready only after a real restart") {
+  SessionHarness h;
+  h.join("p1");
+  const auto requested = h.observer.all<notice::GroupItemRequested>();
+  REQUIRE(requested.size() == 1);
+  CHECK(requested[0].playlistItem == PlaylistItemId("p1"));
+
+  h.post(intent::Open{h.media("p1", 12'000)});
+  CHECK(h.backend.last<command::Load>()->request.startPaused);
+  h.post(backend::SourceOpened{h.currentEpoch(), 0.0, 600.0});
+  CHECK(h.outbox.all<outgoing::Ready>().empty());
+
+  // Paused restart far from the start target: not ready yet.
+  h.post(backend::PlaybackRestarted{h.currentEpoch(), h.sample(2.0, true)});
+  CHECK(h.outbox.all<outgoing::Ready>().empty());
+
+  h.post(backend::PlaybackRestarted{h.currentEpoch(), h.sample(12.04, true)});
+  const auto ready = h.outbox.all<outgoing::Ready>();
+  REQUIRE(ready.size() == 1);
+  CHECK(ready[0].position.milliseconds() == 12'040);
+  CHECK_FALSE(ready[0].isPlaying);
+  CHECK(ready[0].playlistItem == PlaylistItemId("p1"));
+  CHECK(ready[0].epoch == h.group);
+}
+
+TEST_CASE("Group seek reports Ready with the new position, never an earlier restart") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+  h.outbox.sent.clear();
+
+  h.post(h.command(GroupCommandType::Seek, 30'000));
+  const auto seek = h.backend.last<command::Seek>();
+  REQUIRE(seek);
+  CHECK(seek->target.value == doctest::Approx(30.0));
+
+  // A restart from before the seek began must not count.
+  h.post(backend::PlaybackRestarted{epoch, h.sample(0.0, true)});
+  CHECK(h.outbox.all<outgoing::Ready>().empty());
+
+  h.post(backend::SeekStarted{epoch});
+  h.post(backend::PlaybackRestarted{epoch, h.sample(30.01, true)});
+  const auto ready = h.outbox.all<outgoing::Ready>();
+  REQUIRE(ready.size() == 1);
+  CHECK(ready[0].position.milliseconds() == 30'010);
+}
+
+TEST_CASE("A future unpause waits for its instant; a late one joins the group position") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+
+  h.post(h.command(GroupCommandType::Unpause, 0, 500ms));
+  CHECK_FALSE(h.backend.last<command::SetPaused>());
+  h.advance(499ms);
+  CHECK_FALSE(h.backend.last<command::SetPaused>());
+  h.advance(1ms);
+  REQUIRE(h.backend.last<command::SetPaused>());
+  CHECK_FALSE(h.backend.last<command::SetPaused>()->paused);
+
+  // A second client receiving the same command 2 s late at 1.5x seeks to 3 s.
+  SessionHarness late;
+  late.join("p1", *PlaybackRate::base(1.5));
+  late.open(late.media("p1"), true);
+  auto command = late.command(GroupCommandType::Unpause, 0, -2000ms, *PlaybackRate::base(1.5));
+  late.post(command);
+  REQUIRE(late.backend.last<command::SetPaused>());
+  const auto seek = late.backend.last<command::Seek>();
+  REQUIRE(seek);
+  CHECK(seek->target.value == doctest::Approx(3.0));
+  CHECK_FALSE(late.backend.last<command::SetPaused>()->paused);
+  (void)epoch;
+}
+
+TEST_CASE("Drift is corrected by speed after the cooldown, then the base rate returns") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0));
+  h.post(backend::Progress{epoch, h.sample(0.0, false)});
+  CHECK(h.snapshot().group->driftMilliseconds == 0);
+
+  h.advance(2000ms);
+  // 300 ms behind the group.
+  h.post(backend::Progress{epoch, h.sample(1.7, false)});
+  CHECK(h.snapshot().group->driftMilliseconds == 300);
+  CHECK(h.snapshot().group->correction == SyncCorrection::Speed);
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1300);
+  CHECK(h.snapshot().effectiveRate.perMille() == 1300);
+
+  h.advance(1000ms);
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1000);
+  CHECK(h.snapshot().group->correction == SyncCorrection::None);
+}
+
+TEST_CASE("Leaving cancels a pending correction before restoring the personal rate") {
+  SessionHarness h;
+  const auto epoch = h.open(h.media("p1"));
+  h.post(intent::SetRate{*PlaybackRate::base(2.0)});
+  h.join("p1");
+  h.post(h.command(GroupCommandType::Unpause, 0));
+  h.advance(2000ms);
+  h.post(backend::Progress{epoch, h.sample(1.7, false)});
+  REQUIRE(h.timers.isArmed(TimerPurpose::CorrectionEnd));
+
+  h.post(group::Left{h.group});
+  CHECK_FALSE(h.timers.isArmed(TimerPurpose::CorrectionEnd));
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 2000);
+  h.advance(5000ms);
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 2000);
+}
+
+TEST_CASE("Intents inside a group go to the group") {
+  SessionHarness h;
+  h.join("p1");
+  h.open(h.media("p1"), true);
+  h.outbox.sent.clear();
+  h.post(intent::Play{});
+  h.post(intent::Pause{});
+  h.post(intent::Seek{SessionHarness::ms(5'000)});
+  h.post(intent::SetRate{*PlaybackRate::base(1.25)});
+  h.post(intent::SetRate{*PlaybackRate::effective(0.2)});
+  CHECK(h.outbox.all<outgoing::RequestUnpause>().size() == 1);
+  CHECK(h.outbox.all<outgoing::RequestPause>().size() == 1);
+  CHECK(h.outbox.all<outgoing::RequestSeek>()[0].position.milliseconds() == 5'000);
+  const auto rates = h.outbox.all<outgoing::RequestPlaybackRate>();
+  REQUIRE(rates.size() == 1);
+  CHECK(rates[0].rate.perMille() == 1250);
+
+  h.post(group::RateChangeRejected{h.group, 409, 1});
+  const auto rejected = h.observer.all<notice::GroupRateRejected>();
+  REQUIRE(rejected.size() == 1);
+  CHECK(rejected[0].httpStatus == 409);
+}
+
+TEST_CASE("Buffering while the group plays is reported, and Ready on recovery") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0));
+  h.outbox.sent.clear();
+  h.advance(1000ms);
+  h.post(backend::Progress{epoch, h.sample(1.0, false, true)});
+  REQUIRE(h.outbox.all<outgoing::Buffering>().size() == 1);
+  CHECK(h.outbox.all<outgoing::Buffering>()[0].isPlaying);
+  h.post(backend::Progress{epoch, h.sample(1.0, false, false)});
+  CHECK(h.outbox.all<outgoing::Ready>().size() == 1);
+}
+
+TEST_CASE("Old play queue updates and messages of an earlier group are ignored") {
+  SessionHarness h;
+  h.join("p1", *PlaybackRate::base(1.5));
+  group::QueueChanged old;
+  old.epoch = h.group;
+  old.reason = QueueChangeReason::SetCurrentItem;
+  old.lastUpdate = h.serverNow() - 1s;
+  old.currentPlaylistItem = PlaylistItemId("p0");
+  old.baseRate = PlaybackRate::normal();
+  h.post(old);
+  CHECK(h.snapshot().group->baseRate.perMille() == 1500);
+  CHECK(h.snapshot().group->playlistItem == PlaylistItemId("p1"));
+
+  const auto previous = h.group;
+  h.join("p1");
+  const auto dropped = h.session->droppedInputs();
+  h.post(group::Left{previous});
+  CHECK(h.session->droppedInputs() == dropped + 1);
+  CHECK(h.snapshot().group);
+}
+
+TEST_CASE("A seek before the start of an offset transcode asks for a new stream") {
+  SessionHarness h;
+  auto request = h.media({}, 600'000);
+  request.timeline.offset = SessionHarness::ms(600'000);
+  h.open(request);
+  h.post(intent::Seek{SessionHarness::ms(10'000)});
+  const auto reopen = h.observer.all<notice::StreamReopenNeeded>();
+  REQUIRE(reopen.size() == 1);
+  CHECK(reopen[0].position.milliseconds() == 10'000);
+}
+
+TEST_CASE("Snapshots are published only when they change") {
+  SessionHarness h;
+  h.open(h.media());
+  const auto count = h.observer.snapshots.size();
+  h.post(group::ClockSynced{{}, WallTicks(0)});
+  CHECK(h.observer.snapshots.size() == count);
+  CHECK(h.observer.snapshots.back().revision == h.snapshot().revision);
+}
