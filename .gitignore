@@ -4,3 +4,4 @@
 .vscode/
 *.user
 compile_commands.json
+tools/syncplay-agent/out/

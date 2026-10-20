@@ -27,6 +27,11 @@ target_include_directories(nlohmann_json SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/
 add_subdirectory(src/core)
 add_subdirectory(src/syncplay)
 
+# Headless SyncPlay client for the drift checks (POSIX only).
+if(UNIX)
+  add_subdirectory(tools/syncplay-agent)
+endif()
+
 if(JFD_REQUIRE_QT)
   find_package(Qt6 6.4 REQUIRED COMPONENTS Core Network WebSockets)
 else()
