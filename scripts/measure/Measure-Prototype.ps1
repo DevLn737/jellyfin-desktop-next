@@ -319,7 +319,19 @@ function Probe-Summary($Samples) {
     if ($Samples.Count -lt 2) { return @{ samples = $Samples.Count } }
     $first = $Samples[0]; $last = $Samples[-1]
     $av = [double[]]@($Samples | Where-Object { $null -ne (Prop $_ 'avsync') } | ForEach-Object { [Math]::Abs([double](Prop $_ 'avsync')) * 1000 })
-    $delta = { param($name) $l = Prop $last $name; $f = Prop $first $name; if ($null -ne $l -and $null -ne $f) { $l - $f } else { $null } }
+    # Counters restart at zero when a file is (re)loaded, so sum the increments
+    # between samples, counting a value below its predecessor as a restart.
+    $delta = {
+        param($name)
+        $total = $null; $previous = $null
+        foreach ($sample in $Samples) {
+            $value = Prop $sample $name
+            if ($null -eq $value) { continue }
+            if ($null -ne $previous) { $total += $(if ($value -ge $previous) { $value - $previous } else { $value }) } else { $total = 0 }
+            $previous = $value
+        }
+        $total
+    }
     return @{
         samples = $Samples.Count
         hwdecCurrent = @($Samples | ForEach-Object { Prop $_ 'hwdec-current' } | Select-Object -Unique)
