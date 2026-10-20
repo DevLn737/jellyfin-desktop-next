@@ -34,9 +34,18 @@ The plan and its exit criteria are in [docs/roadmap.md](docs/roadmap.md).
 | [DevLn737/jellyfin-syncplay-speed](https://github.com/DevLn737/jellyfin-syncplay-speed) | Server image build, release manifest and protocol documentation |
 | [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop) | Current Windows client (maintenance only) |
 
+## Testing SyncPlay
+
+[tools/syncplay-harness](tools/syncplay-harness) runs the forked Jellyfin 12.2
+server in Docker and checks SyncPlay drift, pause, seek, rate changes and
+rejoin with Jellyfin Web clients in headless Chromium. CI runs it on every
+change to the harness.
+
 ## Building
 
-The Qt-free core library and its tests:
+The Qt-free core always builds. The Qt modules (`platform`, `jellyfin-api`,
+`library`) build when Qt 6.4+ with Qt WebSockets is found; see
+[docs/jellyfin-api.md](docs/jellyfin-api.md).
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release

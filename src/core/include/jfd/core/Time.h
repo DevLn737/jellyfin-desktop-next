@@ -198,10 +198,13 @@ namespace jfd::core {
 
   // Media time that passes during a wall-clock interval at a rate:
   // round(elapsedWallTicks * rate), as the server computes it.
+  // Split so any instant difference (up to centuries) times 5x cannot overflow.
   constexpr MediaDelta mediaElapsed(WallTicks wall, PlaybackRate rate) {
-    const std::int64_t scaled = wall.count() * rate.perMille();
-    const std::int64_t rounded = scaled >= 0 ? (scaled + 500) / 1000 : -((-scaled + 500) / 1000);
-    return MediaDelta::fromTicks(rounded);
+    const bool negative = wall.count() < 0;
+    const std::int64_t magnitude = negative ? -wall.count() : wall.count();
+    const std::int64_t whole = (magnitude / 1000) * rate.perMille();
+    const std::int64_t part = ((magnitude % 1000) * rate.perMille() + 500) / 1000;
+    return MediaDelta::fromTicks(negative ? -(whole + part) : whole + part);
   }
 
   // Wall-clock time needed to cover a media distance at a rate:

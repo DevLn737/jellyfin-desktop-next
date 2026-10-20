@@ -1,0 +1,1 @@
+nlohmann/json 3.11.3 single header from https://github.com/nlohmann/json/releases/tag/v3.11.3 (MIT, see LICENSE.MIT). SHA-256 of json.hpp: 9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6
