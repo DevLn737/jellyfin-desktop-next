@@ -22,6 +22,9 @@ class AppController : public QObject
   Q_PROPERTY(bool statsVisible READ statsVisible WRITE setStatsVisible NOTIFY statsVisibleChanged)
   Q_PROPERTY(QString statsText READ statsText NOTIFY statsTextChanged)
   Q_PROPERTY(QString glRenderer READ glRenderer NOTIFY glRendererChanged)
+  // The shader that encodes the interface for an HDR10 swap chain, or empty
+  // when this build has none.
+  Q_PROPERTY(QString hdrShader READ hdrShader CONSTANT)
 
 public:
   AppController(jfd::media::MpvPlayer* player, bool animateMenu, QObject* parent = nullptr);
@@ -35,6 +38,8 @@ public:
   bool statsVisible() const { return m_statsVisible; }
   void setStatsVisible(bool visible);
   QString statsText() const { return m_statsText; }
+  static QString hdrShader();
+  QString targetParams() const;
   QString glRenderer() const { return m_glRenderer; }
   void setGlRenderer(const QString& renderer);
 

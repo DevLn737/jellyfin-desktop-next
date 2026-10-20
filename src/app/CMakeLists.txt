@@ -11,6 +11,19 @@ qt_add_qml_module(jellyfin-desktop-next
   NO_PLUGIN
   QML_FILES qml/Main.qml qml/PlayerMenu.qml qml/OsdBar.qml qml/ProtocolOverlay.qml)
 
+# HDR experiment (Windows, --hdr hdr10): the shader that encodes the QML
+# interface for an HDR10 swap chain. Without Qt Shader Tools the app builds
+# without it and HDR stays off.
+find_package(Qt6 QUIET COMPONENTS ShaderTools)
+if(Qt6ShaderTools_FOUND)
+  qt_add_shaders(jellyfin-desktop-next "jfd_shaders"
+    PREFIX "/"
+    FILES shaders/hdr10_ui.frag)
+  target_compile_definitions(jellyfin-desktop-next PRIVATE JFD_HAVE_HDR_SHADER=1)
+elseif(WIN32 AND JFD_ENFORCE_PINS)
+  message(FATAL_ERROR "The pinned Qt must include Qt Shader Tools")
+endif()
+
 target_link_libraries(jellyfin-desktop-next PRIVATE
   Qt6::Core Qt6::Gui Qt6::OpenGL Qt6::Quick Qt6::Qml
   jfd::media_backend jfd::diagnostics)
@@ -26,5 +39,8 @@ if(JFD_BUILD_TESTS)
     # The default on Windows is Direct3D 11; OpenGL stays available.
     add_test(NAME app_smoke_gl COMMAND jellyfin-desktop-next --smoke --renderer gl)
     set_tests_properties(app_smoke_gl PROPERTIES TIMEOUT 60)
+    # Without an HDR display Qt Quick falls back to SDR; the app must still play.
+    add_test(NAME app_smoke_hdr_fallback COMMAND jellyfin-desktop-next --smoke --hdr hdr10)
+    set_tests_properties(app_smoke_hdr_fallback PROPERTIES TIMEOUT 60)
   endif()
 endif()

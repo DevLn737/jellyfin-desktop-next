@@ -26,6 +26,11 @@ class MpvD3D11VideoItem : public QQuickItem
   // MpvPlayer.h in the combined moc file.
   Q_MOC_INCLUDE("MpvPlayer.h")
   Q_PROPERTY(jfd::media::MpvPlayer* player READ player WRITE setPlayer NOTIFY playerChanged)
+  // True when the window has an HDR10 (PQ, BT.2020) swap chain and mpv
+  // outputs PQ; QML then encodes its own sRGB content at sdrWhiteNits.
+  Q_PROPERTY(bool hdrActive READ hdrActive NOTIFY hdrChanged)
+  Q_PROPERTY(double sdrWhiteNits READ sdrWhiteNits NOTIFY hdrChanged)
+  Q_PROPERTY(double displayPeakNits READ displayPeakNits NOTIFY hdrChanged)
 
 public:
   explicit MpvD3D11VideoItem(QQuickItem* parent = nullptr);
@@ -42,11 +47,18 @@ public:
 
   MpvHandle handle() const { return m_handle; }
 
+  bool hdrActive() const { return m_hdrActive; }
+  double sdrWhiteNits() const { return m_sdrWhiteNits; }
+  double displayPeakNits() const { return m_displayPeakNits; }
+  // Render thread: the swap chain is HDR10; applied on the GUI thread.
+  void reportHdr(double sdrWhiteNits, double displayPeakNits);
+
 signals:
   void playerChanged();
   // Emitted on the render thread after the first mpv render context is ready.
   void renderContextReady(QString renderer);
   void renderError(QString message);
+  void hdrChanged();
 
 protected:
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData* data) override;
@@ -57,6 +69,9 @@ private:
   MpvHandle m_handle;
   RenderStatus m_status;
   bool m_renderFailed = false;
+  bool m_hdrActive = false;
+  double m_sdrWhiteNits = 0;
+  double m_displayPeakNits = 0;
 };
 
 }

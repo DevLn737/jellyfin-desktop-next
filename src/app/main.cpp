@@ -22,6 +22,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string_view>
 #ifdef _WIN32
 #include <share.h>
 #endif
@@ -58,19 +59,26 @@ void installLogFile(const QString& path)
   });
 }
 
-// The video renderer has to be chosen before QGuiApplication exists, so
-// --renderer is read straight from argv: "gl", "d3d11" or "auto" (Direct3D 11
+// The video renderer and HDR have to be chosen before QGuiApplication exists,
+// so --renderer and --hdr are read straight from argv: "gl", "d3d11" or "auto" (Direct3D 11
 // where the build supports it, otherwise OpenGL).
-bool useD3D11(int argc, char* argv[])
+const char* argValue(int argc, char* argv[], std::string_view name, const char* fallback)
 {
-  const char* value = "auto";
+  const char* value = fallback;
   for (int i = 1; i < argc; ++i)
   {
-    if (std::strcmp(argv[i], "--renderer") == 0 && i + 1 < argc)
+    const std::string_view arg(argv[i]);
+    if (arg == name && i + 1 < argc)
       value = argv[i + 1];
-    else if (std::strncmp(argv[i], "--renderer=", 11) == 0)
-      value = argv[i] + 11;
+    else if (arg.size() > name.size() && arg.substr(0, name.size()) == name && arg[name.size()] == '=')
+      value = argv[i] + name.size() + 1;
   }
+  return value;
+}
+
+bool useD3D11(int argc, char* argv[])
+{
+  const char* value = argValue(argc, argv, "--renderer", "auto");
 #ifdef JFD_HAVE_D3D11_VIDEO
   return std::strcmp(value, "gl") != 0;
 #else
@@ -113,6 +121,10 @@ int main(int argc, char* argv[])
   // The whole scene uses the API mpv draws with (ADR 0001): Direct3D 11 on
   // Windows, OpenGL elsewhere and as the Windows fallback.
   const bool d3d11 = useD3D11(argc, argv);
+  // HDR experiment: Qt Quick asks for an HDR10 swap chain and falls back to
+  // SDR (with a warning) when the display cannot show it.
+  if (d3d11 && argValue(argc, argv, "--hdr", "off") == std::string_view("hdr10"))
+    qputenv("QSG_RHI_HDR", "hdr10");
   QQuickWindow::setGraphicsApi(d3d11 ? QSGRendererInterface::Direct3D11 : QSGRendererInterface::OpenGL);
   QGuiApplication app(argc, argv);
   QGuiApplication::setApplicationName(QStringLiteral("Jellyfin Desktop Next"));
@@ -142,9 +154,10 @@ int main(int argc, char* argv[])
   const QCommandLineOption overlay(QStringLiteral("overlay"), QStringLiteral("menu, protocol or none."), QStringLiteral("name"), QStringLiteral("menu"));
   const QCommandLineOption mpvOption(QStringLiteral("mpv-option"), QStringLiteral("Extra mpv option, repeatable."), QStringLiteral("name=value"));
   const QCommandLineOption renderer(QStringLiteral("renderer"), QStringLiteral("Video renderer: auto, d3d11 or gl."), QStringLiteral("name"), QStringLiteral("auto"));
+  const QCommandLineOption hdr(QStringLiteral("hdr"), QStringLiteral("HDR experiment: off or hdr10 (Direct3D 11)."), QStringLiteral("mode"), QStringLiteral("off"));
   const QCommandLineOption logFile(QStringLiteral("log-file"), QStringLiteral("Write Qt and mpv messages with timestamps."), QStringLiteral("path"));
   parser.addOptions({fullscreen, animate, stats, hwdec, ao, loop, scenario, report, duration, warmup,
-                     sample, replace, toggles, seeks, smoke, maximized, overlay, mpvOption, renderer, logFile});
+                     sample, replace, toggles, seeks, smoke, maximized, overlay, mpvOption, renderer, hdr, logFile});
   parser.process(app);
 
   if (parser.isSet(logFile))
@@ -230,6 +243,11 @@ int main(int argc, char* argv[])
   connectVideo<MpvVideoItem>(video, &controller, contextReady, renderFailed);
 #ifdef JFD_HAVE_D3D11_VIDEO
   connectVideo<jfd::media::MpvD3D11VideoItem>(video, &controller, contextReady, renderFailed);
+  if (auto* d3d11Video = qobject_cast<jfd::media::MpvD3D11VideoItem*>(video))
+    QObject::connect(d3d11Video, &jfd::media::MpvD3D11VideoItem::hdrChanged, &controller, [d3d11Video] {
+      qInfo("HDR10 output: SDR white %.0f nits, display peak %.0f nits", d3d11Video->sdrWhiteNits(),
+            d3d11Video->displayPeakNits());
+    });
 #endif
 
   if (parser.isSet(fullscreen))

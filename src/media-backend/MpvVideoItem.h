@@ -17,6 +17,10 @@ class MpvVideoItem : public QQuickFramebufferObject
 {
   Q_OBJECT
   Q_PROPERTY(jfd::media::MpvPlayer* player READ player WRITE setPlayer NOTIFY playerChanged)
+  // Same interface as the Direct3D 11 item; the OpenGL path has no HDR output.
+  Q_PROPERTY(bool hdrActive READ hdrActive CONSTANT)
+  Q_PROPERTY(double sdrWhiteNits READ sdrWhiteNits CONSTANT)
+  Q_PROPERTY(double displayPeakNits READ displayPeakNits CONSTANT)
 
 public:
   explicit MpvVideoItem(QQuickItem* parent = nullptr);
@@ -32,6 +36,9 @@ public:
   void reportRenderError(const QString& message);
 
   MpvHandle handle() const;
+  bool hdrActive() const { return false; }
+  double sdrWhiteNits() const { return 0; }
+  double displayPeakNits() const { return 0; }
 
   Renderer* createRenderer() const override;
 

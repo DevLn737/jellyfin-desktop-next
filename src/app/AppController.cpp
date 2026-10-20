@@ -57,6 +57,15 @@ void AppController::setStatsVisible(bool visible)
   emit statsVisibleChanged();
 }
 
+QString AppController::hdrShader()
+{
+#ifdef JFD_HAVE_HDR_SHADER
+  return QStringLiteral("qrc:/shaders/hdr10_ui.frag.qsb");
+#else
+  return {};
+#endif
+}
+
 void AppController::setGlRenderer(const QString& renderer)
 {
   m_glRenderer = renderer;
@@ -79,6 +88,18 @@ void AppController::quit()
     m_window->close();
 }
 
+// mpv's video-target-params: the colour space mpv renders for (primaries,
+// transfer and peak), which shows whether HDR output is in effect.
+QString AppController::targetParams() const
+{
+  const QVariantMap params = m_player->property("video-target-params").toMap();
+  if (params.isEmpty())
+    return QStringLiteral("—");
+  return QStringLiteral("%1 %2, пик %3 нит")
+    .arg(params.value(QStringLiteral("primaries")).toString(), params.value(QStringLiteral("gamma")).toString())
+    .arg(params.value(QStringLiteral("max-luma")).toDouble(), 0, 'f', 0);
+}
+
 void AppController::updateStats()
 {
   const auto recent = m_frames->takeRecent();
@@ -93,7 +114,7 @@ void AppController::updateStats()
   m_statsText = QStringLiteral(
       "%1 fps (экран %2 Гц)  p95 %3 мс  пропуски %4\n"
       "hwdec: %5  avsync: %6 мс\n"
-      "CPU %7%  память %8 МиБ\n%9")
+      "CPU %7%  память %8 МиБ\n%9\nвыход: %10")
     .arg(fps, 0, 'f', 1)
     .arg(refresh, 0, 'f', 0)
     .arg(summary.p95Us / 1000.0, 0, 'f', 1)
@@ -102,6 +123,7 @@ void AppController::updateStats()
     .arg(m_player->avsync() * 1000.0, 0, 'f', 1)
     .arg(cpu, 0, 'f', 0)
     .arg(sample ? static_cast<double>(sample->privateBytes) / (1024.0 * 1024.0) : 0.0, 0, 'f', 0)
-    .arg(m_glRenderer);
+    .arg(m_glRenderer)
+    .arg(targetParams());
   emit statsTextChanged();
 }

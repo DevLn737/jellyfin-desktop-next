@@ -23,6 +23,8 @@ param(
     [string[]]$HardwareDecoding = @('auto-safe','auto-copy'),
     # Video renderer of the app: 'auto' is Direct3D 11 on Windows; 'gl' is the OpenGL fallback.
     [ValidateSet('auto','d3d11','gl')][string]$Renderer = 'auto',
+    # HDR experiment: 'hdr10' asks for an HDR10 swap chain (Direct3D 11 only).
+    [ValidateSet('off','hdr10')][string]$Hdr = 'off',
     [int]$MemoryMeasureSeconds = 3600,
     [int]$MemoryWarmupSeconds = 120,
     [string]$PresentMonPath,
@@ -140,7 +142,7 @@ $script:requestId = 0; $script:pending = $null; $script:events = New-Object 'Sys
 function Start-Client([string]$Hwdec, [bool]$RenderLog, [string]$RunDir, [string]$Overlay, [string]$File, [string[]]$Extra = @()) {
     $probe = $probeScript.Replace('\','/'); $probeOut = (Join-Path $RunDir 'mpv-probe.jsonl').Replace('\','/')
     $pipeName = "jfd-measure-$PID-$(Get-Random)"
-    $arguments = @('--maximized', '--renderer', $Renderer, '--overlay', $Overlay, '--hwdec', $Hwdec, '--log-file', ('"' + (Join-Path $RunDir 'client.log') + '"'),
+    $arguments = @('--maximized', '--renderer', $Renderer, '--hdr', $Hdr, '--overlay', $Overlay, '--hwdec', $Hwdec, '--log-file', ('"' + (Join-Path $RunDir 'client.log') + '"'),
         '--mpv-option', 'mute=yes', '--mpv-option', 'loop-file=inf',
         '--mpv-option', ('"scripts=' + $probe + '"'), '--mpv-option', ('"script-opts=jfdprobe-out=' + $probeOut + '"'),
         '--mpv-option', "input-ipc-server=\\.\pipe\$pipeName") + $Extra + @(('"' + $File + '"'))
@@ -410,7 +412,7 @@ function Run-Frames([string]$Res, [string]$Hwdec, [string]$File) {
     $mpv = Probe-Summary (Probe-Window $probe 'window-start' 'window-end')
     $frames = Frame-Summary (Join-Path $dir 'client.log') $from $to $primary.refreshHz 60
     return @{ scenario = "frames-$Res"; file = [IO.Path]::GetFileName($File); hwdecSetting = $Hwdec; overlay = $true; load = $load; windowRect = $rect
-              frames = $frames; presentMon = $presentMon; mpv = $mpv; close = $close; runDir = $dir }
+              targetParams = $target; frames = $frames; presentMon = $presentMon; mpv = $mpv; close = $close; runDir = $dir }
 }
 
 function Run-Cpu([string]$Res, [string]$Hwdec, [string]$File) {
@@ -573,7 +575,7 @@ $null = [JfdWin]::SetThreadExecutionState([uint32]'0x80000003')
 $inventory = Get-Inventory
 $primary = $inventory.screens | Where-Object { $_.primary } | Select-Object -First 1
 $report = [ordered]@{
-    schemaVersion = 1; protocol = 'architecture/measurement-protocol.md rev. 2'; client = 'prototype'; renderer = $Renderer
+    schemaVersion = 1; protocol = 'architecture/measurement-protocol.md rev. 2'; client = 'prototype'; renderer = $Renderer; hdr = $Hdr
     startedAt = (Get-Date).ToString('o'); harnessSha256 = Sha256 $PSCommandPath; probeSha256 = Sha256 $probeScript
     exeSha256 = Sha256 $appExe
     appBuild = $(if (Test-Path -LiteralPath (Join-Path $appRoot 'build-info.json')) { Get-Content -LiteralPath (Join-Path $appRoot 'build-info.json') -Raw | ConvertFrom-Json } else { $null })
