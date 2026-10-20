@@ -90,6 +90,7 @@ public static class JfdWin {
     [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr hwnd);
     [DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool EnumDisplaySettings(string name, int mode, ref DEVMODE dm);
+    [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     public static IntPtr Find(int pid) {
         IntPtr best = IntPtr.Zero; long bestArea = 0;
         EnumWindows((h, p) => {
@@ -111,6 +112,10 @@ public static class JfdWin {
 }
 '@
 }
+# Screen bounds and window rects in physical pixels on every monitor: without
+# this, a 125 % display reports its logical size (2048x1152 for 2560x1440).
+# -4 is DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2; it fails if already set.
+if (-not [JfdWin]::SetProcessDpiAwarenessContext([IntPtr]-4)) { Log 'DPI awareness was already set for this process' }
 Add-Type -AssemblyName System.Windows.Forms
 
 function Get-Inventory {
@@ -319,7 +324,19 @@ function Probe-Summary($Samples) {
     if ($Samples.Count -lt 2) { return @{ samples = $Samples.Count } }
     $first = $Samples[0]; $last = $Samples[-1]
     $av = [double[]]@($Samples | Where-Object { $null -ne (Prop $_ 'avsync') } | ForEach-Object { [Math]::Abs([double](Prop $_ 'avsync')) * 1000 })
-    $delta = { param($name) $l = Prop $last $name; $f = Prop $first $name; if ($null -ne $l -and $null -ne $f) { $l - $f } else { $null } }
+    # Counters restart at zero when a file is (re)loaded, so sum the increments
+    # between samples, counting a value below its predecessor as a restart.
+    $delta = {
+        param($name)
+        $total = $null; $previous = $null
+        foreach ($sample in $Samples) {
+            $value = Prop $sample $name
+            if ($null -eq $value) { continue }
+            if ($null -ne $previous) { $total += $(if ($value -ge $previous) { $value - $previous } else { $value }) } else { $total = 0 }
+            $previous = $value
+        }
+        $total
+    }
     return @{
         samples = $Samples.Count
         hwdecCurrent = @($Samples | ForEach-Object { Prop $_ 'hwdec-current' } | Select-Object -Unique)
