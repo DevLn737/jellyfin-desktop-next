@@ -63,6 +63,7 @@ namespace jfd::settings {
       scale.minimum = 0.75;
       scale.maximum = 2.0;
       scale.step = 0.05;
+      scale.requiresRestart = true;
       section.settings.append(scale);
 
       SettingDescriptor reduceMotion;

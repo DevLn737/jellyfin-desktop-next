@@ -10,6 +10,12 @@ string(JSON JFD_PINNED_LINUX_LIBMPV GET "${_jfd_versions}" linux libmpvVersion)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui OpenGL Quick Qml QuickControls2)
 qt_standard_project_setup(REQUIRES 6.5)
+# QML modules land in <build>/qml/<URI path>, where qmllint and the QML
+# tooling expect them.
+set(QT_QML_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/qml")
+if(Qt6_VERSION VERSION_GREATER_EQUAL 6.8)
+  qt_policy(SET QTP0004 NEW)
+endif()
 if(JFD_ENFORCE_PINS AND NOT Qt6_VERSION VERSION_EQUAL JFD_PINNED_QT_VERSION)
   message(FATAL_ERROR "Qt ${Qt6_VERSION} found, ${JFD_PINNED_QT_VERSION} pinned")
 endif()
