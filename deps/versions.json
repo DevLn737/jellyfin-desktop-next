@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "comment": "Pinned third-party versions for the Qt application. CI and CMake read this file; change versions only here.",
+  "qt": {
+    "version": "6.11.3",
+    "windowsArch": "win64_msvc2022_64",
+    "linuxArch": "linux_gcc_64"
+  },
+  "windows": {
+    "mpv": {
+      "version": "20261011-git-accb7b2821",
+      "commit": "accb7b2821ecf0cb04cf3579ccd98bc8f751f61f",
+      "name": "mpv-dev-x86_64-20261011-git-accb7b2821.7z",
+      "url": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261011/mpv-dev-x86_64-20261011-git-accb7b2821.7z",
+      "sha256": "cf63b4ce66e03e5e70acf2648cbc3177656c77c5b9583e16d83efc58801182b7",
+      "bytes": 31547972
+    },
+    "vulkanRuntime": {
+      "version": "1.4.363.0",
+      "name": "VulkanRT-X64-1.4.363.0-Components.zip",
+      "url": "https://sdk.lunarg.com/sdk/download/1.4.363.0/windows/VulkanRT-X64-1.4.363.0-Components.zip",
+      "sha256": "a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a",
+      "bytes": 18211191,
+      "dll": "VulkanRT-X64-1.4.363.0-Components/x64/vulkan-1.dll",
+      "dllSha256": "e1fcfc9489beefa6a6d9d11d6c7517f6a2b7f16e0d3fb8f4103bee0210f314a3"
+    }
+  },
+  "linux": {
+    "runner": "ubuntu-24.04",
+    "libmpvPackage": "libmpv-dev",
+    "libmpvPackageVersion": "0.37.0-1ubuntu4",
+    "libmpvVersion": "2.2.0"
+  }
+}

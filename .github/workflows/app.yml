@@ -1,0 +1,83 @@
+name: App
+
+# Builds the Qt application with the pinned Qt and libmpv from deps/versions.json
+# and runs its tests on Windows and Linux. The Qt-free core is in ci.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: App (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            qt-arch-key: windowsArch
+          - os: ubuntu-24.04
+            qt-arch-key: linuxArch
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read pinned versions
+        id: pins
+        shell: bash
+        run: |
+          echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "qt-arch=$(jq -r '.qt.${{ matrix.qt-arch-key }}' deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "libmpv-deb=$(jq -r '.linux.libmpvPackage + "=" + .linux.libmpvPackageVersion' deps/versions.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Qt ${{ steps.pins.outputs.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.pins.outputs.qt }}
+          arch: ${{ steps.pins.outputs.qt-arch }}
+          cache: true
+
+      - name: Install libmpv and display libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ${{ steps.pins.outputs.libmpv-deb }} ninja-build xvfb xauth \
+            libgl1-mesa-dev libegl1 libgl1-mesa-dri libfontconfig1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
+
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Fetch pinned libmpv and Vulkan loader (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/fetch-windows-deps.ps1
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $mpv = if ($env:MPV_LIBRARY) { @("-DMPV_INCLUDE_DIR=$env:MPV_INCLUDE_DIR", "-DMPV_LIBRARY=$env:MPV_LIBRARY") } else { @() }
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_ENFORCE_PINS=ON @mpv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test (Linux, Xvfb with Mesa)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" ctest --test-dir build --output-on-failure
+
+      - name: Test (Windows, software OpenGL)
+        if: runner.os == 'Windows'
+        env:
+          QT_OPENGL: software
+        run: ctest --test-dir build --output-on-failure

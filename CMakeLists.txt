@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(JFD_BUILD_TESTS "Build unit tests" ON)
+option(JFD_BUILD_APP "Build the Qt application (needs Qt 6 and libmpv)" OFF)
 
 if(MSVC)
   add_compile_options(/W4 /WX /permissive- /utf-8)
@@ -15,6 +16,11 @@ else()
 endif()
 
 add_subdirectory(src/core)
+
+if(JFD_BUILD_APP)
+  include(cmake/JfdDependencies.cmake)
+  add_subdirectory(src/app)
+endif()
 
 if(JFD_BUILD_TESTS)
   enable_testing()
