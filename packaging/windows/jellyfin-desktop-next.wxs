@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Per-user installer: no administrator rights, installs into
+  %LOCALAPPDATA%\Programs\Jellyfin Desktop Next, Start menu and desktop
+  shortcuts. Uninstalling removes the program folder, shortcuts and the
+  installer's registry key; the profile (settings, cache) is removed only with
+  REMOVEPROFILE=1. Built by packaging/windows/build-msi.ps1, which passes
+  Version, ExeName and the Deployment bind path (the windeployqt folder).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <?define ProductName = "Jellyfin Desktop Next" ?>
+  <?define RegistryKey = "Software\Jellyfin Desktop Next" ?>
+  <!-- Never change: Windows Installer finds earlier versions by this code. -->
+  <?define UpgradeCode = "005785ef-5ba3-445d-bbfd-14d32b7cc805" ?>
+
+  <Package Name="$(var.ProductName)" Manufacturer="Jellyfin Desktop Next" Language="1033"
+           Version="$(var.Version)" UpgradeCode="$(var.UpgradeCode)" Scope="perUser" InstallerVersion="500">
+    <SummaryInformation Description="$(var.ProductName) $(var.Version)" />
+    <!-- CI builds of one version replace each other too. -->
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Windows 10 1903 (build 18362) or newer, x64. -->
+    <Property Id="WINDOWSBUILD">
+      <RegistrySearch Id="WindowsBuildSearch" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR (VersionNT64 AND WINDOWSBUILD &gt;= 18362)"
+            Message="$(var.ProductName) requires 64-bit Windows 10 version 1903 or newer." />
+
+    <Icon Id="AppIcon" SourceFile="$(var.IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ADDDESKTOPSHORTCUT" Value="1" Secure="yes" />
+    <Property Id="REMOVEPROFILE" Secure="yes" />
+
+    <!-- util:RemoveFolderEx runs before the directories are resolved, so it
+         takes paths from properties set early: the install folder remembered
+         in the registry, and the profile folders only with REMOVEPROFILE=1. -->
+    <Property Id="REMEMBEREDINSTALLFOLDER">
+      <RegistrySearch Id="InstallFolderSearch" Root="HKCU" Key="$(var.RegistryKey)" Name="InstallFolder" Type="raw" />
+    </Property>
+    <SetProperty Id="LOCALPROFILEFOLDER" Value="[LocalAppDataFolder]$(var.ProductName)\" After="AppSearch"
+                 Sequence="execute" Condition="REMOVEPROFILE=1" />
+    <SetProperty Id="ROAMINGPROFILEFOLDER" Value="[AppDataFolder]$(var.ProductName)\" After="AppSearch"
+                 Sequence="execute" Condition="REMOVEPROFILE=1" />
+
+    <util:CloseApplication Id="CloseApp" Target="$(var.ExeName)" CloseMessage="yes" RebootPrompt="no" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="StartMenuShortcut" Name="$(var.ProductName)" Description="Jellyfin client for watching together"
+                  Target="[INSTALLFOLDER]$(var.ExeName)" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="InstallFolder" Type="string"
+                       Value="[INSTALLFOLDER]" KeyPath="yes" />
+        <util:RemoveFolderEx Id="RemoveInstallFolder" On="uninstall" Property="REMEMBEREDINSTALLFOLDER" />
+        <!-- Qt's AppDataLocation, AppLocalDataLocation and CacheLocation for this application name. -->
+        <util:RemoveFolderEx Id="RemoveLocalProfile" On="uninstall" Property="LOCALPROFILEFOLDER" />
+        <util:RemoveFolderEx Id="RemoveRoamingProfile" On="uninstall" Property="ROAMINGPROFILEFOLDER" />
+        <RemoveRegistryKey Root="HKCU" Key="$(var.RegistryKey)" Action="removeOnUninstall" />
+      </Component>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Condition="ADDDESKTOPSHORTCUT=1">
+        <Shortcut Id="DesktopShortcut" Name="$(var.ProductName)" Description="Jellyfin client for watching together"
+                  Target="[INSTALLFOLDER]$(var.ExeName)" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Application" Title="$(var.ProductName)" Level="1">
+      <Files Directory="INSTALLFOLDER" Include="!(bindpath.Deployment)\**">
+        <Exclude Files="!(bindpath.Deployment)\**.pdb" />
+      </Files>
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+  </Package>
+</Wix>

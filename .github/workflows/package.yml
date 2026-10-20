@@ -1,0 +1,196 @@
+name: Package
+
+# Builds the Windows installer (MSI) and the Linux AppImage from the pinned
+# dependencies in deps/versions.json, installs and runs them, and keeps them as
+# workflow artifacts. Nothing is published: releases need the owner's consent.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The application target packed; becomes jellyfin-desktop when src/desktop
+  # replaces the prototype.
+  APP_TARGET: jellyfin-desktop-next
+  APP_QML_DIR: src/app/qml
+
+jobs:
+  msi:
+    name: MSI (Windows)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          version=$(sed -nE 's/^project\([A-Za-z]+ VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache pinned downloads
+        uses: actions/cache@v4
+        with:
+          path: build/deps
+          key: windows-deps-${{ hashFiles('deps/versions.json') }}
+
+      - name: Fetch pinned Qt, libmpv and Vulkan loader
+        shell: pwsh
+        run: ./scripts/fetch-windows-deps.ps1
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF `
+            -DJFD_ENFORCE_PINS=ON "-DMPV_INCLUDE_DIR=$env:MPV_INCLUDE_DIR" "-DMPV_LIBRARY=$env:MPV_LIBRARY"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build --parallel --target $env:APP_TARGET
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Deploy Qt and libmpv next to the executable
+        shell: pwsh
+        run: |
+          $stage = 'build/package/app'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $exe = Get-ChildItem build -Recurse -Filter "$env:APP_TARGET.exe" |
+            Where-Object { $_.FullName -notlike '*package*' } | Select-Object -First 1
+          if (-not $exe) { throw "$env:APP_TARGET.exe was not built" }
+          Copy-Item $exe.FullName $stage
+          windeployqt --release --compiler-runtime --qmldir $env:APP_QML_DIR --no-translations "$stage/$env:APP_TARGET.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
+          @{ commit = '${{ github.sha }}'; ref = '${{ github.ref_name }}'; run = '${{ github.run_id }}' } |
+            ConvertTo-Json | Set-Content -Encoding ASCII "$stage/build-info.json"
+
+      - name: Build MSI
+        shell: pwsh
+        run: >
+          ./packaging/windows/build-msi.ps1 -Deployment build/package/app
+          -Version ${{ steps.version.outputs.version }} -ExeName "$env:APP_TARGET.exe"
+          -Output "build/package/$env:APP_TARGET-${{ steps.version.outputs.version }}-x64.msi"
+
+      - name: Install, run and uninstall
+        shell: pwsh
+        run: >
+          ./packaging/windows/test-msi.ps1 -Msi "build/package/$env:APP_TARGET-${{ steps.version.outputs.version }}-x64.msi"
+          -Logs build/package/msi-logs -ExeName "$env:APP_TARGET.exe"
+
+      - name: Upload installer logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-logs
+          path: build/package/msi-logs
+          retention-days: 7
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_TARGET }}-windows-msi
+          path: build/package/*.msi
+          if-no-files-found: error
+          retention-days: 30
+
+  appimage:
+    name: AppImage (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build and runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $(grep -v '^#' packaging/linux/build-deps.txt) \
+            xvfb xauth libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
+
+      - name: Cache libmpv
+        id: libmpv-cache
+        uses: actions/cache@v4
+        with:
+          path: build/libmpv
+          key: libmpv-linux-${{ hashFiles('deps/versions.json', 'packaging/linux/build-libmpv.sh', 'packaging/linux/build-deps.txt') }}
+
+      - name: Build pinned FFmpeg, libplacebo, libass and libmpv
+        if: steps.libmpv-cache.outputs.cache-hit != 'true'
+        run: packaging/linux/build-libmpv.sh build/libmpv build/libmpv-src
+
+      - name: Read pinned versions
+        id: pins
+        run: |
+          echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "version=$(sed -nE 's/^project\([A-Za-z]+ VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Qt ${{ steps.pins.outputs.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.pins.outputs.qt }}
+          arch: ${{ steps.pins.outputs.qt-arch }}
+          cache: true
+
+      - name: Build
+        env:
+          PKG_CONFIG_PATH: ${{ github.workspace }}/build/libmpv/lib/pkgconfig
+        run: |
+          # Same libmpv client API as the pinned Windows build.
+          test "$(pkg-config --modversion mpv)" = "$(jq -r '.windows.mpv.clientApi' deps/versions.json).0"
+          cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF \
+            -DCMAKE_BUILD_RPATH="${{ github.workspace }}/build/libmpv/lib"
+          cmake --build build/app --parallel --target "$APP_TARGET"
+
+      - name: Build AppImage
+        env:
+          JFD_PACKAGE_VERSION: ${{ steps.pins.outputs.version }}
+        run: |
+          exe=$(find build/app -type f -name "$APP_TARGET" -perm -u+x | head -1)
+          packaging/linux/build-appimage.sh "$exe" "$APP_QML_DIR" build/libmpv build/package
+          ls -la build/package
+
+      - name: Smoke test on the build system
+        run: |
+          appimage=$(ls build/package/*.AppImage)
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a -s "-screen 0 1920x1080x24" timeout 120 "$appimage" --smoke
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_TARGET }}-linux-appimage
+          path: build/package/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
+
+  appimage-smoke:
+    name: AppImage on ${{ matrix.image }}
+    needs: appimage
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:24.04', 'fedora:latest', 'archlinux:latest']
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.APP_TARGET }}-linux-appimage
+          path: appimage
+      - name: Smoke test (Xvfb, Mesa llvmpipe)
+        run: |
+          chmod +x appimage/*.AppImage
+          bash packaging/linux/smoke-appimage.sh appimage/*.AppImage

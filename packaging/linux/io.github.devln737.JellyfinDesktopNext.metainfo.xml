@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.devln737.JellyfinDesktopNext</id>
+  <name>Jellyfin Desktop Next</name>
+  <summary>Jellyfin client for watching together</summary>
+  <summary xml:lang="ru">Клиент Jellyfin для совместного просмотра</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <description>
+    <p>A desktop client for Jellyfin with SyncPlay built in: synchronized position and speed,
+      with each participant choosing their own audio and subtitles. Video plays through mpv.</p>
+  </description>
+  <launchable type="desktop-id">io.github.devln737.JellyfinDesktopNext.desktop</launchable>
+  <url type="homepage">https://github.com/DevLn737/jellyfin-desktop-next</url>
+  <content_rating type="oars-1.1" />
+</component>

@@ -79,6 +79,27 @@ CI uses the versions pinned in [deps/versions.json](deps/versions.json) and pass
 
 Any platform can point CMake at a specific libmpv with `-DMPV_INCLUDE_DIR=... -DMPV_LIBRARY=...`.
 
+## Packages
+
+CI builds both packages on every pull request (`.github/workflows/package.yml`)
+and keeps them as workflow artifacts for 30 days. Nothing is published as a
+release yet. See [packaging/README.md](packaging/README.md) for how they are
+built.
+
+- **Windows:** `jellyfin-desktop-next-<version>-x64.msi`. Installs for the
+  current user without administrator rights into
+  `%LOCALAPPDATA%\Programs\Jellyfin Desktop Next`, with Start menu and desktop
+  shortcuts. Windows 10 1903 or newer, 64-bit. The installer is **not signed**
+  (there is no code-signing certificate), so SmartScreen warns on first run:
+  choose "More info", then "Run anyway". Uninstalling removes the program and
+  shortcuts and keeps settings; `msiexec /x <msi> REMOVEPROFILE=1` removes
+  settings and cache too.
+- **Linux:** `jellyfin-desktop-next-x86_64.AppImage`, one file for all
+  distributions with glibc 2.39 or newer: Ubuntu 24.04, Fedora 40, Debian 13,
+  Arch and newer. It carries Qt and the same libmpv build (mpv commit, FFmpeg)
+  as Windows; graphics drivers, VA-API, PipeWire/PulseAudio and GnuTLS come
+  from the system. Make it executable and run it. Flatpak comes later.
+
 ## License
 
 GPL-2.0-or-later. Parts of this client are derived from
