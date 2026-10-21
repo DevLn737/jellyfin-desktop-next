@@ -12,6 +12,7 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QImage>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QUrlQuery>
@@ -22,7 +23,10 @@
 
 // The player screen's model on a live server (scripts/test-server) with
 // headless mpv: track menus, a track change that keeps the position, a seek
-// in a transcoded HLS stream, and the reports the server shows.
+// in a transcoded HLS stream, the reports the server shows, the next
+// episode and the seek bar thumbnails. On the extras stand
+// (extras-server.sh, JFD_EXTRAS_*; skipped without it): an external audio
+// file, and skipping intros and credits.
 
 using namespace jfd;
 using namespace jfd::api;
@@ -65,14 +69,18 @@ namespace {
     std::unique_ptr<session::SessionRuntime> runtime;
     std::unique_ptr<ui::PlayerModel> model;
 
-    Player(const QString& device, const DeviceProfileOptions& profile) : deviceId(device) {
+    // `stand`: the environment prefix, JFD_TEST (stock-server.sh) or
+    // JFD_EXTRAS (extras-server.sh).
+    Player(const QString& device, const DeviceProfileOptions& profile, const QString& stand = QStringLiteral("JFD_TEST"))
+        : deviceId(device) {
       client = std::make_unique<JellyfinClient>(ClientIdentity{
           QStringLiteral("Jellyfin Desktop Next Tests"), QStringLiteral("0.0.1"), QStringLiteral("CI ") + device, device});
-      const auto url = JellyfinClient::normalizeServerUrl(env("JFD_TEST_SERVER_URL"));
-      REQUIRE_MESSAGE(url.has_value(), "Set JFD_TEST_SERVER_URL (scripts/test-server/stock-server.sh up)");
+      const auto var = [&](const char* name) { return qEnvironmentVariable(qPrintable(stand + QLatin1String(name))); };
+      const auto url = JellyfinClient::normalizeServerUrl(var("_SERVER_URL"));
+      REQUIRE_MESSAGE(url.has_value(), "Set " << stand.toStdString() << "_SERVER_URL (scripts/test-server)");
       client->setServerUrl(*url);
       REQUIRE(run<AuthenticationResult>([&](auto done) {
-                client->signIn(env("JFD_TEST_USER"), env("JFD_TEST_PASSWORD"), nullptr, done);
+                client->signIn(var("_USER"), var("_PASSWORD"), nullptr, done);
               }).ok());
       SessionCapabilities capabilities;
       capabilities.deviceProfile = buildDeviceProfile(profile);
@@ -297,4 +305,141 @@ TEST_CASE("At the end of an episode the next one plays, and Previous goes back")
 
   p.model->previous();
   REQUIRE(waitFor([&] { return p.runtime->snapshot().item.value() == first.toStdString() && p.playing(); }, 60000));
+}
+
+TEST_CASE("The seek bar has the server's trickplay thumbnails") {
+  Player p(QStringLiteral("jfd-player-trickplay"), {});
+  const Item episode = findItem(*p.client, QStringLiteral("Episode"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, episode.id};
+
+  p.model->play(episode.id, 0);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  REQUIRE(waitFor([&] { return p.model->hasTrickplay(); }, 20000));
+
+  // The thumbnail ten seconds in, inside its tile.
+  const QVariantMap frame = p.model->trickplayFrame(10);
+  const QString prefix = QStringLiteral("image://jfd/");
+  const QString source = frame.value(QStringLiteral("source")).toString();
+  REQUIRE(source.startsWith(prefix));
+  const int width = frame.value(QStringLiteral("width")).toInt();
+  const int height = frame.value(QStringLiteral("height")).toInt();
+  const int tileWidth = frame.value(QStringLiteral("tileWidth")).toInt();
+  const int tileHeight = frame.value(QStringLiteral("tileHeight")).toInt();
+  CHECK(width > 0);
+  CHECK(height > 0);
+  CHECK(frame.value(QStringLiteral("x")).toInt() + width <= tileWidth);
+  CHECK(frame.value(QStringLiteral("y")).toInt() + height <= tileHeight);
+
+  // The tile behind it loads with the session's authorization, and holds
+  // the thumbnail's rectangle.
+  const QUrl tile(QUrl::fromPercentEncoding(source.mid(prefix.size()).toLatin1()));
+  auto response = run<JellyfinClient::RawResponse>(
+      [&](auto done) { p.client->authorizedGet(tile, nullptr, done); });
+  REQUIRE(response.ok());
+  CHECK(response->httpStatus == 200);
+  const QImage image = QImage::fromData(response->body);
+  REQUIRE_FALSE(image.isNull());
+  CHECK(image.width() >= frame.value(QStringLiteral("x")).toInt() + width);
+  CHECK(image.height() >= frame.value(QStringLiteral("y")).toInt() + height);
+
+  // A later position in the same tile moves to another thumbnail.
+  const QVariantMap later = p.model->trickplayFrame(20);
+  CHECK(later.value(QStringLiteral("source")) == source);
+  CHECK(later.value(QStringLiteral("x")) != frame.value(QStringLiteral("x")));
+}
+
+namespace {
+  bool hasExtrasStand() {
+    if (!env("JFD_EXTRAS_SERVER_URL").isEmpty()) return true;
+    MESSAGE("JFD_EXTRAS_SERVER_URL is not set (scripts/test-server/extras-server.sh up): skipped");
+    return false;
+  }
+} // namespace
+
+TEST_CASE("An external audio file plays, through a transcode, at the same position") {
+  if (!hasExtrasStand()) return;
+  Player p(QStringLiteral("jfd-player-external-audio"), {}, QStringLiteral("JFD_EXTRAS"));
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  // The clock starts at zero although the transcode's timestamps do not.
+  CHECK(p.model->position() < 5);
+  const QVariantList audio = p.model->audioTracks();
+  REQUIRE(audio.size() == 2);
+  const int external = indexOfExternal(audio);
+  REQUIRE(external >= 0);
+  int embedded = -1;
+  for (const QVariant& track : audio) {
+    const int index = track.toMap().value(QStringLiteral("index")).toInt();
+    if (index != external) embedded = index;
+  }
+  REQUIRE(embedded >= 0);
+  REQUIRE(waitFor([&] { return p.model->position() > 3; }, 30000));
+
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.model->paused(); }, 10000));
+  const double before = p.model->position();
+  const auto playState = [&] { return p.serverSession().value(QStringLiteral("PlayState")).toObject(); };
+
+  // Each audio track in turn; the server shows the choice.
+  for (const int index : {embedded, external}) {
+    if (p.model->audioIndex() != index) p.model->selectAudio(index);
+    REQUIRE(waitFor([&] { return p.model->audioIndex() == index && !p.model->loading(); }, 30000));
+    CHECK(p.model->paused());
+    CHECK(std::abs(p.model->position() - before) < 1.0);
+    REQUIRE(waitFor([&] { return playState().value(QStringLiteral("AudioStreamIndex")).toInt(-1) == index; }, 20000));
+  }
+  // The external file plays either mixed into a server transcode, or, when
+  // the file itself plays directly, loaded by mpv beside it.
+  const QString method = playState().value(QStringLiteral("PlayMethod")).toString();
+  INFO("play method " << method.toStdString());
+  if (method != QStringLiteral("Transcode")) {
+    CHECK(waitFor([&] { return p.mpv.property("current-tracks/audio/external").toBool(); }, 10000));
+    CHECK(p.mpv.property("current-tracks/audio/lang").toString() == QStringLiteral("rus"));
+  }
+}
+
+TEST_CASE("The intro shows a Skip button that jumps past it; credits skip on their own") {
+  if (!hasExtrasStand()) return;
+  Player p(QStringLiteral("jfd-player-segments"), {}, QStringLiteral("JFD_EXTRAS"));
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  // The stand's segments: intro 2-12 s, credits 50-58 s.
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  REQUIRE(waitFor([&] { return p.model->segment() == QStringLiteral("Intro"); }, 20000));
+  CHECK(p.model->position() >= 1.5);
+  CHECK(p.model->position() < 12);
+  p.model->skipSegment();
+  REQUIRE(waitFor([&] { return p.model->position() >= 11.9 && !p.model->loading(); }, 20000));
+  CHECK(p.model->position() < 15);
+  CHECK(waitFor([&] { return p.model->segment().isEmpty(); }, 5000));
+
+  // With auto-skip on, playback jumps over the credits: no position well
+  // inside them is ever shown.
+  p.model->setAutoSkip(true);
+  p.model->seek(48);
+  REQUIRE(waitFor([&] { return std::abs(p.model->position() - 48) < 1.0 && !p.model->loading(); }, 20000));
+  bool insideCredits = false;
+  QObject::connect(p.model.get(), &ui::PlayerModel::positionChanged, p.model.get(), [&] {
+    const double position = p.model->position();
+    if (position > 51 && position < 57) insideCredits = true;
+  });
+  REQUIRE(waitFor([&] { return p.model->position() >= 57.9 || p.model->ended(); }, 30000));
+  CHECK_FALSE(insideCredits);
 }

@@ -2,6 +2,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/session/SessionRuntime.h>
+#include <jfd/ui/LibraryImageProvider.h>
 
 #include <MpvPlayer.h>
 #include <MpvVideoItem.h>
@@ -204,6 +205,7 @@ namespace jfd::ui {
                                const api::MediaSource& source, const api::PlaybackStream& stream) {
     m_pending = Pending{request, source, stream};
     loadEpisodes(item);
+    loadTrickplay(request.itemId);
     if (m_segmentsItem != request.itemId) {
       m_segmentsItem = request.itemId;
       m_segments.clear();
@@ -248,6 +250,56 @@ namespace jfd::ui {
     });
   }
 
+  void PlayerModel::loadTrickplay(const QString& itemId) {
+    if (itemId == m_trickplayItem) return;
+    m_trickplayItem = itemId;
+    m_trickplay.clear();
+    // The launcher's item has no trickplay field; the detail request has.
+    m_client.itemDetails(itemId, this, [this, itemId](api::Result<api::Item> item) {
+      if (itemId != m_trickplayItem) return;
+      if (!item) {
+        qCInfo(lcPlayer) << "no trickplay info:" << item.error().message;
+        return;
+      }
+      m_trickplay = item->trickplay;
+      chooseTrickplay();
+    });
+  }
+
+  void PlayerModel::chooseTrickplay() {
+    std::optional<api::TrickplayInfo> chosen;
+    if (m_current && m_current->request.itemId == m_trickplayItem) {
+      // Sorted by width: the smallest that is still sharp at its size on
+      // the seek bar, else the largest there is.
+      const QList<api::TrickplayInfo> resolutions = m_trickplay.value(m_current->source.id);
+      for (const api::TrickplayInfo& info : resolutions) {
+        chosen = info;
+        if (info.width >= 240) break;
+      }
+    }
+    const bool had = m_trickplayInfo.has_value();
+    m_trickplayInfo = chosen;
+    if (had || chosen) Q_EMIT trickplayChanged();
+  }
+
+  QVariantMap PlayerModel::trickplayFrame(double seconds) const {
+    if (!m_trickplayInfo || !m_current) return {};
+    const api::TrickplayInfo& info = *m_trickplayInfo;
+    const auto frame = api::trickplayFrame(info, static_cast<std::int64_t>(std::llround(seconds * 1000)));
+    if (!frame) return {};
+    const QUrl tile =
+        m_client.trickplayTileUrl(m_current->request.itemId, m_current->source.id, info.width, frame->tileIndex);
+    return {
+        {QStringLiteral("source"), LibraryImageProvider::sourceFor(tile)},
+        {QStringLiteral("x"), frame->x},
+        {QStringLiteral("y"), frame->y},
+        {QStringLiteral("width"), frame->width},
+        {QStringLiteral("height"), frame->height},
+        {QStringLiteral("tileWidth"), info.width * info.tileWidth},
+        {QStringLiteral("tileHeight"), info.height * info.tileHeight},
+    };
+  }
+
   void PlayerModel::step(bool forward) {
     const QString target = forward ? m_nextId : m_previousId;
     if (!target.isEmpty()) play(target, 0);
@@ -270,6 +322,7 @@ namespace jfd::ui {
     // Delays belong to the file: a new one starts in sync.
     setSubtitleDelay(0);
     setAudioDelay(0);
+    chooseTrickplay();
     Q_EMIT tracksChanged();
   }
 

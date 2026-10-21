@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Built against the server's own assemblies (JELLYFIN_DIR, copied from the
+       test image by build.sh), so no packages are downloaded. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="MediaBrowser.Common"><HintPath>$(JELLYFIN_DIR)/MediaBrowser.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="MediaBrowser.Controller"><HintPath>$(JELLYFIN_DIR)/MediaBrowser.Controller.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="MediaBrowser.Model"><HintPath>$(JELLYFIN_DIR)/MediaBrowser.Model.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Jellyfin.Data"><HintPath>$(JELLYFIN_DIR)/Jellyfin.Data.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Jellyfin.Database.Implementations"><HintPath>$(JELLYFIN_DIR)/Jellyfin.Database.Implementations.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions"><HintPath>$(JELLYFIN_DIR)/Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

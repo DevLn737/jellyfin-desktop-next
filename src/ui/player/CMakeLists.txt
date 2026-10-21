@@ -36,7 +36,7 @@ qt_add_qml_module(jfd_ui_player
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell Jfd.Ui.Group)
 target_link_libraries(jfd_ui_player
   PUBLIC Qt6::Core Qt6::Quick Qt6::Qml jfd::session_runtime jfd::playback jfd::media_backend
-  PRIVATE jfd_ui_theme jfd_ui_controls jfd_ui_shell jfd_ui_group)
+  PRIVATE jfd_ui_theme jfd_ui_controls jfd_ui_shell jfd_ui_group jfd_ui_library)
 target_compile_definitions(jfd_ui_player PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 target_compile_options(jfd_ui_player PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
 jfd_add_translations(jfd_ui_player)

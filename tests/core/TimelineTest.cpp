@@ -12,6 +12,8 @@ namespace {
 TEST_CASE("Relative timeline adds the transcoding offset exactly once") {
   Timeline timeline({StreamTimeline::Kind::Relative, ms(600'000)}, ms(605'000));
   CHECK(timeline.isReady());
+  // The backend clock starts at zero whatever the stream's first timestamp.
+  CHECK(timeline.rebasesStartTime());
   CHECK(timeline.configure(std::nullopt));
   CHECK(timeline.startPosition()->value == doctest::Approx(5.0));
   CHECK(timeline.toMedia({12.5})->milliseconds() == 612'500);
