@@ -4,7 +4,7 @@ name: Session
 # Jellyfin 12.2 server in Docker, stock and with the SyncPlay fork: our client
 # creates a group, plays the server's stream, follows another member's seek
 # and moves to the next item. The same test on a virtual backend runs in the
-# API workflow.
+# API workflow. The watch-together page (Jfd.Ui.Group) runs here too.
 on:
   push:
     branches: [main]
@@ -70,12 +70,12 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
-        run: cmake --build build --parallel --target jfd_session_mpv_server_tests
+        run: cmake --build build --parallel --target jfd_session_mpv_server_tests jfd_ui_group_server_tests
 
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build --output-on-failure -V -R jfd_session_mpv_server_tests
+        run: ctest --test-dir build --output-on-failure -V -R 'jfd_session_mpv_server_tests|jfd_ui_group_server_tests'
 
       - name: Server log on failure
         if: failure()

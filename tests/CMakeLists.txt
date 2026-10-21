@@ -187,4 +187,15 @@ if(JFD_BUILD_APP)
     add_test(NAME jfd_ui_library_server_tests COMMAND jfd_ui_library_server_tests)
     set_tests_properties(jfd_ui_library_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
   endif()
+
+  if(JFD_SERVER_TESTS AND TARGET jfd_ui_group)
+    # The group page on a live server, on a virtual backend.
+    add_executable(jfd_ui_group_server_tests ui/GroupPageTest.cpp)
+    target_include_directories(jfd_ui_group_server_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_group_server_tests PRIVATE
+      jfd_ui_group jfd_ui_groupplugin jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
+      jfd::session_runtime Qt6::Gui Qt6::Quick doctest Qt6::Test)
+    add_test(NAME jfd_ui_group_server_tests COMMAND jfd_ui_group_server_tests)
+    set_tests_properties(jfd_ui_group_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+  endif()
 endif()
