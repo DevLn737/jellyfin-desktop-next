@@ -126,6 +126,11 @@ if(TARGET jfd_jellyfin_api)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
+  if(TARGET jfd_settings)
+    jfd_add_qt_test(jfd_settings_tests settings/SettingsTest.cpp)
+    target_link_libraries(jfd_settings_tests PRIVATE jfd::settings)
+  endif()
+
   if(JFD_SERVER_TESTS)
     # Needs JFD_TEST_SERVER_URL and friends; see scripts/test-server/README.md.
     jfd_add_qt_test(jfd_server_tests server/ServerTest.cpp)
@@ -155,5 +160,11 @@ if(JFD_BUILD_APP)
     target_link_libraries(jfd_session_mpv_server_tests PRIVATE jfd::session_runtime jfd::media_backend)
     target_compile_definitions(jfd_session_mpv_server_tests PRIVATE JFD_SESSION_TEST_MPV)
     set_tests_properties(jfd_session_mpv_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+  endif()
+
+  if(TARGET jfd_ui_shell)
+    add_executable(jfd_ui_tests support/QtTestMain.cpp ui/ShellTest.cpp)
+    target_link_libraries(jfd_ui_tests PRIVATE jfd_ui_shell doctest Qt6::Test)
+    add_test(NAME jfd_ui_tests COMMAND jfd_ui_tests)
   endif()
 endif()
