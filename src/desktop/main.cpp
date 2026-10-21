@@ -9,6 +9,8 @@
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/PlayerModel.h>
+#include <jfd/ui/PlayerSession.h>
 #include <jfd/ui/WindowStateKeeper.h>
 
 #include <QCommandLineParser>
@@ -31,6 +33,8 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ControlsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_PlayerPlugin)
 
 using namespace jfd;
 
@@ -64,6 +68,7 @@ namespace {
     bool ok = settings::registerCommonSections(registry);
     ok = desktop::registerLibrarySettings(registry) && ok;
     ok = integrations::registerIntegrationsSettings(registry) && ok;
+    ok = desktop::registerPlayerSettings(registry) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }
@@ -146,6 +151,7 @@ int main(int argc, char* argv[]) {
     desktop::installShell(services, engine);
     desktop::installLibrary(services, engine);
     desktop::installSession(services);
+    desktop::installPlayer(services, engine);
     desktop::installIntegrations(services, engine);
     // The media controls and Discord follow the playback session.
     desktop::connectIntegrations(
@@ -208,7 +214,10 @@ int main(int argc, char* argv[]) {
     // Leaving the scope destroys the window and the engine before the
     // services they use.
   }
-  // The session runs on the player and on the library's client and socket.
+  // The player screen's model subscribes to the session; the session runs
+  // on the player and on the library's client and socket.
+  ui::PlayerSession::setInstance(nullptr);
+  services.playerModel.reset();
   services.session.reset();
   services.player.reset();
   services.library.reset();

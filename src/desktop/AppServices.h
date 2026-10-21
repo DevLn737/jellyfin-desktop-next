@@ -31,6 +31,7 @@ namespace jfd::ui {
   class AppSettings;
   class LibraryUi;
   class Navigator;
+  class PlayerModel;
 } // namespace jfd::ui
 
 namespace jfd::desktop {
@@ -78,6 +79,8 @@ namespace jfd::desktop {
     // use these.
     std::shared_ptr<media::MpvPlayer> player;
     std::shared_ptr<session::SessionRuntime> session;
+    // The player screen's model (installPlayer), on the session above.
+    std::unique_ptr<ui::PlayerModel> playerModel;
 
     // installIntegrations; complete in main.cpp, which destroys it.
     std::unique_ptr<IntegrationServices> integrations;
@@ -100,6 +103,12 @@ namespace jfd::desktop {
   // a sign-in completes, so the session socket registers with them.
   // Needs installLibrary.
   void installSession(AppServices& services);
+
+  // The playback settings section (auto-skip of intros and credits).
+  bool registerPlayerSettings(settings::SettingsRegistry& registry);
+  // The player page ("player" route) and the PlayerSession singleton; Play
+  // on the library screens opens it. Needs installSession.
+  void installPlayer(AppServices& services, QQmlEngine& engine);
 
   // Leaves a SyncPlay group before quitting; calls done when the server
   // answered or after a short timeout, so quitting never hangs on the

@@ -148,9 +148,13 @@ RoutePage {
                 font.pixelSize: Theme.fontSizeLarge
                 elide: Text.ElideRight
             }
-            GroupOsd {
+            // Only in a group: GroupSession exists once the group module
+            // is installed.
+            Loader {
                 id: groupOsd
                 anchors.verticalCenter: parent.verticalCenter
+                active: page.player.inGroup
+                sourceComponent: GroupOsd {}
             }
         }
     }
