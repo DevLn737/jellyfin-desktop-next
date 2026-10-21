@@ -112,11 +112,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Pinned libmpv
-        uses: ./.github/actions/linux-libmpv
-
       - name: Install runtime libraries for the smoke test
         run: |
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             xvfb xauth libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
@@ -134,6 +132,10 @@ jobs:
           version: ${{ steps.pins.outputs.qt }}
           arch: ${{ steps.pins.outputs.qt-arch }}
           cache: true
+
+      # After Qt: install-qt-action sets PKG_CONFIG_PATH.
+      - name: Pinned libmpv
+        uses: ./.github/actions/linux-libmpv
 
       - name: Build
         run: |

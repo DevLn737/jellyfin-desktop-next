@@ -3,7 +3,8 @@ description: >
   Installs the build dependencies, restores or builds libmpv from the sources
   pinned in deps/versions.json (packaging/linux/build-libmpv.sh) and points
   pkg-config and the loader at it, so CI builds and tests the libmpv the
-  AppImage ships.
+  AppImage ships. Use it after jurplel/install-qt-action, which sets
+  PKG_CONFIG_PATH.
 
 runs:
   using: composite
@@ -32,5 +33,5 @@ runs:
         lib="$GITHUB_WORKSPACE/build/libmpv/lib"
         # Same libmpv client API as the pinned Windows build.
         test "$(PKG_CONFIG_PATH="$lib/pkgconfig" pkg-config --modversion mpv)" = "$(jq -r '.linux.libmpvVersion' deps/versions.json)"
-        echo "PKG_CONFIG_PATH=$lib/pkgconfig" >> "$GITHUB_ENV"
+        echo "PKG_CONFIG_PATH=$lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
         echo "LD_LIBRARY_PATH=$lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
