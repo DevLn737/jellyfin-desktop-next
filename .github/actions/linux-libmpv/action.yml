@@ -1,0 +1,37 @@
+name: Pinned libmpv (Linux)
+description: >
+  Installs the build dependencies, restores or builds libmpv from the sources
+  pinned in deps/versions.json (packaging/linux/build-libmpv.sh) and points
+  pkg-config and the loader at it, so CI builds and tests the libmpv the
+  AppImage ships. Use it after jurplel/install-qt-action, which sets
+  PKG_CONFIG_PATH.
+
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends $(grep -v '^#' packaging/linux/build-deps.txt)
+
+    - name: Cache libmpv
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: build/libmpv
+        key: libmpv-linux-${{ hashFiles('deps/versions.json', 'packaging/linux/build-libmpv.sh', 'packaging/linux/build-deps.txt') }}
+
+    - name: Build pinned FFmpeg, libplacebo, libass and libmpv
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: packaging/linux/build-libmpv.sh build/libmpv build/libmpv-src
+
+    - name: Use it
+      shell: bash
+      run: |
+        lib="$GITHUB_WORKSPACE/build/libmpv/lib"
+        # Same libmpv client API as the pinned Windows build.
+        test "$(PKG_CONFIG_PATH="$lib/pkgconfig" pkg-config --modversion mpv)" = "$(jq -r '.linux.libmpvVersion' deps/versions.json)"
+        echo "PKG_CONFIG_PATH=$lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"

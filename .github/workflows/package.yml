@@ -112,23 +112,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install build and runtime libraries
+      - name: Install runtime libraries for the smoke test
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends $(grep -v '^#' packaging/linux/build-deps.txt) \
+          sudo apt-get install -y --no-install-recommends \
             xvfb xauth libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
-
-      - name: Cache libmpv
-        id: libmpv-cache
-        uses: actions/cache@v4
-        with:
-          path: build/libmpv
-          key: libmpv-linux-${{ hashFiles('deps/versions.json', 'packaging/linux/build-libmpv.sh', 'packaging/linux/build-deps.txt') }}
-
-      - name: Build pinned FFmpeg, libplacebo, libass and libmpv
-        if: steps.libmpv-cache.outputs.cache-hit != 'true'
-        run: packaging/linux/build-libmpv.sh build/libmpv build/libmpv-src
 
       - name: Read pinned versions
         id: pins
@@ -144,12 +133,12 @@ jobs:
           arch: ${{ steps.pins.outputs.qt-arch }}
           cache: true
 
+      # After Qt: install-qt-action sets PKG_CONFIG_PATH.
+      - name: Pinned libmpv
+        uses: ./.github/actions/linux-libmpv
+
       - name: Build
-        env:
-          PKG_CONFIG_PATH: ${{ github.workspace }}/build/libmpv/lib/pkgconfig
         run: |
-          # Same libmpv client API as the pinned Windows build.
-          test "$(pkg-config --modversion mpv)" = "$(jq -r '.windows.mpv.clientApi' deps/versions.json).0"
           cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF \
             -DCMAKE_BUILD_RPATH="${{ github.workspace }}/build/libmpv/lib"
           cmake --build build/app --parallel --target "$APP_TARGET"
