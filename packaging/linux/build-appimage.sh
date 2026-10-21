@@ -81,7 +81,9 @@ cd "$work"
   "${excludes[@]}" "${forced[@]}" \
   --plugin qt --output appimage
 
-# The image must carry the pinned libmpv, not a system one.
-test -n "$(find "$appdir/usr/lib" -name 'libmpv.so*' -print -quit)"
+# A program that plays video must carry the pinned libmpv, not a system one.
+if readelf -d "$exe" | grep -q 'NEEDED.*libmpv\.so'; then
+  test -n "$(find "$appdir/usr/lib" -name 'libmpv.so*' -print -quit)"
+fi
 test -n "$(find "$appdir/usr/lib" -name 'libfribidi.so*' -print -quit)"
 echo "AppImage: $LDAI_OUTPUT ($(du -h "$LDAI_OUTPUT" | cut -f1))"
