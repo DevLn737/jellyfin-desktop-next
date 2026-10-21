@@ -2,8 +2,8 @@
 
 Built by `.github/workflows/package.yml`; every version used is pinned in
 [deps/versions.json](../deps/versions.json). The packed program is the
-`jellyfin-desktop` target (src/desktop); its file is `jellyfin-desktop-next`,
-so it never clashes with the official client.
+`jellyfin-desktop` target (src/desktop); the packages are named
+`jellyfin-desktop-next`.
 
 ## Windows MSI
 

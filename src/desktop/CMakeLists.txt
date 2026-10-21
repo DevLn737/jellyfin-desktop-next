@@ -8,9 +8,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   SmokeTest.cpp SmokeTest.h
   Translations.cpp Translations.h)
 target_compile_definitions(jellyfin-desktop PRIVATE JFD_VERSION="${PROJECT_VERSION}")
-# The file is jellyfin-desktop-next, so it never clashes with the official
-# client; the packages install it by that name.
-set_target_properties(jellyfin-desktop PROPERTIES AUTOMOC ON OUTPUT_NAME jellyfin-desktop-next)
+set_target_properties(jellyfin-desktop PROPERTIES AUTOMOC ON)
 
 qt_add_qml_module(jellyfin-desktop
   URI Jfd.Desktop

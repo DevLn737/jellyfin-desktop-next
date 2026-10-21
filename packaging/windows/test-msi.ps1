@@ -7,7 +7,7 @@
 param(
     [Parameter(Mandatory)] [string]$Msi,
     [Parameter(Mandatory)] [string]$Logs,
-    [string]$ExeName = 'jellyfin-desktop-next.exe',
+    [string]$ExeName = 'jellyfin-desktop.exe',
     [string]$ProductName = 'Jellyfin Desktop Next'
 )
 $ErrorActionPreference = 'Stop'
