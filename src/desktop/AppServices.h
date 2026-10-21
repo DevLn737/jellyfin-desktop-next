@@ -25,8 +25,9 @@ namespace jfd::media {
 }
 
 namespace jfd::session {
+  class GroupModel;
   class SessionRuntime;
-}
+} // namespace jfd::session
 
 namespace jfd::ui {
   class AppSettings;
@@ -82,6 +83,9 @@ namespace jfd::desktop {
     std::shared_ptr<session::SessionRuntime> session;
     // The player screen's model (installPlayer), on the session above.
     std::unique_ptr<ui::PlayerModel> playerModel;
+    // Watching together (installGroup): the group page's model, on the
+    // session. Declared after it so it goes first.
+    std::unique_ptr<session::GroupModel> group;
 
     // installIntegrations; complete in main.cpp, which destroys it.
     std::unique_ptr<IntegrationServices> integrations;
@@ -118,6 +122,12 @@ namespace jfd::desktop {
   // The player page ("player" route) and the PlayerSession singleton; Play
   // on the library screens opens it. Needs installSession.
   void installPlayer(AppServices& services, QQmlEngine& engine);
+  // The watch-together page (route "group"), the GroupSession singleton
+  // for it and the player's group indicator, and "Watch together" on item
+  // pages. Needs installSession. uninstallGroup, after the QML engine is
+  // gone, drops the model before the session it reads.
+  void installGroup(AppServices& services, QQmlEngine& engine);
+  void uninstallGroup(AppServices& services);
 
   // Leaves a SyncPlay group before quitting; calls done when the server
   // answered or after a short timeout, so quitting never hangs on the

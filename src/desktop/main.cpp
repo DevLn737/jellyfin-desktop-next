@@ -7,6 +7,7 @@
 
 #include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/platform/SingleInstance.h>
+#include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/Navigator.h>
@@ -172,6 +173,7 @@ int main(int argc, char* argv[]) {
         services, services.session->hub(),
         [session = services.session.get()](core::SessionInput input) { session->post(std::move(input)); },
         *services.client);
+    desktop::installGroup(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
     // Home when the saved session was restored.
@@ -234,10 +236,12 @@ int main(int argc, char* argv[]) {
     // Leaving the scope destroys the window and the engine before the
     // services they use.
   }
-  // The player screen's model subscribes to the session; the session runs
-  // on the player and on the library's client and socket.
+  // The player screen's model and the group model subscribe to the
+  // session; the session runs on the player and on the library's client
+  // and socket.
   ui::PlayerSession::setInstance(nullptr);
   services.playerModel.reset();
+  desktop::uninstallGroup(services);
   services.session.reset();
   services.player.reset();
   services.library.reset();

@@ -5,6 +5,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   AppServices.cpp AppServices.h
   FlowCheck.cpp FlowCheck.h
   IntegrationServices.cpp IntegrationServices.h
+  GroupInstall.cpp
   LibraryInstall.cpp
   SessionInstall.cpp
   PlayerInstall.cpp
@@ -19,7 +20,7 @@ qt_add_qml_module(jellyfin-desktop
   VERSION 1.0
   NO_PLUGIN
   QML_FILES Main.qml
-  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Player)
+  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Group Jfd.Ui.Player)
 
 # Static QML modules: link each one's plugin (Q_IMPORT_QML_PLUGIN in
 # main.cpp) as well as the module itself.
