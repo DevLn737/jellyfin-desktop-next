@@ -20,7 +20,9 @@ $DOCKER rm "$container" >/dev/null
 version=$(grep -oE '"MediaBrowser.Controller/[0-9.]+' "$WORK/jellyfin/jellyfin.deps.json" | head -1 | cut -d/ -f2)
 
 cp "$SRC/JfdTestSegments.csproj" "$SRC/Plugin.cs" "$WORK/"
-$DOCKER run --rm -v "$WORK:/src" -w /src -e DOTNET_CLI_TELEMETRY_OPTOUT=1 -e DOTNET_NOLOGO=1 "$SDK" \
+# As the calling user, so the build output can be cleaned up afterwards.
+$DOCKER run --rm --user "$(id -u):$(id -g)" -v "$WORK:/src" -w /src -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp \
+  -e DOTNET_CLI_TELEMETRY_OPTOUT=1 -e DOTNET_NOLOGO=1 "$SDK" \
   dotnet build -c Release -o /src/out -p:JELLYFIN_DIR=/src/jellyfin >&2
 
 mkdir -p "$OUT"

@@ -72,6 +72,8 @@ jobs:
       # External audio and media segments, on a server of their own.
       - name: Start the extras server
         if: matrix.server.fork == '0'
+        # bash with pipefail: a failed start fails the step, not just tee.
+        shell: bash
         run: scripts/test-server/extras-server.sh up | tee -a "$GITHUB_ENV"
 
       - name: Configure
