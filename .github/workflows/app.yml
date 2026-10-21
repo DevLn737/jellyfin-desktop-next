@@ -102,7 +102,7 @@ jobs:
             Where-Object { $_.FullName -notlike '*package*' } | Select-Object -First 1
           if (-not $exe) { throw 'jellyfin-desktop-next.exe was not built' }
           Copy-Item $exe.FullName $stage
-          windeployqt --release --compiler-runtime --qmldir src/app/qml --no-translations "$stage/jellyfin-desktop-next.exe"
+          windeployqt --release --compiler-runtime --qmldir tools/prototype/qml --no-translations "$stage/jellyfin-desktop-next.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
           Copy-Item -Recurse scripts/measure "$stage/measure"

@@ -69,6 +69,14 @@ namespace {
     while (timer.elapsed() < milliseconds) QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
   }
 
+  // Spins until done() or the deadline; coarse timers (Windows) fire late.
+  template <typename Done>
+  void spinUntil(Done done, int milliseconds = 2000) {
+    QElapsedTimer timer;
+    timer.start();
+    while (!done() && timer.elapsed() < milliseconds) QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+  }
+
 } // namespace
 
 TEST_CASE("Start is sent once the file plays, with the stream's identity") {
@@ -122,7 +130,7 @@ TEST_CASE("Progress is sent periodically while playing, not while paused") {
   Fixture f;
   f.reporter.setProgressInterval(std::chrono::milliseconds(40));
   f.push(PlaybackPhase::Playing, 0);
-  spin(150);
+  spinUntil([&] { return f.sink.reports.size() >= 3; });
   const auto playing = f.sink.reports.size();
   CHECK(playing >= 3);
   f.push(PlaybackPhase::Paused, 1 * Second);
