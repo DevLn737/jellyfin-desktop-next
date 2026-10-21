@@ -113,6 +113,12 @@ namespace jfd::ui {
 
   QString PlayerModel::segment() const { return m_segment; }
 
+  void PlayerModel::setAutoNext(bool on) {
+    if (on == m_autoNext) return;
+    m_autoNext = on;
+    Q_EMIT autoNextChanged();
+  }
+
   void PlayerModel::setAutoSkip(bool on) {
     if (on == m_skipper.autoSkip()) return;
     m_skipper.setAutoSkip(on);
@@ -378,7 +384,7 @@ namespace jfd::ui {
 
     // The next episode follows; a group's server moves its own queue. The
     // ended session no longer names its file: the one begun last ended.
-    if (justEnded && !inGroup() && m_current) step(true);
+    if (justEnded && m_autoNext && !inGroup() && m_current) step(true);
   }
 
   QVariantList PlayerModel::tracks(TrackKind kind) const {

@@ -216,10 +216,13 @@ TEST_CASE("Track menus list the movie's tracks, and a change keeps the position"
   REQUIRE(waitFor([&] { return p.model->subtitleIndex() < 0; }, 30000));
 
   // The server shows the item and the chosen tracks.
+  std::string lastState;
+  INFO("the server's last play state: " << lastState);
   REQUIRE(waitFor(
       [&] {
         const QJsonObject session = p.serverSession();
         const QJsonObject state = session.value(QStringLiteral("PlayState")).toObject();
+        lastState = QJsonDocument(state).toJson(QJsonDocument::Compact).toStdString();
         return session.value(QStringLiteral("NowPlayingItem")).toObject().value(QStringLiteral("Id")).toString() ==
                    movie.id &&
                state.value(QStringLiteral("AudioStreamIndex")).toInt(-1) == second;
@@ -392,12 +395,21 @@ TEST_CASE("An external audio file plays, through a transcode, at the same positi
   const auto playState = [&] { return p.serverSession().value(QStringLiteral("PlayState")).toObject(); };
 
   // Each audio track in turn; the server shows the choice.
+  std::string lastState;
+  INFO("the server's last play state: " << lastState);
   for (const int index : {embedded, external}) {
+    INFO("audio stream " << index);
     if (p.model->audioIndex() != index) p.model->selectAudio(index);
     REQUIRE(waitFor([&] { return p.model->audioIndex() == index && !p.model->loading(); }, 30000));
     CHECK(p.model->paused());
     CHECK(std::abs(p.model->position() - before) < 1.0);
-    REQUIRE(waitFor([&] { return playState().value(QStringLiteral("AudioStreamIndex")).toInt(-1) == index; }, 20000));
+    REQUIRE(waitFor(
+        [&] {
+          const QJsonObject state = playState();
+          lastState = QJsonDocument(state).toJson(QJsonDocument::Compact).toStdString();
+          return state.value(QStringLiteral("AudioStreamIndex")).toInt(-1) == index;
+        },
+        20000));
   }
   // The external file plays either mixed into a server transcode, or, when
   // the file itself plays directly, loaded by mpv beside it.

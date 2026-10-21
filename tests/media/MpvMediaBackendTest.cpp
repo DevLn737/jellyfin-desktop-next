@@ -177,3 +177,18 @@ TEST_CASE("A file that cannot be opened ends with an error") {
   REQUIRE(ended);
   CHECK(ended->reason == backend::EndReason::Error);
 }
+
+TEST_CASE("Settings reach mpv as properties while it runs") {
+  MpvPlayer player {headless()};
+  player.setStringProperty("hwdec", QByteArrayLiteral("no"));
+  player.setDoubleProperty("sub-font-size", 60);
+  QDeadlineTimer deadline(5000);
+  // hwdec is a list of modes.
+  const auto hwdec = [&] { return player.property("hwdec").toStringList(); };
+  while ((hwdec() != QStringList{QStringLiteral("no")} ||
+          player.property("sub-font-size").toDouble() != 60) &&
+         !deadline.hasExpired())
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  CHECK(hwdec() == QStringList{QStringLiteral("no")});
+  CHECK(player.property("sub-font-size").toDouble() == doctest::Approx(60));
+}

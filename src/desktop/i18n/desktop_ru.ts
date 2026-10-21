@@ -27,6 +27,66 @@
         <translation>Если сервер знает, где они. Иначе показывается кнопка «Пропустить».</translation>
     </message>
     <message>
+        <source>Play the next episode automatically</source>
+        <translation>Включать следующую серию автоматически</translation>
+    </message>
+    <message>
+        <source>When an episode ends. In a group the group&apos;s queue decides.</source>
+        <translation>Когда серия закончилась. В группе решает очередь группы.</translation>
+    </message>
+    <message>
+        <source>Hardware decoding</source>
+        <translation>Аппаратное декодирование</translation>
+    </message>
+    <message>
+        <source>Decodes video on the graphics card. Copy is slower but works with more drivers; turn it off if the picture is broken.</source>
+        <translation>Видео декодирует видеокарта. «С копированием» медленнее, но работает с большим числом драйверов; выключите, если картинка искажается.</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Включено</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation>С копированием</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Выключено</translation>
+    </message>
+    <message>
+        <source>Subtitle size</source>
+        <translation>Размер субтитров</translation>
+    </message>
+    <message>
+        <source>Text subtitles without their own styles. Styled ones keep their size.</source>
+        <translation>Для текстовых субтитров без собственного оформления. Оформленные сохраняют свой размер.</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation>По умолчанию</translation>
+    </message>
+    <message>
+        <source>Tiny</source>
+        <translation>Очень маленький</translation>
+    </message>
+    <message>
+        <source>Small</source>
+        <translation>Маленький</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>Обычный</translation>
+    </message>
+    <message>
+        <source>Large</source>
+        <translation>Большой</translation>
+    </message>
+    <message>
+        <source>Huge</source>
+        <translation>Очень большой</translation>
+    </message>
+    <message>
         <source>HDR on HDR displays</source>
         <translation>HDR на HDR-экранах</translation>
     </message>

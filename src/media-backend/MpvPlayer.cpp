@@ -171,6 +171,15 @@ void MpvPlayer::setDoubleProperty(const char* name, double value)
   mpv_set_property_async(m_mpv.get(), 0, name, MPV_FORMAT_DOUBLE, &value);
 }
 
+void MpvPlayer::setStringProperty(const char* name, const QByteArray& value)
+{
+  if (!m_mpv)
+    return;
+  // mpv copies the value before returning.
+  const char* data = value.constData();
+  mpv_set_property_async(m_mpv.get(), 0, name, MPV_FORMAT_STRING, &data);
+}
+
 void MpvPlayer::stop()
 {
   command({"stop"});
