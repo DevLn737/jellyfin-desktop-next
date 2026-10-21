@@ -1,6 +1,7 @@
 #include "AppServices.h"
 #include "IntegrationServices.h"
 #include "Logging.h"
+#include "FlowCheck.h"
 #include "SmokeTest.h"
 #include "Translations.h"
 
@@ -42,6 +43,8 @@ namespace {
 
   struct Options {
     bool smoke = false;
+    // --flow: the smoke test's server path (FlowCheck); implies --smoke.
+    bool flow = false;
     QString settingsFile;
   };
 
@@ -54,6 +57,9 @@ namespace {
       const QString arg = QString::fromLocal8Bit(argv[i]);
       if (arg == QLatin1String("--smoke")) {
         options.smoke = true;
+      } else if (arg == QLatin1String("--flow")) {
+        options.smoke = true;
+        options.flow = true;
       } else if (arg == QLatin1String("--settings-file") && i + 1 < argc) {
         options.settingsFile = QString::fromLocal8Bit(argv[++i]);
       } else if (arg.startsWith(QLatin1String("--settings-file="))) {
@@ -112,8 +118,15 @@ int main(int argc, char* argv[]) {
   parser.addHelpOption();
   parser.addVersionOption();
   parser.addOption({QStringLiteral("smoke"), QStringLiteral("Open the window, visit every page, quit.")});
+  parser.addOption({QStringLiteral("flow"),
+                    QStringLiteral("Sign in to JFD_TEST_SERVER_URL, open a series and an episode, play them, "
+                                   "switch tracks, quit.")});
   parser.addOption({QStringLiteral("settings-file"), QStringLiteral("Use this settings file."), QStringLiteral("path")});
   parser.process(app);
+  if (options.flow && !desktop::FlowCheck::configured()) {
+    std::fprintf(stderr, "--flow needs JFD_TEST_SERVER_URL, JFD_TEST_USER and JFD_TEST_PASSWORD\n");
+    return 2;
+  }
 
   services.isolatedProfile = smokeProfile.has_value();
   services.cacheDirectory =
@@ -189,7 +202,11 @@ int main(int argc, char* argv[]) {
     }
 
     std::unique_ptr<desktop::SmokeTest> smoke;
-    if (options.smoke) {
+    std::unique_ptr<desktop::FlowCheck> flow;
+    if (options.flow) {
+      flow = std::make_unique<desktop::FlowCheck>(*window, services);
+      flow->start();
+    } else if (options.smoke) {
       smoke = std::make_unique<desktop::SmokeTest>(*window, *services.navigator);
       smoke->start();
     }
@@ -210,7 +227,7 @@ int main(int argc, char* argv[]) {
     if (!left) {
       leaving.exec();
     }
-    if (smoke && !smoke->passed() && exitCode == 0) {
+    if (((smoke && !smoke->passed()) || (flow && !flow->passed())) && exitCode == 0) {
       exitCode = 1;
     }
     // Leaving the scope destroys the window and the engine before the
