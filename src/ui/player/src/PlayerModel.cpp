@@ -175,16 +175,23 @@ namespace jfd::ui {
     Q_EMIT stateChanged();
   }
 
-  void PlayerModel::attachVideo(QQuickItem* host) {
+  void PlayerModel::attachVideo(QQuickItem* host, QQuickItem* owner) {
     if (!host || !host->window()) return;
     const auto ready = [this] { videoReady(); };
+    QQuickItem* video = nullptr;
 #ifdef JFD_HAVE_D3D11_VIDEO
     if (host->window()->rendererInterface()->graphicsApi() == QSGRendererInterface::Direct3D11) {
-      watchVideo(makeVideo<media::MpvD3D11VideoItem>(host, m_player), this, ready);
-      return;
+      auto* item = makeVideo<media::MpvD3D11VideoItem>(host, m_player);
+      watchVideo(item, this, ready);
+      video = item;
     }
 #endif
-    watchVideo(makeVideo<media::MpvVideoItem>(host, m_player), this, ready);
+    if (!video) {
+      auto* item = makeVideo<media::MpvVideoItem>(host, m_player);
+      watchVideo(item, this, ready);
+      video = item;
+    }
+    if (owner && owner != host) connect(owner, &QObject::destroyed, video, &QObject::deleteLater);
   }
 
   void PlayerModel::videoReady() {

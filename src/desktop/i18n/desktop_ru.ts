@@ -26,5 +26,13 @@
         <source>When the server knows where they are. Otherwise a Skip button is shown.</source>
         <translation>Если сервер знает, где они. Иначе показывается кнопка «Пропустить».</translation>
     </message>
+    <message>
+        <source>HDR on HDR displays</source>
+        <translation>HDR на HDR-экранах</translation>
+    </message>
+    <message>
+        <source>HDR10 videos play in HDR when Windows has HDR turned on for the display. Off: they are converted to SDR.</source>
+        <translation>Видео в HDR10 показывается в HDR, если в Windows для экрана включён HDR. Если выключено, видео переводится в SDR.</translation>
+    </message>
 </context>
 </TS>

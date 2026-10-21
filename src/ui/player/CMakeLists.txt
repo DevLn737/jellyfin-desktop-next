@@ -4,7 +4,9 @@
 # PlayerSession (PlayerModel) runs the track table, media segments and
 # playback reports for the file the session plays.
 qt_add_library(jfd_ui_player STATIC
+  src/HdrOutput.cpp
   src/PlayerModel.cpp
+  include/jfd/ui/HdrOutput.h
   include/jfd/ui/PlayerModel.h
   include/jfd/ui/PlayerSession.h)
 target_include_directories(jfd_ui_player PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -15,6 +17,7 @@ qt_add_qml_module(jfd_ui_player
   URI Jfd.Ui.Player
   VERSION 1.0
   QML_FILES
+    HdrScene.qml
     PlayerIcons.qml
     PlayerPage.qml
     TrackMenu.qml
@@ -37,3 +40,21 @@ target_link_libraries(jfd_ui_player
 target_compile_definitions(jfd_ui_player PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 target_compile_options(jfd_ui_player PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
 jfd_add_translations(jfd_ui_player)
+
+# HDR10 output (HdrOutput): Windows with the Direct3D 11 video item, and the
+# shader that encodes the interface to PQ. Without either the setting stays
+# hidden and the window SDR.
+get_target_property(_jfd_media_defs jfd_media_backend INTERFACE_COMPILE_DEFINITIONS)
+find_package(Qt6 QUIET COMPONENTS ShaderTools)
+if(WIN32 AND "JFD_HAVE_D3D11_VIDEO=1" IN_LIST _jfd_media_defs AND Qt6ShaderTools_FOUND)
+  qt_add_shaders(jfd_ui_player "jfd_ui_player_shaders"
+    PREFIX "/qt/qml/Jfd/Ui/Player"
+    FILES shaders/hdr10_ui.frag)
+  # QRhi (<rhi/qrhi.h>) for the swap chain's format and HDR info.
+  find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+  target_link_libraries(jfd_ui_player PRIVATE Qt6::GuiPrivate)
+  target_compile_definitions(jfd_ui_player PRIVATE JFD_HDR_OUTPUT=1)
+  message(STATUS "Player: HDR10 output available")
+elseif(WIN32 AND JFD_ENFORCE_PINS)
+  message(FATAL_ERROR "HDR10 output needs the Direct3D 11 video item and Qt Shader Tools")
+endif()

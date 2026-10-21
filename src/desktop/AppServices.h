@@ -109,8 +109,12 @@ namespace jfd::desktop {
   // Needs installLibrary.
   void installSession(AppServices& services);
 
-  // The playback settings section (auto-skip of intros and credits).
+  // The playback settings section (auto-skip of intros and credits, HDR10
+  // output).
   bool registerPlayerSettings(settings::SettingsRegistry& registry);
+  // Before QGuiApplication: asks for an HDR10 swap chain when the setting is
+  // on (Windows).
+  void requestHdrOutput(const settings::Settings& settings);
   // The player page ("player" route) and the PlayerSession singleton; Play
   // on the library screens opens it. Needs installSession.
   void installPlayer(AppServices& services, QQmlEngine& engine);

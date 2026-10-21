@@ -110,8 +110,9 @@ namespace jfd::ui {
     Q_INVOKABLE void stop();
 
     // Creates the video item for this platform's renderer inside `host`,
-    // filling it. The page calls it once; the item is the host's child.
-    Q_INVOKABLE void attachVideo(QQuickItem* host);
+    // filling it. The page calls it once; the item is the host's child and
+    // goes away with `owner` too, when given (a host outside the page).
+    Q_INVOKABLE void attachVideo(QQuickItem* host, QQuickItem* owner = nullptr);
 
   Q_SIGNALS:
     void stateChanged();

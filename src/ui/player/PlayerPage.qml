@@ -55,7 +55,11 @@ RoutePage {
         Navigator.back()
     }
 
-    Component.onCompleted: player.attachVideo(videoHost)
+    // With HDR10 output the video goes under the window's interface layer
+    // (HdrScene); the page stays transparent over it.
+    readonly property bool videoUnder: HdrOutput.active && HdrOutput.videoLayer !== null
+
+    Component.onCompleted: player.attachVideo(videoUnder ? HdrOutput.videoLayer : videoHost, page)
     Component.onDestruction: player.stop()
 
     Connections {
@@ -69,6 +73,7 @@ RoutePage {
     Rectangle {
         anchors.fill: parent
         color: "black"
+        visible: !page.videoUnder
     }
 
     Item {

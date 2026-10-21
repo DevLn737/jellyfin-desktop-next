@@ -12,13 +12,15 @@ qt_add_qml_module(jellyfin-desktop-next
   QML_FILES qml/Main.qml qml/PlayerMenu.qml qml/OsdBar.qml qml/ProtocolOverlay.qml)
 
 # HDR experiment (Windows, --hdr hdr10): the shader that encodes the QML
-# interface for an HDR10 swap chain. Without Qt Shader Tools the app builds
-# without it and HDR stays off.
+# interface for an HDR10 swap chain, shared with the player module
+# (src/ui/player). Without Qt Shader Tools the app builds without it and HDR
+# stays off.
 find_package(Qt6 QUIET COMPONENTS ShaderTools)
 if(Qt6ShaderTools_FOUND)
   qt_add_shaders(jellyfin-desktop-next "jfd_shaders"
     PREFIX "/"
-    FILES shaders/hdr10_ui.frag)
+    BASE "${PROJECT_SOURCE_DIR}/src/ui/player"
+    FILES "${PROJECT_SOURCE_DIR}/src/ui/player/shaders/hdr10_ui.frag")
   target_compile_definitions(jellyfin-desktop-next PRIVATE JFD_HAVE_HDR_SHADER=1)
 elseif(WIN32 AND JFD_ENFORCE_PINS)
   message(FATAL_ERROR "The pinned Qt must include Qt Shader Tools")
