@@ -167,4 +167,35 @@ if(JFD_BUILD_APP)
     target_link_libraries(jfd_ui_tests PRIVATE jfd_ui_shell doctest Qt6::Test)
     add_test(NAME jfd_ui_tests COMMAND jfd_ui_tests)
   endif()
+
+  if(TARGET jfd_ui_library)
+    add_executable(jfd_ui_library_tests support/QtTestMain.cpp ui/LibraryUiTest.cpp)
+    target_link_libraries(jfd_ui_library_tests PRIVATE jfd_ui_library doctest Qt6::Test)
+    target_compile_options(jfd_ui_library_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_library_tests COMMAND jfd_ui_library_tests)
+  endif()
+
+  if(JFD_SERVER_TESTS AND TARGET jfd_ui_library)
+    # The library screens in a window, driven against the server.
+    add_executable(jfd_ui_library_server_tests support/QtGuiTestMain.cpp ui/LibraryScreensServerTest.cpp)
+    target_include_directories(jfd_ui_library_server_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_library_server_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      doctest Qt6::Test Qt6::Quick)
+    target_compile_options(jfd_ui_library_server_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_library_server_tests COMMAND jfd_ui_library_server_tests)
+    set_tests_properties(jfd_ui_library_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+  endif()
+
+  if(JFD_SERVER_TESTS AND TARGET jfd_ui_group)
+    # The group page on a live server, on a virtual backend.
+    add_executable(jfd_ui_group_server_tests ui/GroupPageTest.cpp)
+    target_include_directories(jfd_ui_group_server_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_group_server_tests PRIVATE
+      jfd_ui_group jfd_ui_groupplugin jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
+      jfd::session_runtime Qt6::Gui Qt6::Quick doctest Qt6::Test)
+    add_test(NAME jfd_ui_group_server_tests COMMAND jfd_ui_group_server_tests)
+    set_tests_properties(jfd_ui_group_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+  endif()
 endif()
