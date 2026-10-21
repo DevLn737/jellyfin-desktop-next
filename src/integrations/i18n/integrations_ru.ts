@@ -28,4 +28,11 @@
         <translation>Смотрим вместе (%1)</translation>
     </message>
 </context>
+<context>
+    <name>MediaSessionBridge</name>
+    <message>
+        <source>Playing video</source>
+        <translation>Воспроизведение видео</translation>
+    </message>
+</context>
 </TS>
