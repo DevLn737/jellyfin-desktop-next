@@ -7,9 +7,14 @@ import QtQuick
 QtObject {
     id: theme
 
-    // Set by the application from the "Reduce animations" setting, and on
-    // weak graphics. Durations below shrink to a fraction or to zero.
-    property bool reduceMotion: false
+    // Set by the application from the "Simplified effects" setting, which
+    // by default turns on with integrated or software graphics: no blur,
+    // and the durations below are halved.
+    property bool reducedEffects: false
+    // Blur (MultiEffect, layer effects) only when this is true.
+    readonly property bool blurEnabled: !reducedEffects
+    // Older name of reducedEffects.
+    readonly property bool reduceMotion: reducedEffects
 
     // Colours
     readonly property color background: "#101010"
@@ -63,8 +68,8 @@ QtObject {
     readonly property real thumbAspect: 16 / 9
 
     // Animation durations in milliseconds
-    readonly property int durationFast: reduceMotion ? 0 : 120
-    readonly property int durationNormal: reduceMotion ? 0 : 200
-    readonly property int durationSlow: reduceMotion ? 0 : 320
+    readonly property int durationFast: reducedEffects ? 60 : 120
+    readonly property int durationNormal: reducedEffects ? 100 : 200
+    readonly property int durationSlow: reducedEffects ? 160 : 320
     readonly property int easing: Easing.OutCubic
 }

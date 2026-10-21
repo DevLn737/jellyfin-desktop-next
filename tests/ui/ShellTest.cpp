@@ -1,5 +1,6 @@
 #include "../support/DoctestQt.h"
 
+#include <jfd/ui/GraphicsInfo.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/WindowPlacement.h>
 
@@ -107,4 +108,32 @@ TEST_CASE("The window opens where it was, or on a screen that is still there") {
   // Larger than the screen now: shrunk to fit.
   const QRect huge(0, 0, 4000, 3000);
   CHECK(placeWindow(huge, QStringLiteral("left"), onlyLeft, 0, defaultSize).size() == QSize(1920, 1040));
+}
+
+TEST_CASE("Simplified effects turn on with integrated and software graphics") {
+  using Kind = GraphicsDevice::Kind;
+  const auto device = [](Kind kind, quint32 vendor, const char* name) {
+    GraphicsDevice d;
+    d.kind = kind;
+    d.vendorId = vendor;
+    d.name = QString::fromUtf8(name);
+    return d;
+  };
+  // Vulkan says so directly.
+  CHECK(prefersReducedEffects(device(Kind::Integrated, 0x1002, "AMD Radeon RX 9060 XT")));
+  CHECK_FALSE(prefersReducedEffects(device(Kind::Discrete, 0x8086, "Intel(R) Iris(R) Xe Graphics")));
+  CHECK(prefersReducedEffects(device(Kind::Software, 0, "")));
+  // Direct3D 11 and OpenGL: by vendor and name.
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0x8086, "Intel(R) Iris(R) Xe Graphics")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0, "Mesa Intel(R) Xe Graphics (TGL GT2)")));
+  CHECK_FALSE(prefersReducedEffects(device(Kind::Unknown, 0x8086, "Intel(R) Arc(TM) A770 Graphics")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0x1002, "AMD Radeon(TM) Graphics")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0x1002, "AMD Radeon 780M Graphics")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0, "AMD Radeon Graphics (radeonsi, rembrandt, LLVM 17)")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0x1002, "AMD Radeon(TM) Vega 8 Graphics")));
+  CHECK_FALSE(prefersReducedEffects(device(Kind::Unknown, 0x1002, "AMD Radeon RX 9060 XT")));
+  CHECK_FALSE(prefersReducedEffects(device(Kind::Unknown, 0, "AMD Radeon RX 9060 XT (radeonsi, gfx1200, LLVM 19)")));
+  CHECK_FALSE(prefersReducedEffects(device(Kind::Unknown, 0x10de, "NVIDIA GeForce RTX 4070")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0, "llvmpipe (LLVM 15.0.7, 256 bits)")));
+  CHECK(prefersReducedEffects(device(Kind::Unknown, 0x1414, "Microsoft Basic Render Driver")));
 }
