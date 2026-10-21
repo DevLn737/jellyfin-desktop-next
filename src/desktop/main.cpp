@@ -5,12 +5,15 @@
 #include "Translations.h"
 
 #include <jfd/integrations/IntegrationsSettings.h>
+#include <jfd/platform/SingleInstance.h>
+#include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/WindowStateKeeper.h>
 
 #include <QCommandLineParser>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
@@ -125,7 +128,16 @@ int main(int argc, char* argv[]) {
   desktop::installTranslations(app,
                                desktop::resolveLanguage(services.settings->value(settings::keys::Language).toString()));
 
-  // Single instance: joins here once the platform module provides it.
+  // One copy per user: a second start hands its arguments over and exits.
+  // The smoke test runs beside a running app.
+  std::optional<platform::SingleInstance> instance;
+  if (!options.smoke) {
+    instance.emplace();
+    if (!instance->start(app.arguments())) {
+      desktop::stopLogFile();
+      return 0;
+    }
+  }
 
   int exitCode = 0;
   QElapsedTimer shutdown;
@@ -133,7 +145,13 @@ int main(int argc, char* argv[]) {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
     desktop::installLibrary(services, engine);
+    desktop::installSession(services);
     desktop::installIntegrations(services, engine);
+    // The media controls and Discord follow the playback session.
+    desktop::connectIntegrations(
+        services, services.session->hub(),
+        [session = services.session.get()](core::SessionInput input) { session->post(std::move(input)); },
+        *services.client);
     // Other modules: desktop::install<Module>(services, engine);
 
     // Home when the saved session was restored.
@@ -152,6 +170,15 @@ int main(int argc, char* argv[]) {
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
     desktop::startIntegrations(services, *window, !options.smoke);
+    if (instance) {
+      QObject::connect(&*instance, &platform::SingleInstance::activated, window, [window] {
+        if (window->visibility() == QWindow::Minimized) {
+          window->showNormal();
+        }
+        window->raise();
+        window->requestActivate();
+      });
+    }
 
     std::unique_ptr<desktop::SmokeTest> smoke;
     if (options.smoke) {
@@ -164,12 +191,26 @@ int main(int argc, char* argv[]) {
     windowState.save();
     // Before the window they are attached to.
     services.integrations.reset();
+    // Leave a SyncPlay group so the others are not left waiting; bounded
+    // by a timeout inside prepareExit.
+    bool left = false;
+    QEventLoop leaving;
+    desktop::prepareExit(services, [&] {
+      left = true;
+      leaving.quit();
+    });
+    if (!left) {
+      leaving.exec();
+    }
     if (smoke && !smoke->passed() && exitCode == 0) {
       exitCode = 1;
     }
     // Leaving the scope destroys the window and the engine before the
     // services they use.
   }
+  // The session runs on the player and on the library's client and socket.
+  services.session.reset();
+  services.player.reset();
   services.library.reset();
   services.settings.reset();
   desktop::stopLogFile();

@@ -5,6 +5,7 @@
 
 #include <QString>
 
+#include <functional>
 #include <memory>
 
 class QQmlEngine;
@@ -13,6 +14,18 @@ namespace jfd::api {
   class JellyfinClient;
   class SessionSocket;
 } // namespace jfd::api
+
+namespace jfd::library {
+  class SignIn;
+}
+
+namespace jfd::media {
+  class MpvPlayer;
+}
+
+namespace jfd::session {
+  class SessionRuntime;
+}
 
 namespace jfd::ui {
   class AppSettings;
@@ -55,9 +68,16 @@ namespace jfd::desktop {
     std::shared_ptr<LibraryServices> library;
     api::JellyfinClient* client = nullptr;
     api::SessionSocket* socket = nullptr;
+    library::SignIn* signIn = nullptr;
     // Play and Watch together from the library screens go to the handlers
     // set on it (setPlayHandler, setWatchTogetherHandler).
     ui::LibraryUi* libraryUi = nullptr;
+
+    // Playback (installSession): one mpv player and the session on it,
+    // on the library's client and socket. The group and player modules
+    // use these.
+    std::shared_ptr<media::MpvPlayer> player;
+    std::shared_ptr<session::SessionRuntime> session;
 
     // installIntegrations; complete in main.cpp, which destroys it.
     std::unique_ptr<IntegrationServices> integrations;
@@ -74,5 +94,16 @@ namespace jfd::desktop {
   // the server connection. Signs in with the saved session when there is
   // one; otherwise the navigator is left empty for the login page.
   void installLibrary(AppServices& services, QQmlEngine& engine);
+
+  // The mpv player and the playback session. Reports this client's
+  // capabilities (SyncPlay playback rates, the device profile) whenever
+  // a sign-in completes, so the session socket registers with them.
+  // Needs installLibrary.
+  void installSession(AppServices& services);
+
+  // Leaves a SyncPlay group before quitting; calls done when the server
+  // answered or after a short timeout, so quitting never hangs on the
+  // network.
+  void prepareExit(AppServices& services, std::function<void()> done);
 
 } // namespace jfd::desktop

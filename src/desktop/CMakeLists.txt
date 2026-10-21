@@ -5,6 +5,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   AppServices.cpp AppServices.h
   IntegrationServices.cpp IntegrationServices.h
   LibraryInstall.cpp
+  SessionInstall.cpp
   Logging.cpp Logging.h
   SmokeTest.cpp SmokeTest.h
   Translations.cpp Translations.h)
@@ -23,6 +24,7 @@ qt_add_qml_module(jellyfin-desktop
 target_link_libraries(jellyfin-desktop PRIVATE
   Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network
   jfd::settings jfd::integrations jfd::platform jfd::session jfd::jellyfin_api
+  jfd::library jfd::session_runtime jfd::media_backend
   jfd_ui_theme jfd_ui_themeplugin
   jfd_ui_controls jfd_ui_controlsplugin
   jfd_ui_shell jfd_ui_shellplugin
