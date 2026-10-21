@@ -86,6 +86,74 @@
         <translation>Выключено</translation>
     </message>
     <message>
+        <source>As on the server</source>
+        <translation>Как на сервере</translation>
+    </message>
+    <message>
+        <source>Russian</source>
+        <translation>Русский</translation>
+    </message>
+    <message>
+        <source>English</source>
+        <translation>Английский</translation>
+    </message>
+    <message>
+        <source>Japanese</source>
+        <translation>Японский</translation>
+    </message>
+    <message>
+        <source>Ukrainian</source>
+        <translation>Украинский</translation>
+    </message>
+    <message>
+        <source>German</source>
+        <translation>Немецкий</translation>
+    </message>
+    <message>
+        <source>French</source>
+        <translation>Французский</translation>
+    </message>
+    <message>
+        <source>Spanish</source>
+        <translation>Испанский</translation>
+    </message>
+    <message>
+        <source>Italian</source>
+        <translation>Итальянский</translation>
+    </message>
+    <message>
+        <source>Korean</source>
+        <translation>Корейский</translation>
+    </message>
+    <message>
+        <source>Chinese</source>
+        <translation>Китайский</translation>
+    </message>
+    <message>
+        <source>Audio language</source>
+        <translation>Язык озвучки</translation>
+    </message>
+    <message>
+        <source>Until you pick a track yourself; your pick then carries to the next episodes.</source>
+        <translation>Пока вы сами не выберете дорожку; дальше ваш выбор переходит на следующие серии.</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Субтитры</translation>
+    </message>
+    <message>
+        <source>Always, in the subtitle language</source>
+        <translation>Всегда, на языке субтитров</translation>
+    </message>
+    <message>
+        <source>Only forced (signs and songs)</source>
+        <translation>Только принудительные (надписи и песни)</translation>
+    </message>
+    <message>
+        <source>Subtitle language</source>
+        <translation>Язык субтитров</translation>
+    </message>
+    <message>
         <source>Subtitle size</source>
         <translation>Размер субтитров</translation>
     </message>
@@ -116,6 +184,30 @@
     <message>
         <source>Huge</source>
         <translation>Очень большой</translation>
+    </message>
+    <message>
+        <source>Styled subtitles</source>
+        <translation>Оформленные субтитры</translation>
+    </message>
+    <message>
+        <source>How much of the player&apos;s subtitle settings applies to subtitles with their own styles (ASS).</source>
+        <translation>Насколько настройки субтитров плеера действуют на субтитры с собственным оформлением (ASS).</translation>
+    </message>
+    <message>
+        <source>Their style, at the chosen scale</source>
+        <translation>Своё оформление, в выбранном масштабе</translation>
+    </message>
+    <message>
+        <source>Their style as is</source>
+        <translation>Своё оформление без изменений</translation>
+    </message>
+    <message>
+        <source>The player&apos;s style</source>
+        <translation>Оформление плеера</translation>
+    </message>
+    <message>
+        <source>Plain text</source>
+        <translation>Простой текст</translation>
     </message>
     <message>
         <source>HDR on HDR displays</source>

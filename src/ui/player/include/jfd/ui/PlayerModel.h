@@ -108,6 +108,8 @@ namespace jfd::ui {
     bool autoSkip() const { return m_skipper.autoSkip(); }
     void setAutoSkip(bool on);
     bool autoNext() const { return m_autoNext; }
+    // Preferred languages and subtitle mode, for files opened from now on.
+    void setTrackDefaults(playback::TrackDefaults defaults) { m_trackPreference.setDefaults(std::move(defaults)); }
     void setAutoNext(bool on);
     double subtitleDelay() const { return m_subtitleDelay; }
     void setSubtitleDelay(double seconds);

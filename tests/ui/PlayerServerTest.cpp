@@ -12,6 +12,7 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QJsonObject>
 #include <QSignalSpy>
@@ -198,17 +199,30 @@ TEST_CASE("Track menus list the movie's tracks, and a change keeps the position"
     if (index != first) second = index;
   }
   REQUIRE(second >= 0);
+  // Timed from the menu's choice to mpv playing the track (threshold
+  // "Дорожки": under a second).
+  QElapsedTimer switching;
+  switching.start();
   p.model->selectAudio(second);
   REQUIRE(waitFor([&] { return p.model->audioIndex() == second && !p.model->loading(); }, 30000));
   // mpv switches on its own thread.
-  CHECK(waitFor([&] { return mpvLanguage() == language(second); }, 10000));
+  REQUIRE(waitFor([&] { return mpvLanguage() == language(second); }, 10000));
+  const qint64 audioSwitchMs = switching.elapsed();
+  MESSAGE("audio track switch: " << audioSwitchMs << " ms");
+  CHECK(audioSwitchMs < 1000);
   CHECK(p.model->paused());
   CHECK(std::abs(p.model->position() - before) < 1.0);
 
-  // The external subtitle.
+  // The external subtitle, from none: mpv downloads it first.
+  p.model->selectSubtitle(-1);
+  REQUIRE(waitFor([&] { return p.mpv.property("current-tracks/sub").toMap().isEmpty(); }, 10000));
+  switching.restart();
   p.model->selectSubtitle(external);
   REQUIRE(waitFor([&] { return p.model->subtitleIndex() == external && !p.model->loading(); }, 30000));
   REQUIRE(waitFor([&] { return p.mpv.property("current-tracks/sub/external").toBool(); }, 10000));
+  const qint64 subtitleSwitchMs = switching.elapsed();
+  MESSAGE("external subtitle switch: " << subtitleSwitchMs << " ms");
+  CHECK(subtitleSwitchMs < 1000);
   CHECK(std::abs(p.model->position() - before) < 1.0);
 
   // Subtitles off.
@@ -260,10 +274,25 @@ TEST_CASE("A seek in a transcoded HLS stream lands within a second, and the serv
   REQUIRE(waitFor([&] { return std::abs(p.mpv.property("time-pos").toDouble() - Target) < 1.0; }, 10000));
   CHECK(std::abs(p.model->position() - Target) < 1.0);
   REQUIRE(waitFor([&] { return std::abs(serverPosition(p.serverSession()) - Target) < 1.0; }, 20000));
+  MESSAGE("model " << p.model->position() << " s, mpv " << p.mpv.property("time-pos").toDouble() << " s, server "
+                   << serverPosition(p.serverSession()) << " s");
 
   // Playing on from there.
   p.model->togglePause();
   REQUIRE(waitFor([&] { return p.playing() && p.model->position() > Target + 2; }, 30000));
+
+  // A seek while playing, timed until mpv plays half a second past the
+  // target: the server starts a new transcode there (threshold "Первый
+  // кадр / seek": under a second, measured here without that half second).
+  constexpr double Later = Target + 100;
+  QElapsedTimer seeking;
+  seeking.start();
+  p.model->seek(Later);
+  REQUIRE(waitFor([&] { return p.mpv.property("time-pos").toDouble() > Later + 0.5 && p.playing(); }, 60000));
+  MESSAGE("transcoded seek while playing: " << seeking.elapsed() - 500 << " ms to play on");
+  CHECK(std::abs(p.model->position() - (Later + 0.5)) < 1.0);
+  p.model->seek(Target + 2);
+  REQUIRE(waitFor([&] { return std::abs(p.model->position() - (Target + 2)) < 1.0 && p.playing(); }, 60000));
 
   // Stopping is reported: the server keeps the resume point near the seek.
   p.model->stop();
@@ -303,6 +332,13 @@ TEST_CASE("At the end of an episode the next one plays, and Previous goes back")
   const bool moved = waitFor([&] { return p.runtime->snapshot().item.value() == second.toStdString() && p.playing(); }, 60000);
   REQUIRE(moved);
   CHECK(p.model->position() < 10);
+  // Played to the end: the server marks the first episode watched.
+  CHECK(waitFor(
+      [&] {
+        auto item = run<Item>([&](auto done) { p.client->item(first, nullptr, done); });
+        return item.ok() && item->userData.played;
+      },
+      20000));
   REQUIRE(waitFor([&] { return p.model->hasPrevious(); }, 10000));
   CHECK_FALSE(p.model->hasNext());
 

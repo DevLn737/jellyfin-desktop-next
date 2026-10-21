@@ -21,6 +21,37 @@ namespace jfd::desktop {
     const QString AutoNextKey = QStringLiteral("playback/autoNextEpisode");
     const QString HwdecKey = QStringLiteral("playback/hardwareDecoding");
     const QString SubtitleSizeKey = QStringLiteral("playback/subtitleSize");
+    const QString SubtitleStyleKey = QStringLiteral("playback/subtitleStyleOverride");
+    const QString AudioLanguageKey = QStringLiteral("playback/audioLanguage");
+    const QString SubtitleLanguageKey = QStringLiteral("playback/subtitleLanguage");
+    const QString SubtitleModeKey = QStringLiteral("playback/subtitleMode");
+
+    // ISO 639-2/B codes, as Jellyfin names stream languages.
+    QList<settings::Choice> languageChoices() {
+      return {{QString(), QT_TRANSLATE_NOOP("PlayerSettings", "As on the server")},
+              {QStringLiteral("rus"), QT_TRANSLATE_NOOP("PlayerSettings", "Russian")},
+              {QStringLiteral("eng"), QT_TRANSLATE_NOOP("PlayerSettings", "English")},
+              {QStringLiteral("jpn"), QT_TRANSLATE_NOOP("PlayerSettings", "Japanese")},
+              {QStringLiteral("ukr"), QT_TRANSLATE_NOOP("PlayerSettings", "Ukrainian")},
+              {QStringLiteral("ger"), QT_TRANSLATE_NOOP("PlayerSettings", "German")},
+              {QStringLiteral("fre"), QT_TRANSLATE_NOOP("PlayerSettings", "French")},
+              {QStringLiteral("spa"), QT_TRANSLATE_NOOP("PlayerSettings", "Spanish")},
+              {QStringLiteral("ita"), QT_TRANSLATE_NOOP("PlayerSettings", "Italian")},
+              {QStringLiteral("kor"), QT_TRANSLATE_NOOP("PlayerSettings", "Korean")},
+              {QStringLiteral("chi"), QT_TRANSLATE_NOOP("PlayerSettings", "Chinese")}};
+    }
+
+    playback::TrackDefaults trackDefaults(const settings::Settings& settings) {
+      playback::TrackDefaults defaults;
+      defaults.audioLanguage = settings.value(AudioLanguageKey).toString();
+      defaults.subtitleLanguage = settings.value(SubtitleLanguageKey).toString();
+      const QString mode = settings.value(SubtitleModeKey).toString();
+      defaults.subtitleMode = mode == QLatin1String("always")   ? playback::SubtitleMode::Always
+                              : mode == QLatin1String("forced") ? playback::SubtitleMode::OnlyForced
+                              : mode == QLatin1String("off")    ? playback::SubtitleMode::Off
+                                                                : playback::SubtitleMode::Default;
+      return defaults;
+    }
 
     // mpv's own subtitle font size, used for "Default".
     constexpr int MpvSubtitleFontSize = 38;
@@ -29,6 +60,9 @@ namespace jfd::desktop {
     void applyToMpv(media::MpvPlayer& player, const QString& key, const QVariant& value) {
       if (key == HwdecKey) {
         player.setStringProperty("hwdec", value.toString().toUtf8());
+      } else if (key == SubtitleStyleKey) {
+        const QByteArray mode = value.toString().toUtf8();
+        player.setStringProperty("sub-ass-override", mode.isEmpty() ? QByteArrayLiteral("scale") : mode);
       } else if (key == SubtitleSizeKey) {
         const int size = value.toString().toInt();
         player.setDoubleProperty("sub-font-size", size > 0 ? size : MpvSubtitleFontSize);
@@ -74,6 +108,36 @@ namespace jfd::desktop {
         "PlayerSettings", "The player's volume when the app starts. Changes in the player last until you quit.");
     section.settings.append(volume);
 
+    settings::SettingDescriptor audioLanguage;
+    audioLanguage.key = QStringLiteral("audioLanguage");
+    audioLanguage.type = settings::SettingType::Choice;
+    audioLanguage.defaultValue = QString();
+    audioLanguage.label = QT_TRANSLATE_NOOP("PlayerSettings", "Audio language");
+    audioLanguage.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "Until you pick a track yourself; your pick then carries to the next episodes.");
+    audioLanguage.choices = languageChoices();
+    section.settings.append(audioLanguage);
+
+    settings::SettingDescriptor subtitleMode;
+    subtitleMode.key = QStringLiteral("subtitleMode");
+    subtitleMode.type = settings::SettingType::Choice;
+    subtitleMode.defaultValue = QStringLiteral("default");
+    subtitleMode.label = QT_TRANSLATE_NOOP("PlayerSettings", "Subtitles");
+    subtitleMode.choices = {
+        {QStringLiteral("default"), QT_TRANSLATE_NOOP("PlayerSettings", "As on the server")},
+        {QStringLiteral("always"), QT_TRANSLATE_NOOP("PlayerSettings", "Always, in the subtitle language")},
+        {QStringLiteral("forced"), QT_TRANSLATE_NOOP("PlayerSettings", "Only forced (signs and songs)")},
+        {QStringLiteral("off"), QT_TRANSLATE_NOOP("PlayerSettings", "Off")}};
+    section.settings.append(subtitleMode);
+
+    settings::SettingDescriptor subtitleLanguage;
+    subtitleLanguage.key = QStringLiteral("subtitleLanguage");
+    subtitleLanguage.type = settings::SettingType::Choice;
+    subtitleLanguage.defaultValue = QString();
+    subtitleLanguage.label = QT_TRANSLATE_NOOP("PlayerSettings", "Subtitle language");
+    subtitleLanguage.choices = languageChoices();
+    section.settings.append(subtitleLanguage);
+
     // Values are mpv's hwdec modes.
     settings::SettingDescriptor hwdec;
     hwdec.key = QStringLiteral("hardwareDecoding");
@@ -106,6 +170,21 @@ namespace jfd::desktop {
                             {QStringLiteral("60"), QT_TRANSLATE_NOOP("PlayerSettings", "Huge")}};
     subtitleSize.legacyKey = QStringLiteral("subtitles.size");
     section.settings.append(subtitleSize);
+
+    // mpv's sub-ass-override; empty is mpv's default (scale).
+    settings::SettingDescriptor subtitleStyle;
+    subtitleStyle.key = QStringLiteral("subtitleStyleOverride");
+    subtitleStyle.type = settings::SettingType::Choice;
+    subtitleStyle.defaultValue = QString();
+    subtitleStyle.label = QT_TRANSLATE_NOOP("PlayerSettings", "Styled subtitles");
+    subtitleStyle.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "How much of the player's subtitle settings applies to subtitles with their own styles (ASS).");
+    subtitleStyle.choices = {{QString(), QT_TRANSLATE_NOOP("PlayerSettings", "Their style, at the chosen scale")},
+                             {QStringLiteral("no"), QT_TRANSLATE_NOOP("PlayerSettings", "Their style as is")},
+                             {QStringLiteral("force"), QT_TRANSLATE_NOOP("PlayerSettings", "The player's style")},
+                             {QStringLiteral("strip"), QT_TRANSLATE_NOOP("PlayerSettings", "Plain text")}};
+    subtitleStyle.legacyKey = QStringLiteral("subtitles.ass_style_override");
+    section.settings.append(subtitleStyle);
 
     // ADR 0001: off by default, HDR files are tone-mapped to SDR. Shown
     // where the build can drive an HDR10 swap chain (Windows).
@@ -142,10 +221,14 @@ namespace jfd::desktop {
     model.setVolume(settings.value(VolumeKey).toInt());
     media::MpvPlayer* player = services.player.get();
     if (player != nullptr)
-      for (const QString& key : {HwdecKey, SubtitleSizeKey}) applyToMpv(*player, key, settings.value(key));
+      for (const QString& key : {HwdecKey, SubtitleSizeKey, SubtitleStyleKey})
+        applyToMpv(*player, key, settings.value(key));
+    model.setTrackDefaults(trackDefaults(settings));
     QObject::connect(&settings, &settings::Settings::valueChanged, &model,
-                     [&model, player](const QString& key, const QVariant& value) {
+                     [&model, &settings, player](const QString& key, const QVariant& value) {
                        if (key == AutoSkipKey) model.setAutoSkip(value.toBool());
+                       else if (key == AudioLanguageKey || key == SubtitleLanguageKey || key == SubtitleModeKey)
+                         model.setTrackDefaults(trackDefaults(settings));
                        else if (key == AutoNextKey) model.setAutoNext(value.toBool());
                        else if (player != nullptr) applyToMpv(*player, key, value);
                      });
