@@ -77,6 +77,11 @@ namespace jfd::session {
     void setTrackChooser(PlaybackLauncher::TrackChooser chooser) {
       m_launcher->setTrackChooser(std::move(chooser));
     }
+    // The profile sent with PlaybackInfo from the next open on (rebuilt with
+    // api::buildDeviceProfile when a transcoding setting changes).
+    void setDeviceProfile(QJsonObject deviceProfile) {
+      m_launcher->setDeviceProfile(std::move(deviceProfile));
+    }
     ApiTransport& transport() { return *m_transport; }
     SleepDetector& sleepDetector() { return *m_sleep; }
     core::MediaBackend& backend() { return *m_backend; }

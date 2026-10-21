@@ -48,6 +48,10 @@ namespace jfd::session {
 
     void open(const Request& request);
     void setTrackChooser(TrackChooser chooser) { m_chooseTracks = std::move(chooser); }
+    // Used from the next open on (a playback setting changed); a request
+    // already resolving keeps the profile it was sent with.
+    void setDeviceProfile(QJsonObject deviceProfile) { m_deviceProfile = std::move(deviceProfile); }
+    const QJsonObject& deviceProfile() const { return m_deviceProfile; }
     // Forgets any request still resolving.
     void cancel() { ++m_serial; }
 

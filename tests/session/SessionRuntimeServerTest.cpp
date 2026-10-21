@@ -371,6 +371,39 @@ TEST_CASE("The player's track choice reaches every open, direct and transcoded")
   }
 }
 
+TEST_CASE("A device profile set while running applies to the next open") {
+  Connection host(device("profile"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  Backend backend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+  std::optional<PlaybackStream> stream;
+  QObject::connect(&runtime.launcher(), &session::PlaybackLauncher::resolved, &runtime,
+                   [&](const auto&, const Item&, const MediaSource&, const PlaybackStream& s) { stream = s; });
+
+  runtime.play(movie.id, 0);
+  REQUIRE(waitFor([&] { return stream.has_value(); }, 30000));
+  CHECK(stream->method != PlayMethod::Transcode);
+
+  // "Always transcode" switched on: the next open is a transcode.
+  DeviceProfileOptions options;
+  options.alwaysForceTranscode = true;
+  runtime.setDeviceProfile(buildDeviceProfile(options));
+  CHECK(runtime.launcher().deviceProfile() == buildDeviceProfile(options));
+  stream.reset();
+  runtime.play(movie.id, 0);
+  REQUIRE(waitFor([&] { return stream.has_value(); }, 30000));
+  CHECK(stream->method == PlayMethod::Transcode);
+
+  // And back off.
+  runtime.setDeviceProfile(buildDeviceProfile({}));
+  stream.reset();
+  runtime.play(movie.id, 0);
+  REQUIRE(waitFor([&] { return stream.has_value(); }, 30000));
+  CHECK(stream->method != PlayMethod::Transcode);
+}
+
 TEST_CASE("The group model creates, lists, joins, changes speed and leaves groups") {
   Connection host(device("model-host"));
   Connection guest(device("model-guest"));
