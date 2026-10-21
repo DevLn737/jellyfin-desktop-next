@@ -72,6 +72,11 @@ namespace jfd::session {
     const core::Clock& clock() const { return m_clock; }
     syncplay::GroupClient& group() { return *m_group; }
     PlaybackLauncher& launcher() { return *m_launcher; }
+    // The player's track choice for every file the session opens (see
+    // PlaybackLauncher::TrackChooser): items a group switches to included.
+    void setTrackChooser(PlaybackLauncher::TrackChooser chooser) {
+      m_launcher->setTrackChooser(std::move(chooser));
+    }
     ApiTransport& transport() { return *m_transport; }
     SleepDetector& sleepDetector() { return *m_sleep; }
     core::MediaBackend& backend() { return *m_backend; }
