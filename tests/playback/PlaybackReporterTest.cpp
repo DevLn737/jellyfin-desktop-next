@@ -150,6 +150,18 @@ TEST_CASE("Stopped carries the final position and is sent once") {
   CHECK_FALSE(f.sink.reports.back().failed);
 }
 
+TEST_CASE("Stopping, which leaves the session without a file, is reported") {
+  Fixture f;
+  f.push(PlaybackPhase::Playing, 0);
+  core::SessionSnapshot idle;
+  idle.phase = PlaybackPhase::Idle;
+  f.reporter.snapshotChanged(idle);
+  REQUIRE(f.sink.events() == QStringList{QStringLiteral("start"), QStringLiteral("stopped")});
+  CHECK_FALSE(f.sink.reports.back().failed);
+  f.reporter.end();
+  CHECK(f.sink.reports.size() == 2);
+}
+
 TEST_CASE("A failure is reported as failed, and a new file ends the old report") {
   Fixture f;
   f.push(PlaybackPhase::Playing, 0);
