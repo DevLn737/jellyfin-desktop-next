@@ -6,6 +6,9 @@
 
 #include <mpv/client.h>
 
+#include <QByteArray>
+
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -81,6 +84,8 @@ private:
   std::map<std::int64_t, core::MediaEpoch> m_entries;
   // The file mpv is playing or holding, if any.
   std::optional<core::MediaEpoch> m_current;
+  // Track choices (aid, sid; empty: mpv's own) for files not started yet.
+  std::map<core::MediaEpoch, std::array<QByteArray, 2>> m_startTracks;
   std::optional<std::uint64_t> m_hook;
   std::map<std::uint64_t, Pending> m_pending;
   std::uint64_t m_nextToken = 1;

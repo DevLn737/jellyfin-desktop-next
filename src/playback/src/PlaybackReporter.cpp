@@ -119,7 +119,13 @@ namespace jfd::playback {
   }
 
   void PlaybackReporter::snapshotChanged(const core::SessionSnapshot& snapshot) {
-    if (!m_epoch || snapshot.media != *m_epoch || m_ended) return;
+    if (!m_epoch || m_ended) return;
+    // Stopping leaves the session without a file (an empty epoch), and
+    // another file replaces this one: either way this file's report ends.
+    if (snapshot.media != *m_epoch) {
+      stop(false);
+      return;
+    }
 
     const std::int64_t position = snapshot.position.ticks();
     // Where playback should be by now if nothing but time had moved it.
