@@ -3,7 +3,8 @@ import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Player
 
-// Subtitle and audio delay, and automatic skipping of intros and credits.
+// Speed (alone; a group's speed is on the group page), subtitle and audio
+// delay, and automatic skipping of intros and credits.
 Rectangle {
     id: menu
 
@@ -45,6 +46,31 @@ Rectangle {
         Heading {
             text: qsTr("Playback")
             font.pixelSize: Theme.fontSizeLarge
+        }
+        Column {
+            width: parent.width
+            spacing: Theme.spacingTiny
+            visible: !PlayerSession.inGroup
+
+            Text {
+                text: qsTr("Speed")
+                color: Theme.text
+                font.pixelSize: Theme.fontSizeBody
+            }
+            Flow {
+                width: parent.width
+                spacing: Theme.spacingSmall
+                Repeater {
+                    model: [0.5, 0.75, 1, 1.25, 1.5, 2]
+                    ActionButton {
+                        required property real modelData
+                        objectName: "speed" + modelData
+                        text: modelData + "×"
+                        primary: Math.abs(PlayerSession.baseRate - modelData) < 0.001
+                        onClicked: PlayerSession.setRate(modelData)
+                    }
+                }
+            }
         }
         DelayRow {
             label: qsTr("Subtitle delay")

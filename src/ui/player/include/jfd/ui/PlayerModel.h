@@ -50,6 +50,12 @@ namespace jfd::ui {
     Q_PROPERTY(double position READ position NOTIFY positionChanged)
     Q_PROPERTY(double duration READ duration NOTIFY stateChanged)
     Q_PROPERTY(double rate READ rate NOTIFY stateChanged)
+    // The speed the viewer chose (the group's in a group), without the
+    // temporary corrections `rate` includes.
+    Q_PROPERTY(double baseRate READ baseRate NOTIFY stateChanged)
+    // 0-100, local to this client (mpv's volume), kept across files.
+    Q_PROPERTY(int volume READ volume WRITE setVolume NOTIFY volumeChanged)
+    Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY volumeChanged)
     Q_PROPERTY(bool inGroup READ inGroup NOTIFY stateChanged)
     Q_PROPERTY(QVariantList audioTracks READ audioTracks NOTIFY tracksChanged)
     Q_PROPERTY(QVariantList subtitleTracks READ subtitleTracks NOTIFY tracksChanged)
@@ -84,6 +90,13 @@ namespace jfd::ui {
     double position() const { return m_snapshot.position.seconds(); }
     double duration() const;
     double rate() const { return m_snapshot.effectiveRate.value(); }
+    double baseRate() const {
+      return (m_snapshot.group ? m_snapshot.group->baseRate : m_snapshot.personalRate).value();
+    }
+    int volume() const { return m_volume; }
+    void setVolume(int volume);
+    bool muted() const { return m_muted; }
+    void setMuted(bool muted);
     bool inGroup() const { return m_snapshot.group.has_value(); }
     QVariantList audioTracks() const { return tracks(core::TrackKind::Audio); }
     QVariantList subtitleTracks() const { return tracks(core::TrackKind::Subtitle); }
@@ -110,6 +123,8 @@ namespace jfd::ui {
     Q_INVOKABLE void togglePause();
     Q_INVOKABLE void seek(double seconds);
     Q_INVOKABLE void seekBy(double seconds);
+    // In a group this asks the group for the speed.
+    Q_INVOKABLE void setRate(double rate);
     Q_INVOKABLE void selectAudio(int streamIndex);
     // -1 turns subtitles off.
     Q_INVOKABLE void selectSubtitle(int streamIndex);
@@ -135,6 +150,7 @@ namespace jfd::ui {
     void segmentChanged();
     void autoSkipChanged();
     void autoNextChanged();
+    void volumeChanged();
     void delaysChanged();
     void queueChanged();
     void trickplayChanged();
@@ -172,6 +188,8 @@ namespace jfd::ui {
     // The viewer's last audio and subtitle pick, for the next file.
     playback::TrackPreference m_trackPreference;
     bool m_autoNext = true;
+    int m_volume = 100;
+    bool m_muted = false;
     session::SessionHub::Subscription m_subscription;
 
     core::SessionSnapshot m_snapshot;
