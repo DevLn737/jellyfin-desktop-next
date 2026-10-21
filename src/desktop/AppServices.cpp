@@ -28,10 +28,8 @@ namespace jfd::desktop {
                        if (key == settings::keys::OpenLogFolder) {
                          QDir().mkpath(services.logDirectory);
                          QDesktopServices::openUrl(QUrl::fromLocalFile(services.logDirectory));
-                       } else if (key == settings::keys::SignOut || key == settings::keys::ChangeServer) {
-                         // Until the sign-in module handles these: back to the login page.
-                         services.navigator->reset(QStringLiteral("login"));
                        }
+                       // Sign out and Change server: installLibrary.
                      });
   }
 
