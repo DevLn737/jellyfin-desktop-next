@@ -70,6 +70,7 @@ namespace jfd::playback {
     m_epoch = epoch;
     m_started = false;
     m_ended = false;
+    m_seekPending = false;
     m_phase = Phase::Loading;
     const int volume = m_progress.volumeLevel;
     const bool muted = m_progress.isMuted;
@@ -98,6 +99,7 @@ namespace jfd::playback {
   void PlaybackReporter::send(const QString& eventName) {
     if (!m_started || m_ended) return;
     m_progress.eventName = eventName;
+    m_seekPending = false;
     m_sink.progress(m_progress);
   }
 
@@ -133,7 +135,9 @@ namespace jfd::playback {
     if (m_phase == Phase::Playing && m_sincePosition.isValid())
       expected += static_cast<std::int64_t>(static_cast<double>(m_sincePosition.elapsed()) *
                                             m_rate * TicksPerMillisecond);
-    const bool seeked = m_started && std::llabs(position - expected) > SeekThresholdTicks;
+    // A seek usually passes through Loading, which is not reported: it is
+    // remembered until playback is active again.
+    if (m_started && std::llabs(position - expected) > SeekThresholdTicks) m_seekPending = true;
     m_progress.positionTicks = position;
     m_sincePosition.start();
 
@@ -174,7 +178,7 @@ namespace jfd::playback {
       send(m_progress.isPaused ? QStringLiteral("Pause") : QStringLiteral("Unpause"));
     else if (rateChanged)
       send(QStringLiteral("PlaybackRateChange"));
-    else if (seeked)
+    else if (m_seekPending)
       send(QStringLiteral("TimeUpdate"));
   }
 
