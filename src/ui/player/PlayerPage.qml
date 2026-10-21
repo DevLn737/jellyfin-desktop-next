@@ -222,6 +222,66 @@ RoutePage {
             GradientStop { position: 1; color: "#d0000000" }
         }
 
+        // The thumbnail over the seek bar while it is hovered or dragged.
+        Rectangle {
+            id: preview
+            objectName: "trickplayPreview"
+
+            readonly property real fraction: timeline.pressed
+                ? timeline.position
+                : Math.max(0, Math.min(1, (timelineHover.point.position.x - timeline.leftPadding)
+                                           / Math.max(1, timeline.availableWidth)))
+            readonly property real seconds: fraction * page.player.duration
+            readonly property var frame: page.player.hasTrickplay && (timeline.pressed || timelineHover.hovered)
+                ? page.player.trickplayFrame(seconds) : ({})
+            // Thumbnails at most this wide on screen.
+            readonly property real scaleFactor: frame.width ? Math.min(1, 240 / frame.width) : 1
+
+            visible: frame.source !== undefined
+            width: (frame.width || 0) * scaleFactor + 2 * border.width
+            height: (frame.height || 0) * scaleFactor + 2 * border.width + label.height
+            x: Math.max(0, Math.min(bottomBar.width - width,
+                                    column.x + timeline.x + timeline.leftPadding
+                                    + fraction * timeline.availableWidth - width / 2))
+            anchors.bottom: column.top
+            anchors.bottomMargin: Theme.spacingSmall
+            color: "black"
+            border.color: Theme.surfaceHover
+            border.width: 1
+            radius: 4
+
+            Item {
+                x: preview.border.width
+                y: preview.border.width
+                width: (preview.frame.width || 0) * preview.scaleFactor
+                height: (preview.frame.height || 0) * preview.scaleFactor
+                clip: true
+
+                Image {
+                    x: -(preview.frame.x || 0) * preview.scaleFactor
+                    y: -(preview.frame.y || 0) * preview.scaleFactor
+                    width: (preview.frame.tileWidth || 0) * preview.scaleFactor
+                    height: (preview.frame.tileHeight || 0) * preview.scaleFactor
+                    source: preview.frame.source || ""
+                    sourceSize: Qt.size(preview.frame.tileWidth || 0, preview.frame.tileHeight || 0)
+                    asynchronous: true
+                    // The previous tile stays until the next one arrives.
+                    retainWhileLoading: true
+                    smooth: true
+                }
+            }
+
+            Text {
+                id: label
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: page.clock(preview.seconds)
+                color: Theme.text
+                font.pixelSize: Theme.fontSizeBody
+                padding: 2
+            }
+        }
+
         Column {
             id: column
             anchors.left: parent.left
@@ -244,6 +304,10 @@ RoutePage {
                 }
                 onMoved: page.poke()
                 onPressedChanged: if (!pressed) page.player.seek(value)
+
+                HoverHandler {
+                    id: timelineHover
+                }
             }
 
             Item {

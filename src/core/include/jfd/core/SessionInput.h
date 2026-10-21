@@ -18,9 +18,9 @@ namespace jfd::core {
   // How backend positions of one file relate to Jellyfin's media timeline.
   struct StreamTimeline {
     enum class Kind {
-      // Backend time starts at zero; media = backend + offset. The offset is
-      // TranscodingOffsetTicks for non-HLS transcodes without copied
-      // timestamps and zero for everything else that is not preserved.
+      // Backend time is rebased to start at zero; media = backend + offset.
+      // The offset is TranscodingOffsetTicks for non-HLS transcodes without
+      // copied timestamps and zero for everything else not preserved.
       Relative,
       // Original decoder timestamps kept (video in copy-timestamp transcodes):
       // media = backend, duration = source start + stream duration.

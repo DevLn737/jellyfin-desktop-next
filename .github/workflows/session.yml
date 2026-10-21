@@ -5,7 +5,9 @@ name: Session
 # creates a group, plays the server's stream, follows another member's seek
 # and moves to the next item. The same test on a virtual backend runs in the
 # API workflow. The watch-together page (Jfd.Ui.Group) and the player
-# screen's model (Jfd.Ui.Player: tracks, a transcoded seek, reports) run here too.
+# screen's model (Jfd.Ui.Player: tracks, a transcoded seek, reports, the next
+# episode, trickplay) run here too; on the stock server also against a second
+# one with an external audio file and media segments (extras-server.sh).
 on:
   push:
     branches: [main]
@@ -67,6 +69,11 @@ jobs:
       - name: Start the server
         run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
 
+      # External audio and media segments, on a server of their own.
+      - name: Start the extras server
+        if: matrix.server.fork == '0'
+        run: scripts/test-server/extras-server.sh up | tee -a "$GITHUB_ENV"
+
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
 
@@ -80,4 +87,6 @@ jobs:
 
       - name: Server log on failure
         if: failure()
-        run: docker logs --tail 200 jfd-test-server || true
+        run: |
+          docker logs --tail 200 jfd-test-server || true
+          docker logs --tail 100 jfd-extras-server || true

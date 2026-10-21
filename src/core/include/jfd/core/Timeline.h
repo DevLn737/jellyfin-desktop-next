@@ -18,7 +18,10 @@ namespace jfd::core {
     Timeline(StreamTimeline stream, MediaTicks requestedStart);
 
     // Whether the backend should rebase the file's clock to zero.
-    bool rebasesStartTime() const { return m_stream.kind == StreamTimeline::Kind::PreservedMusic; }
+    // Everything but preserved video starts the backend clock at zero: a
+    // Jellyfin HLS transcode with an external audio file starts its
+    // timestamps about ten seconds in, which the playlist does not show.
+    bool rebasesStartTime() const { return m_stream.kind != StreamTimeline::Kind::PreservedVideo; }
 
     // Records the source start once the file is open. Preserved timelines need
     // a finite start and fail without one; relative timelines ignore it.

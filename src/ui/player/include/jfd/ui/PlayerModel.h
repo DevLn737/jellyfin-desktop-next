@@ -9,10 +9,12 @@
 #include <jfd/session/PlaybackLauncher.h>
 #include <jfd/session/SessionHub.h>
 
+#include <QHash>
 #include <QObject>
 #include <QPointer>
 #include <QString>
 #include <QVariantList>
+#include <QVariantMap>
 
 #include <memory>
 #include <optional>
@@ -63,6 +65,8 @@ namespace jfd::ui {
     // At the end of an episode the next one plays.
     Q_PROPERTY(bool hasNext READ hasNext NOTIFY queueChanged)
     Q_PROPERTY(bool hasPrevious READ hasPrevious NOTIFY queueChanged)
+    // The server has thumbnails for the seek bar (trickplayFrame).
+    Q_PROPERTY(bool hasTrickplay READ hasTrickplay NOTIFY trickplayChanged)
 
   public:
     PlayerModel(session::SessionRuntime& runtime, api::JellyfinClient& client,
@@ -94,6 +98,7 @@ namespace jfd::ui {
     void setAudioDelay(double seconds);
     bool hasNext() const { return !m_nextId.isEmpty(); }
     bool hasPrevious() const { return !m_previousId.isEmpty(); }
+    bool hasTrickplay() const { return m_trickplayInfo.has_value(); }
 
     // Plays an item alone. Waits for the video renderer when the page has
     // not drawn its first frame yet.
@@ -108,6 +113,11 @@ namespace jfd::ui {
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
     Q_INVOKABLE void stop();
+    // The seek bar thumbnail at `seconds`: {source, x, y, width, height,
+    // tileWidth, tileHeight} in tile pixels, where source is the tile image
+    // (image://jfd/...) and x, y, width, height the thumbnail inside it.
+    // Empty without trickplay.
+    Q_INVOKABLE QVariantMap trickplayFrame(double seconds) const;
 
     // Creates the video item for this platform's renderer inside `host`,
     // filling it. The page calls it once; the item is the host's child and
@@ -122,6 +132,7 @@ namespace jfd::ui {
     void autoSkipChanged();
     void delaysChanged();
     void queueChanged();
+    void trickplayChanged();
     // A play request could not be resolved, or the renderer failed.
     void failed(const QString& message);
 
@@ -140,6 +151,8 @@ namespace jfd::ui {
     void videoReady();
     void loadEpisodes(const api::Item& item);
     void step(bool forward);
+    void loadTrickplay(const QString& itemId);
+    void chooseTrickplay();
     QVariantList tracks(core::TrackKind kind) const;
 
     session::SessionRuntime& m_runtime;
@@ -166,6 +179,11 @@ namespace jfd::ui {
     QString m_queueItem;
     QString m_nextId;
     QString m_previousId;
+    // Trickplay resolutions of the item (by media source id), and the one
+    // the seek bar uses for the file playing now.
+    QString m_trickplayItem;
+    QHash<QString, QList<api::TrickplayInfo>> m_trickplay;
+    std::optional<api::TrickplayInfo> m_trickplayInfo;
     bool m_videoReady = false;
     std::optional<std::pair<QString, qint64>> m_waitingPlay;
   };

@@ -24,5 +24,16 @@ is the SyncPlay harness's (`tools/syncplay-harness`): `PAYLOAD=release
 tools/syncplay-harness/scripts/server-up.sh` builds it as
 `jellyfin-syncplay-test:local`, and the API workflow builds it the same way.
 
+`extras-server.sh up` starts a second server on port 18097 for the player
+checks that would change the first one's item and track counts: a 60-second
+movie with an external audio file (`.ru.mka`) and media segments (intro 2-12
+s, credits 50-58 s). Stock Jellyfin has no segment provider, so the script
+builds a small test plugin (`segments-plugin/`, segments from a
+`<video>.segments.json` beside the file) against the image's own assemblies in
+the .NET SDK container, installs it before the first start and runs the
+segment extraction task. It prints `JFD_EXTRAS_SERVER_URL`, `JFD_EXTRAS_USER`
+and `JFD_EXTRAS_PASSWORD`; `jfd_ui_player_server_tests` runs its extras cases
+when they are set and skips them otherwise.
+
 Never point these tests at a real server: they create groups, change watched
 state and sign sessions out.
