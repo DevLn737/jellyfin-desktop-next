@@ -71,6 +71,8 @@ namespace jfd::ui {
     connect(&runtime.launcher(), &session::PlaybackLauncher::resolved, this, &PlayerModel::onResolved);
     connect(&runtime.launcher(), &session::PlaybackLauncher::failed, this,
             [this](const QString&, const QString& message) { Q_EMIT failed(message); });
+    // Next and Previous outside a group; in a group the server's queue moves.
+    connect(&runtime, &session::SessionRuntime::queueStepRequested, this, &PlayerModel::step);
     m_subscription = runtime.hub().subscribe(
         [this](const core::SessionSnapshot& snapshot) { onSnapshot(snapshot); });
   }
@@ -191,9 +193,10 @@ namespace jfd::ui {
       m_runtime.play(waiting->first, waiting->second);
   }
 
-  void PlayerModel::onResolved(const session::PlaybackLauncher::Request& request, const api::Item&,
+  void PlayerModel::onResolved(const session::PlaybackLauncher::Request& request, const api::Item& item,
                                const api::MediaSource& source, const api::PlaybackStream& stream) {
     m_pending = Pending{request, source, stream};
+    loadEpisodes(item);
     if (m_segmentsItem != request.itemId) {
       m_segmentsItem = request.itemId;
       m_segments.clear();
@@ -209,6 +212,38 @@ namespace jfd::ui {
           m_skipper.begin(*m_epoch, m_segments);
       });
     }
+  }
+
+  void PlayerModel::loadEpisodes(const api::Item& item) {
+    if (item.id == m_queueItem) return;
+    m_queueItem = item.id;
+    const bool had = hasNext() || hasPrevious();
+    m_nextId.clear();
+    m_previousId.clear();
+    if (had) Q_EMIT queueChanged();
+    if (item.type != QStringLiteral("Episode") || item.seriesId.isEmpty()) return;
+    const QString itemId = item.id;
+    // All of the series' episodes, in season and episode order.
+    m_client.episodes(item.seriesId, QString(), this, [this, itemId](api::Result<api::ItemPage> page) {
+      if (itemId != m_queueItem) return;
+      if (!page) {
+        qCInfo(lcPlayer) << "no episode list:" << page.error().message;
+        return;
+      }
+      const QList<api::Item>& episodes = page->items;
+      for (qsizetype i = 0; i < episodes.size(); ++i) {
+        if (episodes[i].id != itemId) continue;
+        if (i > 0) m_previousId = episodes[i - 1].id;
+        if (i + 1 < episodes.size()) m_nextId = episodes[i + 1].id;
+        break;
+      }
+      Q_EMIT queueChanged();
+    });
+  }
+
+  void PlayerModel::step(bool forward) {
+    const QString target = forward ? m_nextId : m_previousId;
+    if (!target.isEmpty()) play(target, 0);
   }
 
   void PlayerModel::beginFile(core::MediaEpoch epoch) {
@@ -250,6 +285,8 @@ namespace jfd::ui {
       return copy == m_snapshot;
     }();
     const bool newFile = snapshot.media != m_snapshot.media;
+    const bool justEnded = snapshot.phase == PlaybackPhase::Ended &&
+                           (newFile || m_snapshot.phase != PlaybackPhase::Ended);
     m_snapshot = snapshot;
 
     if (newFile && m_pending &&
@@ -268,6 +305,10 @@ namespace jfd::ui {
     }
     Q_EMIT positionChanged();
     if (!positionOnly) Q_EMIT stateChanged();
+
+    // The next episode follows; a group's server moves its own queue. The
+    // ended session no longer names its file: the one begun last ended.
+    if (justEnded && !inGroup() && m_current) step(true);
   }
 
   QVariantList PlayerModel::tracks(TrackKind kind) const {

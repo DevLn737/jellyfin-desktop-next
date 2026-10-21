@@ -62,7 +62,7 @@ RoutePage {
         target: page.player
         // Back to where playback started once the file ends on its own.
         function onStateChanged() {
-            if (page.player.ended && !page.player.inGroup) page.leave()
+            if (page.player.ended && !page.player.inGroup && !page.player.hasNext) page.leave()
         }
     }
 
@@ -267,6 +267,9 @@ RoutePage {
                         onClicked: page.player.seekBy(30)
                     }
                     IconButton {
+                        objectName: "next"
+                        // A group's queue is the server's; alone, the series'.
+                        visible: page.player.inGroup || page.player.hasNext
                         iconSource: PlayerIcons.next
                         toolTipText: qsTr("Next")
                         onClicked: page.player.next()

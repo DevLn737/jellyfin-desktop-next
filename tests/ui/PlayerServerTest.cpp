@@ -262,3 +262,39 @@ TEST_CASE("A seek in a transcoded HLS stream lands within a second, and the serv
   REQUIRE(item.ok());
   CHECK(std::abs(static_cast<double>(item->userData.playbackPositionTicks) / 1e7 - (Target + 2)) < 5.0);
 }
+
+TEST_CASE("At the end of an episode the next one plays, and Previous goes back") {
+  Player p(QStringLiteral("jfd-player-queue"), {});
+  ItemQuery query;
+  query.includeItemTypes = {QStringLiteral("Episode")};
+  query.sortBy = QStringLiteral("SortName");
+  auto page = run<ItemPage>([&](auto done) { p.client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  REQUIRE(page->items.size() == 2);
+  const QString first = page->items[0].id;
+  const QString second = page->items[1].id;
+  struct Restore {
+    Player& p;
+    QStringList ids;
+    ~Restore() {
+      for (const QString& id : ids) p.restore(id);
+    }
+  } restore{p, {first, second}};
+
+  // A few seconds before the end of the first episode.
+  const auto duration = page->items[0].runTimeTicks.value_or(0);
+  REQUIRE(duration > 10 * 10'000'000LL);
+  p.model->play(first, duration - 3 * 10'000'000LL);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  REQUIRE(waitFor([&] { return p.model->hasNext(); }, 10000));
+  CHECK_FALSE(p.model->hasPrevious());
+
+  const bool moved = waitFor([&] { return p.runtime->snapshot().item.value() == second.toStdString() && p.playing(); }, 60000);
+  REQUIRE(moved);
+  CHECK(p.model->position() < 10);
+  REQUIRE(waitFor([&] { return p.model->hasPrevious(); }, 10000));
+  CHECK_FALSE(p.model->hasNext());
+
+  p.model->previous();
+  REQUIRE(waitFor([&] { return p.runtime->snapshot().item.value() == first.toStdString() && p.playing(); }, 60000));
+}

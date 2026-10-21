@@ -59,6 +59,10 @@ namespace jfd::ui {
     // Seconds; positive delays subtitles or audio. Local to this client.
     Q_PROPERTY(double subtitleDelay READ subtitleDelay WRITE setSubtitleDelay NOTIFY delaysChanged)
     Q_PROPERTY(double audioDelay READ audioDelay WRITE setAudioDelay NOTIFY delaysChanged)
+    // Outside a group: the series' next and previous episodes, if any.
+    // At the end of an episode the next one plays.
+    Q_PROPERTY(bool hasNext READ hasNext NOTIFY queueChanged)
+    Q_PROPERTY(bool hasPrevious READ hasPrevious NOTIFY queueChanged)
 
   public:
     PlayerModel(session::SessionRuntime& runtime, api::JellyfinClient& client,
@@ -88,6 +92,8 @@ namespace jfd::ui {
     void setSubtitleDelay(double seconds);
     double audioDelay() const { return m_audioDelay; }
     void setAudioDelay(double seconds);
+    bool hasNext() const { return !m_nextId.isEmpty(); }
+    bool hasPrevious() const { return !m_previousId.isEmpty(); }
 
     // Plays an item alone. Waits for the video renderer when the page has
     // not drawn its first frame yet.
@@ -114,6 +120,7 @@ namespace jfd::ui {
     void segmentChanged();
     void autoSkipChanged();
     void delaysChanged();
+    void queueChanged();
     // A play request could not be resolved, or the renderer failed.
     void failed(const QString& message);
 
@@ -130,6 +137,8 @@ namespace jfd::ui {
     void beginFile(core::MediaEpoch epoch);
     void reopen(const playback::command::Reopen& reopen);
     void videoReady();
+    void loadEpisodes(const api::Item& item);
+    void step(bool forward);
     QVariantList tracks(core::TrackKind kind) const;
 
     session::SessionRuntime& m_runtime;
@@ -152,6 +161,10 @@ namespace jfd::ui {
     QString m_segment;
     double m_subtitleDelay = 0;
     double m_audioDelay = 0;
+    // The episode the queue was built for, and its neighbours.
+    QString m_queueItem;
+    QString m_nextId;
+    QString m_previousId;
     bool m_videoReady = false;
     std::optional<std::pair<QString, qint64>> m_waitingPlay;
   };
