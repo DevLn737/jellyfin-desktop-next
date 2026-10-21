@@ -14,6 +14,7 @@
 #include "MpvPlayer.h"
 #endif
 
+#include <QElapsedTimer>
 #include <QSignalSpy>
 
 #include <memory>
@@ -246,6 +247,70 @@ TEST_CASE("After the computer sleeps our client reconnects and rejoins its group
   REQUIRE(waitFor([&] { return left; }, 5000));
 }
 
+TEST_CASE("Reopening the stream mid-play keeps us in step with the playing group") {
+  // The player reopens a transcode with other tracks from the current
+  // position; the group plays on meanwhile and we must land back in sync.
+  Connection host(device("reopen-host"));
+  Connection guest(device("reopen-guest"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  Backend backend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+  core::SessionSnapshot latest;
+  auto subscription = runtime.hub().subscribe([&](const core::SessionSnapshot& s) { latest = s; });
+
+  runtime.createGroup(device("reopen-group"));
+  REQUIRE(waitFor([&] { return latest.group.has_value(); }, 20000));
+  const QString groupId = QString::fromStdString(latest.group->group.value());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->joinGroup(groupId, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setIgnoreWait(true, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setNewQueue({movie.id}, 0, 0, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Paused; }, 30000));
+  runtime.post(core::intent::Play{});
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Playing &&
+                               latest.position.milliseconds() > 3'000; }, 20000));
+
+  // As PlayerModel::reopen does it.
+  session::PlaybackLauncher::Request request;
+  request.itemId = QString::fromStdString(latest.item.value());
+  request.mediaSourceId = QString::fromStdString(latest.mediaSource.value());
+  request.playlistItem = latest.group->playlistItem;
+  request.startTicks = latest.position.ticks();
+  request.startPaused = false;
+  const auto media = latest.media;
+  QElapsedTimer clock;
+  clock.start();
+  runtime.launcher().open(request);
+  REQUIRE(waitFor([&] { return latest.media != media; }, 20000));
+
+  // Back to playing with the group, close to where it is now.
+  const bool synced = waitFor([&] {
+    return latest.phase == core::PlaybackPhase::Playing && latest.group &&
+           latest.group->state == core::GroupState::Playing && latest.group->driftMilliseconds &&
+           std::abs(*latest.group->driftMilliseconds) < 400;
+  }, 20000);
+  INFO("phase " << static_cast<int>(latest.phase) << ", position " << latest.position.milliseconds()
+                << " ms, group state "
+                << (latest.group ? static_cast<int>(latest.group->state) : -1) << ", drift "
+                << (latest.group && latest.group->driftMilliseconds ? *latest.group->driftMilliseconds : 99999));
+  REQUIRE(synced);
+  MESSAGE("back in sync " << clock.elapsed() << " ms after the reopen, drift "
+                          << *latest.group->driftMilliseconds << " ms, position "
+                          << latest.position.milliseconds() << " ms");
+  // Stays in sync a few seconds later.
+  QElapsedTimer settle;
+  settle.start();
+  waitFor([&] { return settle.elapsed() > 3000; }, 5000);
+  REQUIRE(latest.group->driftMilliseconds);
+  CHECK(std::abs(*latest.group->driftMilliseconds) < 400);
+  CHECK(latest.phase == core::PlaybackPhase::Playing);
+
+  bool left = false;
+  runtime.leaveBeforeExit([&] { left = true; });
+  REQUIRE(waitFor([&] { return left; }, 5000));
+}
+
 #ifndef JFD_SESSION_TEST_MPV
 namespace {
   bool forkServer() { return env("JFD_TEST_SERVER_FORK") == QLatin1String("1"); }
@@ -256,6 +321,55 @@ namespace {
     return false;
   }
 } // namespace
+
+TEST_CASE("The player's track choice reaches every open, direct and transcoded") {
+  Connection host(device("tracks"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  for (const bool transcode : {false, true}) {
+    CAPTURE(transcode);
+    Backend backend;
+    SessionRuntime::Settings settings;
+    DeviceProfileOptions options;
+    options.alwaysForceTranscode = transcode;
+    settings.deviceProfile = buildDeviceProfile(options);
+    SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+
+    // Choose the audio track the server would not: the last one.
+    int chooserCalls = 0;
+    std::optional<int> wanted;
+    runtime.setTrackChooser([&](const Item&, const MediaSource& source, session::PlaybackLauncher::Request& request) {
+      ++chooserCalls;
+      for (const auto& stream : source.mediaStreams)
+        if (stream.type == QLatin1String("Audio")) wanted = stream.index;
+      request.audioStreamIndex = wanted;
+    });
+    std::optional<session::PlaybackLauncher::Request> resolved;
+    std::optional<PlaybackStream> stream;
+    QObject::connect(&runtime.launcher(), &session::PlaybackLauncher::resolved, &runtime,
+                     [&](const auto& request, const Item&, const MediaSource&, const PlaybackStream& s) {
+                       resolved = request;
+                       stream = s;
+                     });
+
+    runtime.play(movie.id, 0);
+    REQUIRE(waitFor([&] { return resolved.has_value(); }, 30000));
+    REQUIRE(wanted.has_value());
+    CHECK(chooserCalls == 1);
+    CHECK(resolved->audioStreamIndex == wanted);
+    CHECK((stream->method == PlayMethod::Transcode) == transcode);
+    // A transcode is asked for again with the chosen track.
+    if (transcode)
+      CHECK(stream->url.query().contains(QStringLiteral("AudioStreamIndex=%1").arg(*wanted)));
+
+    // A request that names its tracks (a reopen) keeps them.
+    session::PlaybackLauncher::Request reopen = *resolved;
+    reopen.audioStreamIndex = 1;
+    resolved.reset();
+    runtime.launcher().open(reopen);
+    REQUIRE(waitFor([&] { return resolved.has_value(); }, 30000));
+    CHECK(resolved->audioStreamIndex == 1);
+  }
+}
 
 TEST_CASE("The group model creates, lists, joins, changes speed and leaves groups") {
   Connection host(device("model-host"));

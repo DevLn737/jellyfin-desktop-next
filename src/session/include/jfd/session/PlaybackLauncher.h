@@ -37,11 +37,17 @@ namespace jfd::session {
     };
 
     using Post = std::function<void(core::SessionInput)>;
+    // Fills the request's audio and subtitle indices for a source (the
+    // player's remembered languages). Called for every open; indices the
+    // request already carries (a reopen with chosen tracks) are kept.
+    using TrackChooser =
+        std::function<void(const api::Item& item, const api::MediaSource& source, Request& request)>;
 
     PlaybackLauncher(api::JellyfinClient& client, QJsonObject deviceProfile, Post post,
                      QObject* parent = nullptr);
 
     void open(const Request& request);
+    void setTrackChooser(TrackChooser chooser) { m_chooseTracks = std::move(chooser); }
     // Forgets any request still resolving.
     void cancel() { ++m_serial; }
 
@@ -56,11 +62,19 @@ namespace jfd::session {
     void failed(const QString& itemId, const QString& message);
 
   private:
-    void openWithItem(std::uint64_t serial, const Request& request, const api::Item& item);
+    // `chosen`: the chooser already ran for this request.
+    void openWithItem(std::uint64_t serial, const Request& request, const api::Item& item,
+                      bool chosen = false);
+    // The request with the chooser's indices where the request has none.
+    void openResolved(const Request& request, const api::Item& item, const api::MediaSource& source,
+                      const api::PlaybackStream& stream);
+    Request withChosenTracks(const Request& request, const api::Item& item,
+                             const api::MediaSource& source) const;
 
     api::JellyfinClient& m_client;
     QJsonObject m_deviceProfile;
     Post m_post;
+    TrackChooser m_chooseTracks;
     std::uint64_t m_serial = 0;
   };
 
