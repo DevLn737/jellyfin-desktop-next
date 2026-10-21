@@ -63,6 +63,32 @@ Costs:
 - an unreleased mpv on Windows: libmpv is built from a pinned main-branch commit until 0.42.0 ships;
 - the Linux interface runs on OpenGL and has no HDR.
 
+### HDR decision (2026-10-21)
+
+The phase 1 experiment answered the swap chain question: `QQuickWindow`
+provides an HDR10 swap chain (`QSG_RHI_HDR=hdr10`), with no custom render
+control needed. mpv renders PQ into an `R10G10B10A2` texture, and one layer
+re-encodes the interface from sRGB to PQ at the SDR white level Windows
+reports. It builds in CI, and without an HDR display it falls back to SDR and
+plays (`app_smoke_hdr_fallback`). It has not yet run on an HDR display: none
+was enabled at the measurement sitting.
+
+Decision: the first release is SDR on both platforms. mpv tone-maps HDR
+sources to the SDR display. HDR10 output on
+Windows stays in the code as an opt-in mode (`--hdr hdr10`). It becomes a
+setting once it is checked on an HDR display, together with these known limits:
+
+- the menu's blurred backdrop samples PQ video, so its colours are off;
+- translucent panels blend in PQ space;
+- the interface layer costs one extra full-window pass.
+
+Measurements on the group's hardware (frames, CPU, first frame, fullscreen,
+memory, and HDR on a TV) move to a pre-release check instead of gating the
+interface work. The first run on the main PC (Direct3D 11, RX 9060 XT) already
+showed 9–11 % of one core for 1080p H.264/HEVC (the 2.x client: 14–15 %),
+no dropped frames, A/V sync p95 under 1 ms, and clean shutdowns of about
+350 ms (2.x: 365 ms).
+
 ## Reasons
 
 - Removing Chromium from the playback path removes the largest class of

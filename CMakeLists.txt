@@ -67,7 +67,8 @@ endif()
 if(JFD_BUILD_APP)
   include(cmake/JfdDependencies.cmake)
   add_subdirectory(src/media-backend)
-  add_subdirectory(src/app)
+  # Stage 1 prototype: the measurement build (scripts/measure).
+  add_subdirectory(tools/prototype)
   # Modules that need Qt Quick or mpv, and the application itself.
   jfd_add_module(src/session)
   jfd_add_module(src/ui/theme)
