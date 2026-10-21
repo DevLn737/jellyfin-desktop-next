@@ -20,6 +20,8 @@ pins="$root/deps/versions.json"
 here="$root/packaging/linux"
 app_id=io.github.devln737.JellyfinDesktopNext
 name=$(basename "$exe")
+# The icon and the AppImage file.
+package=jellyfin-desktop-next
 
 work="$output/work"
 tools="$work/tools"
@@ -70,16 +72,18 @@ export LD_LIBRARY_PATH="$mpv_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export QML_SOURCES_PATHS="$qml"
 # Wayland is first-class on Linux (KDE Plasma and GNOME); X11 comes by default.
 export EXTRA_PLATFORM_PLUGINS="libqwayland.so"
-export LDAI_OUTPUT="$output/$name-x86_64.AppImage"
+export LDAI_OUTPUT="$output/$package-x86_64.AppImage"
 export LINUXDEPLOY_OUTPUT_VERSION="${JFD_PACKAGE_VERSION:-dev}"
 cd "$work"
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
   --desktop-file "$here/$app_id.desktop" \
-  --icon-file "$root/packaging/icons/$name.png" --icon-filename "$name" \
+  --icon-file "$root/packaging/icons/$package.png" --icon-filename "$package" \
   "${excludes[@]}" "${forced[@]}" \
   --plugin qt --output appimage
 
-# The image must carry the pinned libmpv, not a system one.
-test -n "$(find "$appdir/usr/lib" -name 'libmpv.so*' -print -quit)"
+# A program that plays video must carry the pinned libmpv, not a system one.
+if readelf -d "$exe" | grep -q 'NEEDED.*libmpv\.so'; then
+  test -n "$(find "$appdir/usr/lib" -name 'libmpv.so*' -print -quit)"
+fi
 test -n "$(find "$appdir/usr/lib" -name 'libfribidi.so*' -print -quit)"
 echo "AppImage: $LDAI_OUTPUT ($(du -h "$LDAI_OUTPUT" | cut -f1))"

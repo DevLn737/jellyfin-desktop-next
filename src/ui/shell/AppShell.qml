@@ -16,6 +16,8 @@ FocusScope {
 
     function showMessage(text) { toast.show(text, "info") }
     function showError(text) { toast.show(text, "error") }
+    // A message with a button that opens url in the browser.
+    function showLink(text, linkText, url) { toast.show(text, "info", linkText, url) }
 
     function toggleFullScreen() {
         const window = shell.Window.window

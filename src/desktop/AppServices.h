@@ -22,6 +22,7 @@ namespace jfd::ui {
 
 namespace jfd::desktop {
 
+  struct IntegrationServices;
   struct LibraryServices;
 
   // The composition root: every long-lived service of the application,
@@ -57,6 +58,9 @@ namespace jfd::desktop {
     // Play and Watch together from the library screens go to the handlers
     // set on it (setPlayHandler, setWatchTogetherHandler).
     ui::LibraryUi* libraryUi = nullptr;
+
+    // installIntegrations; complete in main.cpp, which destroys it.
+    std::unique_ptr<IntegrationServices> integrations;
   };
 
   // The shell and settings screen: connects AppSettings to the store,

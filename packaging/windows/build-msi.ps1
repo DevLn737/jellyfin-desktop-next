@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory)] [string]$Deployment,
     [Parameter(Mandatory)] [string]$Version,
     [Parameter(Mandatory)] [string]$Output,
-    [string]$ExeName = 'jellyfin-desktop-next.exe'
+    [string]$ExeName = 'jellyfin-desktop.exe'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
