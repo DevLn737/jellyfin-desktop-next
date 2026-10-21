@@ -63,9 +63,10 @@ namespace jfd::ui {
     Q_PROPERTY(double subtitleDelay READ subtitleDelay WRITE setSubtitleDelay NOTIFY delaysChanged)
     Q_PROPERTY(double audioDelay READ audioDelay WRITE setAudioDelay NOTIFY delaysChanged)
     // Outside a group: the series' next and previous episodes, if any.
-    // At the end of an episode the next one plays.
+    // At the end of an episode the next one plays when autoNext is on.
     Q_PROPERTY(bool hasNext READ hasNext NOTIFY queueChanged)
     Q_PROPERTY(bool hasPrevious READ hasPrevious NOTIFY queueChanged)
+    Q_PROPERTY(bool autoNext READ autoNext WRITE setAutoNext NOTIFY autoNextChanged)
     // The server has thumbnails for the seek bar (trickplayFrame).
     Q_PROPERTY(bool hasTrickplay READ hasTrickplay NOTIFY trickplayChanged)
 
@@ -93,6 +94,8 @@ namespace jfd::ui {
     QString segment() const;
     bool autoSkip() const { return m_skipper.autoSkip(); }
     void setAutoSkip(bool on);
+    bool autoNext() const { return m_autoNext; }
+    void setAutoNext(bool on);
     double subtitleDelay() const { return m_subtitleDelay; }
     void setSubtitleDelay(double seconds);
     double audioDelay() const { return m_audioDelay; }
@@ -131,6 +134,7 @@ namespace jfd::ui {
     void tracksChanged();
     void segmentChanged();
     void autoSkipChanged();
+    void autoNextChanged();
     void delaysChanged();
     void queueChanged();
     void trickplayChanged();
@@ -167,6 +171,7 @@ namespace jfd::ui {
     playback::SegmentSkipper m_skipper;
     // The viewer's last audio and subtitle pick, for the next file.
     playback::TrackPreference m_trackPreference;
+    bool m_autoNext = true;
     session::SessionHub::Subscription m_subscription;
 
     core::SessionSnapshot m_snapshot;

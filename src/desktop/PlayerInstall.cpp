@@ -17,6 +17,22 @@ namespace jfd::desktop {
   namespace {
     const QString AutoSkipKey = QStringLiteral("playback/autoSkipSegments");
     const QString HdrKey = QStringLiteral("playback/hdr10");
+    const QString AutoNextKey = QStringLiteral("playback/autoNextEpisode");
+    const QString HwdecKey = QStringLiteral("playback/hardwareDecoding");
+    const QString SubtitleSizeKey = QStringLiteral("playback/subtitleSize");
+
+    // mpv's own subtitle font size, used for "Default".
+    constexpr int MpvSubtitleFontSize = 38;
+
+    // Settings that go straight to an mpv property, at start and on change.
+    void applyToMpv(media::MpvPlayer& player, const QString& key, const QVariant& value) {
+      if (key == HwdecKey) {
+        player.setStringProperty("hwdec", value.toString().toUtf8());
+      } else if (key == SubtitleSizeKey) {
+        const int size = value.toString().toInt();
+        player.setDoubleProperty("sub-font-size", size > 0 ? size : MpvSubtitleFontSize);
+      }
+    }
   } // namespace
 
   bool registerPlayerSettings(settings::SettingsRegistry& registry) {
@@ -34,6 +50,48 @@ namespace jfd::desktop {
     autoSkip.description = QT_TRANSLATE_NOOP(
         "PlayerSettings", "When the server knows where they are. Otherwise a Skip button is shown.");
     section.settings.append(autoSkip);
+
+    settings::SettingDescriptor autoNext;
+    autoNext.key = QStringLiteral("autoNextEpisode");
+    autoNext.type = settings::SettingType::Bool;
+    autoNext.defaultValue = true;
+    autoNext.label = QT_TRANSLATE_NOOP("PlayerSettings", "Play the next episode automatically");
+    autoNext.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "When an episode ends. In a group the group's queue decides.");
+    section.settings.append(autoNext);
+
+    // Values are mpv's hwdec modes.
+    settings::SettingDescriptor hwdec;
+    hwdec.key = QStringLiteral("hardwareDecoding");
+    hwdec.type = settings::SettingType::Choice;
+    hwdec.defaultValue = QStringLiteral("auto-safe");
+    hwdec.label = QT_TRANSLATE_NOOP("PlayerSettings", "Hardware decoding");
+    hwdec.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings",
+        "Decodes video on the graphics card. Copy is slower but works with more drivers; turn it off if "
+        "the picture is broken.");
+    hwdec.choices = {{QStringLiteral("auto-safe"), QT_TRANSLATE_NOOP("PlayerSettings", "On")},
+                     {QStringLiteral("auto-copy-safe"), QT_TRANSLATE_NOOP("PlayerSettings", "Copy")},
+                     {QStringLiteral("no"), QT_TRANSLATE_NOOP("PlayerSettings", "Off")}};
+    hwdec.legacyKey = QStringLiteral("video.hardwareDecoding");
+    section.settings.append(hwdec);
+
+    // The 2.x client's sizes (mpv sub-font-size), so its value imports as is.
+    settings::SettingDescriptor subtitleSize;
+    subtitleSize.key = QStringLiteral("subtitleSize");
+    subtitleSize.type = settings::SettingType::Choice;
+    subtitleSize.defaultValue = QStringLiteral("-1");
+    subtitleSize.label = QT_TRANSLATE_NOOP("PlayerSettings", "Subtitle size");
+    subtitleSize.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "Text subtitles without their own styles. Styled ones keep their size.");
+    subtitleSize.choices = {{QStringLiteral("-1"), QT_TRANSLATE_NOOP("PlayerSettings", "Default")},
+                            {QStringLiteral("18"), QT_TRANSLATE_NOOP("PlayerSettings", "Tiny")},
+                            {QStringLiteral("24"), QT_TRANSLATE_NOOP("PlayerSettings", "Small")},
+                            {QStringLiteral("32"), QT_TRANSLATE_NOOP("PlayerSettings", "Normal")},
+                            {QStringLiteral("42"), QT_TRANSLATE_NOOP("PlayerSettings", "Large")},
+                            {QStringLiteral("60"), QT_TRANSLATE_NOOP("PlayerSettings", "Huge")}};
+    subtitleSize.legacyKey = QStringLiteral("subtitles.size");
+    section.settings.append(subtitleSize);
 
     // ADR 0001: off by default, HDR files are tone-mapped to SDR. Shown
     // where the build can drive an HDR10 swap chain (Windows).
@@ -66,9 +124,15 @@ namespace jfd::desktop {
     // The setting and the player's own switch stay in step.
     settings::Settings& settings = *services.settings;
     model.setAutoSkip(settings.value(AutoSkipKey).toBool());
+    model.setAutoNext(settings.value(AutoNextKey).toBool());
+    media::MpvPlayer* player = services.player.get();
+    if (player != nullptr)
+      for (const QString& key : {HwdecKey, SubtitleSizeKey}) applyToMpv(*player, key, settings.value(key));
     QObject::connect(&settings, &settings::Settings::valueChanged, &model,
-                     [&model](const QString& key, const QVariant& value) {
+                     [&model, player](const QString& key, const QVariant& value) {
                        if (key == AutoSkipKey) model.setAutoSkip(value.toBool());
+                       else if (key == AutoNextKey) model.setAutoNext(value.toBool());
+                       else if (player != nullptr) applyToMpv(*player, key, value);
                      });
     QObject::connect(&model, &ui::PlayerModel::autoSkipChanged, &settings,
                      [&model, &settings] { settings.setValue(AutoSkipKey, model.autoSkip()); });

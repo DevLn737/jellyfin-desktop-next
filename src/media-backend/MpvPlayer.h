@@ -48,6 +48,8 @@ public:
   void setPaused(bool paused);
   // Sets a numeric mpv property without waiting (sub-delay, audio-delay).
   void setDoubleProperty(const char* name, double value);
+  // Sets an mpv property from its string form without waiting (hwdec).
+  void setStringProperty(const char* name, const QByteArray& value);
   // Stops playback; the core stays alive until destruction.
   void stop();
 
