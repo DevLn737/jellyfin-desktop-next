@@ -166,6 +166,34 @@ TEST_CASE("Drift is corrected by speed after the cooldown, then the base rate re
   CHECK(h.snapshot().group->correction == SyncCorrection::None);
 }
 
+TEST_CASE("Sync correction settings change while playing: speed off, a lower seek threshold") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0));
+  h.post(backend::Progress{epoch, h.sample(0.0, false)});
+
+  // Speed off: 300 ms behind stays under the default 400 ms seek threshold.
+  ReconcilerSettings settings;
+  settings.useSpeed = false;
+  h.post(intent::SetSyncCorrection{settings});
+  h.advance(2000ms);
+  h.post(backend::Progress{epoch, h.sample(1.7, false)});
+  CHECK(h.snapshot().group->driftMilliseconds == 300);
+  CHECK(h.snapshot().group->correction == SyncCorrection::None);
+  CHECK(h.snapshot().effectiveRate.perMille() == 1000);
+  CHECK_FALSE(h.backend.last<command::Seek>());
+
+  // With the threshold at 200 ms the same drift is a seek to the group.
+  settings.skipMinimum = MediaDelta::fromMilliseconds(200);
+  h.post(intent::SetSyncCorrection{settings});
+  h.advance(2000ms);
+  h.post(backend::Progress{epoch, h.sample(3.7, false)});
+  CHECK(h.snapshot().group->correction == SyncCorrection::Skip);
+  REQUIRE(h.backend.last<command::Seek>());
+  CHECK(h.backend.last<command::Seek>()->target.value == doctest::Approx(4.0).epsilon(0.01));
+}
+
 TEST_CASE("Leaving cancels a pending correction before restoring the personal rate") {
   SessionHarness h;
   const auto epoch = h.open(h.media("p1"));

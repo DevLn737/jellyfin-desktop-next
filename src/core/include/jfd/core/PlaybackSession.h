@@ -117,6 +117,7 @@ namespace jfd::core {
     void on(const intent::Previous&);
     void on(const intent::SelectTrack&);
     void on(const intent::AddExternalTrack&);
+    void on(const intent::SetSyncCorrection&);
     void on(const backend::SourceOpened&);
     void on(const backend::SeekStarted&);
     void on(const backend::PlaybackRestarted&);

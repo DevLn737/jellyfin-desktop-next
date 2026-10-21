@@ -122,6 +122,8 @@ namespace jfd::desktop {
   // The player page ("player" route) and the PlayerSession singleton; Play
   // on the library screens opens it. Needs installSession.
   void installPlayer(AppServices& services, QQmlEngine& engine);
+  // The watch-together settings section (speed correction, seek threshold).
+  bool registerGroupSettings(settings::SettingsRegistry& registry);
   // The watch-together page (route "group"), the GroupSession singleton
   // for it and the player's group indicator, and "Watch together" on item
   // pages. Needs installSession. uninstallGroup, after the QML engine is
