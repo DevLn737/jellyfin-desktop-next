@@ -9,6 +9,7 @@
 #include <memory>
 
 class QQmlEngine;
+class QQuickWindow;
 
 namespace jfd::api {
   class JellyfinClient;
@@ -90,6 +91,10 @@ namespace jfd::desktop {
   // registers the settings page and the placeholder, and handles the
   // diagnostics actions.
   void installShell(AppServices& services, QQmlEngine& engine);
+
+  // After the window loads: sets Theme.reducedEffects from the "Simplified
+  // effects" setting; on automatic, from the GPU the window renders on.
+  void startEffects(AppServices& services, QQmlEngine& engine, QQuickWindow& window);
 
   // The device id the server knows this installation by.
   bool registerLibrarySettings(settings::SettingsRegistry& registry);

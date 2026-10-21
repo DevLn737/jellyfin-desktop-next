@@ -66,14 +66,32 @@ namespace jfd::settings {
       scale.requiresRestart = true;
       section.settings.append(scale);
 
-      SettingDescriptor reduceMotion;
-      reduceMotion.key = key(keys::ReduceMotion);
-      reduceMotion.type = SettingType::Bool;
-      reduceMotion.defaultValue = false;
-      reduceMotion.label = QT_TRANSLATE_NOOP("CommonSettings", "Reduce animations");
-      reduceMotion.description =
-          QT_TRANSLATE_NOOP("CommonSettings", "Shorter animations for slower graphics.");
-      section.settings.append(reduceMotion);
+      SettingDescriptor effects;
+      effects.key = key(keys::Effects);
+      effects.type = SettingType::Choice;
+      effects.defaultValue = QStringLiteral("auto");
+      effects.label = QT_TRANSLATE_NOOP("CommonSettings", "Simplified effects");
+      effects.description = QT_TRANSLATE_NOOP(
+          "CommonSettings", "No blur and shorter animations, for slower graphics.");
+      effects.choices = {
+          {QStringLiteral("auto"), QT_TRANSLATE_NOOP("CommonSettings", "Automatic (on with integrated graphics)")},
+          {QStringLiteral("on"), QT_TRANSLATE_NOOP("CommonSettings", "On")},
+          {QStringLiteral("off"), QT_TRANSLATE_NOOP("CommonSettings", "Off")},
+      };
+      section.settings.append(effects);
+
+      // Version 1 had a "Reduce animations" switch; on becomes "on", off
+      // becomes automatic.
+      section.version = 2;
+      section.migrations = {
+          {1,
+           [](QVariantMap& values) {
+             const QVariant reduced = values.take(QStringLiteral("reduceMotion"));
+             if (reduced.isValid() && reduced.toBool()) {
+               values.insert(QStringLiteral("effects"), QStringLiteral("on"));
+             }
+           }},
+      };
       return section;
     }
 

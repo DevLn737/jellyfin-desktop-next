@@ -23,12 +23,12 @@ Row {
             opacity: 0.3
 
             SequentialAnimation on opacity {
-                running: root.running && !Theme.reduceMotion
+                running: root.running
                 loops: Animation.Infinite
-                PauseAnimation { duration: dot.index * 160 }
-                NumberAnimation { to: 1; duration: 320 }
-                NumberAnimation { to: 0.3; duration: 320 }
-                PauseAnimation { duration: (2 - dot.index) * 160 }
+                PauseAnimation { duration: dot.index * Theme.durationSlow / 2 }
+                NumberAnimation { to: 1; duration: Theme.durationSlow }
+                NumberAnimation { to: 0.3; duration: Theme.durationSlow }
+                PauseAnimation { duration: (2 - dot.index) * Theme.durationSlow / 2 }
             }
         }
     }

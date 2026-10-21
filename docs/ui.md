@@ -25,8 +25,9 @@ parallel look and behave alike. Each module is a static library linked into
 `spacing` (12) / `spacingLarge` (20) / `spacingHuge` (32), `radius`,
 `controlHeight`, `iconSize`, `posterWidth`, `thumbWidth`, `squareWidth`,
 `posterAspect`, `thumbAspect`; `durationFast` / `Normal` / `Slow` and
-`easing`. Durations are 0 when `Theme.reduceMotion` is on (the "Reduce
-animations" setting), so always animate with them. The interface scale
+`easing`. Durations are halved when `Theme.reducedEffects` is on (the
+"Simplified effects" setting, automatically on with integrated or software
+graphics), so always animate with them; blur only when `Theme.blurEnabled`. The interface scale
 setting applies through `QT_SCALE_FACTOR`; do not scale sizes by hand.
 
 ## Controls

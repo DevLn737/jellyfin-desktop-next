@@ -19,7 +19,8 @@ namespace jfd::settings {
     // Interface scale on top of the system's, 0.75 to 2.0.
     inline constexpr QLatin1String Scale{"interface/scale"};
     // Shorter or no animations, for slow graphics.
-    inline constexpr QLatin1String ReduceMotion{"interface/reduceMotion"};
+    // "auto" (on with integrated or software graphics), "on", "off".
+    inline constexpr QLatin1String Effects{"interface/effects"};
 
     // diagnostics
     // "error", "warning", "info" or "debug".

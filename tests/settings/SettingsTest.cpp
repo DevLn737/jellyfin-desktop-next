@@ -248,3 +248,27 @@ TEST_CASE("The common sections register and keep their keys") {
   CHECK(sections.first().id == QStringLiteral("account"));
   CHECK(sections.last().id == QStringLiteral("diagnostics"));
 }
+
+TEST_CASE("The old Reduce animations switch becomes Simplified effects") {
+  for (const auto& [stored, expected] :
+       {std::pair{"true", "on"}, std::pair{"false", "auto"}, std::pair{"", "auto"}}) {
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    {
+      QFile file(iniPath(dir));
+      REQUIRE(file.open(QIODevice::WriteOnly));
+      QByteArray text("[schema]\ninterface=1\n[interface]\nscale=1.25\n");
+      if (*stored != '\0') text += QByteArray("reduceMotion=") + stored + '\n';
+      file.write(text);
+    }
+    SettingsRegistry registry;
+    REQUIRE(registerCommonSections(registry));
+    Settings settings(registry, iniPath(dir));
+    CAPTURE(stored);
+    CHECK(settings.storedVersion(QStringLiteral("interface")) == 2);
+    CHECK(settings.value(keys::Effects).toString() == QLatin1String(expected));
+    CHECK(settings.value(keys::Scale).toDouble() == 1.25);
+    QSettings raw(iniPath(dir), QSettings::IniFormat);
+    CHECK_FALSE(raw.contains(QStringLiteral("interface/reduceMotion")));
+  }
+}

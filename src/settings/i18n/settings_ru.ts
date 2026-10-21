@@ -44,12 +44,24 @@
         <translation>Дополнительно к масштабу, заданному в системе.</translation>
     </message>
     <message>
-        <source>Reduce animations</source>
-        <translation>Меньше анимации</translation>
+        <source>Simplified effects</source>
+        <translation>Упрощённые эффекты</translation>
     </message>
     <message>
-        <source>Shorter animations for slower graphics.</source>
-        <translation>Короткие анимации для слабой графики.</translation>
+        <source>No blur and shorter animations, for slower graphics.</source>
+        <translation>Без размытия и с более короткой анимацией, для слабой графики.</translation>
+    </message>
+    <message>
+        <source>Automatic (on with integrated graphics)</source>
+        <translation>Автоматически (включены на встроенной графике)</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Включены</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Выключены</translation>
     </message>
     <message>
         <source>Diagnostics</source>

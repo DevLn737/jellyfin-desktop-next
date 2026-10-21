@@ -173,6 +173,8 @@ int main(int argc, char* argv[]) {
       return 3;
     }
 
+    desktop::startEffects(services, engine, *window);
+
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
     desktop::startIntegrations(services, *window, !options.smoke);
