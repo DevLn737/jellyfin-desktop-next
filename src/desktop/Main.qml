@@ -1,7 +1,6 @@
 import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Shell
-import Jfd.Ui.Settings
 
 // The main window. The application places and shows it (WindowStateKeeper).
 Window {
@@ -20,11 +19,5 @@ Window {
         id: shell
         objectName: "shell"
         anchors.fill: parent
-    }
-
-    Binding {
-        target: Theme
-        property: "reduceMotion"
-        value: AppSettings.revision >= 0 && AppSettings.value("interface/reduceMotion") === true
     }
 }

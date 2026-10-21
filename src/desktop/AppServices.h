@@ -9,6 +9,7 @@
 #include <memory>
 
 class QQmlEngine;
+class QQuickWindow;
 
 namespace jfd::api {
   class JellyfinClient;
@@ -32,6 +33,7 @@ namespace jfd::ui {
   class AppSettings;
   class LibraryUi;
   class Navigator;
+  class PlayerModel;
 } // namespace jfd::ui
 
 namespace jfd::desktop {
@@ -79,6 +81,8 @@ namespace jfd::desktop {
     // use these.
     std::shared_ptr<media::MpvPlayer> player;
     std::shared_ptr<session::SessionRuntime> session;
+    // The player screen's model (installPlayer), on the session above.
+    std::unique_ptr<ui::PlayerModel> playerModel;
     // Watching together (installGroup): the group page's model, on the
     // session. Declared after it so it goes first.
     std::unique_ptr<session::GroupModel> group;
@@ -91,6 +95,10 @@ namespace jfd::desktop {
   // registers the settings page and the placeholder, and handles the
   // diagnostics actions.
   void installShell(AppServices& services, QQmlEngine& engine);
+
+  // After the window loads: sets Theme.reducedEffects from the "Simplified
+  // effects" setting; on automatic, from the GPU the window renders on.
+  void startEffects(AppServices& services, QQmlEngine& engine, QQuickWindow& window);
 
   // The device id the server knows this installation by.
   bool registerLibrarySettings(settings::SettingsRegistry& registry);
@@ -105,6 +113,11 @@ namespace jfd::desktop {
   // Needs installLibrary.
   void installSession(AppServices& services);
 
+  // The playback settings section (auto-skip of intros and credits).
+  bool registerPlayerSettings(settings::SettingsRegistry& registry);
+  // The player page ("player" route) and the PlayerSession singleton; Play
+  // on the library screens opens it. Needs installSession.
+  void installPlayer(AppServices& services, QQmlEngine& engine);
   // The watch-together page (route "group"), the GroupSession singleton
   // for it and the player's group indicator, and "Watch together" on item
   // pages. Needs installSession. uninstallGroup, after the QML engine is

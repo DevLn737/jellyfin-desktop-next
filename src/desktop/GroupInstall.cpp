@@ -38,7 +38,9 @@ namespace jfd::desktop {
   }
 
   void uninstallGroup(AppServices& services) {
-    if (services.libraryUi != nullptr) services.libraryUi->setWatchTogetherHandler({});
+    // The watch-together handler stays on LibraryUi: nothing calls it once
+    // the window is gone, and LibraryUi's signals must not fire after the
+    // QML engine that bound them.
     ui::GroupSession::setInstance(nullptr);
     services.group.reset();
   }

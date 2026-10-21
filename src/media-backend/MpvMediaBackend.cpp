@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <utility>
@@ -44,9 +45,11 @@ bool flagProperty(mpv_handle* mpv, const char* name)
   return mpv_get_property(mpv, name, MPV_FORMAT_FLAG, &value) >= 0 && value != 0;
 }
 
+// File-local, so a choice never carries over to the next file, where the
+// same number can be a different track or none.
 const char* trackProperty(core::TrackKind kind)
 {
-  return kind == core::TrackKind::Audio ? "aid" : "sid";
+  return kind == core::TrackKind::Audio ? "file-local-options/aid" : "file-local-options/sid";
 }
 
 }
@@ -159,10 +162,16 @@ void MpvMediaBackend::setRate(core::MediaEpoch epoch, core::PlaybackRate rate)
 
 void MpvMediaBackend::selectTrack(core::MediaEpoch epoch, core::TrackKind kind, std::optional<int> trackId)
 {
-  if (!isCurrent(epoch))
-    return;
   const QByteArray value = trackId ? QByteArray::number(*trackId) : QByteArray("no");
-  mpv_set_property_string(m_mpv, trackProperty(kind), value.constData());
+  if (isCurrent(epoch))
+  {
+    mpv_set_property_string(m_mpv, trackProperty(kind), value.constData());
+    return;
+  }
+  // The first choice usually comes while mpv is still opening the file:
+  // applied once it starts, before its tracks are selected.
+  if (std::find(m_starting.begin(), m_starting.end(), epoch) != m_starting.end())
+    m_startTracks[epoch][kind == core::TrackKind::Audio ? 0 : 1] = value;
 }
 
 void MpvMediaBackend::addExternalTrack(core::MediaEpoch epoch, core::RequestId request,
@@ -285,6 +294,19 @@ void MpvMediaBackend::handle(const mpv_event& event)
     m_current = m_starting.front();
     m_starting.pop_front();
     m_entries[start->playlist_entry_id] = *m_current;
+    if (const auto tracks = m_startTracks.extract(*m_current))
+    {
+      for (const core::TrackKind kind : {core::TrackKind::Audio, core::TrackKind::Subtitle})
+      {
+        const QByteArray& value = tracks.mapped()[kind == core::TrackKind::Audio ? 0 : 1];
+        if (!value.isEmpty())
+          mpv_set_property_string(m_mpv, trackProperty(kind), value.constData());
+      }
+    }
+    // Choices for loads that were replaced before they started.
+    std::erase_if(m_startTracks, [this](const auto& entry) {
+      return std::find(m_starting.begin(), m_starting.end(), entry.first) == m_starting.end();
+    });
     m_restartPending = false;
     m_lastProgress.reset();
     break;

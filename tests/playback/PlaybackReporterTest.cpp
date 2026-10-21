@@ -69,6 +69,14 @@ namespace {
     while (timer.elapsed() < milliseconds) QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
   }
 
+  // Spins until done() or the deadline; coarse timers (Windows) fire late.
+  template <typename Done>
+  void spinUntil(Done done, int milliseconds = 2000) {
+    QElapsedTimer timer;
+    timer.start();
+    while (!done() && timer.elapsed() < milliseconds) QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+  }
+
 } // namespace
 
 TEST_CASE("Start is sent once the file plays, with the stream's identity") {
@@ -122,7 +130,7 @@ TEST_CASE("Progress is sent periodically while playing, not while paused") {
   Fixture f;
   f.reporter.setProgressInterval(std::chrono::milliseconds(40));
   f.push(PlaybackPhase::Playing, 0);
-  spin(150);
+  spinUntil([&] { return f.sink.reports.size() >= 3; });
   const auto playing = f.sink.reports.size();
   CHECK(playing >= 3);
   f.push(PlaybackPhase::Paused, 1 * Second);
@@ -140,6 +148,18 @@ TEST_CASE("Stopped carries the final position and is sent once") {
   REQUIRE(f.sink.events() == QStringList{QStringLiteral("start"), QStringLiteral("stopped")});
   CHECK(f.sink.reports.back().progress.positionTicks == 1300 * Second);
   CHECK_FALSE(f.sink.reports.back().failed);
+}
+
+TEST_CASE("Stopping, which leaves the session without a file, is reported") {
+  Fixture f;
+  f.push(PlaybackPhase::Playing, 0);
+  core::SessionSnapshot idle;
+  idle.phase = PlaybackPhase::Idle;
+  f.reporter.snapshotChanged(idle);
+  REQUIRE(f.sink.events() == QStringList{QStringLiteral("start"), QStringLiteral("stopped")});
+  CHECK_FALSE(f.sink.reports.back().failed);
+  f.reporter.end();
+  CHECK(f.sink.reports.size() == 2);
 }
 
 TEST_CASE("A failure is reported as failed, and a new file ends the old report") {

@@ -164,6 +164,13 @@ void MpvPlayer::setPaused(bool paused)
   mpv_set_property_async(m_mpv.get(), 0, "pause", MPV_FORMAT_FLAG, &flag);
 }
 
+void MpvPlayer::setDoubleProperty(const char* name, double value)
+{
+  if (!m_mpv)
+    return;
+  mpv_set_property_async(m_mpv.get(), 0, name, MPV_FORMAT_DOUBLE, &value);
+}
+
 void MpvPlayer::stop()
 {
   command({"stop"});

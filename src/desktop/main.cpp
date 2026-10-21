@@ -1,6 +1,7 @@
 #include "AppServices.h"
 #include "IntegrationServices.h"
 #include "Logging.h"
+#include "FlowCheck.h"
 #include "SmokeTest.h"
 #include "Translations.h"
 
@@ -10,6 +11,8 @@
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/PlayerModel.h>
+#include <jfd/ui/PlayerSession.h>
 #include <jfd/ui/WindowStateKeeper.h>
 
 #include <QCommandLineParser>
@@ -33,6 +36,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_PlayerPlugin)
 
 using namespace jfd;
 
@@ -40,6 +44,8 @@ namespace {
 
   struct Options {
     bool smoke = false;
+    // --flow: the smoke test's server path (FlowCheck); implies --smoke.
+    bool flow = false;
     QString settingsFile;
   };
 
@@ -52,6 +58,9 @@ namespace {
       const QString arg = QString::fromLocal8Bit(argv[i]);
       if (arg == QLatin1String("--smoke")) {
         options.smoke = true;
+      } else if (arg == QLatin1String("--flow")) {
+        options.smoke = true;
+        options.flow = true;
       } else if (arg == QLatin1String("--settings-file") && i + 1 < argc) {
         options.settingsFile = QString::fromLocal8Bit(argv[++i]);
       } else if (arg.startsWith(QLatin1String("--settings-file="))) {
@@ -66,6 +75,7 @@ namespace {
     bool ok = settings::registerCommonSections(registry);
     ok = desktop::registerLibrarySettings(registry) && ok;
     ok = integrations::registerIntegrationsSettings(registry) && ok;
+    ok = desktop::registerPlayerSettings(registry) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }
@@ -109,8 +119,15 @@ int main(int argc, char* argv[]) {
   parser.addHelpOption();
   parser.addVersionOption();
   parser.addOption({QStringLiteral("smoke"), QStringLiteral("Open the window, visit every page, quit.")});
+  parser.addOption({QStringLiteral("flow"),
+                    QStringLiteral("Sign in to JFD_TEST_SERVER_URL, open a series and an episode, play them, "
+                                   "switch tracks, quit.")});
   parser.addOption({QStringLiteral("settings-file"), QStringLiteral("Use this settings file."), QStringLiteral("path")});
   parser.process(app);
+  if (options.flow && !desktop::FlowCheck::configured()) {
+    std::fprintf(stderr, "--flow needs JFD_TEST_SERVER_URL, JFD_TEST_USER and JFD_TEST_PASSWORD\n");
+    return 2;
+  }
 
   services.isolatedProfile = smokeProfile.has_value();
   services.cacheDirectory =
@@ -148,6 +165,7 @@ int main(int argc, char* argv[]) {
     desktop::installShell(services, engine);
     desktop::installLibrary(services, engine);
     desktop::installSession(services);
+    desktop::installPlayer(services, engine);
     desktop::installIntegrations(services, engine);
     // The media controls and Discord follow the playback session.
     desktop::connectIntegrations(
@@ -170,6 +188,8 @@ int main(int argc, char* argv[]) {
       return 3;
     }
 
+    desktop::startEffects(services, engine, *window);
+
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
     desktop::startIntegrations(services, *window, !options.smoke);
@@ -184,7 +204,11 @@ int main(int argc, char* argv[]) {
     }
 
     std::unique_ptr<desktop::SmokeTest> smoke;
-    if (options.smoke) {
+    std::unique_ptr<desktop::FlowCheck> flow;
+    if (options.flow) {
+      flow = std::make_unique<desktop::FlowCheck>(*window, services);
+      flow->start();
+    } else if (options.smoke) {
       smoke = std::make_unique<desktop::SmokeTest>(*window, *services.navigator);
       smoke->start();
     }
@@ -205,14 +229,17 @@ int main(int argc, char* argv[]) {
     if (!left) {
       leaving.exec();
     }
-    if (smoke && !smoke->passed() && exitCode == 0) {
+    if (((smoke && !smoke->passed()) || (flow && !flow->passed())) && exitCode == 0) {
       exitCode = 1;
     }
     // Leaving the scope destroys the window and the engine before the
     // services they use.
   }
-  // The session runs on the player and on the library's client and socket;
-  // the group model reads the session.
+  // The player screen's model and the group model subscribe to the
+  // session; the session runs on the player and on the library's client
+  // and socket.
+  ui::PlayerSession::setInstance(nullptr);
+  services.playerModel.reset();
   desktop::uninstallGroup(services);
   services.session.reset();
   services.player.reset();

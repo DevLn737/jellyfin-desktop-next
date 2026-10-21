@@ -102,7 +102,7 @@ jobs:
             Where-Object { $_.FullName -notlike '*package*' } | Select-Object -First 1
           if (-not $exe) { throw 'jellyfin-desktop-next.exe was not built' }
           Copy-Item $exe.FullName $stage
-          windeployqt --release --compiler-runtime --qmldir src/app/qml --no-translations "$stage/jellyfin-desktop-next.exe"
+          windeployqt --release --compiler-runtime --qmldir tools/prototype/qml --no-translations "$stage/jellyfin-desktop-next.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
           Copy-Item -Recurse scripts/measure "$stage/measure"
@@ -139,3 +139,74 @@ jobs:
           name: jellyfin-desktop-next-windows
           path: build/package/jellyfin-desktop-next
           retention-days: 30
+
+  flow:
+    # Checkpoint 1 on the Docker stand: jellyfin-desktop --flow signs in,
+    # opens home, a series and an episode, plays the episode, plays the
+    # movie and switches its audio and subtitles (embedded, external), then
+    # quits. The run is recorded from the virtual screen; the video and a
+    # picture of each step are kept as an artifact.
+    name: App flow (Linux, Jellyfin 12.2 in Docker)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read pinned versions
+        id: pins
+        run: |
+          echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
+          echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Qt ${{ steps.pins.outputs.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.pins.outputs.qt }}
+          arch: ${{ steps.pins.outputs.qt-arch }}
+          cache: true
+
+      - name: Pinned libmpv
+        uses: ./.github/actions/linux-libmpv
+
+      - name: Install display libraries and the recorder
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            xvfb xauth ffmpeg libgl1-mesa-dri libfontconfig1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
+
+      - name: Start the server
+        run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_ENFORCE_PINS=ON -DJFD_SERVER_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel --target jellyfin-desktop
+
+      - name: Run and record
+        env:
+          DISPLAY: ":99"
+          JFD_SMOKE_SCREENSHOTS: ${{ github.workspace }}/flow
+        run: |
+          mkdir -p flow
+          Xvfb :99 -screen 0 1280x800x24 &
+          sleep 2
+          ffmpeg -loglevel error -f x11grab -video_size 1280x800 -framerate 15 -i :99 \
+            -c:v libx264 -preset veryfast -pix_fmt yuv420p flow/flow.mp4 &
+          recorder=$!
+          status=0
+          ctest --test-dir build --output-on-failure -V -R desktop_flow || status=$?
+          kill -INT "$recorder"; wait "$recorder" || true
+          exit "$status"
+
+      - name: Recording and pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-flow
+          path: flow
+          if-no-files-found: ignore
+
+      - name: Server log on failure
+        if: failure()
+        run: docker logs --tail 200 jfd-test-server || true

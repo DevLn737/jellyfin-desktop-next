@@ -46,6 +46,8 @@ public:
   Q_INVOKABLE void seekRelative(double seconds);
   Q_INVOKABLE void togglePause() { setPaused(!m_paused); }
   void setPaused(bool paused);
+  // Sets a numeric mpv property without waiting (sub-delay, audio-delay).
+  void setDoubleProperty(const char* name, double value);
   // Stops playback; the core stays alive until destruction.
   void stop();
 

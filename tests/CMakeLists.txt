@@ -175,6 +175,32 @@ if(JFD_BUILD_APP)
     add_test(NAME jfd_ui_library_tests COMMAND jfd_ui_library_tests)
   endif()
 
+  if(TARGET jfd_ui_player)
+    # The player page on the session runtime with a virtual backend.
+    add_executable(jfd_ui_player_tests support/QtGuiTestMain.cpp ui/PlayerPageTest.cpp)
+    target_include_directories(jfd_ui_player_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_player_tests PRIVATE
+      jfd_ui_player jfd_ui_playerplugin jfd_ui_group jfd_ui_groupplugin
+      jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
+      jfd::session_runtime Qt6::Gui Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_player_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_player_tests COMMAND jfd_ui_player_tests)
+    set_tests_properties(jfd_ui_player_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
+  if(JFD_SERVER_TESTS AND TARGET jfd_ui_player)
+    # The player screen's model on headless mpv against the server: tracks,
+    # a transcoded seek and the server's playback reports.
+    add_executable(jfd_ui_player_server_tests support/QtGuiTestMain.cpp ui/PlayerServerTest.cpp)
+    target_include_directories(jfd_ui_player_server_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_player_server_tests PRIVATE
+      jfd_ui_player jfd::session_runtime jfd::media_backend Qt6::Gui Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_player_server_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_player_server_tests COMMAND jfd_ui_player_server_tests)
+    set_tests_properties(jfd_ui_player_server_tests PROPERTIES
+      TIMEOUT 300 RESOURCE_LOCK jellyfin_server ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
   if(JFD_SERVER_TESTS AND TARGET jfd_ui_library)
     # The library screens in a window, driven against the server.
     add_executable(jfd_ui_library_server_tests support/QtGuiTestMain.cpp ui/LibraryScreensServerTest.cpp)
