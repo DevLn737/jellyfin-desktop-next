@@ -201,6 +201,18 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_ui_library_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
   endif()
 
+  if(TARGET jfd_ui_library)
+    # Timings for the startup, home and library-scroll thresholds; run by
+    # scripts/library-bench.sh, not by ctest.
+    add_executable(jfd_library_bench ui/LibraryBench.cpp)
+    target_include_directories(jfd_library_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_library_bench PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      Qt6::Quick Qt6::WebSockets)
+    target_compile_options(jfd_library_bench PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+  endif()
+
   if(JFD_SERVER_TESTS AND TARGET jfd_ui_group)
     # The group page on a live server, on a virtual backend.
     add_executable(jfd_ui_group_server_tests ui/GroupPageTest.cpp)
