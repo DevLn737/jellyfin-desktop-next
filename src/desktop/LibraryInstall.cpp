@@ -73,6 +73,7 @@ namespace jfd::desktop {
     ui::LibraryScreens& screens = services.library->screens;
     services.client = &screens.client();
     services.socket = &screens.socket();
+    services.signIn = &screens.signIn();
     const bool installed = screens.install(engine, *services.navigator);
     Q_ASSERT(installed);
     Q_UNUSED(installed);
