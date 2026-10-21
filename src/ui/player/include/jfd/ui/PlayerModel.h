@@ -6,6 +6,7 @@
 #include <jfd/playback/PlaybackReporter.h>
 #include <jfd/playback/SegmentSkipper.h>
 #include <jfd/playback/TrackController.h>
+#include <jfd/playback/TrackPreference.h>
 #include <jfd/session/PlaybackLauncher.h>
 #include <jfd/session/SessionHub.h>
 
@@ -148,6 +149,8 @@ namespace jfd::ui {
                     const api::MediaSource& source, const api::PlaybackStream& stream);
     void beginFile(core::MediaEpoch epoch);
     void reopen(const playback::command::Reopen& reopen);
+    // A track the viewer picked: remembered for the next file.
+    void selectTrack(core::TrackKind kind, std::optional<int> streamIndex);
     void videoReady();
     void loadEpisodes(const api::Item& item);
     void step(bool forward);
@@ -162,6 +165,8 @@ namespace jfd::ui {
     playback::PlaybackReporter m_reporter;
     playback::TrackController m_tracks;
     playback::SegmentSkipper m_skipper;
+    // The viewer's last audio and subtitle pick, for the next file.
+    playback::TrackPreference m_trackPreference;
     session::SessionHub::Subscription m_subscription;
 
     core::SessionSnapshot m_snapshot;

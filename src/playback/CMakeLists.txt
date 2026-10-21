@@ -5,11 +5,13 @@ add_library(jfd_playback STATIC
   src/SegmentSkipper.cpp
   src/StreamPlan.cpp
   src/TrackController.cpp
+  src/TrackPreference.cpp
   src/TrackTable.cpp
   include/jfd/playback/PlaybackReporter.h
   include/jfd/playback/SegmentSkipper.h
   include/jfd/playback/StreamPlan.h
   include/jfd/playback/TrackController.h
+  include/jfd/playback/TrackPreference.h
   include/jfd/playback/TrackTable.h)
 add_library(jfd::playback ALIAS jfd_playback)
 target_include_directories(jfd_playback PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
