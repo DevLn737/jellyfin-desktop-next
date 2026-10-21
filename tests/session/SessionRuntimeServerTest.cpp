@@ -6,6 +6,7 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
 #include <jfd/api/SyncPlayApi.h>
+#include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
 
 #ifdef JFD_SESSION_TEST_MPV
@@ -244,3 +245,93 @@ TEST_CASE("After the computer sleeps our client reconnects and rejoins its group
   runtime.leaveBeforeExit([&] { left = true; });
   REQUIRE(waitFor([&] { return left; }, 5000));
 }
+
+#ifndef JFD_SESSION_TEST_MPV
+namespace {
+  bool forkServer() { return env("JFD_TEST_SERVER_FORK") == QLatin1String("1"); }
+
+  bool noticed(const QSignalSpy& spy, const QString& part) {
+    for (const auto& arguments : spy)
+      if (arguments.front().toString().contains(part)) return true;
+    return false;
+  }
+} // namespace
+
+TEST_CASE("The group model creates, lists, joins, changes speed and leaves groups") {
+  Connection host(device("model-host"));
+  Connection guest(device("model-guest"));
+  const Item movie = findItem(*host.client, QStringLiteral("Movie"));
+  Backend backend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime runtime(*host.client, *host.socket, backend.factory(), settings);
+  session::GroupModel model(runtime, *host.client, *host.socket);
+  QSignalSpy notices(&model, &session::GroupModel::notice);
+  const QString user = env("JFD_TEST_USER");
+
+  // The playback-rate extension is found on the fork and not on stock 12.2.
+  if (forkServer())
+    REQUIRE(waitFor([&] { return model.rateSupported(); }, 10000));
+  else
+    CHECK_FALSE(waitFor([&] { return model.rateSupported(); }, 2000));
+
+  // Create a group; it shows in the server's list.
+  model.createGroup(device("model-group"));
+  REQUIRE(waitFor([&] { return model.inGroup() && !model.busy(); }, 20000));
+  CHECK(model.groupName() == device("model-group"));
+  CHECK(model.participants().contains(user));
+  model.refreshGroups();
+  REQUIRE(waitFor([&] { return !model.busy(); }, 10000));
+  bool listed = false;
+  for (const QVariant& group : model.groups())
+    listed = listed || group.toMap().value(QStringLiteral("id")).toString() == model.groupId();
+  CHECK(listed);
+
+  // Another member joins: the model says so and shows the queue they start.
+  const QString groupId = model.groupId();
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->joinGroup(groupId, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setIgnoreWait(true, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return model.participants().size() == 2; }, 20000));
+  CHECK(noticed(notices, QStringLiteral("joined the group")));
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->setNewQueue({movie.id}, 0, 0, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] {
+    return model.queue().size() == 1 &&
+           model.queue().front().toMap().value(QStringLiteral("name")).toString() == movie.name;
+  }, 20000));
+  CHECK(model.queue().front().toMap().value(QStringLiteral("current")).toBool());
+
+  // Speed: changed for everyone on the fork, refused up front on stock.
+  model.setRate(1.5);
+  if (forkServer()) {
+    REQUIRE(waitFor([&] { return model.rate() == doctest::Approx(1.5); }, 20000));
+    CHECK(noticed(notices, QStringLiteral("Group speed")));
+  } else {
+    CHECK(noticed(notices, QStringLiteral("cannot change the group's speed")));
+    CHECK(model.rate() == doctest::Approx(1.0));
+  }
+
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->leaveGroup(nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return model.participants().size() == 1; }, 20000));
+  CHECK(noticed(notices, QStringLiteral("left the group")));
+  model.leaveGroup();
+  REQUIRE(waitFor([&] { return !model.inGroup() && !model.busy(); }, 20000));
+  CHECK(model.queue().isEmpty());
+
+  // Joining a group someone else made, and one that does not exist.
+  auto made = run<SyncPlayGroup>([&](auto done) {
+    guest.syncPlay->createGroup(device("model-guest-group"), nullptr, done);
+  });
+  REQUIRE(made.ok());
+  model.joinGroup(made->groupId);
+  REQUIRE(waitFor([&] { return model.inGroup() && !model.busy(); }, 20000));
+  CHECK(model.groupId() == made->groupId);
+  model.leaveGroup();
+  REQUIRE(waitFor([&] { return !model.inGroup(); }, 20000));
+  REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->leaveGroup(nullptr, done); }).ok());
+
+  model.joinGroup(QStringLiteral("00000000000000000000000000000000"));
+  REQUIRE(waitFor([&] { return !model.busy(); }, 20000));
+  CHECK_FALSE(model.inGroup());
+  CHECK_FALSE(model.errorText().isEmpty());
+}
+#endif
