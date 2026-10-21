@@ -15,6 +15,7 @@
 #include <QQuickWindow>
 #include <QVariantMap>
 
+#include <algorithm>
 #include <cmath>
 
 namespace jfd::ui {
@@ -167,6 +168,27 @@ namespace jfd::ui {
   }
 
   void PlayerModel::seekBy(double seconds) { seek(position() + seconds); }
+
+  void PlayerModel::setRate(double rate) {
+    if (const auto value = core::PlaybackRate::base(rate)) m_runtime.post(core::intent::SetRate{*value});
+  }
+
+  void PlayerModel::setVolume(int volume) {
+    volume = std::clamp(volume, 0, 100);
+    if (volume == m_volume) return;
+    m_volume = volume;
+    if (m_player) m_player->setDoubleProperty("volume", volume);
+    m_reporter.setVolume(m_volume, m_muted);
+    Q_EMIT volumeChanged();
+  }
+
+  void PlayerModel::setMuted(bool muted) {
+    if (muted == m_muted) return;
+    m_muted = muted;
+    if (m_player) m_player->setStringProperty("mute", muted ? QByteArrayLiteral("yes") : QByteArrayLiteral("no"));
+    m_reporter.setVolume(m_volume, m_muted);
+    Q_EMIT volumeChanged();
+  }
 
   void PlayerModel::selectAudio(int streamIndex) { selectTrack(TrackKind::Audio, streamIndex); }
 

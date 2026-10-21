@@ -35,6 +35,14 @@
         <translation>Когда серия закончилась. В группе решает очередь группы.</translation>
     </message>
     <message>
+        <source>Volume at start</source>
+        <translation>Громкость при запуске</translation>
+    </message>
+    <message>
+        <source>The player&apos;s volume when the app starts. Changes in the player last until you quit.</source>
+        <translation>Громкость плеера при запуске приложения. Изменения в плеере действуют до выхода.</translation>
+    </message>
+    <message>
         <source>Hardware decoding</source>
         <translation>Аппаратное декодирование</translation>
     </message>

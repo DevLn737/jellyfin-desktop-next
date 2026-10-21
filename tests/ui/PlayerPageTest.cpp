@@ -12,12 +12,14 @@
 #include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/PlayerSession.h>
 
+#include <QKeyEvent>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QtQml/qqmlextensionplugin.h>
 
+#include <cmath>
 #include <memory>
 
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
@@ -165,4 +167,49 @@ TEST_CASE("Delays are rounded to tenths and reset for the next file") {
   REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
   CHECK(f.player->subtitleDelay() == 0);
   CHECK(f.player->audioDelay() == 0);
+}
+
+TEST_CASE("Keys seek, change the volume and the delays, and the speed applies alone") {
+  Fixture f;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  f.page->forceActiveFocus();
+  const auto press = [&](int key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+    QKeyEvent pressEvent(QEvent::KeyPress, key, modifiers);
+    QCoreApplication::sendEvent(&f.window, &pressEvent);
+    QKeyEvent releaseEvent(QEvent::KeyRelease, key, modifiers);
+    QCoreApplication::sendEvent(&f.window, &releaseEvent);
+  };
+
+  f.player->togglePause();
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+  const double before = f.player->position();
+  press(Qt::Key_Right);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (before + 10)) < 0.5; }, 2000));
+  press(Qt::Key_Left);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - before) < 0.5; }, 2000));
+
+  CHECK(f.player->volume() == 100);
+  press(Qt::Key_Down);
+  press(Qt::Key_Down);
+  CHECK(f.player->volume() == 90);
+  press(Qt::Key_Up);
+  CHECK(f.player->volume() == 95);
+  press(Qt::Key_M);
+  CHECK(f.player->muted());
+  press(Qt::Key_Up);
+  CHECK_FALSE(f.player->muted());
+  CHECK(f.player->volume() == 100);
+
+  press(Qt::Key_L);
+  press(Qt::Key_L);
+  press(Qt::Key_J);
+  CHECK(f.player->subtitleDelay() == doctest::Approx(0.1));
+  CHECK(f.player->audioDelay() == doctest::Approx(0));
+  press(Qt::Key_J, Qt::ShiftModifier);
+  CHECK(f.player->audioDelay() == doctest::Approx(-0.1));
+  CHECK(f.player->subtitleDelay() == doctest::Approx(0.1));
+
+  f.player->setRate(1.5);
+  REQUIRE(waitFor([&] { return f.player->baseRate() == doctest::Approx(1.5); }, 2000));
 }
