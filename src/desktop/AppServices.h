@@ -16,6 +16,8 @@ namespace jfd::ui {
 
 namespace jfd::desktop {
 
+  struct IntegrationServices;
+
   // The composition root: every long-lived service of the application,
   // created in startup order and destroyed in reverse.
   //
@@ -35,6 +37,9 @@ namespace jfd::desktop {
     ui::AppSettings* appSettings = nullptr;
 
     QString logDirectory;
+
+    // installIntegrations; complete in main.cpp, which destroys it.
+    std::unique_ptr<IntegrationServices> integrations;
   };
 
   // The shell and settings screen: connects AppSettings to the store,

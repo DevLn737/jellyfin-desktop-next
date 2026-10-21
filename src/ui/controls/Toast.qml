@@ -3,17 +3,23 @@ import Jfd.Ui.Theme
 
 // A short message at the bottom of the window that hides itself. One per
 // window (the shell has it); screens call show() through the shell.
-// kind: "info" or "error".
+// kind: "info" or "error". With linkText and link it has a button that opens
+// the link in the browser, and stays longer.
 Rectangle {
     id: toast
 
     property string message
     property string kind: "info"
-    property int timeout: 5000
+    property string linkText
+    property url link
+    readonly property bool hasLink: linkText.length > 0 && link.toString().length > 0
+    property int timeout: hasLink ? 15000 : 5000
 
-    function show(text, messageKind) {
+    function show(text, messageKind, messageLinkText, messageLink) {
         message = text
         kind = messageKind === undefined ? "info" : messageKind
+        linkText = messageLinkText === undefined ? "" : messageLinkText
+        link = messageLink === undefined ? "" : messageLink
         state = "shown"
         timer.restart()
     }
@@ -61,12 +67,23 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
         }
         Text {
-            width: Math.min(implicitWidth, row.width - (toast.kind === "error" ? 18 + row.spacing : 0))
+            width: Math.min(implicitWidth, row.width - (toast.kind === "error" ? 18 + row.spacing : 0)
+                            - (linkButton.visible ? linkButton.implicitWidth + row.spacing : 0))
             text: toast.message
             color: Theme.text
             font.pixelSize: Theme.fontSizeBody
             wrapMode: Text.Wrap
             anchors.verticalCenter: parent.verticalCenter
+        }
+        ActionButton {
+            id: linkButton
+            visible: toast.hasLink
+            text: toast.linkText
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: {
+                Qt.openUrlExternally(toast.link)
+                toast.hide()
+            }
         }
     }
 

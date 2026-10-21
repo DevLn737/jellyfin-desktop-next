@@ -64,14 +64,12 @@ $savedPath = $env:PATH
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
 $env:QT_OPENGL = 'software'
 try {
-    foreach ($renderer in @('auto', 'gl')) {
-        $out = Join-Path $Logs "smoke-$renderer.out"
-        $err = Join-Path $Logs "smoke-$renderer.err"
-        $process = Start-Process -FilePath $exe -PassThru -Wait -ArgumentList @('--smoke', '--renderer', $renderer) `
-            -RedirectStandardOutput $out -RedirectStandardError $err
-        Get-Content $out, $err
-        Assert ($process.ExitCode -eq 0) "installed app smoke test ($renderer)"
-    }
+    $out = Join-Path $Logs 'smoke.out'
+    $err = Join-Path $Logs 'smoke.err'
+    $process = Start-Process -FilePath $exe -PassThru -Wait -ArgumentList @('--smoke') `
+        -RedirectStandardOutput $out -RedirectStandardError $err
+    Get-Content $out, $err
+    Assert ($process.ExitCode -eq 0) 'installed app smoke test'
 } finally {
     $env:PATH = $savedPath
 }

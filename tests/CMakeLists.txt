@@ -107,7 +107,7 @@ if(TARGET jfd_jellyfin_api)
 
   if(TARGET jfd_integrations)
     jfd_add_qt_test(jfd_integrations_tests integrations/DiscordTest.cpp integrations/UpdateCheckerTest.cpp
-      integrations/MediaSessionBridgeTest.cpp)
+      integrations/MediaSessionBridgeTest.cpp integrations/IntegrationsSettingsTest.cpp)
     target_link_libraries(jfd_integrations_tests PRIVATE jfd::integrations Qt6::WebSockets)
   endif()
 

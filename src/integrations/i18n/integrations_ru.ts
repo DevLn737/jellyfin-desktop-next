@@ -29,6 +29,29 @@
     </message>
 </context>
 <context>
+    <name>IntegrationsSettings</name>
+    <message>
+        <source>Integrations</source>
+        <translation>Интеграции</translation>
+    </message>
+    <message>
+        <source>Show what I watch in Discord</source>
+        <translation>Показывать в Discord, что я смотрю</translation>
+    </message>
+    <message>
+        <source>The Discord app on this computer shows the title, and &quot;Watching together&quot; in a group.</source>
+        <translation>Приложение Discord на этом компьютере покажет название, а в группе — «Смотрим вместе».</translation>
+    </message>
+    <message>
+        <source>Check for a new version at startup</source>
+        <translation>Проверять новую версию при запуске</translation>
+    </message>
+    <message>
+        <source>Only shows a link to the download page; nothing is installed.</source>
+        <translation>Только показывает ссылку на страницу загрузки, ничего не устанавливает.</translation>
+    </message>
+</context>
+<context>
     <name>MediaSessionBridge</name>
     <message>
         <source>Playing video</source>

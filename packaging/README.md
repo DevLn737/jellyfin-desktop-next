@@ -1,7 +1,9 @@
 # Packages
 
 Built by `.github/workflows/package.yml`; every version used is pinned in
-[deps/versions.json](../deps/versions.json).
+[deps/versions.json](../deps/versions.json). The packed program is the
+`jellyfin-desktop` target (src/desktop); its file is `jellyfin-desktop-next`,
+so it never clashes with the official client.
 
 ## Windows MSI
 
@@ -42,7 +44,7 @@ organization name; keep them in step if the application's names change.
    library (libOpenGL.so.0 from libglvnd) must be installed; every desktop
    has it.
 4. [linux/smoke-appimage.sh](linux/smoke-appimage.sh) runs the AppImage's smoke
-   test (a generated video on Xvfb with Mesa's software renderer) in Ubuntu
+   test (the window and every page on Xvfb with Mesa's software renderer) in Ubuntu
    24.04, Fedora and Arch containers. First it lists every library the
    program needs from the system and is missing, so one run shows them all.
 

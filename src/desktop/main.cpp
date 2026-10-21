@@ -1,8 +1,10 @@
 #include "AppServices.h"
+#include "IntegrationServices.h"
 #include "Logging.h"
 #include "SmokeTest.h"
 #include "Translations.h"
 
+#include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/WindowStateKeeper.h>
@@ -56,6 +58,7 @@ namespace {
   // Each module's settings section, before the file opens.
   bool registerSettings(settings::SettingsRegistry& registry) {
     bool ok = settings::registerCommonSections(registry);
+    ok = integrations::registerIntegrationsSettings(registry) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }
@@ -124,6 +127,7 @@ int main(int argc, char* argv[]) {
   {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
+    desktop::installIntegrations(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
     services.navigator->reset(QStringLiteral("login"));
@@ -138,6 +142,7 @@ int main(int argc, char* argv[]) {
 
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
+    desktop::startIntegrations(services, *window, !options.smoke);
 
     std::unique_ptr<desktop::SmokeTest> smoke;
     if (options.smoke) {
@@ -148,6 +153,8 @@ int main(int argc, char* argv[]) {
     exitCode = app.exec();
     shutdown.start();
     windowState.save();
+    // Before the window they are attached to.
+    services.integrations.reset();
     if (smoke && !smoke->passed() && exitCode == 0) {
       exitCode = 1;
     }

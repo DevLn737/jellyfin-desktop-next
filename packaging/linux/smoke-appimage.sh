@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the AppImage's smoke test inside a distribution container: installs what
 # a desktop system has (Mesa, X11, audio and VA-API client libraries), starts
-# Xvfb and runs --smoke (plays a generated video and exits with 0).
+# Xvfb and runs --smoke (opens the window, visits every page, exits with 0).
 #
 #   packaging/linux/smoke-appimage.sh APPIMAGE        (inside the container)
 set -euo pipefail
