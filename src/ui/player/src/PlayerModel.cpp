@@ -70,6 +70,11 @@ namespace jfd::ui {
         }),
         m_skipper([&runtime](core::SessionInput input) { runtime.post(std::move(input)); }) {
     connect(&runtime.launcher(), &session::PlaybackLauncher::resolved, this, &PlayerModel::onResolved);
+    // Every file opens with the viewer's own tracks, in a group too.
+    runtime.setTrackChooser([this](const api::Item&, const api::MediaSource& source,
+                                   session::PlaybackLauncher::Request& request) {
+      m_trackPreference.choose(source, request.audioStreamIndex, request.subtitleStreamIndex);
+    });
     connect(&runtime.launcher(), &session::PlaybackLauncher::failed, this,
             [this](const QString&, const QString& message) { Q_EMIT failed(message); });
     // Next and Previous outside a group; in a group the server's queue moves.
@@ -79,6 +84,7 @@ namespace jfd::ui {
   }
 
   PlayerModel::~PlayerModel() {
+    m_runtime.setTrackChooser({});
     m_subscription.reset();
     m_reporter.end();
   }
@@ -156,11 +162,15 @@ namespace jfd::ui {
 
   void PlayerModel::seekBy(double seconds) { seek(position() + seconds); }
 
-  void PlayerModel::selectAudio(int streamIndex) { m_tracks.select(TrackKind::Audio, streamIndex); }
+  void PlayerModel::selectAudio(int streamIndex) { selectTrack(TrackKind::Audio, streamIndex); }
 
   void PlayerModel::selectSubtitle(int streamIndex) {
-    m_tracks.select(TrackKind::Subtitle,
-                    streamIndex < 0 ? std::nullopt : std::optional<int>(streamIndex));
+    selectTrack(TrackKind::Subtitle, streamIndex < 0 ? std::nullopt : std::optional<int>(streamIndex));
+  }
+
+  void PlayerModel::selectTrack(TrackKind kind, std::optional<int> streamIndex) {
+    if (m_current) m_trackPreference.remember(kind, m_current->source, streamIndex);
+    m_tracks.select(kind, streamIndex);
   }
 
   void PlayerModel::skipSegment() { m_skipper.skip(); }

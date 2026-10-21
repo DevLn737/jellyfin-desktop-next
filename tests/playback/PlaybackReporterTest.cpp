@@ -126,6 +126,19 @@ TEST_CASE("Pause, resume, seek, rate, track and volume changes are reported at o
   CHECK(last.volumeLevel == 40);
 }
 
+TEST_CASE("A seek first seen while loading is reported once playback is active again") {
+  Fixture f;
+  f.push(PlaybackPhase::Playing, 0);
+  f.push(PlaybackPhase::Paused, 1 * Second);
+  f.push(PlaybackPhase::Loading, 200 * Second);
+  f.push(PlaybackPhase::Paused, 200 * Second);
+  REQUIRE(f.sink.events() == QStringList{QStringLiteral("start"), QStringLiteral("Pause"), QStringLiteral("TimeUpdate")});
+  CHECK(f.sink.reports.back().progress.positionTicks == 200 * Second);
+  CHECK(f.sink.reports.back().progress.isPaused);
+  f.push(PlaybackPhase::Paused, 200 * Second);
+  CHECK(f.sink.events().size() == 3);
+}
+
 TEST_CASE("Progress is sent periodically while playing, not while paused") {
   Fixture f;
   f.reporter.setProgressInterval(std::chrono::milliseconds(40));

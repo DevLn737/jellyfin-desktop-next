@@ -69,6 +69,8 @@ namespace jfd::playback {
     api::PlaybackProgress m_progress;
     bool m_started = false;
     bool m_ended = false;
+    // A seek seen while loading, not yet sent: the next active snapshot sends it.
+    bool m_seekPending = false;
     core::PlaybackPhase m_phase = core::PlaybackPhase::Idle;
     double m_rate = 1.0;
   };
