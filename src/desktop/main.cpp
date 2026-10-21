@@ -25,6 +25,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ControlsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 
 using namespace jfd;
 
@@ -56,6 +57,7 @@ namespace {
   // Each module's settings section, before the file opens.
   bool registerSettings(settings::SettingsRegistry& registry) {
     bool ok = settings::registerCommonSections(registry);
+    ok = desktop::registerLibrarySettings(registry) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }
@@ -102,6 +104,9 @@ int main(int argc, char* argv[]) {
   parser.addOption({QStringLiteral("settings-file"), QStringLiteral("Use this settings file."), QStringLiteral("path")});
   parser.process(app);
 
+  services.isolatedProfile = smokeProfile.has_value();
+  services.cacheDirectory =
+      smokeProfile ? QString() : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
   services.logDirectory = smokeProfile ? smokeProfile->filePath(QStringLiteral("logs"))
                                        : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) +
                                              QStringLiteral("/logs");
@@ -124,9 +129,13 @@ int main(int argc, char* argv[]) {
   {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
+    desktop::installLibrary(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
-    services.navigator->reset(QStringLiteral("login"));
+    // Home when the saved session was restored.
+    if (services.navigator->depth() == 0) {
+      services.navigator->reset(QStringLiteral("login"));
+    }
 
     engine.loadFromModule("Jfd.Desktop", "Main");
     auto* window = engine.rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow*>(engine.rootObjects().first());
@@ -154,6 +163,7 @@ int main(int argc, char* argv[]) {
     // Leaving the scope destroys the window and the engine before the
     // services they use.
   }
+  services.library.reset();
   services.settings.reset();
   desktop::stopLogFile();
 

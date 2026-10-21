@@ -80,6 +80,25 @@ module and plugin to `src/desktop/CMakeLists.txt` and a
 To show a message: `shell.showError(text)` through the window's `AppShell`
 (objectName `shell`).
 
+## Library screens
+
+`Jfd.Ui.Library` holds the `login`, `home`, `library/<id>`, `item/<id>` and
+`search` pages. `ui::LibraryScreens` (installed by `installLibrary` in
+`src/desktop`) owns the server connection: the `JellyfinClient` and
+`SessionSocket` in `AppServices::client` and `socket` are the ones the
+session and group modules should use. Signing in opens `home`, signing out
+or a rejected token opens `login`.
+
+From QML, `Library` gives `signIn`, `home`, `search`,
+`createLibrary(id, page)`, `createDetails(id, page)`, `image(url)` and
+`routeFor(id, type)`. Cards load images through `image://jfd/`, which
+decodes at the card's `sourceSize` and keeps what Qt Quick holds under a
+video memory budget (192 MiB by default; over it, new images come at half
+size). Play and Watch together on the item page call the handlers set with
+`AppServices::libraryUi->setPlayHandler(...)` and
+`setWatchTogetherHandler(...)`; without one the page says the feature is not
+available yet.
+
 ## Settings from QML
 
 `AppSettings.value("interface/language")`, `AppSettings.setValue(key,

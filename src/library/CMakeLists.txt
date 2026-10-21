@@ -32,3 +32,7 @@ set_target_properties(jfd_library PROPERTIES AUTOMOC ON)
 
 # Russian interface strings in i18n/library_ru.ts (see cmake/JfdTranslations.cmake).
 jfd_add_translations(jfd_library)
+
+# Type information for the screens' QML module, which declares these models
+# as QML types (src/ui/library/include/jfd/ui/LibraryTypes.h).
+qt_extract_metatypes(jfd_library)
