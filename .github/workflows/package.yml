@@ -23,7 +23,6 @@ env:
   APP_TARGET: jellyfin-desktop
   APP_EXE: jellyfin-desktop
   APP_PACKAGE: jellyfin-desktop-next
-  APP_DIR: src/desktop
   # Scanned for QML imports to deploy.
   APP_QML_DIR: src
 
@@ -71,9 +70,11 @@ jobs:
         run: |
           $stage = 'build/package/app'
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          $exe = "build/$env:APP_DIR/$env:APP_EXE.exe"
-          if (-not (Test-Path -LiteralPath $exe)) { throw "$exe was not built" }
-          Copy-Item $exe $stage
+          # Where Qt puts it depends on the generator and the QML module setup.
+          $exe = Get-ChildItem build -Recurse -Filter "$env:APP_EXE.exe" |
+            Where-Object { $_.FullName -notlike '*package*' } | Select-Object -First 1
+          if (-not $exe) { throw "$env:APP_EXE.exe was not built" }
+          Copy-Item $exe.FullName $stage
           windeployqt --release --compiler-runtime --qmldir $env:APP_QML_DIR --no-translations "$stage/$env:APP_EXE.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
@@ -150,8 +151,8 @@ jobs:
         env:
           JFD_PACKAGE_VERSION: ${{ steps.pins.outputs.version }}
         run: |
-          exe="build/app/$APP_DIR/$APP_EXE"
-          test -x "$exe"
+          exe=$(find build/app -type f -name "$APP_EXE" -perm -u+x | head -1)
+          test -n "$exe"
           packaging/linux/build-appimage.sh "$exe" "$APP_QML_DIR" build/libmpv build/package
           ls -la build/package
 
