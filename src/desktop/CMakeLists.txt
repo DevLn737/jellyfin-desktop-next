@@ -6,6 +6,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   IntegrationServices.cpp IntegrationServices.h
   LibraryInstall.cpp
   SessionInstall.cpp
+  PlayerInstall.cpp
   Logging.cpp Logging.h
   SmokeTest.cpp SmokeTest.h
   Translations.cpp Translations.h)
@@ -17,7 +18,7 @@ qt_add_qml_module(jellyfin-desktop
   VERSION 1.0
   NO_PLUGIN
   QML_FILES Main.qml
-  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library)
+  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Player)
 
 # Static QML modules: link each one's plugin (Q_IMPORT_QML_PLUGIN in
 # main.cpp) as well as the module itself.
@@ -29,7 +30,9 @@ target_link_libraries(jellyfin-desktop PRIVATE
   jfd_ui_controls jfd_ui_controlsplugin
   jfd_ui_shell jfd_ui_shellplugin
   jfd_ui_settings jfd_ui_settingsplugin
-  jfd_ui_library jfd_ui_libraryplugin)
+  jfd_ui_library jfd_ui_libraryplugin
+  jfd_ui_group jfd_ui_groupplugin
+  jfd_ui_player jfd_ui_playerplugin)
 jfd_add_translations(jellyfin-desktop)
 
 if(JFD_BUILD_TESTS)

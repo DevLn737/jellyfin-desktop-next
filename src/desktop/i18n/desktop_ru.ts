@@ -12,4 +12,19 @@
         <translation>Страница загрузки</translation>
     </message>
 </context>
+<context>
+    <name>PlayerSettings</name>
+    <message>
+        <source>Playback</source>
+        <translation>Воспроизведение</translation>
+    </message>
+    <message>
+        <source>Skip intros and credits automatically</source>
+        <translation>Пропускать заставки и титры автоматически</translation>
+    </message>
+    <message>
+        <source>When the server knows where they are. Otherwise a Skip button is shown.</source>
+        <translation>Если сервер знает, где они. Иначе показывается кнопка «Пропустить».</translation>
+    </message>
+</context>
 </TS>
