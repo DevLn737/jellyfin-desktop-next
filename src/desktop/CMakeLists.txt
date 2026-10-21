@@ -41,6 +41,12 @@ if(JFD_BUILD_TESTS)
   # quits, and fails if shutdown takes a second or more.
   add_test(NAME desktop_smoke COMMAND jellyfin-desktop --smoke)
   set_tests_properties(desktop_smoke PROPERTIES TIMEOUT 60)
+  if(WIN32)
+    # The HDR10 setting on a runner without an HDR display: Qt Quick falls
+    # back to SDR and the app has to work as without it.
+    add_test(NAME desktop_smoke_hdr_fallback COMMAND jellyfin-desktop --smoke)
+    set_tests_properties(desktop_smoke_hdr_fallback PROPERTIES TIMEOUT 60 ENVIRONMENT "QSG_RHI_HDR=hdr10")
+  endif()
   if(JFD_SERVER_TESTS)
     # Against scripts/test-server: sign in, series, episode, play, switch
     # audio and subtitles, quit (checkpoint 1).

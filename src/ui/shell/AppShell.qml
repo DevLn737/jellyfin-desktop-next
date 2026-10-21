@@ -13,6 +13,9 @@ FocusScope {
     readonly property alias toast: toast
     readonly property Item currentPage: stack.currentItem
     readonly property string title: currentPage && currentPage.title ? currentPage.title : ""
+    // Off while something under the shell must show through (the video with
+    // HDR10 output).
+    property bool backgroundVisible: true
 
     function showMessage(text) { toast.show(text, "info") }
     function showError(text) { toast.show(text, "error") }
@@ -40,6 +43,7 @@ FocusScope {
     Rectangle {
         anchors.fill: parent
         color: Theme.background
+        visible: shell.backgroundVisible
     }
 
     Sidebar {

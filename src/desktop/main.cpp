@@ -110,6 +110,7 @@ int main(int argc, char* argv[]) {
   if (scale != 1.0 && qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR")) {
     qputenv("QT_SCALE_FACTOR", QByteArray::number(scale, 'f', 2));
   }
+  desktop::requestHdrOutput(*services.settings);
 
   QGuiApplication app(argc, argv);
 

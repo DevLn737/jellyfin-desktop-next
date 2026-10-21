@@ -1,6 +1,7 @@
 #include "AppServices.h"
 
 #include <jfd/session/SessionRuntime.h>
+#include <jfd/ui/HdrOutput.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/PlayerModel.h>
@@ -15,6 +16,7 @@ namespace jfd::desktop {
 
   namespace {
     const QString AutoSkipKey = QStringLiteral("playback/autoSkipSegments");
+    const QString HdrKey = QStringLiteral("playback/hdr10");
   } // namespace
 
   bool registerPlayerSettings(settings::SettingsRegistry& registry) {
@@ -32,7 +34,26 @@ namespace jfd::desktop {
     autoSkip.description = QT_TRANSLATE_NOOP(
         "PlayerSettings", "When the server knows where they are. Otherwise a Skip button is shown.");
     section.settings.append(autoSkip);
+
+    // ADR 0001: off by default, HDR files are tone-mapped to SDR. Shown
+    // where the build can drive an HDR10 swap chain (Windows).
+    settings::SettingDescriptor hdr;
+    hdr.key = QStringLiteral("hdr10");
+    hdr.type = settings::SettingType::Bool;
+    hdr.defaultValue = false;
+    hdr.label = QT_TRANSLATE_NOOP("PlayerSettings", "HDR on HDR displays");
+    hdr.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings",
+        "HDR10 videos play in HDR when Windows has HDR turned on for the display. Off: they are converted "
+        "to SDR.");
+    hdr.requiresRestart = true;
+    hdr.hidden = !ui::HdrOutput::supported();
+    section.settings.append(hdr);
     return registry.registerSection(std::move(section));
+  }
+
+  void requestHdrOutput(const settings::Settings& settings) {
+    ui::HdrOutput::request(settings.value(HdrKey).toBool());
   }
 
   void installPlayer(AppServices& services, QQmlEngine&) {
