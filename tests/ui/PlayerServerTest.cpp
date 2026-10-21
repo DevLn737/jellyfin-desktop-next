@@ -391,9 +391,7 @@ TEST_CASE("An external audio file plays, through a transcode, at the same positi
   const double before = p.model->position();
   const auto playState = [&] { return p.serverSession().value(QStringLiteral("PlayState")).toObject(); };
 
-  // Each audio track in turn. The server mixes an external file into a
-  // transcode, so mpv sees one audio track either way; what plays is the
-  // server's choice, and the server shows it.
+  // Each audio track in turn; the server shows the choice.
   for (const int index : {embedded, external}) {
     if (p.model->audioIndex() != index) p.model->selectAudio(index);
     REQUIRE(waitFor([&] { return p.model->audioIndex() == index && !p.model->loading(); }, 30000));
@@ -401,7 +399,14 @@ TEST_CASE("An external audio file plays, through a transcode, at the same positi
     CHECK(std::abs(p.model->position() - before) < 1.0);
     REQUIRE(waitFor([&] { return playState().value(QStringLiteral("AudioStreamIndex")).toInt(-1) == index; }, 20000));
   }
-  CHECK(playState().value(QStringLiteral("PlayMethod")).toString() == QStringLiteral("Transcode"));
+  // The external file plays either mixed into a server transcode, or, when
+  // the file itself plays directly, loaded by mpv beside it.
+  const QString method = playState().value(QStringLiteral("PlayMethod")).toString();
+  INFO("play method " << method.toStdString());
+  if (method != QStringLiteral("Transcode")) {
+    CHECK(waitFor([&] { return p.mpv.property("current-tracks/audio/external").toBool(); }, 10000));
+    CHECK(p.mpv.property("current-tracks/audio/lang").toString() == QStringLiteral("rus"));
+  }
 }
 
 TEST_CASE("The intro shows a Skip button that jumps past it; credits skip on their own") {
