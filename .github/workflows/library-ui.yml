@@ -3,7 +3,9 @@ name: Library screens
 # The sign-in, home, library, item and search screens in a window
 # (offscreen), driven against Jellyfin 12.2 in Docker: sign in, open a
 # library, a series, an episode, Play and Watch together, search, sign out.
-# Screenshots of each screen are kept as an artifact.
+# Screenshots of each screen are kept as an artifact. Then the startup and
+# navigation timings are checked against their thresholds under Xvfb, and the
+# 1000-item grid scroll is measured as a preliminary (job summary).
 on:
   push:
     branches: [main]
@@ -39,7 +41,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ${{ steps.pins.outputs.libmpv-deb }} ninja-build libsecret-1-dev \
-            libgl1-mesa-dev libegl1 libfontconfig1 libxkbcommon-x11-0 fonts-dejavu-core
+            libgl1-mesa-dev libegl1 libfontconfig1 libxkbcommon-x11-0 fonts-dejavu-core \
+            xvfb xauth libgl1-mesa-dri libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
 
       - name: Start the server
         run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
@@ -48,13 +52,16 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
-        run: cmake --build build --parallel --target jfd_ui_library_server_tests
+        run: cmake --build build --parallel --target jfd_ui_library_server_tests jfd_library_bench
 
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
           JFD_UI_SCREENSHOTS: ${{ github.workspace }}/screenshots
         run: ctest --test-dir build --output-on-failure -V -R jfd_ui_library_server_tests
+
+      - name: Timings (Xvfb with Mesa)
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" scripts/measure/library-bench.sh build/tests/jfd_library_bench 5
 
       - name: Screenshots
         if: always()

@@ -113,3 +113,12 @@ in a binding so it re-evaluates when values change. See
 login page, visits every route and back, and fails if shutdown takes a
 second or more. Set `JFD_SMOKE_SCREENSHOTS=<dir>` to save a screenshot of
 each page.
+
+`scripts/measure/library-bench.sh build/tests/jfd_library_bench` times the
+library screens against the test server (the `JFD_TEST_*` variables) and
+fails when a threshold is missed: cold start to home under 4 s, warm start
+under 2 s, and a series, its season and home again under 1 s each. It also
+scrolls a 1000-item grid on an in-process fake server and reports the frame
+intervals; on Xvfb that number is only a preliminary for the laptop
+threshold. The Library screens workflow runs it under Xvfb and puts the
+table in the job summary.
