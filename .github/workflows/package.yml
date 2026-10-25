@@ -307,7 +307,13 @@ jobs:
           cd packages
           name="$APP_PACKAGE-$VERSION-x86_64.AppImage"
           grep " $name\$" SHA256SUMS > SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" --prerelease --verify-tag \
-            --title "Jellyfin Desktop $VERSION" \
-            --notes "Pre-release for testing. Linux AppImage: make it executable and run it. The file is signed with minisign (minisign.pub); SHA-256 in SHA256SUMS.txt." \
-            "$name" "$name.minisig" SHA256SUMS.txt minisign.pub
+          notes="Pre-release for testing. Linux AppImage: make it executable and run it. The file is signed with minisign (minisign.pub); SHA-256 in SHA256SUMS.txt."
+          # A release made from the tag by hand (gh release create) gets the files.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --prerelease --title "Jellyfin Desktop $VERSION" --notes "$notes"
+            gh release upload "$GITHUB_REF_NAME" --clobber "$name" "$name.minisig" SHA256SUMS.txt minisign.pub
+          else
+            gh release create "$GITHUB_REF_NAME" --prerelease --verify-tag \
+              --title "Jellyfin Desktop $VERSION" --notes "$notes" \
+              "$name" "$name.minisig" SHA256SUMS.txt minisign.pub
+          fi
