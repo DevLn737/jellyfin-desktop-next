@@ -12,6 +12,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Publish a pre-release from main under this tag (v<version>[-<pre-release>]); empty builds only'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -21,6 +26,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  # The release tag: the pushed tag, or the "tag" input of a manual run on main.
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || '') }}
   # The application target packed (src/desktop), the file it builds, and the
   # packages' name.
   APP_TARGET: jellyfin-desktop
@@ -283,7 +290,7 @@ jobs:
   release:
     name: Publish pre-release
     needs: sign
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.tag != '') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -312,11 +319,11 @@ jobs:
           grep -E " ($name|$msi)\$" SHA256SUMS > SHA256SUMS.txt
           notes="Pre-release for testing. Linux: the AppImage (make it executable and run it). Windows: the .msi installer (per user, no administrator rights). Both are signed with minisign (minisign.pub); SHA-256 in SHA256SUMS.txt."
           # A release made from the tag by hand (gh release create) gets the files.
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --prerelease --title "Jellyfin Desktop $VERSION" --notes "$notes"
-            gh release upload "$GITHUB_REF_NAME" --clobber "$name" "$name.minisig" "$msi" "$msi.minisig" SHA256SUMS.txt minisign.pub
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --prerelease --title "Jellyfin Desktop $VERSION" --notes "$notes"
+            gh release upload "$RELEASE_TAG" --clobber "$name" "$name.minisig" "$msi" "$msi.minisig" SHA256SUMS.txt minisign.pub
           else
-            gh release create "$GITHUB_REF_NAME" --prerelease --verify-tag \
+            gh release create "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" \
               --title "Jellyfin Desktop $VERSION" --notes "$notes" \
               "$name" "$name.minisig" "$msi" "$msi.minisig" SHA256SUMS.txt minisign.pub
           fi

@@ -16,6 +16,8 @@
 #include <jfd/ui/Navigator.h>
 
 #include <QDir>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -307,18 +309,77 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   });
   REQUIRE(waitFor([&] { return answered; }, Timeout));
 
+  // The server saves a collection's metadata file in the background, and
+  // saving it while a library scan runs can fail ("collection.xml being
+  // used by another process"), leaving a collection that is not listed.
+  // So wait for the scan, and if the new collection does not show up with
+  // its movie, remove it and make it again.
+  auto call = [&](api::JellyfinClient::Method method, const QString& path, const QUrlQuery& q) {
+    bool done = false;
+    api::JellyfinClient::RawResponse response;
+    client.send(method, path, q, std::nullopt, &client,
+                [&](api::Result<api::JellyfinClient::RawResponse> r) {
+                  if (r) response = r.value();
+                  done = true;
+                });
+    waitFor([&] { return done; }, Timeout);
+    return response;
+  };
+  waitFor(
+      [&] {
+        const auto tasks =
+            QJsonDocument::fromJson(
+                call(api::JellyfinClient::Method::Get, QStringLiteral("ScheduledTasks"), {}).body)
+                .array();
+        for (const QJsonValue& task : tasks) {
+          if (task.toObject().value(QStringLiteral("Key")).toString() ==
+              QLatin1String("RefreshLibrary"))
+            return task.toObject().value(QStringLiteral("State")).toString() ==
+                   QLatin1String("Idle");
+        }
+        return true;
+      },
+      60000);
+
   QString collectionId;
-  QUrlQuery create;
-  create.addQueryItem(QStringLiteral("name"), QStringLiteral("Stand collection"));
-  create.addQueryItem(QStringLiteral("ids"), movieId);
-  answered = false;
-  client.sendJson(api::JellyfinClient::Method::Post, QStringLiteral("Collections"), create,
-                  std::nullopt, &client, [&](api::Result<QJsonObject> result) {
-                    REQUIRE(result);
-                    collectionId = result->value(QStringLiteral("Id")).toString();
-                    answered = true;
-                  });
-  REQUIRE(waitFor([&] { return answered; }, Timeout));
+  auto listed = [&](const QString& id) {
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("parentId"), id);
+    q.addQueryItem(QStringLiteral("enableImages"), QStringLiteral("false"));
+    const auto items = QJsonDocument::fromJson(
+                           call(api::JellyfinClient::Method::Get, QStringLiteral("Items"), q).body)
+                           .object()
+                           .value(QStringLiteral("Items"))
+                           .toArray();
+    for (const QJsonValue& item : items)
+      if (item.toObject().value(QStringLiteral("Id")).toString() == movieId) return true;
+    return false;
+  };
+  for (int attempt = 0; attempt < 4 && collectionId.isEmpty(); ++attempt) {
+    QUrlQuery create;
+    create.addQueryItem(QStringLiteral("name"), QStringLiteral("Stand collection"));
+    create.addQueryItem(QStringLiteral("ids"), movieId);
+    const auto made =
+        call(api::JellyfinClient::Method::Post, QStringLiteral("Collections"), create);
+    const QString id =
+        QJsonDocument::fromJson(made.body).object().value(QStringLiteral("Id")).toString();
+    if (id.isEmpty()) continue;
+    // Listed with its movie, and found among the collections.
+    if (waitFor([&] { return listed(id); }, 8000) &&
+        waitFor(
+            [&] {
+              QUrlQuery q;
+              q.addQueryItem(QStringLiteral("includeItemTypes"), QStringLiteral("BoxSet"));
+              q.addQueryItem(QStringLiteral("recursive"), QStringLiteral("true"));
+              return call(api::JellyfinClient::Method::Get, QStringLiteral("Items"), q)
+                  .body.contains(id.toUtf8());
+            },
+            8000)) {
+      collectionId = id;
+    } else {
+      call(api::JellyfinClient::Method::Delete, QStringLiteral("Items/") + id, {});
+    }
+  }
   REQUIRE_FALSE(collectionId.isEmpty());
   // Whatever the checks below do, the server is left as it was found.
   auto cleanup = [&] {
