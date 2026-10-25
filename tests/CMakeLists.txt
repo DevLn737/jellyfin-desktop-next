@@ -14,7 +14,8 @@ add_executable(jfd_core_tests
   core/TimelineTest.cpp
   core/ReadinessTest.cpp
   core/ReconcilerTest.cpp
-  core/PlaybackSessionTest.cpp)
+  core/PlaybackSessionTest.cpp
+  core/SessionJournalTest.cpp)
 target_link_libraries(jfd_core_tests PRIVATE jfd::core jfd_test_support doctest)
 add_test(NAME jfd_core_tests COMMAND jfd_core_tests)
 

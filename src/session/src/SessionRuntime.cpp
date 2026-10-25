@@ -30,6 +30,7 @@ namespace jfd::session {
     m_backend = makeBackend(m_clock, post);
     m_session = std::make_unique<core::PlaybackSession>(
         core::SessionPorts{*m_backend, m_clock, *m_timers, *m_group, m_hub}, settings.session);
+    m_session->setJournal(&m_journal);
     m_hub.snapshotChanged(m_session->snapshot());
     m_launcher = new PlaybackLauncher(client, std::move(settings.deviceProfile), post, this);
     m_notices = m_hub.subscribe({}, [this](const core::SessionNotice& notice) { onNotice(notice); });

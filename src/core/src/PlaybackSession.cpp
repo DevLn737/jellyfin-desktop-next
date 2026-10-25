@@ -48,7 +48,9 @@ namespace jfd::core {
     while (!m_queue.empty()) {
       SessionInput next = std::move(m_queue.front());
       m_queue.pop_front();
-      if (accept(next)) {
+      const bool accepted = accept(next);
+      if (m_journal) m_journal->input(now(), next, accepted);
+      if (accepted) {
         handle(next);
       } else {
         ++m_dropped;
@@ -106,6 +108,11 @@ namespace jfd::core {
     std::visit([&](const auto& value) { on(value); }, input);
   }
 
+  void PlaybackSession::send(const SyncPlayMessage& message) {
+    if (m_journal) m_journal->output(now(), message);
+    m_ports.syncPlay.send(message);
+  }
+
   // ---- Intents -------------------------------------------------------------
 
   void PlaybackSession::on(const intent::Open& open) {
@@ -135,7 +142,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Play&) {
     if (m_group) {
-      m_ports.syncPlay.send(outgoing::RequestUnpause{m_group->epoch});
+      send(outgoing::RequestUnpause{m_group->epoch});
       return;
     }
     setPaused(false);
@@ -143,7 +150,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Pause&) {
     if (m_group) {
-      m_ports.syncPlay.send(outgoing::RequestPause{m_group->epoch});
+      send(outgoing::RequestPause{m_group->epoch});
       return;
     }
     setPaused(true);
@@ -151,7 +158,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Seek& seek) {
     if (m_group) {
-      m_ports.syncPlay.send(outgoing::RequestSeek{m_group->epoch, seek.position});
+      send(outgoing::RequestSeek{m_group->epoch, seek.position});
       return;
     }
     seekTo(seek.position, ReadyPurpose::Local);
@@ -161,7 +168,7 @@ namespace jfd::core {
     if (m_group) {
       // The group rate is a base rate; the server validates the same range.
       if (const auto base = PlaybackRate::basePerMille(rate.rate.perMille()))
-        m_ports.syncPlay.send(outgoing::RequestPlaybackRate{m_group->epoch, *base});
+        send(outgoing::RequestPlaybackRate{m_group->epoch, *base});
       return;
     }
     if (!PlaybackRate::basePerMille(rate.rate.perMille())) return;
@@ -171,7 +178,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Stop&) {
     if (m_group) {
-      m_ports.syncPlay.send(outgoing::RequestStop{m_group->epoch});
+      send(outgoing::RequestStop{m_group->epoch});
       return;
     }
     stopMedia(PlaybackPhase::Idle);
@@ -190,9 +197,9 @@ namespace jfd::core {
     }
     if (m_group->playlistItem.isEmpty()) return;
     if (forward)
-      m_ports.syncPlay.send(outgoing::RequestNextItem{m_group->epoch, m_group->playlistItem});
+      send(outgoing::RequestNextItem{m_group->epoch, m_group->playlistItem});
     else
-      m_ports.syncPlay.send(outgoing::RequestPreviousItem{m_group->epoch, m_group->playlistItem});
+      send(outgoing::RequestPreviousItem{m_group->epoch, m_group->playlistItem});
   }
 
   // A track switch is local: it changes neither the position nor readiness,
@@ -557,11 +564,11 @@ namespace jfd::core {
                      .value_or(position);
     if (ready) {
       m_group->reportedBuffering = false;
-      m_ports.syncPlay.send(outgoing::Ready{m_group->epoch, when, position, playing,
+      send(outgoing::Ready{m_group->epoch, when, position, playing,
                                             m_media->request.playlistItem});
     } else {
       m_group->reportedBuffering = true;
-      m_ports.syncPlay.send(outgoing::Buffering{m_group->epoch, when, position, !m_media->paused,
+      send(outgoing::Buffering{m_group->epoch, when, position, !m_media->paused,
                                                 m_media->request.playlistItem});
     }
   }

@@ -2,6 +2,7 @@ set(JFD_CORE_SOURCES
   src/PlaybackSession.cpp
   src/Readiness.cpp
   src/Reconciler.cpp
+  src/SessionJournal.cpp
   src/Timeline.cpp)
 
 add_library(jfd_core STATIC ${JFD_CORE_SOURCES})
@@ -17,6 +18,7 @@ function(jfd_core_mutant name number)
     ${dir}/src/PlaybackSession.cpp
     ${dir}/src/Readiness.cpp
     ${dir}/src/Reconciler.cpp
+    ${dir}/src/SessionJournal.cpp
     ${dir}/src/Timeline.cpp)
   target_include_directories(jfd_core_mutant_${name} PUBLIC ${dir}/include)
   target_compile_features(jfd_core_mutant_${name} PUBLIC cxx_std_20)
