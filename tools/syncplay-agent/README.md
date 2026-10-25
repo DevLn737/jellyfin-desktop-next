@@ -43,6 +43,26 @@ The thresholds are the stage 1 rows «Дрейф, автоматически», 
 Web participants leave before the resume in `native-controls`: Web 12.2 cannot
 resume after a paused seek (harness known issue 2), which is not ours to test.
 
+## Mixed group with real playback
+
+`jfd_syncplay_app_agent` ([app/appAgent.cpp](app/appAgent.cpp)) is our
+client as the app runs it, without the window: headless mpv, the player
+screen's model and the watch-together model. It speaks the same protocol
+plus `watch` (Watch together on an item), `tracks`, `audio`, `subtitle`
+and `skip` (the segment Skip button). [mixedGroup.mjs](mixedGroup.mjs)
+runs it with Jellyfin Web on the extras stand
+(`scripts/test-server/extras-server.sh`): the group starts from Watch
+together, Web joins, our client plays the external audio file and moves
+to a track Web is not on, and its Skip button moves everyone past the
+intro, each step within the 400 ms drift threshold. The Session workflow
+runs it on the stock server job.
+
+```sh
+cmake --build build-app --target jfd_syncplay_app_agent   # needs -DJFD_BUILD_APP=ON
+eval "$(scripts/test-server/extras-server.sh up | sed 's/^/export /')"
+node tools/syncplay-agent/mixedGroup.mjs --agent build-app/tools/syncplay-agent/app/jfd_syncplay_app_agent --out out/mixed
+```
+
 ## Run it locally
 
 ```sh
