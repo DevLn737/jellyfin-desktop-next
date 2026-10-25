@@ -1,10 +1,12 @@
 #include "LegacyInstall.h"
 
 #include <jfd/library/SignIn.h>
+#include <jfd/playback/PlayerOptions.h>
 #include <jfd/ui/Navigator.h>
 
 #include <QCoreApplication>
 #include <QLoggingCategory>
+#include <QSet>
 
 namespace jfd::desktop {
 
@@ -25,6 +27,25 @@ namespace jfd::desktop {
       if (shell != nullptr) {
         QMetaObject::invokeMethod(shell, "showMessage", Q_ARG(QVariant, QVariant(text)));
       }
+    }
+
+    // The settings that name a legacyKey, then the player's own translation
+    // of the 2.x playback, audio and subtitle values. Counts each setting
+    // once.
+    int importAll(settings::Settings& settings, const settings::LegacyProfile& profile) {
+      QSet<QString> imported;
+      for (const QString& key : settings::importLegacySettings(settings, profile).imported) {
+        imported.insert(key);
+      }
+      const QVariantMap player = playback::importLegacyPlayback(profile.values);
+      for (auto it = player.begin(); it != player.end(); ++it) {
+        if (settings.setValue(it.key(), it.value())) {
+          imported.insert(it.key());
+        } else {
+          qCInfo(lcLegacy) << "not imported:" << it.key() << it.value();
+        }
+      }
+      return int(imported.size());
     }
 
     // Only while no server is chosen: a restored session or a server the
@@ -84,7 +105,7 @@ namespace jfd::desktop {
     if (!legacy.profile || !firstStart) {
       return;
     }
-    legacy.imported = int(settings::importLegacySettings(*services.settings, *legacy.profile).imported.size());
+    legacy.imported = importAll(*services.settings, *legacy.profile);
     services.settings->setValue(ImportedFrom, legacy.profile->directory);
   }
 
@@ -104,8 +125,7 @@ namespace jfd::desktop {
                        if (auto profile = settings::readLegacyProfile(legacy.profile->directory)) {
                          legacy.profile = std::move(profile);
                        }
-                       const int count =
-                           int(settings::importLegacySettings(*services.settings, *legacy.profile).imported.size());
+                       const int count = importAll(*services.settings, *legacy.profile);
                        if (legacy.window) {
                          showMessage(*legacy.window, importedText(count));
                        }
