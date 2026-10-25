@@ -61,7 +61,7 @@ namespace jfd::ui {
     library::HomeModel& home() { return m_home; }
     library::CollectionIndex& collections() { return m_collections; }
     library::ImageCache& images() { return m_images; }
-    const TextureBudget& textures() const { return m_textures; }
+    const TextureBudget& textures() const { return *m_textures; }
     // Null before install().
     LibraryUi* ui() const { return m_ui; }
 
@@ -79,7 +79,7 @@ namespace jfd::ui {
     library::CollectionIndex m_collections;
     std::function<QJsonObject()> m_readFilters;
     std::function<void(const QJsonObject&)> m_writeFilters;
-    TextureBudget m_textures;
+    std::shared_ptr<TextureBudget> m_textures;
     LibraryUi* m_ui = nullptr;
   };
 
