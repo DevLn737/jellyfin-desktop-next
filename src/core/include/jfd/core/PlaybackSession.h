@@ -5,6 +5,7 @@
 #include <jfd/core/Readiness.h>
 #include <jfd/core/Reconciler.h>
 #include <jfd/core/SessionInput.h>
+#include <jfd/core/SessionJournal.h>
 #include <jfd/core/SessionSnapshot.h>
 #include <jfd/core/SyncPlay.h>
 #include <jfd/core/Timeline.h>
@@ -51,6 +52,10 @@ namespace jfd::core {
 
     const SessionSnapshot& snapshot() const { return m_snapshot; }
     std::uint64_t droppedInputs() const { return m_dropped; }
+
+    // Records every input from now on and each SyncPlay message sent; the
+    // journal must outlive the session or be unset first.
+    void setJournal(SessionJournal* journal) { m_journal = journal; }
 
   private:
     enum class ReadyPurpose { None, Local, GroupOpen, GroupSeek, Sync };
@@ -159,6 +164,7 @@ namespace jfd::core {
     void reportReady(bool ready);
     void synchronize();
     LocalInstant now() const { return m_ports.clock.now(); }
+    void send(const SyncPlayMessage& message);
     ServerInstant serverNow() const { return m_offset.toServer(now()); }
 
     // Timers.
@@ -174,6 +180,7 @@ namespace jfd::core {
     std::deque<SessionInput> m_queue;
     bool m_handling = false;
     std::uint64_t m_dropped = 0;
+    SessionJournal* m_journal = nullptr;
 
     EpochCounter<MediaEpochTag> m_mediaEpochs;
     EpochCounter<RequestTag> m_requests;

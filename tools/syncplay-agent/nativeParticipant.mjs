@@ -139,7 +139,8 @@ export class NativeParticipant {
   onAgent(msg) {
     switch (msg.t) {
       case 'sample':
-      case 'tracks': {
+      case 'tracks':
+      case 'journal': {
         const resolve = this.samples.get(msg.id);
         this.samples.delete(msg.id);
         resolve?.(msg);
@@ -239,6 +240,15 @@ export class NativeParticipant {
     return new Promise((resolve) => {
       this.samples.set(id, resolve);
       this.toAgent({ t: 'tracks', id });
+    });
+  }
+
+  /** The session journal's lines (app agent only): what our client heard and sent. */
+  journal() {
+    const id = ++this.serial;
+    return new Promise((resolve) => {
+      this.samples.set(id, (msg) => resolve(msg.lines ?? []));
+      this.toAgent({ t: 'journal', id });
     });
   }
 

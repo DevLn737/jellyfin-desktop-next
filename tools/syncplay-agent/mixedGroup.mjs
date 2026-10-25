@@ -194,6 +194,9 @@ try {
   error = e.stack ?? String(e);
   log(`ERROR ${e.message}`);
 }
+// What our client heard and sent, for reading a failure next to the server log.
+const journal = await Promise.race([native.journal(), sleep(3_000).then(() => [])]).catch(() => []);
+await writeFile(`${args.out}/session-journal.txt`, `${journal.join('\n')}\n`);
 await native.stop().catch(() => {});
 await web.stop().catch(() => {});
 await browser.close();

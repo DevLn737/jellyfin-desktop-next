@@ -90,6 +90,9 @@ namespace jfd::session {
     ApiTransport& transport() { return *m_transport; }
     SleepDetector& sleepDetector() { return *m_sleep; }
     core::MediaBackend& backend() { return *m_backend; }
+    // The session's last inputs and the SyncPlay messages it sent, for the
+    // diagnostics report (lines() gives text without URLs or tokens).
+    const core::SessionJournal& journal() const { return m_journal; }
 
   Q_SIGNALS:
     // Next or Previous outside a group: the app's queue picks the item.
@@ -105,6 +108,7 @@ namespace jfd::session {
     api::SessionSocket& m_socket;
     SteadyClock m_clock;
     SessionHub m_hub;
+    core::SessionJournal m_journal;
     InputQueue* m_queue;
     QtTimers* m_timers;
     ApiTransport* m_transport;

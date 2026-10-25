@@ -196,6 +196,10 @@ namespace {
         emit(sample(message.value("id", std::uint64_t{0})));
       } else if (type == "tracks") {
         emit(tracks(message.value("id", std::uint64_t{0})));
+      } else if (type == "journal") {
+        emit(json{{"t", "journal"},
+                  {"id", message.value("id", std::uint64_t{0})},
+                  {"lines", m_runtime->journal().lines()}});
       } else if (type == "create") {
         m_group->createGroup(text("name"));
       } else if (type == "join") {
