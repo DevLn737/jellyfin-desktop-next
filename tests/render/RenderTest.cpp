@@ -4,7 +4,11 @@
 #include "MpvD3D11VideoItem.h"
 #endif
 
+#include <jfd/playback/PlayerOptions.h>
+
 #include <QElapsedTimer>
+#include <QFile>
+#include <QTemporaryDir>
 #include <QGuiApplication>
 #include <QImage>
 #include <QQmlApplicationEngine>
@@ -55,6 +59,25 @@ bool near(const QColor& color, double r, double g, double b, double tolerance = 
 void describe(const char* name, const QColor& c)
 {
   std::printf("     %s: %.2f %.2f %.2f\n", name, c.redF(), c.greenF(), c.blueF());
+}
+
+// Pixels of a colour inside a rectangle of the window.
+int countPixels(const QImage& image, const QRect& rect, const std::function<bool(const QColor&)>& match)
+{
+  int n = 0;
+  for (int y = rect.top(); y <= rect.bottom(); ++y)
+    for (int x = rect.left(); x <= rect.right(); ++x)
+      n += match(image.pixelColor(x, y)) ? 1 : 0;
+  return n;
+}
+
+bool isYellow(const QColor& c) { return c.redF() > 0.75 && c.greenF() > 0.75 && c.blueF() < 0.45; }
+bool isGreen(const QColor& c) { return c.greenF() > 0.6 && c.redF() < 0.35 && c.blueF() < 0.35; }
+
+bool writeFile(const QString& path, const QByteArray& text)
+{
+  QFile file(path);
+  return file.open(QIODevice::WriteOnly) && file.write(text) == text.size();
 }
 
 // Waits on the event loop for a condition, up to a timeout.
@@ -176,6 +199,67 @@ int main(int argc, char* argv[])
   check(near(overlay, 0.5, 0, 0.5, 0.15), "QML overlay blends over the video");
   check(near(outside, 0, 0, 0), "video stays inside its item");
   check(near(white, 1, 1, 1), "Qt items after mpv render normally");
+
+  // Subtitle style (threshold "Субтитры" of stage 2b): the player's style
+  // on plain subtitles, and on styled ones only when it overrides theirs.
+  // The video is black; a long line of capitals gives enough pixels.
+  QTemporaryDir subtitles;
+  const QString srt = subtitles.filePath(QStringLiteral("plain.srt"));
+  const QString ass = subtitles.filePath(QStringLiteral("styled.ass"));
+  check(writeFile(srt, "1\n00:00:00,000 --> 10:00:00,000\nHHHHHHHHHH\n")
+          && writeFile(ass,
+               "[Script Info]\nScriptType: v4.00+\nPlayResX: 320\nPlayResY: 180\n\n"
+               "[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
+               "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
+               "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+               // Green (ASS colours are &HAABBGGRR), no outline, bottom centre.
+               "Style: Default,Arial,24,&H0000FF00,&H0000FF00,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,2,10,10,"
+               "10,1\n\n"
+               "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+               "Dialogue: 0,0:00:00.00,9:00:00.00,Default,,0,0,0,,HHHHHHHHHH\n"),
+        "subtitle files are written");
+  const QRect videoTop(40, 60, 320, 90);
+  const QRect videoBottom(40, 150, 320, 90);
+  const auto grab = [&] { return window->grabWindow().convertToFormat(QImage::Format_RGB32); };
+  // Enough coloured pixels in one half and none to speak of in the other.
+  const auto shows = [&](const QRect& where, const QRect& elsewhere, bool (*colour)(const QColor&)) {
+    int inside = 0, beside = 0;
+    const bool ok = waitFor([&] {
+      const QImage frame = grab();
+      inside = countPixels(frame, where, colour);
+      beside = countPixels(frame, elsewhere, colour);
+      return inside > 80 && beside < 20;
+    }, 10000);
+    std::printf("     %d pixels where expected, %d elsewhere\n", inside, beside);
+    return ok;
+  };
+  const auto loadWithSubtitle = [&](const QString& file) {
+    firstFrame = false;
+    player->setStringProperty("sub-files", file.toUtf8());
+    player->load(QStringLiteral("av://lavfi:color=c=black:s=320x180:r=30"));
+    return waitFor([&] { return firstFrame; }, 20000);
+  };
+
+  jfd::playback::SubtitleStyle style;
+  style.color = QStringLiteral("#FBF93E");
+  style.size = 60;
+  style.borderSize = 0;
+  player->setProperties(jfd::playback::subtitleProperties(style));
+  check(loadWithSubtitle(srt), "video with a plain subtitle starts");
+  check(shows(videoBottom, videoTop, isYellow), "plain subtitle takes the colour, at the bottom");
+  style.placement = QStringLiteral("center,top");
+  player->setProperties(jfd::playback::subtitleProperties(style));
+  check(shows(videoTop, videoBottom, isYellow), "plain subtitle moves to the top");
+
+  style.placement.clear();
+  player->setProperties(jfd::playback::subtitleProperties(style));
+  check(loadWithSubtitle(ass), "video with a styled subtitle starts");
+  check(shows(videoBottom, videoTop, isGreen), "styled subtitle keeps its own colour");
+  check(countPixels(grab(), videoBottom, isYellow) < 20, "player colour stays off the styled subtitle");
+  style.assOverride = QStringLiteral("force");
+  player->setProperties(jfd::playback::subtitleProperties(style));
+  check(shows(videoBottom, videoTop, isYellow), "forced override gives the styled subtitle the player's colour");
+  check(countPixels(grab(), videoBottom, isGreen) < 20, "its own colour is gone");
 
   // Ordered teardown while playing: window and render context first, then mpv.
   QElapsedTimer teardown;

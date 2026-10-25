@@ -180,6 +180,43 @@ void MpvPlayer::setStringProperty(const char* name, const QByteArray& value)
   mpv_set_property_async(m_mpv.get(), 0, name, MPV_FORMAT_STRING, &data);
 }
 
+void MpvPlayer::setProperties(const QList<QPair<QByteArray, QByteArray>>& properties)
+{
+  if (!m_mpv)
+    return;
+  for (const auto& [name, value] : properties)
+  {
+    // Options are properties too; option-info knows every one.
+    if (!property(QByteArray("option-info/" + name + "/name").constData()).isValid())
+      continue;
+    setStringProperty(name.constData(), value);
+  }
+}
+
+QList<MpvPlayer::AudioDevice> MpvPlayer::listAudioDevices()
+{
+  QList<AudioDevice> devices;
+  MpvHandle mpv = createMpv();
+  if (!mpv)
+    return devices;
+  for (const auto& [name, value] : {std::pair{"config", "no"}, std::pair{"terminal", "no"},
+                                    std::pair{"msg-level", "all=no"}, std::pair{"vo", "null"},
+                                    std::pair{"idle", "yes"}})
+    mpv_set_option_string(mpv.get(), name, value);
+  if (mpv_initialize(mpv.get()) < 0)
+    return devices;
+  mpv_node node;
+  if (mpv_get_property(mpv.get(), "audio-device-list", MPV_FORMAT_NODE, &node) < 0)
+    return devices;
+  for (const QVariant& entry : nodeToVariant(node).toList())
+  {
+    const QVariantMap map = entry.toMap();
+    devices.append({map.value(QStringLiteral("name")).toString(), map.value(QStringLiteral("description")).toString()});
+  }
+  mpv_free_node_contents(&node);
+  return devices;
+}
+
 void MpvPlayer::stop()
 {
   command({"stop"});
