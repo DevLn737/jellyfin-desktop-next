@@ -8,6 +8,10 @@ name: Session
 # screen's model (Jfd.Ui.Player: tracks, a transcoded seek, reports, the next
 # episode, trickplay) run here too; on the stock server also against a second
 # one with an external audio file and media segments (extras-server.sh).
+# There, too, our client with real playback (the app agent: headless mpv and
+# the player's model) and Jellyfin Web in one group: started with Watch
+# together, each on its own audio, the intro skipped for everyone
+# (tools/syncplay-agent/mixedGroup.mjs).
 on:
   push:
     branches: [main]
@@ -80,12 +84,43 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
-        run: cmake --build build --parallel --target jfd_session_mpv_server_tests jfd_ui_group_server_tests jfd_ui_player_server_tests
+        run: cmake --build build --parallel --target jfd_session_mpv_server_tests jfd_ui_group_server_tests jfd_ui_player_server_tests jfd_syncplay_app_agent
 
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure -V -R 'jfd_session_mpv_server_tests|jfd_ui_group_server_tests|jfd_ui_player_server_tests'
+
+      - uses: actions/setup-node@v4
+        if: matrix.server.fork == '0'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tools/syncplay-harness/package-lock.json
+
+      - name: Install the harness and Chromium
+        if: matrix.server.fork == '0'
+        working-directory: tools/syncplay-harness
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Mixed group with Jellyfin Web
+        if: matrix.server.fork == '0'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: node tools/syncplay-agent/mixedGroup.mjs --agent build/tools/syncplay-agent/app/jfd_syncplay_app_agent --out out/mixed
+
+      - name: Mixed group summary
+        if: always() && matrix.server.fork == '0'
+        run: cat out/mixed/mixed-group.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.server.fork == '0'
+        with:
+          name: mixed-group
+          path: out/mixed/
+          if-no-files-found: ignore
 
       - name: Server log on failure
         if: failure()

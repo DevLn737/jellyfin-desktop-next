@@ -138,7 +138,8 @@ export class NativeParticipant {
 
   onAgent(msg) {
     switch (msg.t) {
-      case 'sample': {
+      case 'sample':
+      case 'tracks': {
         const resolve = this.samples.get(msg.id);
         this.samples.delete(msg.id);
         resolve?.(msg);
@@ -224,6 +225,26 @@ export class NativeParticipant {
     this.toAgent({ t: 'create', name });
     return (await joined).data.GroupId;
   }
+
+  // The app agent only (app/appAgent.cpp): the item page's Watch together,
+  // the player's track menus and the segment Skip button.
+  async watchTogether(itemId, name) {
+    const joined = this.waitFor((e) => e.type === 'SyncPlayGroupUpdate' && e.data?.Type === 'GroupJoined', 15_000, 'GroupJoined');
+    this.toAgent({ t: 'watch', item: itemId, name });
+    return (await joined).data.GroupId;
+  }
+
+  tracks() {
+    const id = ++this.serial;
+    return new Promise((resolve) => {
+      this.samples.set(id, resolve);
+      this.toAgent({ t: 'tracks', id });
+    });
+  }
+
+  selectAudio(index) { this.toAgent({ t: 'audio', index }); }
+  selectSubtitle(index) { this.toAgent({ t: 'subtitle', index }); }
+  skipSegment() { this.toAgent({ t: 'skip' }); }
 
   leave() { this.toAgent({ t: 'leave' }); }
   play() { this.toAgent({ t: 'intent', op: 'play' }); }
