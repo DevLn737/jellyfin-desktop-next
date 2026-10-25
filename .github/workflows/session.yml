@@ -109,6 +109,8 @@ jobs:
         if: matrix.server.fork == '0'
         env:
           QT_QPA_PLATFORM: offscreen
+          # Every SyncPlay message our client sends and receives, for a failure.
+          QT_LOGGING_RULES: jfd.session.wire.debug=true
         run: node tools/syncplay-agent/mixedGroup.mjs --agent build/tools/syncplay-agent/app/jfd_syncplay_app_agent --out out/mixed
 
       - name: Mixed group summary

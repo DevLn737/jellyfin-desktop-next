@@ -4,6 +4,7 @@
 #include <jfd/api/SessionSocket.h>
 
 #include <QJsonDocument>
+#include <QLoggingCategory>
 
 #include <chrono>
 #include <memory>
@@ -11,6 +12,11 @@
 #include <variant>
 
 namespace jfd::session {
+
+  namespace {
+    // Session messages as they arrive, for tracing a group session.
+    Q_LOGGING_CATEGORY(lcWire, "jfd.session.wire", QtWarningMsg)
+  } // namespace
 
   SessionRuntime::SessionRuntime(api::JellyfinClient& client, api::SessionSocket& socket,
                                  const BackendFactory& makeBackend, Settings settings,
@@ -60,7 +66,9 @@ namespace jfd::session {
     QJsonObject message;
     message.insert(QStringLiteral("MessageType"), QLatin1String(messageType));
     message.insert(QStringLiteral("Data"), data);
-    m_group->onMessage(QJsonDocument(message).toJson(QJsonDocument::Compact).toStdString());
+    const QByteArray wire = QJsonDocument(message).toJson(QJsonDocument::Compact);
+    qCDebug(lcWire).noquote() << "<=" << wire;
+    m_group->onMessage(wire.toStdString());
   }
 
   void SessionRuntime::onSocketReady(quint64 generation) {
