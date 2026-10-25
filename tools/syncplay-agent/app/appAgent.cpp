@@ -285,7 +285,8 @@ namespace {
               {"audioIndex", m_model->audioIndex()},
               {"subtitleIndex", m_model->subtitleIndex()},
               {"mpvAudioExternal", m_mpv.property("current-tracks/audio/external").toBool()},
-              {"mpvAudioLang", m_mpv.property("current-tracks/audio/lang").toString().toStdString()}};
+              {"mpvAudioLang", m_mpv.property("current-tracks/audio/lang").toString().toStdString()},
+              {"mpvSubtitleLang", m_mpv.property("current-tracks/sub/lang").toString().toStdString()}};
     }
 
     void onSnapshot(const core::SessionSnapshot& snapshot) {

@@ -67,6 +67,11 @@ if (!users.some((u) => u.Name === WEB_USER.name)) {
   log(`Creating user ${WEB_USER.name}`);
   await admin.post('Users/New', { Name: WEB_USER.name, Password: WEB_USER.password });
 }
+// Web's own subtitle choice comes from its user's preference: English,
+// always shown. (Choosing in Web's player menu would need its UI.)
+const webUser = (await admin.get('Users')).find((u) => u.Name === WEB_USER.name);
+await admin.post(`Users/Configuration?userId=${webUser.Id}`,
+  { ...webUser.Configuration, SubtitleLanguagePreference: 'eng', SubtitleMode: 'Always' });
 const movies = await admin.get('Items?Recursive=true&IncludeItemTypes=Movie');
 const movie = movies.Items[0];
 log(`Item: ${movie.Name} (${movie.Id})`);
@@ -138,6 +143,38 @@ try {
   check('the group is in step after our switch', resynced.ok, `${resynced.elapsedMs} ms; ${describe(resynced.snapshot)}`);
   await driftChecks(all, 'own audio', 2);
 
+  // 3b. Each member on its own external subtitles (when the stand has the
+  //     Russian .srt and English .ass): Web shows the English one from its
+  //     user's preference, our client picks the Russian one.
+  const rusSub = menus.subtitle.find((t) => t.isExternal && t.language === 'rus');
+  const engSub = menus.subtitle.find((t) => t.isExternal && t.language === 'eng');
+  if (rusSub && engSub) {
+    const sessionOf = async (match) => (await admin.get('Sessions')).find(match)?.PlayState?.SubtitleStreamIndex;
+    const webSub = () => sessionOf((x) => x.UserName === WEB_USER.name && x.NowPlayingItem);
+    const ourSub = () => sessionOf((x) => x.DeviceId === `jfd-agent-${native.label}`);
+    const until = async (read, want, ms = 15_000) => {
+      let value = await read();
+      for (const deadline = Date.now() + ms; value !== want && Date.now() < deadline; value = await read()) await sleep(500);
+      return value;
+    };
+    const webBeforeSub = await until(webSub, engSub.index);
+    check('Web shows its English .ass', webBeforeSub === engSub.index, `Web subtitle ${webBeforeSub}, English ${engSub.index}`);
+    native.selectSubtitle(rusSub.index);
+    const picked = await waitUntil([native], (x) => x.samples[0].subtitleIndex === rusSub.index && x.samples[0].playing, 30_000, 250);
+    const ours = await until(ourSub, rusSub.index);
+    let shown = await native.tracks();
+    for (const deadline = Date.now() + 5000; shown.mpvSubtitleLang !== 'rus' && Date.now() < deadline; shown = await native.tracks()) await sleep(250);
+    check('our client shows its Russian .srt', picked.ok && ours === rusSub.index && shown.mpvSubtitleLang === 'rus',
+      `ours ${ours}, Russian ${rusSub.index}, mpv shows ${shown.mpvSubtitleLang || 'none'}`);
+    const webAfterSub = await webSub();
+    check('Web keeps its English subtitles', webAfterSub === engSub.index, `Web ${webBeforeSub} -> ${webAfterSub}`);
+    const inStep = await waitUntil(all, (x) => allPlaying(x) && x.spreadMs != null && x.spreadMs < DRIFT_MS, 20_000, 250);
+    check('the group is in step with our subtitles on', inStep.ok, `${inStep.elapsedMs} ms; ${describe(inStep.snapshot)}`);
+    await driftChecks(all, 'own subtitles', 2);
+  } else {
+    log('The stand has no Russian and English external subtitles: subtitle step skipped');
+  }
+
   // 4. The intro: back to it for everyone, then our Skip button moves the
   //    whole group past it (intro 2-12 s on the stand).
   native.seek(3000);
@@ -169,7 +206,7 @@ const lines = [
   '',
   `${passed ? '✅ All checks passed' : '❌ Failures'} · ${movie.Name} on the extras stand · ${report.generatedAt}`,
   '',
-  `Max spread: mixed group ${round(metrics['mixed group'])} ms, own audio ${round(metrics['own audio'])} ms, after skip ${round(metrics['after skip'])} ms (limit ${DRIFT_MS}). Web joined in ${metrics.webJoinMs} ms; Skip reached everyone in ${metrics.skipMs} ms. Our external audio played as ${metrics.audioPlayback ?? 'n/a'}.`,
+  `Max spread: mixed group ${round(metrics['mixed group'])} ms, own audio ${round(metrics['own audio'])} ms, own subtitles ${round(metrics['own subtitles'])} ms, after skip ${round(metrics['after skip'])} ms (limit ${DRIFT_MS}). Web joined in ${metrics.webJoinMs} ms; Skip reached everyone in ${metrics.skipMs} ms. Our external audio played as ${metrics.audioPlayback ?? 'n/a'}.`,
   '',
 ];
 if (error) lines.push('```', error.split('\n').slice(0, 6).join('\n'), '```', '');
