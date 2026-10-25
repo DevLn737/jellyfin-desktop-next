@@ -13,7 +13,8 @@ namespace {
 
 std::uint32_t read16(const std::string& s, std::size_t at)
 {
-  return static_cast<unsigned char>(s[at]) | (static_cast<unsigned char>(s[at + 1]) << 8);
+  return static_cast<std::uint32_t>(static_cast<unsigned char>(s[at])) |
+         (static_cast<std::uint32_t>(static_cast<unsigned char>(s[at + 1])) << 8);
 }
 
 std::uint32_t read32(const std::string& s, std::size_t at)
