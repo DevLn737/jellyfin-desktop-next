@@ -248,7 +248,8 @@ jobs:
           cd packages
           # Release name first: the signature names the file.
           mv "$(ls *.AppImage | head -1)" "$APP_PACKAGE-$VERSION-x86_64.AppImage"
-          mv "$(ls *.msi | head -1)" "$APP_PACKAGE-$VERSION-x64.msi"
+          [ "$(ls *.msi | head -1)" = "$APP_PACKAGE-$VERSION-x64.msi" ] \
+            || mv "$(ls *.msi | head -1)" "$APP_PACKAGE-$VERSION-x64.msi"
           for file in *.msi *.AppImage; do
             # The client accepts a signature only when the trusted comment
             # names the file (ReleaseSignature.cpp).
