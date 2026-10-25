@@ -8,7 +8,7 @@ qt_add_qml_module(jfd_render_test
   VERSION 1.0
   NO_PLUGIN
   QML_FILES RenderScene.qml)
-target_link_libraries(jfd_render_test PRIVATE Qt6::Gui Qt6::Quick Qt6::Qml jfd::media_backend)
+target_link_libraries(jfd_render_test PRIVATE Qt6::Gui Qt6::Quick Qt6::Qml jfd::media_backend jfd::playback)
 add_test(NAME jfd_render_test COMMAND jfd_render_test)
 set_tests_properties(jfd_render_test PROPERTIES TIMEOUT 90)
 if(WIN32 AND TARGET jfd_media_backend)

@@ -106,7 +106,7 @@ if(TARGET jfd_jellyfin_api)
 
   jfd_add_qt_test(jfd_playback_tests playback/TrackTableTest.cpp playback/PlaybackReporterTest.cpp
     playback/StreamPlanTest.cpp playback/TrackControllerTest.cpp
-    playback/SegmentSkipperTest.cpp playback/TrackPreferenceTest.cpp)
+    playback/SegmentSkipperTest.cpp playback/TrackPreferenceTest.cpp playback/PlayerOptionsTest.cpp)
   target_link_libraries(jfd_playback_tests PRIVATE jfd::playback)
 
   if(TARGET jfd_integrations)

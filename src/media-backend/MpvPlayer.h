@@ -50,8 +50,20 @@ public:
   void setDoubleProperty(const char* name, double value);
   // Sets an mpv property from its string form without waiting (hwdec).
   void setStringProperty(const char* name, const QByteArray& value);
+  // Sets each property from its string form, skipping ones this libmpv
+  // does not have (newer options on an older system libmpv).
+  void setProperties(const QList<QPair<QByteArray, QByteArray>>& properties);
   // Stops playback; the core stays alive until destruction.
   void stop();
+
+  struct AudioDevice
+  {
+    QString name;        // mpv's audio-device value
+    QString description; // for people
+  };
+  // The outputs mpv can play on, "auto" (the system's default) first. Starts
+  // a short-lived core of its own, so it works before any player exists.
+  static QList<AudioDevice> listAudioDevices();
 
   bool paused() const { return m_paused; }
   double position() const { return m_position; }
