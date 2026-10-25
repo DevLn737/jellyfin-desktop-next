@@ -15,6 +15,7 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QJsonObject>
+#include <QMap>
 #include <QSignalSpy>
 #include <QUrlQuery>
 
@@ -27,7 +28,7 @@
 // in a transcoded HLS stream, the reports the server shows, the next
 // episode and the seek bar thumbnails. On the extras stand
 // (extras-server.sh, JFD_EXTRAS_*; skipped without it): an external audio
-// file, and skipping intros and credits.
+// file, two external subtitles, and skipping intros and credits.
 
 using namespace jfd;
 using namespace jfd::api;
@@ -487,6 +488,49 @@ TEST_CASE("An external audio file plays, through a transcode, at the same positi
   if (method != QStringLiteral("Transcode")) {
     CHECK(waitFor([&] { return p.mpv.property("current-tracks/audio/external").toBool(); }, 10000));
     CHECK(p.mpv.property("current-tracks/audio/lang").toString() == QStringLiteral("rus"));
+  }
+}
+
+TEST_CASE("Two external subtitles, in different languages and formats, each load with their language") {
+  if (!hasExtrasStand()) return;
+  Player p(QStringLiteral("jfd-player-external-subtitles"), {}, QStringLiteral("JFD_EXTRAS"));
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing() && p.model->position() > 3; }, 60000));
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.model->paused(); }, 10000));
+  const double before = p.model->position();
+
+  // The stand's subtitles: rus .srt and eng .ass, both external.
+  QMap<QString, int> byLanguage;
+  for (const QVariant& track : p.model->subtitleTracks()) {
+    const QVariantMap map = track.toMap();
+    if (map.value(QStringLiteral("isExternal")).toBool())
+      byLanguage.insert(map.value(QStringLiteral("language")).toString(), map.value(QStringLiteral("index")).toInt());
+  }
+  REQUIRE(byLanguage.contains(QStringLiteral("rus")));
+  REQUIRE(byLanguage.contains(QStringLiteral("eng")));
+
+  const auto playState = [&] { return p.serverSession().value(QStringLiteral("PlayState")).toObject(); };
+  for (const QString& language : {QStringLiteral("rus"), QStringLiteral("eng")}) {
+    INFO("subtitle " << language.toStdString());
+    const int index = byLanguage.value(language);
+    p.model->selectSubtitle(index);
+    REQUIRE(waitFor([&] { return p.model->subtitleIndex() == index && !p.model->loading(); }, 30000));
+    REQUIRE(waitFor(
+        [&] {
+          return p.mpv.property("current-tracks/sub/external").toBool() &&
+                 p.mpv.property("current-tracks/sub/lang").toString() == language;
+        },
+        10000));
+    CHECK(std::abs(p.model->position() - before) < 1.0);
+    CHECK(waitFor([&] { return playState().value(QStringLiteral("SubtitleStreamIndex")).toInt(-2) == index; }, 20000));
   }
 }
 
