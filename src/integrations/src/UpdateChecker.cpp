@@ -1,5 +1,6 @@
 #include <jfd/integrations/UpdateChecker.h>
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -60,14 +61,48 @@ namespace jfd::integrations {
     return comparePrerelease(a->prerelease, b->prerelease) > 0;
   }
 
-  QUrl UpdateChecker::defaultReleasesUrl() {
-    return QUrl(QStringLiteral("https://api.github.com/repos/DevLn737/jellyfin-desktop-next/releases/latest"));
+  UpdateChannel updateChannel(const QString& value) {
+    return value == QLatin1String("stable") ? UpdateChannel::Stable : UpdateChannel::Beta;
   }
 
-  UpdateChecker::UpdateChecker(QNetworkAccessManager* network, QString currentVersion, QUrl latestReleaseUrl,
-                               QObject* parent)
-      : QObject(parent), m_network(network), m_currentVersion(std::move(currentVersion)),
-        m_url(std::move(latestReleaseUrl)) {}
+  std::optional<Release> newestRelease(const QJsonArray& releases, UpdateChannel channel) {
+    static const QRegularExpression clientTag(QStringLiteral(R"(^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$)"));
+    std::optional<Release> newest;
+    for (const QJsonValue& value : releases) {
+      const QJsonObject release = value.toObject();
+      const QString tag = release.value(QStringLiteral("tag_name")).toString();
+      const bool prerelease = release.value(QStringLiteral("prerelease")).toBool();
+      if (!clientTag.match(tag).hasMatch() || release.value(QStringLiteral("draft")).toBool()) continue;
+      if (prerelease && channel == UpdateChannel::Stable) continue;
+      // Only GitHub pages are offered as download links.
+      const QUrl page(release.value(QStringLiteral("html_url")).toString());
+      if (page.scheme() != QStringLiteral("https") || page.host() != QStringLiteral("github.com")) continue;
+      const QString version = tag.mid(1);
+      if (newest && !isNewerVersion(version, newest->version)) continue;
+
+      Release candidate;
+      candidate.version = version;
+      candidate.page = page;
+      candidate.prerelease = prerelease;
+      for (const QJsonValue& assetValue : release.value(QStringLiteral("assets")).toArray()) {
+        const QJsonObject asset = assetValue.toObject();
+        candidate.assets.append({asset.value(QStringLiteral("name")).toString(),
+                                 QUrl(asset.value(QStringLiteral("browser_download_url")).toString()),
+                                 asset.value(QStringLiteral("size")).toInteger()});
+      }
+      newest = std::move(candidate);
+    }
+    return newest;
+  }
+
+  QUrl UpdateChecker::defaultReleasesUrl() {
+    return QUrl(QStringLiteral("https://api.github.com/repos/DevLn737/jellyfin-desktop-next/releases?per_page=30"));
+  }
+
+  UpdateChecker::UpdateChecker(QNetworkAccessManager* network, QString currentVersion, UpdateChannel channel,
+                               QUrl releasesUrl, QObject* parent)
+      : QObject(parent), m_network(network), m_currentVersion(std::move(currentVersion)), m_channel(channel),
+        m_url(std::move(releasesUrl)) {}
 
   void UpdateChecker::check() {
     QNetworkRequest request(m_url);
@@ -84,27 +119,25 @@ namespace jfd::integrations {
         return;
       }
       if (status != 200) {
-        // 404: nothing published yet.
         Q_EMIT checkFailed(QStringLiteral("HTTP %1").arg(status));
         return;
       }
-      const QJsonObject release = QJsonDocument::fromJson(reply->readAll()).object();
-      const QString tag = release.value(QStringLiteral("tag_name")).toString();
-      const QUrl page(release.value(QStringLiteral("html_url")).toString());
-      if (tag.isEmpty() || release.value(QStringLiteral("draft")).toBool() ||
-          release.value(QStringLiteral("prerelease")).toBool()) {
-        Q_EMIT checkFailed(QStringLiteral("no published release"));
+      const QJsonDocument document = QJsonDocument::fromJson(reply->readAll());
+      if (!document.isArray()) {
+        Q_EMIT checkFailed(QStringLiteral("unexpected answer"));
         return;
       }
-      // Only GitHub pages are offered as download links.
-      if (page.scheme() != QStringLiteral("https") || page.host() != QStringLiteral("github.com")) {
-        Q_EMIT checkFailed(QStringLiteral("unexpected release page"));
+      const auto newest = newestRelease(document.array(), m_channel);
+      if (!newest) {
+        Q_EMIT checkFailed(QStringLiteral("no client release"));
         return;
       }
-      if (isNewerVersion(tag, m_currentVersion))
-        Q_EMIT updateAvailable(tag.startsWith(QLatin1Char('v')) ? tag.mid(1) : tag, page);
-      else
+      if (isNewerVersion(newest->version, m_currentVersion)) {
+        m_available = newest;
+        Q_EMIT updateAvailable(newest->version, newest->page);
+      } else {
         Q_EMIT upToDate();
+      }
     });
   }
 

@@ -77,8 +77,9 @@ namespace jfd::desktop {
     QObject::connect(&controls, &platform::MediaControls::quitRequested, &window, &QQuickWindow::close);
 
     if (!checkForUpdates || !services.settings->value(integrations::keys::CheckForUpdates).toBool()) return;
-    integrations.updates = std::make_unique<integrations::UpdateChecker>(&integrations.network,
-                                                                         QCoreApplication::applicationVersion());
+    integrations.updates = std::make_unique<integrations::UpdateChecker>(
+        &integrations.network, QCoreApplication::applicationVersion(),
+        integrations::updateChannel(services.settings->value(integrations::keys::UpdateChannel).toString()));
     auto* checker = integrations.updates.get();
     QObject::connect(checker, &integrations::UpdateChecker::updateAvailable, &window,
                      [&window](const QString& version, const QUrl& downloadPage) {
