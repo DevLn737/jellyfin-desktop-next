@@ -12,8 +12,10 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QJsonObject>
+#include <QMap>
 #include <QSignalSpy>
 #include <QUrlQuery>
 
@@ -26,7 +28,7 @@
 // in a transcoded HLS stream, the reports the server shows, the next
 // episode and the seek bar thumbnails. On the extras stand
 // (extras-server.sh, JFD_EXTRAS_*; skipped without it): an external audio
-// file, and skipping intros and credits.
+// file, two external subtitles, and skipping intros and credits.
 
 using namespace jfd;
 using namespace jfd::api;
@@ -198,17 +200,30 @@ TEST_CASE("Track menus list the movie's tracks, and a change keeps the position"
     if (index != first) second = index;
   }
   REQUIRE(second >= 0);
+  // Timed from the menu's choice to mpv playing the track (threshold
+  // "Дорожки": under a second).
+  QElapsedTimer switching;
+  switching.start();
   p.model->selectAudio(second);
   REQUIRE(waitFor([&] { return p.model->audioIndex() == second && !p.model->loading(); }, 30000));
   // mpv switches on its own thread.
-  CHECK(waitFor([&] { return mpvLanguage() == language(second); }, 10000));
+  REQUIRE(waitFor([&] { return mpvLanguage() == language(second); }, 10000));
+  const qint64 audioSwitchMs = switching.elapsed();
+  MESSAGE("audio track switch: " << audioSwitchMs << " ms");
+  CHECK(audioSwitchMs < 1000);
   CHECK(p.model->paused());
   CHECK(std::abs(p.model->position() - before) < 1.0);
 
-  // The external subtitle.
+  // The external subtitle, from none: mpv downloads it first.
+  p.model->selectSubtitle(-1);
+  REQUIRE(waitFor([&] { return p.mpv.property("current-tracks/sub").toMap().isEmpty(); }, 10000));
+  switching.restart();
   p.model->selectSubtitle(external);
   REQUIRE(waitFor([&] { return p.model->subtitleIndex() == external && !p.model->loading(); }, 30000));
   REQUIRE(waitFor([&] { return p.mpv.property("current-tracks/sub/external").toBool(); }, 10000));
+  const qint64 subtitleSwitchMs = switching.elapsed();
+  MESSAGE("external subtitle switch: " << subtitleSwitchMs << " ms");
+  CHECK(subtitleSwitchMs < 1000);
   CHECK(std::abs(p.model->position() - before) < 1.0);
 
   // Subtitles off.
@@ -228,6 +243,39 @@ TEST_CASE("Track menus list the movie's tracks, and a change keeps the position"
                state.value(QStringLiteral("AudioStreamIndex")).toInt(-1) == second;
       },
       20000));
+}
+
+TEST_CASE("A lower quality reopens the file as a transcode at the same position, and back") {
+  Player p(QStringLiteral("jfd-player-quality"), {});
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing() && p.model->position() > 3; }, 60000));
+  CHECK(p.model->playMethod() != QStringLiteral("Transcode"));
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.model->paused(); }, 10000));
+  const double before = p.model->position();
+
+  // Below any real file's bitrate.
+  p.model->setMaxBitrate(100'000);
+  REQUIRE(waitFor([&] { return p.model->playMethod() == QStringLiteral("Transcode") && !p.model->loading(); }, 60000));
+  CHECK(p.model->paused());
+  CHECK(std::abs(p.model->position() - before) < 1.0);
+  CHECK(waitFor(
+      [&] {
+        return p.serverSession().value(QStringLiteral("PlayState")).toObject().value(QStringLiteral("PlayMethod")).toString() ==
+               QStringLiteral("Transcode");
+      },
+      20000));
+
+  p.model->setMaxBitrate(0);
+  REQUIRE(waitFor([&] { return p.model->playMethod() != QStringLiteral("Transcode") && !p.model->loading(); }, 60000));
+  CHECK(std::abs(p.model->position() - before) < 1.0);
 }
 
 TEST_CASE("A seek in a transcoded HLS stream lands within a second, and the server shows it") {
@@ -260,10 +308,25 @@ TEST_CASE("A seek in a transcoded HLS stream lands within a second, and the serv
   REQUIRE(waitFor([&] { return std::abs(p.mpv.property("time-pos").toDouble() - Target) < 1.0; }, 10000));
   CHECK(std::abs(p.model->position() - Target) < 1.0);
   REQUIRE(waitFor([&] { return std::abs(serverPosition(p.serverSession()) - Target) < 1.0; }, 20000));
+  MESSAGE("model " << p.model->position() << " s, mpv " << p.mpv.property("time-pos").toDouble() << " s, server "
+                   << serverPosition(p.serverSession()) << " s");
 
   // Playing on from there.
   p.model->togglePause();
   REQUIRE(waitFor([&] { return p.playing() && p.model->position() > Target + 2; }, 30000));
+
+  // A seek while playing, timed until mpv plays half a second past the
+  // target: the server starts a new transcode there (threshold "Первый
+  // кадр / seek": under a second, measured here without that half second).
+  constexpr double Later = Target + 100;
+  QElapsedTimer seeking;
+  seeking.start();
+  p.model->seek(Later);
+  REQUIRE(waitFor([&] { return p.mpv.property("time-pos").toDouble() > Later + 0.5 && p.playing(); }, 60000));
+  MESSAGE("transcoded seek while playing: " << seeking.elapsed() - 500 << " ms to play on");
+  CHECK(std::abs(p.model->position() - (Later + 0.5)) < 1.0);
+  p.model->seek(Target + 2);
+  REQUIRE(waitFor([&] { return std::abs(p.model->position() - (Target + 2)) < 1.0 && p.playing(); }, 60000));
 
   // Stopping is reported: the server keeps the resume point near the seek.
   p.model->stop();
@@ -303,6 +366,13 @@ TEST_CASE("At the end of an episode the next one plays, and Previous goes back")
   const bool moved = waitFor([&] { return p.runtime->snapshot().item.value() == second.toStdString() && p.playing(); }, 60000);
   REQUIRE(moved);
   CHECK(p.model->position() < 10);
+  // Played to the end: the server marks the first episode watched.
+  CHECK(waitFor(
+      [&] {
+        auto item = run<Item>([&](auto done) { p.client->item(first, nullptr, done); });
+        return item.ok() && item->userData.played;
+      },
+      20000));
   REQUIRE(waitFor([&] { return p.model->hasPrevious(); }, 10000));
   CHECK_FALSE(p.model->hasNext());
 
@@ -418,6 +488,49 @@ TEST_CASE("An external audio file plays, through a transcode, at the same positi
   if (method != QStringLiteral("Transcode")) {
     CHECK(waitFor([&] { return p.mpv.property("current-tracks/audio/external").toBool(); }, 10000));
     CHECK(p.mpv.property("current-tracks/audio/lang").toString() == QStringLiteral("rus"));
+  }
+}
+
+TEST_CASE("Two external subtitles, in different languages and formats, each load with their language") {
+  if (!hasExtrasStand()) return;
+  Player p(QStringLiteral("jfd-player-external-subtitles"), {}, QStringLiteral("JFD_EXTRAS"));
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing() && p.model->position() > 3; }, 60000));
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.model->paused(); }, 10000));
+  const double before = p.model->position();
+
+  // The stand's subtitles: rus .srt and eng .ass, both external.
+  QMap<QString, int> byLanguage;
+  for (const QVariant& track : p.model->subtitleTracks()) {
+    const QVariantMap map = track.toMap();
+    if (map.value(QStringLiteral("isExternal")).toBool())
+      byLanguage.insert(map.value(QStringLiteral("language")).toString(), map.value(QStringLiteral("index")).toInt());
+  }
+  REQUIRE(byLanguage.contains(QStringLiteral("rus")));
+  REQUIRE(byLanguage.contains(QStringLiteral("eng")));
+
+  const auto playState = [&] { return p.serverSession().value(QStringLiteral("PlayState")).toObject(); };
+  for (const QString& language : {QStringLiteral("rus"), QStringLiteral("eng")}) {
+    INFO("subtitle " << language.toStdString());
+    const int index = byLanguage.value(language);
+    p.model->selectSubtitle(index);
+    REQUIRE(waitFor([&] { return p.model->subtitleIndex() == index && !p.model->loading(); }, 30000));
+    REQUIRE(waitFor(
+        [&] {
+          return p.mpv.property("current-tracks/sub/external").toBool() &&
+                 p.mpv.property("current-tracks/sub/lang").toString() == language;
+        },
+        10000));
+    CHECK(std::abs(p.model->position() - before) < 1.0);
+    CHECK(waitFor([&] { return playState().value(QStringLiteral("SubtitleStreamIndex")).toInt(-2) == index; }, 20000));
   }
 }
 

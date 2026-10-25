@@ -45,7 +45,8 @@ wait_for() {
 
 make_media() {
   # A movie with one embedded audio track (jpn), an external one (rus,
-  # Movie.ru.mka) and segments: intro 2-12 s, credits 50-58 s.
+  # Movie.ru.mka), two external subtitles (rus .srt, eng .ass) and
+  # segments: intro 2-12 s, credits 50-58 s.
   $DOCKER exec "$NAME" bash -euc '
     ff=/usr/lib/jellyfin-ffmpeg/ffmpeg
     dir="/media/Movies/Extras Movie (2024)"
@@ -54,6 +55,23 @@ make_media() {
       -c:v libx264 -preset ultrafast -c:a aac -metadata:s:a:0 language=jpn "$dir/Extras Movie (2024).mkv"
     $ff -loglevel error -y -f lavfi -i sine=frequency=880 -t 60 -c:a libopus -b:a 32k \
       -metadata:s:a:0 language=rus "$dir/Extras Movie (2024).ru.mka"
+    cat > "$dir/Extras Movie (2024).ru.srt" <<SRT
+1
+00:00:01,000 --> 00:00:59,000
+Привет
+SRT
+    cat > "$dir/Extras Movie (2024).en.ass" <<ASS
+[Script Info]
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:59.00,Default,,0,0,0,,Hello
+ASS
     cat > "$dir/Extras Movie (2024).segments.json" <<JSON
 [{"Type": "Intro", "Start": 2, "End": 12}, {"Type": "Outro", "Start": 50, "End": 58}]
 JSON
@@ -107,6 +125,8 @@ up() {
     "[[ \$(curl -fsS '$URL/MediaSegments/$id' -H 'Authorization: $AUTH, Token=\"$token\"' | jq '.Items | length') -ge 2 ]]"
   wait_for "the external audio" 60 bash -c \
     "[[ \$(curl -fsS '$URL/Items/$id/PlaybackInfo' -X POST -H 'Content-Type: application/json' -d '{}' -H 'Authorization: $AUTH, Token=\"$token\"' | jq '[.MediaSources[0].MediaStreams[] | select(.Type == \"Audio\")] | length') -ge 2 ]]"
+  wait_for "the external subtitles" 60 bash -c \
+    "[[ \$(curl -fsS '$URL/Items/$id/PlaybackInfo' -X POST -H 'Content-Type: application/json' -d '{}' -H 'Authorization: $AUTH, Token=\"$token\"' | jq '[.MediaSources[0].MediaStreams[] | select(.Type == \"Subtitle\" and .IsExternal)] | length') -ge 2 ]]"
   api POST /Sessions/Logout '' "$token" >/dev/null || true
 
   log "ready"

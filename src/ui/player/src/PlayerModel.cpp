@@ -173,6 +173,38 @@ namespace jfd::ui {
     if (const auto value = core::PlaybackRate::base(rate)) m_runtime.post(core::intent::SetRate{*value});
   }
 
+  void PlayerModel::setProfileOptions(const api::DeviceProfileOptions& options) {
+    m_profileOptions = options;
+    applyDeviceProfile();
+  }
+
+  void PlayerModel::applyDeviceProfile() {
+    QJsonObject profile = api::buildDeviceProfile(m_profileOptions);
+    if (m_maxBitrate > 0) {
+      // The server's StreamBuilder reads the streaming limit for video and
+      // the static one for direct play.
+      profile.insert(QStringLiteral("MaxStreamingBitrate"), static_cast<double>(m_maxBitrate));
+      profile.insert(QStringLiteral("MaxStaticBitrate"), static_cast<double>(m_maxBitrate));
+    }
+    m_runtime.setDeviceProfile(profile);
+  }
+
+  void PlayerModel::setMaxBitrate(qint64 bitsPerSecond) {
+    bitsPerSecond = std::max<qint64>(0, bitsPerSecond);
+    if (bitsPerSecond == m_maxBitrate) return;
+    m_maxBitrate = bitsPerSecond;
+    applyDeviceProfile();
+    Q_EMIT maxBitrateChanged();
+    if (m_current && m_epoch) {
+      const auto subtitle = m_tracks.table().selected(TrackKind::Subtitle);
+      reopen(playback::command::Reopen{m_tracks.table().selected(TrackKind::Audio), subtitle.value_or(-1)});
+    }
+  }
+
+  QString PlayerModel::playMethod() const {
+    return m_current ? api::playMethodName(m_current->stream.method) : QString();
+  }
+
   void PlayerModel::setVolume(int volume) {
     volume = std::clamp(volume, 0, 100);
     if (volume == m_volume) return;
