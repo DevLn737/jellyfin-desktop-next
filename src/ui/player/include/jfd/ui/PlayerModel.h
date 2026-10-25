@@ -1,5 +1,6 @@
 #pragma once
 
+#include <jfd/api/DeviceProfile.h>
 #include <jfd/api/Models.h>
 #include <jfd/api/Playback.h>
 #include <jfd/core/SessionSnapshot.h>
@@ -56,6 +57,11 @@ namespace jfd::ui {
     // 0-100, local to this client (mpv's volume), kept across files.
     Q_PROPERTY(int volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY volumeChanged)
+    // The most the server may stream, in bits per second; 0 for no limit.
+    // A file above it is transcoded down.
+    Q_PROPERTY(qint64 maxBitrate READ maxBitrate WRITE setMaxBitrate NOTIFY maxBitrateChanged)
+    // How the file plays: "DirectPlay", "DirectStream" or "Transcode".
+    Q_PROPERTY(QString playMethod READ playMethod NOTIFY tracksChanged)
     Q_PROPERTY(bool inGroup READ inGroup NOTIFY stateChanged)
     Q_PROPERTY(QVariantList audioTracks READ audioTracks NOTIFY tracksChanged)
     Q_PROPERTY(QVariantList subtitleTracks READ subtitleTracks NOTIFY tracksChanged)
@@ -97,6 +103,13 @@ namespace jfd::ui {
     void setVolume(int volume);
     bool muted() const { return m_muted; }
     void setMuted(bool muted);
+    qint64 maxBitrate() const { return m_maxBitrate; }
+    // Reopens the playing file at the same position under the new limit.
+    void setMaxBitrate(qint64 bitsPerSecond);
+    QString playMethod() const;
+    // What the device profile allows (the transcoding settings); applies to
+    // files opened from now on.
+    void setProfileOptions(const api::DeviceProfileOptions& options);
     bool inGroup() const { return m_snapshot.group.has_value(); }
     QVariantList audioTracks() const { return tracks(core::TrackKind::Audio); }
     QVariantList subtitleTracks() const { return tracks(core::TrackKind::Subtitle); }
@@ -153,6 +166,7 @@ namespace jfd::ui {
     void autoSkipChanged();
     void autoNextChanged();
     void volumeChanged();
+    void maxBitrateChanged();
     void delaysChanged();
     void queueChanged();
     void trickplayChanged();
@@ -190,6 +204,10 @@ namespace jfd::ui {
     // The viewer's last audio and subtitle pick, for the next file.
     playback::TrackPreference m_trackPreference;
     bool m_autoNext = true;
+    void applyDeviceProfile();
+
+    api::DeviceProfileOptions m_profileOptions;
+    qint64 m_maxBitrate = 0;
     int m_volume = 100;
     bool m_muted = false;
     session::SessionHub::Subscription m_subscription;

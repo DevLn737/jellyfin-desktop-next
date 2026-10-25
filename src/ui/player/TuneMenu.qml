@@ -3,8 +3,8 @@ import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Player
 
-// Speed (alone; a group's speed is on the group page), subtitle and audio
-// delay, and automatic skipping of intros and credits.
+// Speed (alone; a group's speed is on the group page), quality, subtitle
+// and audio delay, and automatic skipping of intros and credits.
 Rectangle {
     id: menu
 
@@ -68,6 +68,33 @@ Rectangle {
                         text: modelData + "×"
                         primary: Math.abs(PlayerSession.baseRate - modelData) < 0.001
                         onClicked: PlayerSession.setRate(modelData)
+                    }
+                }
+            }
+        }
+        Column {
+            width: parent.width
+            spacing: Theme.spacingTiny
+
+            Text {
+                text: PlayerSession.playMethod === "Transcode"
+                    ? qsTr("Quality (the server converts this video)")
+                    : qsTr("Quality")
+                color: Theme.text
+                font.pixelSize: Theme.fontSizeBody
+            }
+            Flow {
+                width: parent.width
+                spacing: Theme.spacingSmall
+                Repeater {
+                    // Bits per second; 0 is the original.
+                    model: [0, 20000000, 10000000, 6000000, 3000000, 1500000]
+                    ActionButton {
+                        required property real modelData
+                        objectName: "quality" + modelData
+                        text: modelData === 0 ? qsTr("Original") : qsTr("%1 Mbit/s").arg(modelData / 1000000)
+                        primary: PlayerSession.maxBitrate === modelData
+                        onClicked: PlayerSession.maxBitrate = modelData
                     }
                 }
             }

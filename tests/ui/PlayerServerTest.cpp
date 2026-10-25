@@ -244,6 +244,39 @@ TEST_CASE("Track menus list the movie's tracks, and a change keeps the position"
       20000));
 }
 
+TEST_CASE("A lower quality reopens the file as a transcode at the same position, and back") {
+  Player p(QStringLiteral("jfd-player-quality"), {});
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing() && p.model->position() > 3; }, 60000));
+  CHECK(p.model->playMethod() != QStringLiteral("Transcode"));
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.model->paused(); }, 10000));
+  const double before = p.model->position();
+
+  // Below any real file's bitrate.
+  p.model->setMaxBitrate(100'000);
+  REQUIRE(waitFor([&] { return p.model->playMethod() == QStringLiteral("Transcode") && !p.model->loading(); }, 60000));
+  CHECK(p.model->paused());
+  CHECK(std::abs(p.model->position() - before) < 1.0);
+  CHECK(waitFor(
+      [&] {
+        return p.serverSession().value(QStringLiteral("PlayState")).toObject().value(QStringLiteral("PlayMethod")).toString() ==
+               QStringLiteral("Transcode");
+      },
+      20000));
+
+  p.model->setMaxBitrate(0);
+  REQUIRE(waitFor([&] { return p.model->playMethod() != QStringLiteral("Transcode") && !p.model->loading(); }, 60000));
+  CHECK(std::abs(p.model->position() - before) < 1.0);
+}
+
 TEST_CASE("A seek in a transcoded HLS stream lands within a second, and the server shows it") {
   DeviceProfileOptions profile;
   profile.alwaysForceTranscode = true;

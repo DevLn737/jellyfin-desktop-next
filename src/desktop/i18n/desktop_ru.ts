@@ -130,6 +130,50 @@
         <translation>Китайский</translation>
     </message>
     <message>
+        <source>Always transcode video</source>
+        <translation>Всегда перекодировать видео</translation>
+    </message>
+    <message>
+        <source>The server converts every video, even ones the player could play as they are.</source>
+        <translation>Сервер перекодирует любое видео, даже то, что плеер может воспроизвести напрямую.</translation>
+    </message>
+    <message>
+        <source>Transcode HEVC</source>
+        <translation>Перекодировать HEVC</translation>
+    </message>
+    <message>
+        <source>Transcode AV1</source>
+        <translation>Перекодировать AV1</translation>
+    </message>
+    <message>
+        <source>Transcode 4K</source>
+        <translation>Перекодировать 4K</translation>
+    </message>
+    <message>
+        <source>Transcode HDR</source>
+        <translation>Перекодировать HDR</translation>
+    </message>
+    <message>
+        <source>Transcode 10-bit H.264</source>
+        <translation>Перекодировать 10-битный H.264</translation>
+    </message>
+    <message>
+        <source>Transcode Dolby Vision</source>
+        <translation>Перекодировать Dolby Vision</translation>
+    </message>
+    <message>
+        <source>Allow transcoding to HEVC</source>
+        <translation>Разрешить перекодирование в HEVC</translation>
+    </message>
+    <message>
+        <source>Smaller streams at the same quality, if the server&apos;s hardware can encode HEVC.</source>
+        <translation>Поток меньше при том же качестве, если оборудование сервера умеет кодировать HEVC.</translation>
+    </message>
+    <message>
+        <source>Prefer HEVC when transcoding</source>
+        <translation>Предпочитать HEVC при перекодировании</translation>
+    </message>
+    <message>
         <source>Audio language</source>
         <translation>Язык озвучки</translation>
     </message>
@@ -216,6 +260,42 @@
     <message>
         <source>HDR10 videos play in HDR when Windows has HDR turned on for the display. Off: they are converted to SDR.</source>
         <translation>Видео в HDR10 показывается в HDR, если в Windows для экрана включён HDR. Если выключено, видео переводится в SDR.</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Качество</translation>
+    </message>
+    <message>
+        <source>The most the server may stream; a file above it is transcoded down. The player menu changes it for the session.</source>
+        <translation>Наибольший поток с сервера; файл выше этого предела сервер перекодирует. Меню плеера меняет его до выхода из приложения.</translation>
+    </message>
+    <message>
+        <source>Original</source>
+        <translation>Исходное</translation>
+    </message>
+    <message>
+        <source>40 Mbit/s</source>
+        <translation>40 Мбит/с</translation>
+    </message>
+    <message>
+        <source>20 Mbit/s</source>
+        <translation>20 Мбит/с</translation>
+    </message>
+    <message>
+        <source>10 Mbit/s</source>
+        <translation>10 Мбит/с</translation>
+    </message>
+    <message>
+        <source>6 Mbit/s</source>
+        <translation>6 Мбит/с</translation>
+    </message>
+    <message>
+        <source>3 Mbit/s</source>
+        <translation>3 Мбит/с</translation>
+    </message>
+    <message>
+        <source>1.5 Mbit/s</source>
+        <translation>1,5 Мбит/с</translation>
     </message>
 </context>
 </TS>

@@ -41,6 +41,54 @@ namespace jfd::desktop {
               {QStringLiteral("chi"), QT_TRANSLATE_NOOP("PlayerSettings", "Chinese")}};
     }
 
+    const QString MaxBitrateKey = QStringLiteral("playback/maxBitrate");
+
+    // The transcoding settings: key inside the section, the 2.x key, the
+    // DeviceProfileOptions field, labels.
+    struct TranscodeSetting {
+      const char* key;
+      const char* legacyKey;
+      bool api::DeviceProfileOptions::*field;
+      const char* label;
+      const char* description;
+    };
+    const TranscodeSetting TranscodeSettings[] = {
+        {"alwaysTranscode", "video.always_force_transcode", &api::DeviceProfileOptions::alwaysForceTranscode,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Always transcode video"),
+         QT_TRANSLATE_NOOP("PlayerSettings", "The server converts every video, even ones the player could play as they are.")},
+        {"forceTranscodeHevc", "video.force_transcode_hevc", &api::DeviceProfileOptions::forceTranscodeHevc,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Transcode HEVC"), nullptr},
+        {"forceTranscodeAv1", "video.force_transcode_av1", &api::DeviceProfileOptions::forceTranscodeAv1,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Transcode AV1"), nullptr},
+        {"forceTranscode4k", "video.force_transcode_4k", &api::DeviceProfileOptions::forceTranscode4k,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Transcode 4K"), nullptr},
+        {"forceTranscodeHdr", "video.force_transcode_hdr", &api::DeviceProfileOptions::forceTranscodeHdr,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Transcode HDR"), nullptr},
+        {"forceTranscodeHi10p", "video.force_transcode_hi10p", &api::DeviceProfileOptions::forceTranscodeHi10p,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Transcode 10-bit H.264"), nullptr},
+        {"forceTranscodeDolbyVision", "video.force_transcode_dovi",
+         &api::DeviceProfileOptions::forceTranscodeDolbyVision,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Transcode Dolby Vision"), nullptr},
+        {"allowTranscodeToHevc", "video.allow_transcode_to_hevc", &api::DeviceProfileOptions::allowTranscodeToHevc,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Allow transcoding to HEVC"),
+         QT_TRANSLATE_NOOP("PlayerSettings", "Smaller streams at the same quality, if the server's hardware can encode HEVC.")},
+        {"preferTranscodeToHevc", "video.prefer_transcode_to_h265", &api::DeviceProfileOptions::preferTranscodeToHevc,
+         QT_TRANSLATE_NOOP("PlayerSettings", "Prefer HEVC when transcoding"), nullptr},
+    };
+
+    api::DeviceProfileOptions profileOptions(const settings::Settings& settings) {
+      api::DeviceProfileOptions options;
+      for (const TranscodeSetting& setting : TranscodeSettings)
+        options.*setting.field = settings.value(QStringLiteral("playback/") + QLatin1String(setting.key)).toBool();
+      return options;
+    }
+
+    bool isTranscodeKey(const QString& key) {
+      for (const TranscodeSetting& setting : TranscodeSettings)
+        if (key == QStringLiteral("playback/") + QLatin1String(setting.key)) return true;
+      return false;
+    }
+
     playback::TrackDefaults trackDefaults(const settings::Settings& settings) {
       playback::TrackDefaults defaults;
       defaults.audioLanguage = settings.value(AudioLanguageKey).toString();
@@ -200,6 +248,35 @@ namespace jfd::desktop {
     hdr.requiresRestart = true;
     hdr.hidden = !ui::HdrOutput::supported();
     section.settings.append(hdr);
+
+    // Bits per second; "0" for no limit.
+    settings::SettingDescriptor maxBitrate;
+    maxBitrate.key = QStringLiteral("maxBitrate");
+    maxBitrate.type = settings::SettingType::Choice;
+    maxBitrate.defaultValue = QStringLiteral("0");
+    maxBitrate.label = QT_TRANSLATE_NOOP("PlayerSettings", "Quality");
+    maxBitrate.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "The most the server may stream; a file above it is transcoded down. The player menu changes it "
+                          "for the session.");
+    maxBitrate.choices = {{QStringLiteral("0"), QT_TRANSLATE_NOOP("PlayerSettings", "Original")},
+                          {QStringLiteral("40000000"), QT_TRANSLATE_NOOP("PlayerSettings", "40 Mbit/s")},
+                          {QStringLiteral("20000000"), QT_TRANSLATE_NOOP("PlayerSettings", "20 Mbit/s")},
+                          {QStringLiteral("10000000"), QT_TRANSLATE_NOOP("PlayerSettings", "10 Mbit/s")},
+                          {QStringLiteral("6000000"), QT_TRANSLATE_NOOP("PlayerSettings", "6 Mbit/s")},
+                          {QStringLiteral("3000000"), QT_TRANSLATE_NOOP("PlayerSettings", "3 Mbit/s")},
+                          {QStringLiteral("1500000"), QT_TRANSLATE_NOOP("PlayerSettings", "1.5 Mbit/s")}};
+    section.settings.append(maxBitrate);
+
+    for (const TranscodeSetting& transcode : TranscodeSettings) {
+      settings::SettingDescriptor setting;
+      setting.key = QLatin1String(transcode.key);
+      setting.type = settings::SettingType::Bool;
+      setting.defaultValue = false;
+      setting.label = transcode.label;
+      setting.description = transcode.description;
+      setting.legacyKey = QLatin1String(transcode.legacyKey);
+      section.settings.append(setting);
+    }
     return registry.registerSection(std::move(section));
   }
 
@@ -224,9 +301,15 @@ namespace jfd::desktop {
       for (const QString& key : {HwdecKey, SubtitleSizeKey, SubtitleStyleKey})
         applyToMpv(*player, key, settings.value(key));
     model.setTrackDefaults(trackDefaults(settings));
+    model.setProfileOptions(profileOptions(settings));
+    model.setMaxBitrate(settings.value(MaxBitrateKey).toString().toLongLong());
     QObject::connect(&settings, &settings::Settings::valueChanged, &model,
                      [&model, &settings, player](const QString& key, const QVariant& value) {
                        if (key == AutoSkipKey) model.setAutoSkip(value.toBool());
+                       else if (isTranscodeKey(key))
+                         model.setProfileOptions(profileOptions(settings));
+                       else if (key == MaxBitrateKey)
+                         model.setMaxBitrate(value.toString().toLongLong());
                        else if (key == AudioLanguageKey || key == SubtitleLanguageKey || key == SubtitleModeKey)
                          model.setTrackDefaults(trackDefaults(settings));
                        else if (key == AutoNextKey) model.setAutoNext(value.toBool());

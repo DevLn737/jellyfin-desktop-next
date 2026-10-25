@@ -142,6 +142,22 @@
         <translation>Скорость</translation>
     </message>
     <message>
+        <source>Quality (the server converts this video)</source>
+        <translation>Качество (сервер перекодирует это видео)</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Качество</translation>
+    </message>
+    <message>
+        <source>Original</source>
+        <translation>Исходное</translation>
+    </message>
+    <message>
+        <source>%1 Mbit/s</source>
+        <translation>%1 Мбит/с</translation>
+    </message>
+    <message>
         <source>Subtitle delay</source>
         <translation>Задержка субтитров</translation>
     </message>
