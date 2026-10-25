@@ -34,7 +34,8 @@ namespace jfd::ui {
         m_home(m_client, homeOptions(config.devicePixelRatio)),
         m_search(m_client, searchOptions(config.devicePixelRatio)), m_collections(m_client),
         m_readFilters(std::move(config.readFilters)),
-        m_writeFilters(std::move(config.writeFilters)), m_textures(config.textureBytes) {
+        m_writeFilters(std::move(config.writeFilters)),
+        m_textures(std::make_shared<TextureBudget>(config.textureBytes)) {
     m_updates.attach(m_socket);
     m_home.follow(m_updates);
     m_search.follow(m_updates);

@@ -20,11 +20,11 @@ namespace jfd::ui {
     // Quick keeps it.
     class CountedTextureFactory final : public QQuickTextureFactory {
     public:
-      CountedTextureFactory(QImage image, TextureBudget& budget)
-          : m_image(std::move(image)), m_budget(budget), m_bytes(m_image.sizeInBytes()) {
-        m_budget.add(m_bytes);
+      CountedTextureFactory(QImage image, std::shared_ptr<TextureBudget> budget)
+          : m_image(std::move(image)), m_budget(std::move(budget)), m_bytes(m_image.sizeInBytes()) {
+        m_budget->add(m_bytes);
       }
-      ~CountedTextureFactory() override { m_budget.remove(m_bytes); }
+      ~CountedTextureFactory() override { m_budget->remove(m_bytes); }
 
       QSGTexture* createTexture(QQuickWindow* window) const override {
         return window->createTextureFromImage(m_image);
@@ -35,7 +35,7 @@ namespace jfd::ui {
 
     private:
       QImage m_image;
-      TextureBudget& m_budget;
+      std::shared_ptr<TextureBudget> m_budget;
       qint64 m_bytes;
     };
 
@@ -54,8 +54,9 @@ namespace jfd::ui {
 
     class Response final : public QQuickImageResponse {
     public:
-      Response(std::shared_ptr<Shared> shared, library::ImageCache& cache, TextureBudget& budget)
-          : m_shared(std::move(shared)), m_cache(cache), m_budget(budget) {
+      Response(std::shared_ptr<Shared> shared, QPointer<library::ImageCache> cache,
+               std::shared_ptr<TextureBudget> budget)
+          : m_shared(std::move(shared)), m_cache(std::move(cache)), m_budget(std::move(budget)) {
         m_shared->response = this;
       }
       ~Response() override {
@@ -76,9 +77,12 @@ namespace jfd::ui {
           m_error = QStringLiteral("Cancelled");
           Q_EMIT finished();
         }
-        // The cache lives on another thread; a request it has not started
-        // never reaches the network.
-        QMetaObject::invokeMethod(&m_cache, [cache = &m_cache, shared = m_shared] {
+        // The cache lives on another thread, and may be gone; a request it
+        // has not started never reaches the network.
+        library::ImageCache* cache = m_cache.data();
+        if (cache == nullptr) return;
+        QMetaObject::invokeMethod(cache, [cache = m_cache, shared = m_shared] {
+          if (cache.isNull()) return;
           library::ImageCache::Ticket ticket = 0;
           {
             QMutexLocker lock(&shared->mutex);
@@ -97,8 +101,8 @@ namespace jfd::ui {
 
     private:
       std::shared_ptr<Shared> m_shared;
-      library::ImageCache& m_cache;
-      TextureBudget& m_budget;
+      QPointer<library::ImageCache> m_cache;
+      std::shared_ptr<TextureBudget> m_budget;
       QImage m_image;
       QString m_error;
     };
@@ -113,9 +117,9 @@ namespace jfd::ui {
                  std::max(1, requested.height() / divisor));
   }
 
-  LibraryImageProvider::LibraryImageProvider(library::ImageCache& cache, TextureBudget& budget,
-                                             QSize maxSize)
-      : m_cache(cache), m_budget(budget), m_maxSize(maxSize) {}
+  LibraryImageProvider::LibraryImageProvider(library::ImageCache& cache,
+                                             std::shared_ptr<TextureBudget> budget, QSize maxSize)
+      : m_cache(&cache), m_budget(std::move(budget)), m_maxSize(maxSize) {}
 
   QString LibraryImageProvider::sourceFor(const QUrl& url) {
     if (url.isEmpty()) return {};
@@ -136,16 +140,18 @@ namespace jfd::ui {
                                          : m_maxSize.width(),
                requestedSize.height() > 0 ? std::min(requestedSize.height(), m_maxSize.height())
                                           : m_maxSize.height());
-    size = m_budget.allowedSize(size);
+    size = m_budget->allowedSize(size);
 
-    if (!url.isValid() || url.isRelative()) {
+    library::ImageCache* cache = m_cache.data();
+    if (cache == nullptr || !url.isValid() || url.isRelative()) {
       QMutexLocker lock(&shared->mutex);
       shared->done = true;
       response->complete({});
       return response;
     }
 
-    QMetaObject::invokeMethod(&m_cache, [cache = &m_cache, shared, url, size] {
+    QMetaObject::invokeMethod(cache, [cache = m_cache, shared, url, size] {
+      if (cache.isNull()) return;
       {
         QMutexLocker lock(&shared->mutex);
         if (shared->done) return;
