@@ -4,6 +4,7 @@ find_package(Qt6 REQUIRED COMPONENTS Gui)
 
 add_library(jfd_library STATIC
   src/CardImages.cpp
+  src/CollectionIndex.cpp
   src/HomeModel.cpp
   src/ImageCache.cpp
   src/ItemBrowser.cpp
@@ -15,6 +16,7 @@ add_library(jfd_library STATIC
   src/ServerStore.cpp
   src/SignIn.cpp
   include/jfd/library/CardImages.h
+  include/jfd/library/CollectionIndex.h
   include/jfd/library/HomeModel.h
   include/jfd/library/ImageCache.h
   include/jfd/library/ItemBrowser.h

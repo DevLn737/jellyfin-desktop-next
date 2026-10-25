@@ -32,11 +32,13 @@ namespace jfd::ui {
         m_servers(config.serversFile), m_client(config.identity), m_socket(m_client),
         m_images(m_client, config.imageDirectory), m_signIn(m_client, m_servers, *m_tokens),
         m_home(m_client, homeOptions(config.devicePixelRatio)),
-        m_search(m_client, searchOptions(config.devicePixelRatio)),
-        m_textures(config.textureBytes) {
+        m_search(m_client, searchOptions(config.devicePixelRatio)), m_collections(m_client),
+        m_readFilters(std::move(config.readFilters)),
+        m_writeFilters(std::move(config.writeFilters)), m_textures(config.textureBytes) {
     m_updates.attach(m_socket);
     m_home.follow(m_updates);
     m_search.follow(m_updates);
+    m_collections.follow(m_updates);
   }
 
   LibraryScreens::~LibraryScreens() = default;
@@ -54,21 +56,27 @@ namespace jfd::ui {
     services.home = &m_home;
     services.search = &m_search;
     services.updates = &m_updates;
+    services.collections = &m_collections;
+    services.readFilters = m_readFilters;
+    services.writeFilters = m_writeFilters;
     services.devicePixelRatio = m_devicePixelRatio;
     m_ui->attach(services);
 
     navigator.registerPage(QStringLiteral("login"), page("LoginPage"));
     navigator.registerPage(QStringLiteral("home"), page("HomePage"));
     navigator.registerPage(QStringLiteral("library"), page("LibraryPage"));
+    navigator.registerPage(QStringLiteral("collection"), page("CollectionPage"));
     navigator.registerPage(QStringLiteral("item"), page("ItemPage"));
     navigator.registerPage(QStringLiteral("search"), page("SearchPage"));
 
     QObject::connect(&m_signIn, &library::SignIn::signedIn, &navigator, [this, &navigator] {
+      m_collections.invalidate();
       m_socket.start();
       navigator.reset(QStringLiteral("home"));
     });
     QObject::connect(&m_signIn, &library::SignIn::signedOut, &navigator, [this, &navigator] {
       m_socket.stop();
+      m_collections.invalidate();
       navigator.reset(QStringLiteral("login"));
     });
     return true;

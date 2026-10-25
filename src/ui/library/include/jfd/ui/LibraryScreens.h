@@ -3,6 +3,7 @@
 #include <jfd/api/ClientIdentity.h>
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
+#include <jfd/library/CollectionIndex.h>
 #include <jfd/library/HomeModel.h>
 #include <jfd/library/ImageCache.h>
 #include <jfd/library/LibraryUpdates.h>
@@ -12,8 +13,10 @@
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/ui/LibraryImageProvider.h>
 
+#include <QJsonObject>
 #include <QString>
 
+#include <functional>
 #include <memory>
 
 class QQmlEngine;
@@ -27,7 +30,7 @@ namespace jfd::ui {
   // and session socket, shared with the session and group modules), saved
   // servers and tokens, the image cache and texture budget, and the home
   // and search models. install() puts them in front of QML: the image
-  // provider, the `Library` singleton, the five pages, and the move between
+  // provider, the `Library` singleton, the pages, and the move between
   // the login and home pages on sign-in and sign-out.
   class LibraryScreens {
   public:
@@ -39,6 +42,10 @@ namespace jfd::ui {
       std::unique_ptr<platform::CredentialStore> tokens;
       qreal devicePixelRatio = 1.0;
       qint64 textureBytes = LibraryImageProvider::DefaultTextureBytes;
+      // Each library's sort and filters, keyed by library id. Unset: kept
+      // for the session only.
+      std::function<QJsonObject()> readFilters;
+      std::function<void(const QJsonObject&)> writeFilters;
     };
 
     explicit LibraryScreens(Config config);
@@ -52,6 +59,7 @@ namespace jfd::ui {
     api::SessionSocket& socket() { return m_socket; }
     library::SignIn& signIn() { return m_signIn; }
     library::HomeModel& home() { return m_home; }
+    library::CollectionIndex& collections() { return m_collections; }
     library::ImageCache& images() { return m_images; }
     const TextureBudget& textures() const { return m_textures; }
     // Null before install().
@@ -68,6 +76,9 @@ namespace jfd::ui {
     library::SignIn m_signIn;
     library::HomeModel m_home;
     library::SearchModel m_search;
+    library::CollectionIndex m_collections;
+    std::function<QJsonObject()> m_readFilters;
+    std::function<void(const QJsonObject&)> m_writeFilters;
     TextureBudget m_textures;
     LibraryUi* m_ui = nullptr;
   };

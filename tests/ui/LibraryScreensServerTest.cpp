@@ -9,12 +9,14 @@
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
 
+#include <jfd/api/JellyfinClient.h>
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
 
 #include <QDir>
+#include <QJsonObject>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -246,4 +248,198 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   // Signing out goes back to the login page.
   screens.screens->signIn().signOut();
   REQUIRE(screens.waitShowing(QStringLiteral("login")));
+}
+
+namespace {
+  void signInAs(Screens& screens) {
+    REQUIRE(screens.waitShowing(QStringLiteral("login")));
+    screens.find("serverAddress")->setProperty("text", env("JFD_TEST_SERVER_URL"));
+    Screens::click(screens.find("connectButton"));
+    REQUIRE(waitFor([&] { return screens.find("userName") != nullptr; }, Timeout));
+    screens.find("userName")->setProperty("text", env("JFD_TEST_USER"));
+    screens.find("password")->setProperty("text", env("JFD_TEST_PASSWORD"));
+    Screens::click(screens.find("signInButton"));
+    REQUIRE(screens.waitShowing(QStringLiteral("home")));
+    REQUIRE(screens.waitCount("librariesRow", 2));
+  }
+
+  // Sets a ChoiceBox the way a click on one of its entries does.
+  void choose(QObject* box, int index) {
+    REQUIRE(box != nullptr);
+    box->setProperty("currentIndex", index);
+    QMetaObject::invokeMethod(box, "activated", Q_ARG(int, index));
+  }
+
+  // The card of `view` showing `itemId`, if it has been made.
+  QQuickItem* cardFor(const Screens& screens, const char* view, const QString& itemId) {
+    for (int i = 0; i < 20; ++i) {
+      QQuickItem* card = screens.card(view, i);
+      if (card != nullptr && card->property("itemId").toString() == itemId) return card;
+    }
+    return nullptr;
+  }
+
+  QObject* libraryModel(const Screens& screens) {
+    QQuickItem* page = screens.page();
+    REQUIRE(page != nullptr);
+    return page->property("library").value<QObject*>();
+  }
+} // namespace
+
+TEST_CASE("Year, several genres and collections in the library; the collection page") {
+  REQUIRE_MESSAGE(!env("JFD_TEST_SERVER_URL").isEmpty(),
+                  "Set JFD_TEST_SERVER_URL (scripts/test-server/stock-server.sh up)");
+  Screens screens;
+  signInAs(screens);
+  api::JellyfinClient& client = screens.screens->client();
+
+  // A movie and a collection holding it, made through the API.
+  QString movieId;
+  api::ItemQuery query;
+  query.includeItemTypes = {QStringLiteral("Movie")};
+  query.limit = 1;
+  bool answered = false;
+  client.items(query, &client, [&](api::Result<api::ItemPage> result) {
+    REQUIRE(result);
+    REQUIRE(result->items.size() == 1);
+    movieId = result->items[0].id;
+    answered = true;
+  });
+  REQUIRE(waitFor([&] { return answered; }, Timeout));
+
+  QString collectionId;
+  QUrlQuery create;
+  create.addQueryItem(QStringLiteral("name"), QStringLiteral("Stand collection"));
+  create.addQueryItem(QStringLiteral("ids"), movieId);
+  answered = false;
+  client.sendJson(api::JellyfinClient::Method::Post, QStringLiteral("Collections"), create,
+                  std::nullopt, &client, [&](api::Result<QJsonObject> result) {
+                    REQUIRE(result);
+                    collectionId = result->value(QStringLiteral("Id")).toString();
+                    answered = true;
+                  });
+  REQUIRE(waitFor([&] { return answered; }, Timeout));
+  REQUIRE_FALSE(collectionId.isEmpty());
+  // Whatever the checks below do, the server is left as it was found.
+  auto cleanup = [&] {
+    bool removed = false;
+    client.sendNoContent(api::JellyfinClient::Method::Delete,
+                         QStringLiteral("Items/") + collectionId, {}, std::nullopt, &client,
+                         [&](api::Result<api::Empty>) { removed = true; });
+    waitFor([&] { return removed; }, Timeout);
+  };
+  struct Guard {
+    std::function<void()> run;
+    ~Guard() { run(); }
+  } guard{cleanup};
+
+  // The movies library from home.
+  const library::ItemListModel* libraries = screens.screens->home().libraries();
+  QString moviesId;
+  for (int row = 0; row < libraries->count(); ++row)
+    if (libraries->entry(row)->item.collectionType == QLatin1String("movies"))
+      moviesId = libraries->entry(row)->item.id;
+  REQUIRE_FALSE(moviesId.isEmpty());
+  REQUIRE(screens.navigator->navigate(QStringLiteral("library/") + moviesId));
+  REQUIRE(screens.waitShowing(QStringLiteral("library/") + moviesId));
+  REQUIRE(screens.waitCount("libraryGrid", 1));
+  QObject* model = libraryModel(screens);
+  REQUIRE(model != nullptr);
+  CHECK(model->property("canShowCollections").toBool());
+  const int movies = model->property("count").toInt();
+
+  // Year: the library offers its years, and one year narrows the grid.
+  REQUIRE(waitFor([&] { return model->property("availableYears").toList().size() > 0; }, Timeout));
+  QObject* year = screens.find("libraryYear");
+  REQUIRE(year != nullptr);
+  CHECK(year->property("visible").toBool());
+  const int yearValue = model->property("availableYears").toList().first().toInt();
+  int yearIndex = -1;
+  QMetaObject::invokeMethod(year, "indexOfValue", Q_RETURN_ARG(int, yearIndex),
+                            Q_ARG(QVariant, yearValue));
+  REQUIRE(yearIndex > 0);
+  choose(year, yearIndex);
+  CHECK(model->property("years").toList() == QVariantList{yearValue});
+  REQUIRE(waitFor([&] { return !model->property("loading").toBool(); }, Timeout));
+  CHECK(model->property("count").toInt() >= 1);
+  choose(year, 0);
+  CHECK(model->property("years").toList().isEmpty());
+  REQUIRE(waitFor([&] { return model->property("count").toInt() == movies; }, Timeout));
+
+  // Genres: any number at once, one matching nothing empties the grid.
+  QObject* genres = screens.find("libraryGenre");
+  REQUIRE(genres != nullptr);
+  QMetaObject::invokeMethod(genres, "genreToggled",
+                            Q_ARG(QString, QStringLiteral("No such genre")));
+  QMetaObject::invokeMethod(genres, "genreToggled", Q_ARG(QString, QStringLiteral("Nor this")));
+  CHECK(model->property("genres").toStringList() ==
+        QStringList{QStringLiteral("No such genre"), QStringLiteral("Nor this")});
+  REQUIRE(waitFor([&] { return model->property("count").toInt() == 0; }, Timeout));
+  QMetaObject::invokeMethod(genres, "genreToggled", Q_ARG(QString, QStringLiteral("Nor this")));
+  CHECK(model->property("genres").toStringList() == QStringList{QStringLiteral("No such genre")});
+  QMetaObject::invokeMethod(genres, "genresCleared");
+  CHECK(model->property("genres").toStringList().isEmpty());
+  REQUIRE(waitFor([&] { return model->property("count").toInt() == movies; }, Timeout));
+  screens.screenshot(QStringLiteral("library-filters"));
+
+  // Collections instead of movies; a card leads to the collection page.
+  QObject* show = screens.find("libraryShow");
+  REQUIRE(show != nullptr);
+  CHECK(show->property("visible").toBool());
+  choose(show, 1);
+  REQUIRE(
+      waitFor([&] { return cardFor(screens, "libraryGrid", collectionId) != nullptr; }, Timeout));
+  screens.screenshot(QStringLiteral("library-collections"));
+
+  // The choice is kept: the library opens as it was left.
+  REQUIRE(screens.navigator->navigate(QStringLiteral("home")));
+  REQUIRE(screens.waitShowing(QStringLiteral("home")));
+  REQUIRE(screens.navigator->navigate(QStringLiteral("library/") + moviesId));
+  REQUIRE(screens.waitShowing(QStringLiteral("library/") + moviesId));
+  REQUIRE(waitFor([&] { return libraryModel(screens) != nullptr; }, Timeout));
+  CHECK(libraryModel(screens)->property("showCollections").toBool());
+  REQUIRE(
+      waitFor([&] { return cardFor(screens, "libraryGrid", collectionId) != nullptr; }, Timeout));
+  Screens::click(cardFor(screens, "libraryGrid", collectionId));
+  REQUIRE(screens.waitShowing(QStringLiteral("collection/") + collectionId));
+
+  // The collection page: name and the movie inside.
+  REQUIRE(waitFor(
+      [&] {
+        return screens.find("collectionName")->property("text").toString() ==
+               QStringLiteral("Stand collection");
+      },
+      Timeout));
+  REQUIRE(screens.waitCount("collectionGrid", 1));
+  QQuickItem* inside = nullptr;
+  REQUIRE(waitFor(
+      [&] {
+        inside = screens.card("collectionGrid", 0);
+        return inside != nullptr && !inside->property("itemId").toString().isEmpty();
+      },
+      Timeout));
+  CHECK(inside->property("itemId").toString() == movieId);
+  CHECK(screens.find("collectionError")->property("text").toString().isEmpty());
+  screens.screenshot(QStringLiteral("collection"));
+
+  // From the movie, back to the collection holding it.
+  Screens::click(inside);
+  REQUIRE(screens.waitShowing(QStringLiteral("item/") + movieId));
+  REQUIRE(screens.waitCount("collectionsRow", 1));
+  QQuickItem* holder = nullptr;
+  REQUIRE(waitFor(
+      [&] {
+        holder = cardFor(screens, "collectionsRow", collectionId);
+        return holder != nullptr;
+      },
+      Timeout));
+  screens.screenshot(QStringLiteral("movie-in-collection"));
+  Screens::click(holder);
+  REQUIRE(screens.waitShowing(QStringLiteral("collection/") + collectionId));
+
+  // Put the switch back for the next run's profile-free state.
+  REQUIRE(screens.navigator->navigate(QStringLiteral("library/") + moviesId));
+  REQUIRE(screens.waitShowing(QStringLiteral("library/") + moviesId));
+  REQUIRE(waitFor([&] { return libraryModel(screens) != nullptr; }, Timeout));
+  libraryModel(screens)->setProperty("showCollections", false);
 }

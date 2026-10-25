@@ -2,10 +2,52 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>CollectionPage</name>
+    <message>
+        <source>Collection</source>
+        <translation>Коллекция</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n элемент</numerusform>
+            <numerusform>%n элемента</numerusform>
+            <numerusform>%n элементов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>♥ Favorite</source>
+        <translation>♥ В избранном</translation>
+    </message>
+    <message>
+        <source>♡ Add to favorites</source>
+        <translation>♡ В избранное</translation>
+    </message>
+    <message>
+        <source>This collection is empty.</source>
+        <translation>В этой коллекции пусто.</translation>
+    </message>
+</context>
+<context>
     <name>EpisodeRow</name>
     <message>
         <source>Play</source>
         <translation>Смотреть</translation>
+    </message>
+</context>
+<context>
+    <name>GenrePicker</name>
+    <message>
+        <source>All genres</source>
+        <translation>Все жанры</translation>
+    </message>
+    <message>
+        <source>Genres: %1</source>
+        <translation>Жанры: %1</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Сбросить</translation>
     </message>
 </context>
 <context>
@@ -60,6 +102,10 @@
     <message>
         <source>Next: %1</source>
         <translation>Следующая: %1</translation>
+    </message>
+    <message>
+        <source>In collections</source>
+        <translation>В коллекциях</translation>
     </message>
     <message>
         <source>More like this</source>
@@ -125,8 +171,16 @@
         <translation>Просмотренные</translation>
     </message>
     <message>
-        <source>All genres</source>
-        <translation>Все жанры</translation>
+        <source>Movies</source>
+        <translation>Фильмы</translation>
+    </message>
+    <message>
+        <source>Collections</source>
+        <translation>Коллекции</translation>
+    </message>
+    <message>
+        <source>All years</source>
+        <translation>Все годы</translation>
     </message>
     <message>
         <source>Favorites</source>

@@ -617,6 +617,22 @@ namespace jfd::api {
              context, parsed<ItemPage>(std::move(done), json::itemPage));
   }
 
+  void JellyfinClient::collectionItemIds(const QString& collectionId, QObject* context,
+                                         Callback<QStringList> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("parentId"), collectionId);
+    query.addQueryItem(QStringLiteral("enableImages"), QStringLiteral("false"));
+    query.addQueryItem(QStringLiteral("enableUserData"), QStringLiteral("false"));
+    query.addQueryItem(QStringLiteral("enableTotalRecordCount"), QStringLiteral("false"));
+    sendJson(Method::Get, QStringLiteral("Items"), query, std::nullopt, context,
+             parsed<QStringList>(std::move(done), [](const QJsonObject& page) {
+               QStringList ids;
+               for (const QJsonValue& item : page.value(QStringLiteral("Items")).toArray())
+                 ids.append(item.toObject().value(QStringLiteral("Id")).toString());
+               return ids;
+             }));
+  }
+
   void JellyfinClient::itemFilters(const QString& parentId, const QStringList& includeItemTypes,
                                    QObject* context, Callback<ItemFilters> done) {
     QUrlQuery query = userQuery();

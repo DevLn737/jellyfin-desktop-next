@@ -17,7 +17,9 @@ qt_add_qml_module(jfd_ui_library
   URI Jfd.Ui.Library
   VERSION 1.0
   QML_FILES
+    CollectionPage.qml
     EpisodeRow.qml
+    GenrePicker.qml
     HomePage.qml
     ItemCard.qml
     ItemPage.qml
