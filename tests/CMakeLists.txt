@@ -18,6 +18,10 @@ add_executable(jfd_core_tests
 target_link_libraries(jfd_core_tests PRIVATE jfd::core jfd_test_support doctest)
 add_test(NAME jfd_core_tests COMMAND jfd_core_tests)
 
+# QML strings people read go through qsTr(), so translations_check sees them.
+add_test(NAME qml_literals_check
+  COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/i18n/QmlLiterals.cmake")
+
 add_executable(jfd_diagnostics_tests
   core/main.cpp
   diagnostics/FrameStatsTest.cpp
