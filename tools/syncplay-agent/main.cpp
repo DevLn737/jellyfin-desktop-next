@@ -117,6 +117,8 @@ namespace {
       return out;
     }
 
+    void preload(MediaEpoch, const BackendLoad&) override {}
+
     void load(MediaEpoch epoch, const BackendLoad& request) override {
       File file;
       file.epoch = epoch;

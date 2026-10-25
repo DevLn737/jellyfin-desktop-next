@@ -85,6 +85,14 @@ namespace jfd::core {
       MediaEpoch epoch;
       ExternalTrack track;
     };
+    // The file that follows the current one, opened ahead so that the
+    // transition has no gap (MediaBackend::preload). It replaces an earlier
+    // one; ignored in a group, where the server's queue picks the next item,
+    // and while nothing is playing. Open, Stop and the end of the current
+    // file by any other way than reaching its end drop it.
+    struct PreloadNext {
+      MediaRequest media;
+    };
     // The user's SyncPlay correction settings; apply from the next decision.
     struct SetSyncCorrection {
       ReconcilerSettings reconciler;
@@ -143,6 +151,13 @@ namespace jfd::core {
       std::string error;
     };
 
+    // The current file reached its end and the backend went on to the one
+    // queued by preload() without unloading: the session's media is now `to`.
+    struct Advanced {
+      MediaEpoch from;
+      MediaEpoch to;
+    };
+
     struct TrackAdded {
       MediaEpoch epoch;
       RequestId request;
@@ -164,6 +179,6 @@ namespace jfd::core {
                    group::QueueChanged, group::RateChangeRejected, group::ClockSynced,
                    TimerFired, intent::Next, intent::Previous, intent::SelectTrack,
                    intent::AddExternalTrack, group::ParticipantsChanged,
-                   intent::SetSyncCorrection>;
+                   intent::SetSyncCorrection, intent::PreloadNext, backend::Advanced>;
 
 } // namespace jfd::core

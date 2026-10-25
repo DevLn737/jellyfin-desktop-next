@@ -116,11 +116,40 @@ void MpvMediaBackend::load(core::MediaEpoch epoch, const core::BackendLoad& requ
   }
   // A held file must be released, or mpv waits in the hook for ever.
   releaseHook();
+  // loadfile replace clears the playlist, the queued file with it.
+  dropPreload();
   mpv_set_property_string(m_mpv, "rebase-start-time", request.rebaseStartTime ? "yes" : "no");
   int pause = request.startPaused ? 1 : 0;
   mpv_set_property(m_mpv, "pause", MPV_FORMAT_FLAG, &pause);
   m_starting.push_back(epoch);
   command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "replace"});
+}
+
+void MpvMediaBackend::preload(core::MediaEpoch epoch, const core::BackendLoad& request)
+{
+  if (!m_mpv || !m_current)
+  {
+    m_post(core::backend::Ended {epoch, core::backend::EndReason::Error, "no file is playing to follow"});
+    return;
+  }
+  dropPreload();
+  m_preload = epoch;
+  m_starting.push_back(epoch);
+  // Per-file options: the property is global, and the current file keeps its own.
+  const char* options = request.rebaseStartTime ? "rebase-start-time=yes" : "rebase-start-time=no";
+  command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "append", "-1", options});
+}
+
+void MpvMediaBackend::dropPreload()
+{
+  m_leaving.reset();
+  m_gapless.reset();
+  if (!m_preload)
+    return;
+  std::erase(m_starting, *m_preload);
+  m_preload.reset();
+  // Everything but the current file.
+  mpv_command_string(m_mpv, "playlist-clear");
 }
 
 void MpvMediaBackend::start(core::MediaEpoch epoch, std::optional<core::BackendSeconds> position)
@@ -192,6 +221,7 @@ void MpvMediaBackend::stop(core::MediaEpoch epoch)
   if (!m_mpv || (!isCurrent(epoch) && m_starting.empty()))
     return;
   releaseHook();
+  dropPreload();
   mpv_command_string(m_mpv, "stop");
 }
 
@@ -294,6 +324,28 @@ void MpvMediaBackend::handle(const mpv_event& event)
     m_current = m_starting.front();
     m_starting.pop_front();
     m_entries[start->playlist_entry_id] = *m_current;
+    if (m_preload && *m_preload == *m_current)
+    {
+      // The queued file starts: the one before it has ended.
+      m_preload.reset();
+      if (m_leaving)
+      {
+        const core::backend::Ended left = *m_leaving;
+        m_leaving.reset();
+        if (left.reason == core::backend::EndReason::EndOfFile)
+        {
+          m_gapless = *m_current;
+          m_post(core::backend::Advanced {left.epoch, *m_current});
+        }
+        else
+        {
+          // The session was told the file failed or stopped; it does not
+          // follow on into the queued one.
+          m_post(left);
+          mpv_command_string(m_mpv, "stop");
+        }
+      }
+    }
     if (const auto tracks = m_startTracks.extract(*m_current))
     {
       for (const core::TrackKind kind : {core::TrackKind::Audio, core::TrackKind::Subtitle})
@@ -321,9 +373,16 @@ void MpvMediaBackend::handle(const mpv_event& event)
       mpv_hook_continue(m_mpv, hook->id);
       break;
     }
-    m_hook = hook->id;
     m_post(core::backend::SourceOpened {*m_current, doubleProperty(m_mpv, "demuxer-start-time"),
                                         doubleProperty(m_mpv, "duration")});
+    if (m_gapless == m_current)
+    {
+      // A file that followed on without a gap is not held for start().
+      m_gapless.reset();
+      mpv_hook_continue(m_mpv, hook->id);
+      break;
+    }
+    m_hook = hook->id;
     break;
   }
   case MPV_EVENT_SEEK:
@@ -349,7 +408,9 @@ void MpvMediaBackend::handle(const mpv_event& event)
     {
       const auto* property = static_cast<const mpv_event_property*>(event.data);
       // keep-open=yes holds the last frame at the end instead of ending the file.
-      if (m_current && property->format == MPV_FORMAT_FLAG && *static_cast<int*>(property->data))
+      // With a file queued mpv goes on to it instead of holding the last frame.
+      if (m_current && !m_preload && property->format == MPV_FORMAT_FLAG
+          && *static_cast<int*>(property->data))
         m_post(core::backend::Ended {*m_current, core::backend::EndReason::EndOfFile, {}});
       break;
     }
@@ -365,11 +426,29 @@ void MpvMediaBackend::handle(const mpv_event& event)
       break;
     const core::MediaEpoch epoch = entry->second;
     m_entries.erase(entry);
-    if (isCurrent(epoch))
+    const bool wasCurrent = isCurrent(epoch);
+    if (wasCurrent)
     {
       m_current.reset();
       m_hook.reset();
+      m_gapless.reset();
       m_restartPending = false;
+    }
+    if (wasCurrent && m_preload)
+    {
+      // mpv goes on to the queued file; the session hears how this one ended
+      // when that file has started (Advanced after a natural end).
+      core::backend::EndReason reason = core::backend::EndReason::Stopped;
+      std::string error;
+      if (end->reason == MPV_END_FILE_REASON_EOF)
+        reason = core::backend::EndReason::EndOfFile;
+      else if (end->reason == MPV_END_FILE_REASON_ERROR)
+      {
+        reason = core::backend::EndReason::Error;
+        error = mpv_error_string(end->error);
+      }
+      m_leaving = core::backend::Ended {epoch, reason, error};
+      break;
     }
     switch (end->reason)
     {

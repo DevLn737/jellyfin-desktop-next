@@ -5,6 +5,8 @@
 
 #include <QCoreApplication>
 #include <QDeadlineTimer>
+#include <QDir>
+#include <QFile>
 #include <QElapsedTimer>
 
 #include <cmath>
@@ -41,9 +43,12 @@ namespace {
   };
 
   struct Fixture {
-    MpvPlayer player {headless()};
+    explicit Fixture(const MpvPlayer::Options& options = headless()) : player(options) {}
+    MpvPlayer player;
     SteadyClock clock;
     std::vector<SessionInput> inputs;
+    // Every input next() has gone through, for checks that something never came.
+    std::vector<SessionInput> seen;
     MpvMediaBackend backend {player, clock, [this](SessionInput input) { inputs.push_back(std::move(input)); }};
     EpochCounter<MediaEpochTag> files;
     EpochCounter<RequestTag> requests;
@@ -57,6 +62,7 @@ namespace {
         while (!inputs.empty()) {
           SessionInput input = std::move(inputs.front());
           inputs.erase(inputs.begin());
+          seen.push_back(input);
           if (const T* event = std::get_if<T>(&input); event && event->epoch == epoch && accept(*event))
             return *event;
         }
@@ -191,4 +197,163 @@ TEST_CASE("Settings reach mpv as properties while it runs") {
     QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
   CHECK(hwdec() == QStringList{QStringLiteral("no")});
   CHECK(player.property("sub-font-size").toDouble() == doctest::Approx(60));
+}
+
+namespace {
+  // Two short tones: a queued file has something to follow.
+  constexpr const char* Tone = "av://lavfi:sine=frequency=440:duration=1.2";
+  constexpr const char* Tone2 = "av://lavfi:sine=frequency=660:duration=1.2";
+
+  template <class T> bool any(const std::vector<SessionInput>& inputs, MediaEpoch epoch) {
+    for (const SessionInput& input : inputs)
+      if (const T* event = std::get_if<T>(&input); event && event->epoch == epoch) return true;
+    return false;
+  }
+
+  bool advancedTo(const std::vector<SessionInput>& inputs, MediaEpoch epoch) {
+    for (const SessionInput& input : inputs)
+      if (const auto* event = std::get_if<backend::Advanced>(&input); event && event->to == epoch)
+        return true;
+    return false;
+  }
+} // namespace
+
+TEST_CASE("A queued file follows the current one by itself, reported as Advanced") {
+  Fixture f;
+  REQUIRE(f.player.isValid());
+  const MediaEpoch first = f.files.advance();
+  f.backend.load(first, {Tone, false, true});
+  REQUIRE(f.next<backend::SourceOpened>(first));
+  f.backend.start(first, std::nullopt);
+  REQUIRE(f.next<backend::PlaybackRestarted>(first));
+  f.backend.setPaused(first, false);
+
+  const MediaEpoch second = f.files.advance();
+  f.backend.preload(second, {Tone2, true, true});
+
+  // The first file ends on its own; nothing says it ended, the second plays on.
+  std::optional<backend::Advanced> advanced;
+  QDeadlineTimer deadline(10000);
+  while (!advanced && !deadline.hasExpired()) {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    while (!advanced && !f.inputs.empty()) {
+      SessionInput input = std::move(f.inputs.front());
+      f.inputs.erase(f.inputs.begin());
+      f.seen.push_back(input);
+      if (const auto* event = std::get_if<backend::Advanced>(&input)) advanced = *event;
+      if (const auto* ended = std::get_if<backend::Ended>(&input)) CHECK_FALSE(ended->epoch == first);
+    }
+  }
+  REQUIRE(advanced);
+  CHECK(advanced->from == first);
+  CHECK(advanced->to == second);
+
+  // Not held: it opens and restarts without a start() call.
+  const auto opened = f.next<backend::SourceOpened>(second);
+  REQUIRE(opened);
+  REQUIRE(opened->demuxerStart);
+  const auto restarted = f.next<backend::PlaybackRestarted>(second);
+  REQUIRE(restarted);
+  CHECK_FALSE(restarted->sample.paused);
+  CHECK(positionOf(restarted->sample) < 0.5);
+  CHECK_FALSE(any<backend::Ended>(f.seen, first));
+
+  // The last file of the queue ends as usual.
+  const auto ended = f.next<backend::Ended>(second);
+  REQUIRE(ended);
+  CHECK(ended->reason == backend::EndReason::EndOfFile);
+}
+
+TEST_CASE("A queued file is dropped by stop, load and a newer preload") {
+  Fixture f;
+  const MediaEpoch first = f.files.advance();
+  f.backend.load(first, {Tone, false, true});
+  REQUIRE(f.next<backend::SourceOpened>(first));
+  f.backend.start(first, std::nullopt);
+  REQUIRE(f.next<backend::PlaybackRestarted>(first));
+
+  // A newer preload replaces the older one: only the newer is followed.
+  const MediaEpoch older = f.files.advance();
+  const MediaEpoch newer = f.files.advance();
+  f.backend.preload(older, {Tone2, false, true});
+  f.backend.preload(newer, {Tone2, false, true});
+  f.backend.setPaused(first, false);
+  REQUIRE(f.next<backend::SourceOpened>(newer));
+  CHECK(advancedTo(f.seen, newer));
+  CHECK_FALSE(advancedTo(f.seen, older));
+  CHECK_FALSE(any<backend::SourceOpened>(f.seen, older));
+
+  // stop() leaves nothing queued: the file just ends.
+  f.backend.stop(newer);
+  CHECK(f.next<backend::Ended>(newer));
+  const MediaEpoch third = f.files.advance();
+  f.backend.load(third, {Tone, false, true});
+  REQUIRE(f.next<backend::SourceOpened>(third));
+  f.backend.start(third, std::nullopt);
+  REQUIRE(f.next<backend::PlaybackRestarted>(third));
+  const MediaEpoch queued = f.files.advance();
+  f.backend.preload(queued, {Tone2, false, true});
+  const MediaEpoch replacing = f.files.advance();
+  f.backend.load(replacing, {Tone, false, true});
+  REQUIRE(f.next<backend::SourceOpened>(replacing));
+  CHECK_FALSE(advancedTo(f.seen, queued));
+  f.backend.start(replacing, std::nullopt);
+  REQUIRE(f.next<backend::PlaybackRestarted>(replacing));
+  f.backend.setPaused(replacing, false);
+  const auto ended = f.next<backend::Ended>(replacing);
+  REQUIRE(ended);
+  CHECK(ended->reason == backend::EndReason::EndOfFile);
+}
+
+TEST_CASE("Two queued tones play without a gap") {
+  const QString path = QDir::temp().filePath(QStringLiteral("jfd-gapless-%1.pcm").arg(QCoreApplication::applicationPid()));
+  QFile::remove(path);
+  MpvPlayer::Options options;
+  options.audioOutput = QStringLiteral("pcm");
+  options.extra = {{"vo", "null"}, {"ao-pcm-file", path.toUtf8()}, {"ao-pcm-waveheader", "no"},
+                   {"audio-format", "s16"}, {"audio-samplerate", "48000"}, {"audio-channels", "mono"},
+                   {"gapless-audio", "yes"}};
+  {
+    Fixture f(options);
+    REQUIRE(f.player.isValid());
+    const MediaEpoch first = f.files.advance();
+    const MediaEpoch second = f.files.advance();
+    f.backend.load(first, {Tone, false, true});
+    REQUIRE(f.next<backend::SourceOpened>(first));
+    f.backend.start(first, std::nullopt);
+    REQUIRE(f.next<backend::PlaybackRestarted>(first));
+    f.backend.preload(second, {Tone2, false, true});
+    f.backend.setPaused(first, false);
+    const auto ended = f.next<backend::Ended>(second, [](auto&) { return true; }, 15000);
+    REQUIRE(ended);
+    CHECK(advancedTo(f.seen, second));
+  }
+
+  QFile file(path);
+  REQUIRE(file.open(QIODevice::ReadOnly));
+  const QByteArray raw = file.readAll();
+  file.close();
+  QFile::remove(path);
+  const auto* samples = reinterpret_cast<const std::int16_t*>(raw.constData());
+  const qsizetype count = raw.size() / 2;
+  // The 660 Hz tone starts where zero crossings come closer than the 440 Hz
+  // tone's (54 samples against 36 apart at 48 kHz). Both tones are the same
+  // length, so the second one played in full when the whole is twice the first
+  // (without gapless audio the output stops short of it).
+  qsizetype change = 0, lastCrossing = 0;
+  for (qsizetype i = 1; i < count && change == 0; ++i) {
+    if ((samples[i - 1] < 0) == (samples[i] < 0)) continue;
+    if (lastCrossing > 0 && i - lastCrossing < 45) change = lastCrossing;
+    lastCrossing = i;
+  }
+  CHECK(change > 48000);
+  CHECK(count == doctest::Approx(2.0 * static_cast<double>(change)).epsilon(0.01));
+  // The longest stretch of near-silence between 0.5 s and the end: a sine
+  // crosses zero every ~1 ms, so anything over 5 ms is a hole.
+  qsizetype longest = 0, run = 0;
+  for (qsizetype i = 24000; i + 24000 < count; ++i) {
+    if (std::abs(samples[i]) < 50) ++run; else run = 0;
+    longest = std::max(longest, run);
+  }
+  CHECK(longest < 48 * 5);
 }

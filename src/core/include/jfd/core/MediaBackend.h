@@ -47,6 +47,20 @@ namespace jfd::core {
     // the demuxer start time is known.
     virtual void load(MediaEpoch epoch, const BackendLoad& request) = 0;
 
+    // Queues `request` to play right after the current file without a gap
+    // (gapless music): the backend opens it ahead of time and, when the
+    // current file reaches its natural end, continues with it without
+    // unloading anything. It reports backend::Advanced{from, epoch} instead
+    // of Ended for the file it leaves, then SourceOpened, PlaybackRestarted
+    // and Progress for the new one as for any file. The new file is not held
+    // for start(): it plays from its beginning at once, in the pause state
+    // and at the rate the backend already has; startPaused is ignored.
+    // One file is queued at a time. A later preload() replaces it; load(),
+    // stop() and any end of the current file other than a natural one drop it
+    // without a report. A queued file that cannot be opened reports
+    // Ended{epoch, Error} once it has become the current one.
+    virtual void preload(MediaEpoch epoch, const BackendLoad& request) = 0;
+
     // Releases a file held by load(). Without a position the file starts at
     // its natural beginning.
     virtual void start(MediaEpoch epoch, std::optional<BackendSeconds> position) = 0;

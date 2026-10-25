@@ -415,3 +415,75 @@ TEST_CASE("Buffering that ends during the group's pause seek is followed by Read
   h.post(backend::Progress{epoch, h.sample(1.0, true)});
   CHECK(h.outbox.all<outgoing::Ready>().size() == 1);
 }
+
+TEST_CASE("A preloaded file takes over when the backend advances, without a stop") {
+  SessionHarness h;
+  const auto first = h.open(h.media(), false);
+  h.post(backend::Progress{first, h.sample(5.0, false)});
+
+  MediaRequest next = h.media();
+  next.item = ItemId("next-item");
+  next.url = "http://server/next";
+  next.title = "Next";
+  h.post(intent::PreloadNext{next});
+  const auto preload = h.backend.last<command::Preload>();
+  REQUIRE(preload);
+  CHECK(preload->request.url == "http://server/next");
+  CHECK_FALSE(preload->request.startPaused);
+  CHECK_FALSE(preload->epoch == first);
+
+  h.post(backend::Advanced{first, preload->epoch});
+  CHECK(h.snapshot().media == preload->epoch);
+  CHECK(h.snapshot().item == ItemId("next-item"));
+  CHECK(h.snapshot().title == "Next");
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+  CHECK(h.backend.all<command::Stop>().empty());
+
+  // The new file reports as any file does; it is not started by the session.
+  h.post(backend::SourceOpened{preload->epoch, 0.0, 200.0});
+  h.post(backend::PlaybackRestarted{preload->epoch, h.sample(0.0, false)});
+  CHECK(h.snapshot().phase == PlaybackPhase::Playing);
+  CHECK(h.snapshot().duration);
+
+  // Whatever the old file still reports is dropped.
+  h.post(backend::Progress{first, h.sample(99.0, true)});
+  CHECK(h.snapshot().media == preload->epoch);
+  CHECK(h.snapshot().phase == PlaybackPhase::Playing);
+}
+
+TEST_CASE("A preload is ignored in a group and while nothing plays") {
+  SessionHarness idle;
+  idle.post(intent::PreloadNext{idle.media()});
+  CHECK(idle.backend.all<command::Preload>().empty());
+
+  SessionHarness h;
+  h.join("p1");
+  h.open(h.media("p1"), true);
+  h.post(intent::PreloadNext{h.media()});
+  CHECK(h.backend.all<command::Preload>().empty());
+}
+
+TEST_CASE("Opening, stopping or ending drops the preload; a stale Advanced changes nothing") {
+  SessionHarness h;
+  const auto first = h.open(h.media());
+  h.post(intent::PreloadNext{h.media()});
+  const auto queued = h.backend.last<command::Preload>()->epoch;
+  const auto second = h.open(h.media());
+  h.post(backend::Advanced{first, queued});
+  CHECK(h.snapshot().media == second);
+
+  h.post(intent::PreloadNext{h.media()});
+  const auto queuedAgain = h.backend.last<command::Preload>()->epoch;
+  h.post(backend::Ended{second, backend::EndReason::EndOfFile, {}});
+  CHECK(h.snapshot().phase == PlaybackPhase::Ended);
+  h.post(backend::Advanced{second, queuedAgain});
+  CHECK(h.snapshot().phase == PlaybackPhase::Ended);
+
+  // The preload that was asked for last is the one followed.
+  const auto third = h.open(h.media());
+  h.post(intent::PreloadNext{h.media()});
+  h.post(intent::PreloadNext{h.media()});
+  const auto newest = h.backend.last<command::Preload>()->epoch;
+  h.post(backend::Advanced{third, newest});
+  CHECK(h.snapshot().media == newest);
+}

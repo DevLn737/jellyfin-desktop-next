@@ -73,6 +73,11 @@ namespace jfd::core {
             [&](const intent::Next&) { return true; },
             [&](const intent::Previous&) { return true; },
             [&](const intent::SetSyncCorrection&) { return true; },
+            [&](const intent::PreloadNext&) { return true; },
+            [&](const backend::Advanced& advanced) {
+              return m_media.has_value() && m_media->epoch == advanced.from && m_preload &&
+                     m_preload->epoch == advanced.to;
+            },
             [&](const group::Joined& joined) {
               return joined.epoch.isValid() && joined.epoch > m_latestGroupEpoch;
             },
@@ -117,6 +122,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Open& open) {
     if (m_media) m_ports.backend.stop(m_media->epoch);
+    m_preload.reset();
     Media media;
     media.epoch = m_mediaEpochs.advance();
     media.request = open.media;
@@ -138,6 +144,19 @@ namespace jfd::core {
     m_media->paused = load.startPaused;
     m_media->readyDeadline = arm(TimerPurpose::ReadyDeadline, now() + m_settings.readyDeadline);
     m_ports.backend.load(m_media->epoch, load);
+  }
+
+  void PlaybackSession::on(const intent::PreloadNext& next) {
+    // Group items come from the server's queue; nothing is playing to follow.
+    if (!m_media || m_group) return;
+    Preload preload;
+    preload.epoch = m_mediaEpochs.advance();
+    preload.request = next.media;
+    BackendLoad load;
+    load.url = next.media.url;
+    load.rebaseStartTime = Timeline(next.media.timeline, next.media.start).rebasesStartTime();
+    m_preload = std::move(preload);
+    m_ports.backend.preload(m_preload->epoch, load);
   }
 
   void PlaybackSession::on(const intent::Play&) {
@@ -313,6 +332,26 @@ namespace jfd::core {
     cancel(media.readyDeadline);
   }
 
+  void PlaybackSession::on(const backend::Advanced&) {
+    // The backend went on to the queued file by itself: it is already playing
+    // from its beginning, so only the session's view of the media changes. Its
+    // SourceOpened, restart and progress follow like those of any file.
+    const bool paused = m_media->paused;
+    cancel(m_media->readyDeadline);
+    Media media;
+    media.epoch = m_preload->epoch;
+    media.request = std::move(m_preload->request);
+    media.timeline = Timeline(media.request.timeline, media.request.start);
+    media.duration = media.request.runTime;
+    media.paused = paused;
+    media.purpose = ReadyPurpose::Local;
+    m_preload.reset();
+    m_media = std::move(media);
+    m_endPhase = PlaybackPhase::Idle;
+    m_error.clear();
+    m_media->readyDeadline = arm(TimerPurpose::ReadyDeadline, now() + m_settings.readyDeadline);
+  }
+
   void PlaybackSession::on(const backend::TrackAdded& added) {
     for (auto& track : m_media->tracks) {
       if (track.request != added.request) continue;
@@ -468,6 +507,7 @@ namespace jfd::core {
   }
 
   void PlaybackSession::stopMedia(PlaybackPhase endPhase, std::string error) {
+    m_preload.reset();
     if (m_media) {
       cancel(m_media->readyDeadline);
       m_ports.backend.stop(m_media->epoch);
