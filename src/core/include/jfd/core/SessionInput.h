@@ -3,6 +3,7 @@
 #include <jfd/core/Epoch.h>
 #include <jfd/core/Ids.h>
 #include <jfd/core/MediaBackend.h>
+#include <jfd/core/Reconciler.h>
 #include <jfd/core/SyncPlay.h>
 #include <jfd/core/Time.h>
 #include <jfd/core/Timers.h>
@@ -84,6 +85,10 @@ namespace jfd::core {
       MediaEpoch epoch;
       ExternalTrack track;
     };
+    // The user's SyncPlay correction settings; apply from the next decision.
+    struct SetSyncCorrection {
+      ReconcilerSettings reconciler;
+    };
   } // namespace intent
 
   namespace backend {
@@ -158,6 +163,7 @@ namespace jfd::core {
                    group::ConnectionLost, group::StateChanged, group::Command,
                    group::QueueChanged, group::RateChangeRejected, group::ClockSynced,
                    TimerFired, intent::Next, intent::Previous, intent::SelectTrack,
-                   intent::AddExternalTrack, group::ParticipantsChanged>;
+                   intent::AddExternalTrack, group::ParticipantsChanged,
+                   intent::SetSyncCorrection>;
 
 } // namespace jfd::core

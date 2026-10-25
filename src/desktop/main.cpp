@@ -76,6 +76,7 @@ namespace {
     ok = desktop::registerLibrarySettings(registry) && ok;
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
+    ok = desktop::registerGroupSettings(registry) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }

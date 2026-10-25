@@ -2,6 +2,29 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>GroupSettings</name>
+    <message>
+        <source>Watch together</source>
+        <translation>Смотреть вместе</translation>
+    </message>
+    <message>
+        <source>Catch up by changing speed</source>
+        <translation>Догонять группу изменением скорости</translation>
+    </message>
+    <message>
+        <source>Small differences from the group are made up by playing a little faster or slower for a moment, without a jump. Off: only by seeking.</source>
+        <translation>Небольшое отставание или опережение выравнивается ненадолго ускоренным или замедленным воспроизведением, без скачка. Если выключено, только перемоткой.</translation>
+    </message>
+    <message>
+        <source>Seek when out of step by more than</source>
+        <translation>Перематывать при расхождении больше чем на</translation>
+    </message>
+    <message>
+        <source>With speed correction on, differences up to 3 seconds are made up by speed first.</source>
+        <translation>Если включено выравнивание скоростью, расхождение до 3 секунд сначала выравнивается скоростью.</translation>
+    </message>
+</context>
+<context>
     <name>Integrations</name>
     <message>
         <source>Version %1 is available.</source>

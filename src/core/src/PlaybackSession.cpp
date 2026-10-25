@@ -70,6 +70,7 @@ namespace jfd::core {
             [&](const intent::Stop&) { return true; },
             [&](const intent::Next&) { return true; },
             [&](const intent::Previous&) { return true; },
+            [&](const intent::SetSyncCorrection&) { return true; },
             [&](const group::Joined& joined) {
               return joined.epoch.isValid() && joined.epoch > m_latestGroupEpoch;
             },
@@ -179,6 +180,8 @@ namespace jfd::core {
   void PlaybackSession::on(const intent::Next&) { stepQueue(true); }
 
   void PlaybackSession::on(const intent::Previous&) { stepQueue(false); }
+
+  void PlaybackSession::on(const intent::SetSyncCorrection& set) { m_settings.reconciler = set.reconciler; }
 
   void PlaybackSession::stepQueue(bool forward) {
     if (!m_group) {

@@ -193,6 +193,7 @@ namespace jfd::sim {
                 [&](const intent::Stop&) { return false; },
                 [&](const intent::Next&) { return false; },
                 [&](const intent::Previous&) { return false; },
+                [&](const intent::SetSyncCorrection&) { return false; },
                 [&](const group::Joined&) { return false; },
                 [&](const group::ClockSynced&) { return false; },
                 [&](const TimerFired& fired) { return !armed.contains(fired.id.serial); },

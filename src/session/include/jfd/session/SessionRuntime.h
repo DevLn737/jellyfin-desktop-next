@@ -77,6 +77,11 @@ namespace jfd::session {
     void setTrackChooser(PlaybackLauncher::TrackChooser chooser) {
       m_launcher->setTrackChooser(std::move(chooser));
     }
+    // The user's SyncPlay correction settings (speed correction on or off,
+    // the drift that makes a member seek), from the next decision on.
+    void setSyncCorrection(const core::ReconcilerSettings& reconciler) {
+      post(core::intent::SetSyncCorrection{reconciler});
+    }
     // The profile sent with PlaybackInfo from the next open on (rebuilt with
     // api::buildDeviceProfile when a transcoding setting changes).
     void setDeviceProfile(QJsonObject deviceProfile) {
