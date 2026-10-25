@@ -74,6 +74,10 @@ namespace jfd::testing {
       MediaEpoch epoch;
       BackendLoad request;
     };
+    struct Preload {
+      MediaEpoch epoch;
+      BackendLoad request;
+    };
     struct Start {
       MediaEpoch epoch;
       std::optional<BackendSeconds> position;
@@ -107,7 +111,7 @@ namespace jfd::testing {
   } // namespace command
 
   using BackendCommand =
-      std::variant<command::Load, command::Start, command::Seek, command::SetPaused,
+      std::variant<command::Load, command::Preload, command::Start, command::Seek, command::SetPaused,
                    command::SetRate, command::SelectTrack, command::AddTrack, command::Stop>;
 
   // Records commands; tests and the simulator decide what the backend reports.
@@ -117,6 +121,9 @@ namespace jfd::testing {
 
     void load(MediaEpoch epoch, const BackendLoad& request) override {
       record(command::Load{epoch, request});
+    }
+    void preload(MediaEpoch epoch, const BackendLoad& request) override {
+      record(command::Preload{epoch, request});
     }
     void start(MediaEpoch epoch, std::optional<BackendSeconds> position) override {
       record(command::Start{epoch, position});

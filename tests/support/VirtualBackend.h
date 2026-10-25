@@ -37,6 +37,8 @@ namespace jfd::testing {
       loadedUrls.push_back(request.url);
       later(80, [this, epoch] { m_post(core::backend::SourceOpened{epoch, 0.0, 600.0}); });
     }
+    // Never plays to its end in a test, so a queued file is never reached.
+    void preload(core::MediaEpoch, const core::BackendLoad&) override {}
     void start(core::MediaEpoch epoch, std::optional<core::BackendSeconds> position) override {
       later(60, [this, epoch, position] {
         m_position = position ? position->value : 0.0;

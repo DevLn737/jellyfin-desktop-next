@@ -86,6 +86,12 @@ namespace jfd::core {
       std::vector<ExternalTrackRequest> tracks;
     };
 
+    // The file queued behind the current one (MediaBackend::preload).
+    struct Preload {
+      MediaEpoch epoch;
+      MediaRequest request;
+    };
+
     struct Group {
       GroupEpoch epoch;
       GroupId id;
@@ -130,6 +136,8 @@ namespace jfd::core {
     void on(const backend::Ended&);
     void on(const backend::RequestFailed&);
     void on(const backend::TrackAdded&);
+    void on(const backend::Advanced&);
+    void on(const intent::PreloadNext&);
     void on(const group::Joined&);
     void on(const group::Left&);
     void on(const group::ParticipantsChanged&);
@@ -183,6 +191,7 @@ namespace jfd::core {
     SessionJournal* m_journal = nullptr;
 
     EpochCounter<MediaEpochTag> m_mediaEpochs;
+    std::optional<Preload> m_preload;
     EpochCounter<RequestTag> m_requests;
     GroupEpoch m_latestGroupEpoch;
     std::uint64_t m_timerSerial = 0;

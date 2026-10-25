@@ -140,6 +140,9 @@ namespace jfd::core {
               return "AddExternalTrack " + epoch("media", add.epoch) + " " + name(add.track.kind) +
                      (add.track.language.empty() ? std::string() : " " + add.track.language);
             },
+            [](const intent::PreloadNext& next) {
+              return "PreloadNext item " + next.media.item.value();
+            },
             [](const intent::SetSyncCorrection& set) {
               return std::string("SetSyncCorrection speed ") +
                      (set.reconciler.useSpeed ? "on" : "off") + " skip " +
@@ -165,6 +168,10 @@ namespace jfd::core {
             [](const backend::RequestFailed& failed) {
               return "RequestFailed " + epoch("media", failed.epoch) + " " +
                      epoch("request", failed.request);
+            },
+            [](const backend::Advanced& advanced) {
+              return "Advanced " + epoch("media", advanced.from) + " -> " +
+                     epoch("media", advanced.to);
             },
             [](const backend::TrackAdded& added) {
               return "TrackAdded " + epoch("media", added.epoch) + " " +

@@ -194,6 +194,8 @@ namespace jfd::sim {
                 [&](const intent::Next&) { return false; },
                 [&](const intent::Previous&) { return false; },
                 [&](const intent::SetSyncCorrection&) { return false; },
+                [&](const intent::PreloadNext&) { return false; },
+                [&](const backend::Advanced&) { return true; },
                 [&](const group::Joined&) { return false; },
                 [&](const group::ClockSynced&) { return false; },
                 [&](const TimerFired& fired) { return !armed.contains(fired.id.serial); },
@@ -307,6 +309,9 @@ namespace jfd::sim {
         }
         return true;
       }
+
+      // The simulated files never play on into a queued one.
+      void preload(MediaEpoch, const BackendLoad&) override { ++commandsIssued; }
 
       MediaEpoch previousMedia;
       void load(MediaEpoch epoch, const BackendLoad& request) override {

@@ -30,6 +30,9 @@ class MpvPlayer;
 //   the hook, so the first frame mpv decodes is the requested one.
 // - Files are matched to epochs in loadfile order through MPV_EVENT_START_FILE
 //   and the playlist entry id that later events carry.
+// - preload() appends the next file to mpv's playlist (prefetched ahead of
+//   time) and tells the session about the switch with Advanced when the
+//   current file ends by itself; the file is not held at the start.
 // - PlaybackRestarted and Progress carry a sample read after the event queue
 //   is drained. Progress is posted on any pause, seeking or buffering change
 //   and at most every 250 ms for position alone.
@@ -45,6 +48,7 @@ public:
   MpvMediaBackend& operator=(const MpvMediaBackend&) = delete;
 
   void load(core::MediaEpoch epoch, const core::BackendLoad& request) override;
+  void preload(core::MediaEpoch epoch, const core::BackendLoad& request) override;
   void start(core::MediaEpoch epoch, std::optional<core::BackendSeconds> position) override;
   void seek(core::MediaEpoch epoch, core::RequestId request, core::BackendSeconds target) override;
   void setPaused(core::MediaEpoch epoch, bool paused) override;
@@ -71,6 +75,8 @@ private:
   core::backend::Sample sample() const;
   bool isCurrent(core::MediaEpoch epoch) const;
   void releaseHook();
+  // Forgets the queued file: it leaves mpv's playlist and the pending starts.
+  void dropPreload();
   std::uint64_t command(const Pending& pending, std::initializer_list<const char*> arguments);
   std::optional<int> findExternalTrack(core::TrackKind kind, const std::string& url) const;
 
@@ -87,6 +93,13 @@ private:
   // Track choices (aid, sid; empty: mpv's own) for files not started yet.
   std::map<core::MediaEpoch, std::array<QByteArray, 2>> m_startTracks;
   std::optional<std::uint64_t> m_hook;
+  // The file queued behind the current one (preload()), and the file mpv has
+  // just finished while it waits for the queued one to start.
+  std::optional<core::MediaEpoch> m_preload;
+  // How the file mpv left ended, reported once the queued file has started.
+  std::optional<core::backend::Ended> m_leaving;
+  // The queued file that has just become current: not held at its start.
+  std::optional<core::MediaEpoch> m_gapless;
   std::map<std::uint64_t, Pending> m_pending;
   std::uint64_t m_nextToken = 1;
 
