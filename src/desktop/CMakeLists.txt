@@ -12,7 +12,10 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   Logging.cpp Logging.h
   SmokeTest.cpp SmokeTest.h
   Translations.cpp Translations.h)
-target_compile_definitions(jellyfin-desktop PRIVATE JFD_VERSION="${PROJECT_VERSION}")
+# Release builds of pre-release tags add the tag's suffix (-beta.1), so the
+# update check compares pre-releases with each other.
+set(JFD_VERSION_SUFFIX "" CACHE STRING "Pre-release suffix of the version, such as -beta.1")
+target_compile_definitions(jellyfin-desktop PRIVATE JFD_VERSION="${PROJECT_VERSION}${JFD_VERSION_SUFFIX}")
 set_target_properties(jellyfin-desktop PROPERTIES AUTOMOC ON)
 
 qt_add_qml_module(jellyfin-desktop

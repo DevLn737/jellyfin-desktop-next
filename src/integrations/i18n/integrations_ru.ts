@@ -50,6 +50,18 @@
         <source>Only shows a link to the download page; nothing is installed.</source>
         <translation>Только показывает ссылку на страницу загрузки, ничего не устанавливает.</translation>
     </message>
+    <message>
+        <source>Update channel</source>
+        <translation>Канал обновлений</translation>
+    </message>
+    <message>
+        <source>Beta (pre-release versions too)</source>
+        <translation>Бета (с предварительными версиями)</translation>
+    </message>
+    <message>
+        <source>Stable</source>
+        <translation>Стабильный</translation>
+    </message>
 </context>
 <context>
     <name>MediaSessionBridge</name>

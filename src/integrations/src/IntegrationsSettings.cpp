@@ -36,6 +36,18 @@ namespace jfd::integrations {
                                             "Only shows a link to the download page; nothing is installed.");
     section.settings.append(updates);
 
+    settings::SettingDescriptor channel;
+    channel.key = key(keys::UpdateChannel);
+    channel.type = settings::SettingType::Choice;
+    // The first builds for the group are pre-releases.
+    channel.defaultValue = QStringLiteral("beta");
+    channel.label = QT_TRANSLATE_NOOP("IntegrationsSettings", "Update channel");
+    channel.choices = {
+        {QStringLiteral("beta"), QT_TRANSLATE_NOOP("IntegrationsSettings", "Beta (pre-release versions too)")},
+        {QStringLiteral("stable"), QT_TRANSLATE_NOOP("IntegrationsSettings", "Stable")},
+    };
+    section.settings.append(channel);
+
     return registry.registerSection(section);
   }
 

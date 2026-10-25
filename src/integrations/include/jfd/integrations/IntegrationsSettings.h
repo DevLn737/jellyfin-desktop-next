@@ -12,6 +12,8 @@ namespace jfd::integrations {
     inline constexpr QLatin1String Discord{"integrations/discord"};
     // Ask GitHub for a newer release at startup and show its download page.
     inline constexpr QLatin1String CheckForUpdates{"integrations/checkForUpdates"};
+    // "beta" (pre-releases too) or "stable".
+    inline constexpr QLatin1String UpdateChannel{"integrations/updateChannel"};
   } // namespace keys
 
   // False if the section is already registered.

@@ -5,8 +5,12 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/integrations/NowPlayingItem.h>
+#include <jfd/integrations/ReleaseSignature.h>
+#include <jfd/ui/Navigator.h>
 
 #include <QCoreApplication>
+#include <QDesktopServices>
+#include <QStandardPaths>
 #include <QLoggingCategory>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -19,6 +23,103 @@ namespace jfd::desktop {
     // MPRIS Identity and the .desktop file (packaging/linux).
     constexpr auto MprisIdentity = "Jellyfin Desktop Next";
     constexpr auto DesktopEntry = "io.github.devln737.JellyfinDesktopNext";
+
+    // Calls a function of the shell (src/ui/shell/AppShell.qml) with text arguments.
+    template <typename... Texts>
+    void callShell(QQuickWindow& window, const char* function, const Texts&... texts) {
+      QObject* shell = window.findChild<QQuickItem*>(QStringLiteral("shell"));
+      if (shell != nullptr) QMetaObject::invokeMethod(shell, function, Q_ARG(QVariant, QVariant(texts))...);
+    }
+
+    void showDownloadPage(QQuickWindow& window, const QString& version, const QUrl& page) {
+      callShell(window, "showLink", QCoreApplication::translate("Integrations", "Version %1 is available.").arg(version),
+                QCoreApplication::translate("Integrations", "Download page"), page);
+    }
+
+    void offerRestart(QQuickWindow& window, const QString& version) {
+      callShell(window, "showLink",
+                QCoreApplication::translate("Integrations", "Version %1 is ready to install.").arg(version),
+                QCoreApplication::translate("Integrations", "Restart and update"),
+                QUrl(integrations::AppImageUpdater::urlScheme() + QStringLiteral(":restart")));
+    }
+
+    // After an update the new version opens the screen the old one showed,
+    // once the saved session has signed in (home).
+    void reopen(ui::Navigator& navigator, const QString& route) {
+      const ui::Navigator::Route target = ui::Navigator::parse(route);
+      if (target.name.isEmpty() || target.name == QStringLiteral("login") || target.name == QStringLiteral("home"))
+        return;
+      if (navigator.currentName() == QStringLiteral("home")) {
+        navigator.navigate(route);
+        return;
+      }
+      auto connection = std::make_shared<QMetaObject::Connection>();
+      *connection = QObject::connect(&navigator, &ui::Navigator::currentChanged, &navigator,
+                                     [&navigator, route, connection] {
+                                       const QString name = navigator.currentName();
+                                       if (name == QStringLiteral("home")) navigator.navigate(route);
+                                       if (name != QStringLiteral("login")) QObject::disconnect(*connection);
+                                     });
+    }
+
+    // Downloads and installs AppImage updates in place (AppImageUpdater):
+    // offered in the toast once downloaded and checked, never while
+    // something plays or in a group.
+    void startAppImageUpdates(AppServices& services, QQuickWindow& window) {
+      IntegrationServices& integrations = *services.integrations;
+      integrations.appImage = std::make_unique<integrations::AppImageUpdater>(
+          &integrations.network, qEnvironmentVariable("APPIMAGE"),
+          QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/update"),
+          integrations::releasePublicKey());
+      integrations::AppImageUpdater& updater = *integrations.appImage;
+
+      using Kind = integrations::AppImageUpdater::StartState::Kind;
+      const auto start = updater.confirmStart(QCoreApplication::applicationVersion());
+      if (start.kind == Kind::Updated) {
+        qCInfo(lcIntegrations) << "Updated to" << start.version;
+        callShell(window, "showMessage",
+                  QCoreApplication::translate("Integrations", "Updated to version %1.").arg(start.version));
+        if (services.navigator != nullptr) reopen(*services.navigator, start.route);
+      } else if (start.kind == Kind::RolledBack) {
+        qCWarning(lcIntegrations) << "Version" << start.version << "did not start; rolled back";
+        callShell(window, "showError",
+                  QCoreApplication::translate("Integrations", "Version %1 did not start, so this version stays.")
+                      .arg(start.version));
+      }
+
+      QDesktopServices::setUrlHandler(integrations::AppImageUpdater::urlScheme(), &updater, "handleUrl");
+      QObject::connect(&updater, &integrations::AppImageUpdater::ready, &window,
+                       [&integrations, &window](const QString& version) {
+                         qCInfo(lcIntegrations) << "Update" << version << "downloaded and verified";
+                         integrations.offerWhenIdle = integrations.busy;
+                         if (!integrations.busy) offerRestart(window, version);
+                       });
+      QObject::connect(&updater, &integrations::AppImageUpdater::failed, &window,
+                       [&integrations, &window](const QString& reason) {
+                         qCInfo(lcIntegrations) << "AppImage update failed:" << reason;
+                         if (integrations.updates && integrations.updates->available())
+                           showDownloadPage(window, integrations.updates->available()->version,
+                                            integrations.updates->available()->page);
+                       });
+      QObject::connect(&updater, &integrations::AppImageUpdater::restartRequested, &window,
+                       [&services, &integrations, &window] {
+                         if (integrations.busy) {
+                           integrations.offerWhenIdle = true;
+                           callShell(window, "showMessage",
+                                     QCoreApplication::translate(
+                                         "Integrations", "The update restarts the app, so it waits until playback ends and you are not in a group."));
+                           return;
+                         }
+                         const QString route = services.navigator ? services.navigator->currentRoute() : QString();
+                         if (integrations.appImage->apply(route)) {
+                           qCInfo(lcIntegrations) << "Restarting into" << integrations.appImage->readyVersion();
+                           window.close();
+                         } else {
+                           callShell(window, "showError",
+                                     QCoreApplication::translate("Integrations", "The update could not be installed."));
+                         }
+                       });
+    }
   } // namespace
 
   void installIntegrations(AppServices& services, QQmlEngine&) {
@@ -49,6 +150,13 @@ namespace jfd::desktop {
     IntegrationServices& integrations = *services.integrations;
     integrations.post = std::move(post);
     integrations.subscription = hub.subscribe([&integrations, &client](const core::SessionSnapshot& snapshot) {
+      const bool busy = snapshot.group.has_value() ||
+                        (snapshot.phase != core::PlaybackPhase::Idle && snapshot.phase != core::PlaybackPhase::Ended &&
+                         snapshot.phase != core::PlaybackPhase::Failed);
+      if (integrations.busy && !busy && integrations.offerWhenIdle && integrations.appImage &&
+          !integrations.appImage->readyVersion().isEmpty())
+        Q_EMIT integrations.appImage->ready(integrations.appImage->readyVersion());
+      integrations.busy = busy;
       const QString item = QString::fromStdString(snapshot.item.value());
       if (!item.isEmpty() && item != integrations.detailsItem) {
         integrations.detailsItem = item;
@@ -76,19 +184,21 @@ namespace jfd::desktop {
     // The same way out as closing the window.
     QObject::connect(&controls, &platform::MediaControls::quitRequested, &window, &QQuickWindow::close);
 
-    if (!checkForUpdates || !services.settings->value(integrations::keys::CheckForUpdates).toBool()) return;
-    integrations.updates = std::make_unique<integrations::UpdateChecker>(&integrations.network,
-                                                                         QCoreApplication::applicationVersion());
+    if (!checkForUpdates) return;
+    // Also confirms an update that started this version.
+    startAppImageUpdates(services, window);
+    if (!services.settings->value(integrations::keys::CheckForUpdates).toBool()) return;
+    integrations.updates = std::make_unique<integrations::UpdateChecker>(
+        &integrations.network, QCoreApplication::applicationVersion(),
+        integrations::updateChannel(services.settings->value(integrations::keys::UpdateChannel).toString()));
     auto* checker = integrations.updates.get();
     QObject::connect(checker, &integrations::UpdateChecker::updateAvailable, &window,
-                     [&window](const QString& version, const QUrl& downloadPage) {
-                       QObject* shell = window.findChild<QQuickItem*>(QStringLiteral("shell"));
-                       if (shell == nullptr) return;
-                       QMetaObject::invokeMethod(
-                           shell, "showLink",
-                           Q_ARG(QVariant, QCoreApplication::translate("Integrations", "Version %1 is available.").arg(version)),
-                           Q_ARG(QVariant, QCoreApplication::translate("Integrations", "Download page")),
-                           Q_ARG(QVariant, downloadPage));
+                     [&integrations, &window, checker](const QString& version, const QUrl& downloadPage) {
+                       if (integrations.appImage->supported() && checker->available()) {
+                         integrations.appImage->prepare(*checker->available());
+                       } else {
+                         showDownloadPage(window, version, downloadPage);
+                       }
                      });
     QObject::connect(checker, &integrations::UpdateChecker::checkFailed, checker,
                      [](const QString& reason) { qCInfo(lcIntegrations) << "Update check failed:" << reason; });
