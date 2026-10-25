@@ -2,11 +2,14 @@ name: Package
 
 # Builds the Windows installer (MSI) and the Linux AppImage from the pinned
 # dependencies in deps/versions.json, installs and runs them, and keeps them as
-# workflow artifacts. Nothing is published: releases need the owner's consent.
+# workflow artifacts. Every file is signed with minisign (sign job). A tag
+# v<version>[-<pre-release>] publishes the signed AppImage as a GitHub
+# pre-release (release job); nothing else is published.
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -25,6 +28,9 @@ env:
   APP_PACKAGE: jellyfin-desktop-next
   # Scanned for QML imports to deploy.
   APP_QML_DIR: src
+  # The minisign public key built into the client; the matching secret key is
+  # the MINISIGN_SECRET_KEY secret. Unset: the client installs no update.
+  RELEASE_PUBLIC_KEY: ${{ vars.MINISIGN_PUBLIC_KEY }}
 
 jobs:
   msi:
@@ -36,10 +42,7 @@ jobs:
       - name: Read version
         id: version
         shell: bash
-        run: |
-          version=$(sed -nE 's/^project\([A-Za-z]+ VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        run: packaging/release-version.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -60,7 +63,8 @@ jobs:
         shell: pwsh
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF `
-            -DJFD_ENFORCE_PINS=ON "-DMPV_INCLUDE_DIR=$env:MPV_INCLUDE_DIR" "-DMPV_LIBRARY=$env:MPV_LIBRARY"
+            -DJFD_ENFORCE_PINS=ON "-DMPV_INCLUDE_DIR=$env:MPV_INCLUDE_DIR" "-DMPV_LIBRARY=$env:MPV_LIBRARY" `
+            "-DJFD_VERSION_SUFFIX=${{ steps.version.outputs.suffix }}" "-DJFD_RELEASE_PUBLIC_KEY=$env:RELEASE_PUBLIC_KEY"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build --parallel --target $env:APP_TARGET
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -85,13 +89,13 @@ jobs:
         shell: pwsh
         run: >
           ./packaging/windows/build-msi.ps1 -Deployment build/package/app
-          -Version ${{ steps.version.outputs.version }} -ExeName "$env:APP_EXE.exe"
-          -Output "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.version }}-x64.msi"
+          -Version ${{ steps.version.outputs.base }} -ExeName "$env:APP_EXE.exe"
+          -Output "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.base }}-x64.msi"
 
       - name: Install, run and uninstall
         shell: pwsh
         run: >
-          ./packaging/windows/test-msi.ps1 -Msi "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.version }}-x64.msi"
+          ./packaging/windows/test-msi.ps1 -Msi "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.base }}-x64.msi"
           -Logs build/package/msi-logs -ExeName "$env:APP_EXE.exe"
 
       - name: Upload installer logs
@@ -128,7 +132,7 @@ jobs:
         run: |
           echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
           echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
-          echo "version=$(sed -nE 's/^project\([A-Za-z]+ VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
+          packaging/release-version.sh >> "$GITHUB_OUTPUT"
 
       - name: Install Qt ${{ steps.pins.outputs.qt }}
         uses: jurplel/install-qt-action@v4
@@ -144,7 +148,8 @@ jobs:
       - name: Build
         run: |
           cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF \
-            -DCMAKE_BUILD_RPATH="${{ github.workspace }}/build/libmpv/lib"
+            -DCMAKE_BUILD_RPATH="${{ github.workspace }}/build/libmpv/lib" \
+            -DJFD_VERSION_SUFFIX="${{ steps.pins.outputs.suffix }}" -DJFD_RELEASE_PUBLIC_KEY="$RELEASE_PUBLIC_KEY"
           cmake --build build/app --parallel --target "$APP_TARGET"
 
       - name: Build AppImage
@@ -188,3 +193,121 @@ jobs:
         run: |
           chmod +x appimage/*.AppImage
           bash packaging/linux/smoke-appimage.sh appimage/*.AppImage
+
+  sign:
+    name: Sign packages
+    needs: [msi, appimage]
+    runs-on: ubuntu-24.04
+    outputs:
+      real-key: ${{ steps.key.outputs.real }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.APP_PACKAGE }}-*
+          path: packages
+          merge-multiple: true
+
+      - name: Install minisign
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends minisign
+
+      # The release key when the secret exists (pushes to this repository),
+      # otherwise a throwaway key made here, so pull requests check the same
+      # steps. Its public key must be the one built into the client.
+      - name: Signing key
+        id: key
+        env:
+          SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/minisign"
+          key="$RUNNER_TEMP/minisign/release.key"
+          if [ -n "$SECRET_KEY" ]; then
+            printf '%s\n' "$SECRET_KEY" > "$key"
+            minisign -R -s "$key" -p release.pub
+            if [ "$(sed -n 2p release.pub)" != "$RELEASE_PUBLIC_KEY" ]; then
+              echo "::error::MINISIGN_SECRET_KEY does not match the MINISIGN_PUBLIC_KEY variable"
+              exit 1
+            fi
+            echo "real=true" >> "$GITHUB_OUTPUT"
+          else
+            minisign -G -W -s "$key" -p release.pub
+            echo "real=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No MINISIGN_SECRET_KEY: signed with a throwaway key"
+          fi
+          echo "file=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Read version
+        id: version
+        run: packaging/release-version.sh >> "$GITHUB_OUTPUT"
+
+      - name: Sign and verify
+        env:
+          KEY: ${{ steps.key.outputs.file }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd packages
+          # Release name first: the signature names the file.
+          mv "$(ls *.AppImage | head -1)" "$APP_PACKAGE-$VERSION-x86_64.AppImage"
+          for file in *.msi *.AppImage; do
+            # The client accepts a signature only when the trusted comment
+            # names the file (ReleaseSignature.cpp).
+            minisign -S -s "$KEY" -m "$file" -t "file:$file"
+            minisign -V -p ../release.pub -m "$file"
+          done
+          # A changed file must fail.
+          cp "$(ls *.AppImage | head -1)" tampered
+          printf 'x' | dd of=tampered bs=1 seek=4096 conv=notrunc status=none
+          cp "$(ls *.AppImage | head -1).minisig" tampered.minisig
+          if minisign -V -p ../release.pub -m tampered -x tampered.minisig; then
+            echo "::error::a tampered file passed the signature check"
+            exit 1
+          fi
+          rm tampered tampered.minisig
+          rm -f "$KEY"
+          sha256sum *.msi *.AppImage > SHA256SUMS
+          cp ../release.pub minisign.pub
+          ls -la
+
+      - name: Upload signed packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_PACKAGE }}-signed
+          path: packages
+          if-no-files-found: error
+          retention-days: 30
+
+  # A tag v<version>[-<pre-release>] publishes the AppImage, its signature and
+  # the checksums as a GitHub pre-release. Only with the real key.
+  release:
+    name: Publish pre-release
+    needs: sign
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the version
+        id: version
+        run: packaging/release-version.sh >> "$GITHUB_OUTPUT"
+      - name: Require the release key
+        if: needs.sign.outputs.real-key != 'true'
+        run: |
+          echo "::error::No MINISIGN_SECRET_KEY secret: nothing is published"
+          exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.APP_PACKAGE }}-signed
+          path: packages
+      - name: Create the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd packages
+          name="$APP_PACKAGE-$VERSION-x86_64.AppImage"
+          grep " $name\$" SHA256SUMS > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --prerelease --verify-tag \
+            --title "Jellyfin Desktop $VERSION" \
+            --notes "Pre-release for testing. Linux AppImage: make it executable and run it. The file is signed with minisign (minisign.pub); SHA-256 in SHA256SUMS.txt." \
+            "$name" "$name.minisig" SHA256SUMS.txt minisign.pub
