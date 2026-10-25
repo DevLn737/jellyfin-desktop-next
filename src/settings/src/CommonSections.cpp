@@ -72,9 +72,9 @@ namespace jfd::settings {
       effects.defaultValue = QStringLiteral("auto");
       effects.label = QT_TRANSLATE_NOOP("CommonSettings", "Simplified effects");
       effects.description = QT_TRANSLATE_NOOP(
-          "CommonSettings", "No blur and shorter animations, for slower graphics.");
+          "CommonSettings", "No blur and shorter animations, for slower graphics. Automatic: on with integrated graphics.");
       effects.choices = {
-          {QStringLiteral("auto"), QT_TRANSLATE_NOOP("CommonSettings", "Automatic (on with integrated graphics)")},
+          {QStringLiteral("auto"), QT_TRANSLATE_NOOP("CommonSettings", "Automatic")},
           {QStringLiteral("on"), QT_TRANSLATE_NOOP("CommonSettings", "On")},
           {QStringLiteral("off"), QT_TRANSLATE_NOOP("CommonSettings", "Off")},
       };

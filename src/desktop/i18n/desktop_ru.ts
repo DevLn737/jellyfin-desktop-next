@@ -16,6 +16,10 @@
         <translation>Небольшое отставание или опережение выравнивается ненадолго ускоренным или замедленным воспроизведением, без скачка. Если выключено, только перемоткой.</translation>
     </message>
     <message>
+        <source>ms</source>
+        <translation>мс</translation>
+    </message>
+    <message>
         <source>Seek when out of step by more than</source>
         <translation>Перематывать при расхождении больше чем на</translation>
     </message>

@@ -52,7 +52,7 @@ namespace jfd::desktop {
     threshold.minimum = 100;
     threshold.maximum = 3000;
     threshold.step = 50;
-    threshold.unit = QStringLiteral("ms");
+    threshold.unit = QT_TRANSLATE_NOOP("GroupSettings", "ms");
     threshold.label = QT_TRANSLATE_NOOP("GroupSettings", "Seek when out of step by more than");
     threshold.description = QT_TRANSLATE_NOOP(
         "GroupSettings",
