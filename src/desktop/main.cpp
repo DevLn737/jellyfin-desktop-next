@@ -1,5 +1,6 @@
 #include "AppServices.h"
 #include "IntegrationServices.h"
+#include "LegacyInstall.h"
 #include "Logging.h"
 #include "FlowCheck.h"
 #include "SmokeTest.h"
@@ -16,12 +17,15 @@
 #include <jfd/ui/WindowStateKeeper.h>
 
 #include <QCommandLineParser>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QTemporaryDir>
 #include <QtQml/qqmlextensionplugin.h>
 
@@ -71,12 +75,13 @@ namespace {
   }
 
   // Each module's settings section, before the file opens.
-  bool registerSettings(settings::SettingsRegistry& registry) {
+  bool registerSettings(settings::SettingsRegistry& registry, const desktop::LegacyImport& legacy) {
     bool ok = settings::registerCommonSections(registry);
     ok = desktop::registerLibrarySettings(registry) && ok;
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
     ok = desktop::registerGroupSettings(registry) && ok;
+    ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }
@@ -101,12 +106,17 @@ int main(int argc, char* argv[]) {
   }
 
   desktop::AppServices services;
-  if (!registerSettings(services.settingsRegistry)) {
+  desktop::LegacyImport legacy = desktop::findLegacyImport(options.smoke);
+  if (!registerSettings(services.settingsRegistry, legacy)) {
     std::fprintf(stderr, "Invalid settings schema\n");
     return 2;
   }
-  services.settings = std::make_unique<settings::Settings>(
-      services.settingsRegistry, settingsFile.isEmpty() ? settings::Settings::defaultFilePath() : settingsFile);
+  if (settingsFile.isEmpty()) {
+    settingsFile = settings::Settings::defaultFilePath();
+  }
+  const bool firstStart = !QFile::exists(settingsFile);
+  services.settings = std::make_unique<settings::Settings>(services.settingsRegistry, settingsFile);
+  desktop::importLegacyAtFirstStart(services, legacy, firstStart);
 
   const double scale = services.settings->value(settings::keys::Scale).toDouble();
   if (scale != 1.0 && qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR")) {
@@ -166,6 +176,7 @@ int main(int argc, char* argv[]) {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
     desktop::installLibrary(services, engine);
+    desktop::installLegacy(services, legacy, !options.smoke);
     desktop::installSession(services);
     desktop::installPlayer(services, engine);
     desktop::installIntegrations(services, engine);
@@ -191,6 +202,8 @@ int main(int argc, char* argv[]) {
     }
 
     desktop::startEffects(services, engine, *window);
+    desktop::announceLegacyImport(legacy, *window);
+    desktop::installDiagnostics(services, *window);
 
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
@@ -202,6 +215,22 @@ int main(int argc, char* argv[]) {
         }
         window->raise();
         window->requestActivate();
+      });
+    }
+
+    // The smoke test checks below that the log file hides access keys.
+    constexpr const char* PlantedKey = "smoke0planted0access0key";
+    if (options.smoke) {
+      qWarning("smoke: planted http://127.0.0.1/Videos/x/stream?api_key=%s&Static=true", PlantedKey);
+      // As MpvPlayer forwards mpv's own messages.
+      qWarning().noquote() << "mpv ffmpeg http: HTTP error 404 Not Found for" <<
+          QStringLiteral("https://jellyfin.example.org/Videos/x/master.m3u8?ApiKey=%1").arg(QLatin1String(PlantedKey));
+    }
+
+    // One press of "Save diagnostic report", checked after shutdown.
+    if (options.smoke) {
+      QTimer::singleShot(300, window, [&services] {
+        services.settings->trigger(settings::keys::SaveReport);
       });
     }
 
@@ -250,7 +279,37 @@ int main(int argc, char* argv[]) {
   desktop::stopLogFile();
 
   const qint64 shutdownMs = shutdown.elapsed();
+  if (options.smoke && legacy.profile) {
+    std::printf("smoke: imported %d settings from 2.x, server %s\n", legacy.imported,
+                legacy.profile->serverAddress.isEmpty() ? "none" : "found");
+    if (legacy.imported <= 0 || legacy.profile->serverAddress.isEmpty()) {
+      std::printf("smoke: FAILED: the 2.x profile was not imported\n");
+      exitCode = 1;
+    }
+  }
   if (options.smoke) {
+    QFile log(services.logDirectory + QStringLiteral("/jellyfin-desktop.log"));
+    const QByteArray written = log.open(QIODevice::ReadOnly) ? log.readAll() : QByteArray();
+    if (!written.contains("api_key=***") || !written.contains("https://***/Videos") ||
+        written.contains("planted0access0key") || written.contains("jellyfin.example.org")) {
+      std::printf("smoke: FAILED: the log file must hide access keys\n");
+      exitCode = 1;
+    }
+    const QStringList reports = QDir(services.logDirectory + QStringLiteral("/reports"))
+                                    .entryList({QStringLiteral("jfd-report-*.zip")}, QDir::Files);
+    bool reportOk = reports.size() == 1;
+    if (reportOk) {
+      QFile zip(services.logDirectory + QStringLiteral("/reports/") + reports.first());
+      const QByteArray bytes = zip.open(QIODevice::ReadOnly) ? zip.readAll() : QByteArray();
+      // Stored entries: secrets would be visible in the raw bytes.
+      reportOk = !bytes.isEmpty() && bytes.size() <= 10 * 1024 * 1024 && bytes.contains("report.txt") &&
+                 bytes.contains("log.txt") && !bytes.contains("planted0access0key") &&
+                 !bytes.contains("jellyfin.example.org");
+    }
+    std::printf("smoke: diagnostic report %s\n", reportOk ? "ok" : "FAILED");
+    if (!reportOk) {
+      exitCode = 1;
+    }
     std::printf("smoke: shutdown took %lld ms\n", static_cast<long long>(shutdownMs));
     if (shutdownMs >= 1000) {
       std::printf("smoke: FAILED: shutdown must take under 1 s\n");

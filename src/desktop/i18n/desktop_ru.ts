@@ -137,6 +137,17 @@
     </message>
 </context>
 <context>
+    <name>Diagnostics</name>
+    <message>
+        <source>Could not save the report.</source>
+        <translation>Не удалось сохранить отчёт.</translation>
+    </message>
+    <message>
+        <source>Report saved: %1</source>
+        <translation>Отчёт сохранён: %1</translation>
+    </message>
+</context>
+<context>
     <name>GroupSettings</name>
     <message>
         <source>Watch together</source>
@@ -196,6 +207,29 @@
     <message>
         <source>The update restarts the app, so it waits until playback ends and you are not in a group.</source>
         <translation>Обновление перезапускает приложение, поэтому ждёт конца просмотра и выхода из группы.</translation>
+    </message>
+</context>
+<context>
+    <name>LegacySettings</name>
+    <message numerus="yes">
+        <source>Imported %n setting(s) from version 2.x.</source>
+        <translation>
+            <numerusform>Перенесена %n настройка из версии 2.x.</numerusform>
+            <numerusform>Перенесены %n настройки из версии 2.x.</numerusform>
+            <numerusform>Перенесено %n настроек из версии 2.x.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Version 2.x</source>
+        <translation>Версия 2.x</translation>
+    </message>
+    <message>
+        <source>Import settings from version 2.x</source>
+        <translation>Перенести настройки из версии 2.x</translation>
+    </message>
+    <message>
+        <source>The server address and the settings of the 2.x client on this computer. Settings changed here are replaced.</source>
+        <translation>Адрес сервера и настройки клиента 2.x на этом компьютере. Настройки, изменённые здесь, будут заменены.</translation>
     </message>
 </context>
 <context>

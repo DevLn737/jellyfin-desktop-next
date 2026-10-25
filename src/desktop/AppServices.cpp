@@ -57,8 +57,9 @@ namespace jfd::desktop {
                          apply();
                        }
                      });
-    ui::probeGraphics(window, [detected, apply](const ui::GraphicsDevice& device) {
+    ui::probeGraphics(window, [&services, detected, apply](const ui::GraphicsDevice& device) {
       *detected = ui::prefersReducedEffects(device);
+      services.graphicsDescription = device.api + QStringLiteral(", ") + device.name;
       static const char* const kinds[] = {"unknown", "integrated", "discrete", "software"};
       qCInfo(lcEffects).nospace().noquote()
           << "graphics: " << device.api << ", \"" << device.name << "\", vendor 0x" << Qt::hex

@@ -26,6 +26,8 @@ namespace jfd::settings {
     // "error", "warning", "info" or "debug".
     inline constexpr QLatin1String LogLevel{"diagnostics/logLevel"};
     inline constexpr QLatin1String OpenLogFolder{"diagnostics/openLogFolder"};
+    // Saves a zip with the logs, versions, GPU and session journal.
+    inline constexpr QLatin1String SaveReport{"diagnostics/saveReport"};
 
     // window (hidden): restored at startup.
     // QWindow geometry in device-independent pixels, "x,y,width,height".

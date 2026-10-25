@@ -54,6 +54,10 @@ namespace jfd::settings {
     // (resources/settings/settings_description.json, "section.value"), for
     // the import planned in stage 2b. Empty when 2.x had none.
     QString legacyKey;
+    // Turns the 2.x value into this setting's value; an invalid QVariant
+    // skips it. Without one the 2.x value is imported as it is, when it is
+    // valid for this setting (LegacyImport.h).
+    std::function<QVariant(const QVariant& legacyValue)> fromLegacy;
     // Not shown on the settings screen (window geometry and other state).
     bool hidden = false;
     // The change applies after a restart; the screen says so.
