@@ -17,6 +17,7 @@ namespace jfd::desktop {
   namespace {
     const QString AutoSkipKey = QStringLiteral("playback/autoSkipSegments");
     const QString HdrKey = QStringLiteral("playback/hdr10");
+    const QString VolumeKey = QStringLiteral("playback/defaultVolume");
     const QString AutoNextKey = QStringLiteral("playback/autoNextEpisode");
     const QString HwdecKey = QStringLiteral("playback/hardwareDecoding");
     const QString SubtitleSizeKey = QStringLiteral("playback/subtitleSize");
@@ -59,6 +60,19 @@ namespace jfd::desktop {
     autoNext.description = QT_TRANSLATE_NOOP(
         "PlayerSettings", "When an episode ends. In a group the group's queue decides.");
     section.settings.append(autoNext);
+
+    settings::SettingDescriptor volume;
+    volume.key = QStringLiteral("defaultVolume");
+    volume.type = settings::SettingType::Int;
+    volume.defaultValue = 100;
+    volume.minimum = 0;
+    volume.maximum = 100;
+    volume.step = 5;
+    volume.unit = QStringLiteral("%");
+    volume.label = QT_TRANSLATE_NOOP("PlayerSettings", "Volume at start");
+    volume.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "The player's volume when the app starts. Changes in the player last until you quit.");
+    section.settings.append(volume);
 
     // Values are mpv's hwdec modes.
     settings::SettingDescriptor hwdec;
@@ -125,6 +139,7 @@ namespace jfd::desktop {
     settings::Settings& settings = *services.settings;
     model.setAutoSkip(settings.value(AutoSkipKey).toBool());
     model.setAutoNext(settings.value(AutoNextKey).toBool());
+    model.setVolume(settings.value(VolumeKey).toInt());
     media::MpvPlayer* player = services.player.get();
     if (player != nullptr)
       for (const QString& key : {HwdecKey, SubtitleSizeKey}) applyToMpv(*player, key, settings.value(key));

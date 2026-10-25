@@ -10,8 +10,12 @@ import Jfd.Ui.Player
 
 // The player: video under an on-screen display that hides after a few
 // seconds without the mouse. Top: back, title and the group indicator.
-// Bottom: the timeline, play/pause, jumps, next, track and playback menus,
-// fullscreen. A skip button shows during intros and credits.
+// Bottom: the timeline, play/pause, jumps, next, volume, track and playback
+// menus, fullscreen. A skip button shows during intros and credits.
+//
+// Keys: Space or K play/pause, ←/→ ∓10 s, ↑/↓ volume, M mute, F fullscreen,
+// S skip, N next, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
+// Shift+J/L audio delay, Esc back.
 RoutePage {
     id: page
 
@@ -48,6 +52,37 @@ RoutePage {
     function toggleMenu(name) {
         openMenu = openMenu === name ? "" : name
         poke()
+    }
+
+    // A short line in the middle of the screen for a key's effect.
+    function notify(text) {
+        noticeText.text = text
+        noticeTimer.restart()
+    }
+
+    function delayText(seconds) {
+        return (seconds > 0 ? "+" : "") + seconds.toFixed(1) + " " + qsTr("s")
+    }
+
+    function changeVolume(step) {
+        player.muted = false
+        player.volume = player.volume + step
+        notify(qsTr("Volume %1%").arg(player.volume))
+    }
+
+    function toggleMute() {
+        player.muted = !player.muted
+        notify(player.muted ? qsTr("Sound off") : qsTr("Volume %1%").arg(player.volume))
+    }
+
+    function shiftSubtitles(step) {
+        player.subtitleDelay = Math.round((player.subtitleDelay + step) * 10) / 10
+        notify(qsTr("Subtitle delay %1").arg(delayText(player.subtitleDelay)))
+    }
+
+    function shiftAudio(step) {
+        player.audioDelay = Math.round((player.audioDelay + step) * 10) / 10
+        notify(qsTr("Audio delay %1").arg(delayText(player.audioDelay)))
     }
 
     function leave() {
@@ -99,6 +134,29 @@ RoutePage {
             page.poke()
         }
         onDoubleClicked: page.toggleFullscreen()
+    }
+
+    Rectangle {
+        objectName: "notice"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: topBar.height + Theme.spacingLarge
+        width: noticeText.implicitWidth + 2 * Theme.spacing
+        height: noticeText.implicitHeight + Theme.spacing
+        radius: Theme.radius
+        color: "#c0000000"
+        visible: noticeTimer.running
+
+        Text {
+            id: noticeText
+            anchors.centerIn: parent
+            color: Theme.text
+            font.pixelSize: Theme.fontSizeLarge
+        }
+        Timer {
+            id: noticeTimer
+            interval: 1200
+        }
     }
 
     LoadingIndicator {
@@ -332,8 +390,8 @@ RoutePage {
                     }
                     IconButton {
                         iconSource: PlayerIcons.forward
-                        toolTipText: qsTr("Forward 30 seconds")
-                        onClicked: page.player.seekBy(30)
+                        toolTipText: qsTr("Forward 10 seconds")
+                        onClicked: page.player.seekBy(10)
                     }
                     IconButton {
                         objectName: "next"
@@ -356,6 +414,27 @@ RoutePage {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall
 
+                    IconButton {
+                        objectName: "mute"
+                        iconSource: page.player.muted || page.player.volume === 0 ? PlayerIcons.volumeOff
+                                                                                  : PlayerIcons.volume
+                        toolTipText: page.player.muted ? qsTr("Unmute") : qsTr("Mute")
+                        onClicked: page.toggleMute()
+                    }
+                    ValueSlider {
+                        objectName: "volume"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 96
+                        from: 0
+                        to: 100
+                        stepSize: 1
+                        value: page.player.muted ? 0 : page.player.volume
+                        onMoved: {
+                            page.player.muted = false
+                            page.player.volume = Math.round(value)
+                            page.poke()
+                        }
+                    }
                     IconButton {
                         iconSource: PlayerIcons.audio
                         toolTipText: qsTr("Audio")
@@ -387,11 +466,23 @@ RoutePage {
         case Qt.Key_K:
             page.player.togglePause(); break
         case Qt.Key_Left:
-        case Qt.Key_J:
             page.player.seekBy(-10); break
         case Qt.Key_Right:
+            page.player.seekBy(10); break
+        case Qt.Key_Up:
+            page.changeVolume(5); break
+        case Qt.Key_Down:
+            page.changeVolume(-5); break
+        case Qt.Key_M:
+            page.toggleMute(); break
+        case Qt.Key_J:
+            if (event.modifiers & Qt.ShiftModifier) page.shiftAudio(-0.1)
+            else page.shiftSubtitles(-0.1)
+            break
         case Qt.Key_L:
-            page.player.seekBy(30); break
+            if (event.modifiers & Qt.ShiftModifier) page.shiftAudio(0.1)
+            else page.shiftSubtitles(0.1)
+            break
         case Qt.Key_F:
             page.toggleFullscreen(); break
         case Qt.Key_S:
@@ -402,10 +493,6 @@ RoutePage {
             page.toggleMenu("audio"); break
         case Qt.Key_C:
             page.toggleMenu("subtitles"); break
-        case Qt.Key_Z:
-            page.player.subtitleDelay = page.player.subtitleDelay - 0.1; break
-        case Qt.Key_X:
-            page.player.subtitleDelay = page.player.subtitleDelay + 0.1; break
         case Qt.Key_Escape:
         case Qt.Key_Back:
             if (page.openMenu.length > 0) page.openMenu = ""

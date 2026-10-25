@@ -4,6 +4,26 @@
 <context>
     <name>PlayerPage</name>
     <message>
+        <source>s</source>
+        <translation>с</translation>
+    </message>
+    <message>
+        <source>Volume %1%</source>
+        <translation>Громкость %1%</translation>
+    </message>
+    <message>
+        <source>Sound off</source>
+        <translation>Звук выключен</translation>
+    </message>
+    <message>
+        <source>Subtitle delay %1</source>
+        <translation>Задержка субтитров %1</translation>
+    </message>
+    <message>
+        <source>Audio delay %1</source>
+        <translation>Задержка звука %1</translation>
+    </message>
+    <message>
         <source>Playback failed: %1</source>
         <translation>Не удалось воспроизвести: %1</translation>
     </message>
@@ -52,12 +72,20 @@
         <translation>Назад на 10 секунд</translation>
     </message>
     <message>
-        <source>Forward 30 seconds</source>
-        <translation>Вперёд на 30 секунд</translation>
+        <source>Forward 10 seconds</source>
+        <translation>Вперёд на 10 секунд</translation>
     </message>
     <message>
         <source>Next</source>
         <translation>Следующая</translation>
+    </message>
+    <message>
+        <source>Unmute</source>
+        <translation>Включить звук</translation>
+    </message>
+    <message>
+        <source>Mute</source>
+        <translation>Выключить звук</translation>
     </message>
     <message>
         <source>Playback settings</source>
@@ -108,6 +136,10 @@
     <message>
         <source>Playback</source>
         <translation>Воспроизведение</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Скорость</translation>
     </message>
     <message>
         <source>Subtitle delay</source>
