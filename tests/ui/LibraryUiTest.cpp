@@ -34,7 +34,8 @@ TEST_CASE("Cards lead to a library or an item page") {
   LibraryUi ui;
   CHECK(ui.routeFor(QStringLiteral("a"), QStringLiteral("CollectionFolder")) ==
         QStringLiteral("library/a"));
-  CHECK(ui.routeFor(QStringLiteral("b"), QStringLiteral("BoxSet")) == QStringLiteral("library/b"));
+  CHECK(ui.routeFor(QStringLiteral("b"), QStringLiteral("BoxSet")) ==
+        QStringLiteral("collection/b"));
   CHECK(ui.routeFor(QStringLiteral("c"), QStringLiteral("Series")) == QStringLiteral("item/c"));
   CHECK(ui.routeFor(QStringLiteral("d"), QStringLiteral("Episode")) == QStringLiteral("item/d"));
 }

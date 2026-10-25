@@ -1,5 +1,6 @@
 #include "LibraryTestSupport.h"
 
+#include <jfd/library/CollectionIndex.h>
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LibraryUpdates.h>
 
@@ -21,6 +22,8 @@ namespace {
     HttpResponse operator()(const HttpRequest& r) const {
       if (r.path == QLatin1String("/Items/Filters"))
         return ok(R"({"Genres": ["Drama", "Comedy"], "Years": [2001, 2002]})");
+      // The library's own name.
+      if (r.path == QLatin1String("/Items/lib1")) return ok(R"({"Id": "lib1", "Name": "Films"})");
       if (r.path != QLatin1String("/Items")) return {404, {}, {}, 0};
       const int start = r.query.queryItemValue(QStringLiteral("startIndex")).toInt();
       const int limit = r.query.queryItemValue(QStringLiteral("limit")).toInt();
@@ -50,7 +53,13 @@ TEST_CASE("The grid has every row from the first page and loads pages as rows ar
   // Both properties set in a row: one listing.
   REQUIRE(waitFor([&] { return library.count() == 250; }));
   CHECK(f.count(QStringLiteral("/Items")) == 1);
-  const auto& first = f.server.requests().front();
+  HttpRequest first;
+  for (const HttpRequest& r : f.server.requests()) {
+    if (r.path == QLatin1String("/Items")) {
+      first = r;
+      break;
+    }
+  }
   CHECK(first.query.queryItemValue(QStringLiteral("parentId")) == QStringLiteral("lib1"));
   CHECK(first.query.queryItemValue(QStringLiteral("includeItemTypes")) == QStringLiteral("Movie"));
   CHECK(first.query.queryItemValue(QStringLiteral("limit")) == QStringLiteral("100"));
@@ -142,4 +151,142 @@ TEST_CASE("A library type decides the item types; updates reach loaded rows") {
                         QJsonDocument::fromJson(R"({"ItemsAdded": ["m9"]})").object());
   movies.total = 6;
   REQUIRE(waitFor([&] { return library.count() == 6; }));
+}
+
+namespace {
+  // Last query of a path.
+  QUrlQuery lastQuery(const LibraryFixture& f, const QString& path) {
+    QUrlQuery q;
+    for (const HttpRequest& r : f.server.requests())
+      if (r.path == path) q = r.query;
+    return q;
+  }
+} // namespace
+
+TEST_CASE("The library's name comes from the server") {
+  Movies movies;
+  LibraryFixture f([&movies](const HttpRequest& r) { return movies(r); });
+  LibraryModel library(f.client);
+  library.setLibraryId(QStringLiteral("lib1"));
+  CHECK(library.name().isEmpty());
+  REQUIRE(waitFor([&] { return library.name() == QStringLiteral("Films"); }));
+}
+
+TEST_CASE("Sort and filters can be kept and applied again") {
+  Movies movies;
+  movies.total = 3;
+  LibraryFixture f([&movies](const HttpRequest& r) { return movies(r); });
+  LibraryModel one(f.client);
+  one.setCollectionType(QStringLiteral("movies"));
+  one.setLibraryId(QStringLiteral("lib1"));
+  one.setSortBy(QStringLiteral("PremiereDate"));
+  one.setDescending(true);
+  one.setPlayedFilter(LibraryModel::PlayedFilter::Played);
+  one.setFavoritesOnly(true);
+  one.setGenres({QStringLiteral("Drama"), QStringLiteral("Comedy")});
+  one.setYears({2001});
+  one.setShowCollections(true);
+  const QJsonObject kept = one.filters();
+
+  // Through JSON, as the settings keep it.
+  const QJsonObject stored = QJsonDocument::fromJson(QJsonDocument(kept).toJson()).object();
+  LibraryModel two(f.client);
+  two.setCollectionType(QStringLiteral("movies"));
+  two.applyFilters(stored);
+  CHECK(two.sortBy() == QStringLiteral("PremiereDate"));
+  CHECK(two.descending());
+  CHECK(two.playedFilter() == LibraryModel::PlayedFilter::Played);
+  CHECK(two.favoritesOnly());
+  CHECK(two.genres() == QStringList{QStringLiteral("Drama"), QStringLiteral("Comedy")});
+  CHECK(two.years() == QVariantList{2001});
+  CHECK(two.showCollections());
+  CHECK(two.filters() == kept);
+
+  // Missing or foreign keys change nothing.
+  two.applyFilters({});
+  two.applyFilters(QJsonObject{{QStringLiteral("sortBy"), 5}, {QStringLiteral("genres"), 7}});
+  CHECK(two.filters() == kept);
+}
+
+TEST_CASE("A movie library can list its collections; a collection lists its own items") {
+  Movies movies;
+  movies.total = 2;
+  LibraryFixture f([&movies](const HttpRequest& r) { return movies(r); });
+  LibraryModel library(f.client);
+  library.setCollectionType(QStringLiteral("movies"));
+  library.setLibraryId(QStringLiteral("lib1"));
+  CHECK(library.canShowCollections());
+  library.setShowCollections(true);
+  REQUIRE(waitFor([&] { return library.count() == 2; }));
+  CHECK(lastQuery(f, QStringLiteral("/Items")).queryItemValue(QStringLiteral("includeItemTypes")) ==
+        QStringLiteral("BoxSet"));
+  CHECK(lastQuery(f, QStringLiteral("/Items/Filters"))
+            .queryItemValue(QStringLiteral("includeItemTypes")) == QStringLiteral("BoxSet"));
+
+  // A show library has no such switch, and ignores it.
+  LibraryModel shows(f.client);
+  shows.setCollectionType(QStringLiteral("tvshows"));
+  shows.setShowCollections(true);
+  CHECK_FALSE(shows.canShowCollections());
+  shows.setLibraryId(QStringLiteral("lib1"));
+  REQUIRE(waitFor([&] { return shows.count() == 2; }));
+  CHECK(lastQuery(f, QStringLiteral("/Items")).queryItemValue(QStringLiteral("includeItemTypes")) ==
+        QStringLiteral("Series"));
+
+  // A collection: whatever it holds, one level down.
+  LibraryModel collection(f.client);
+  collection.setCollectionType(LibraryModel::CollectionItems);
+  collection.setLibraryId(QStringLiteral("lib1"));
+  REQUIRE(waitFor([&] { return collection.count() == 2; }));
+  const QUrlQuery q = lastQuery(f, QStringLiteral("/Items"));
+  CHECK(q.queryItemValue(QStringLiteral("parentId")) == QStringLiteral("lib1"));
+  CHECK(q.queryItemValue(QStringLiteral("includeItemTypes")).isEmpty());
+  CHECK(q.queryItemValue(QStringLiteral("recursive")) == QStringLiteral("false"));
+}
+
+TEST_CASE("The collection index finds the collections holding an item") {
+  int collectionListings = 0;
+  QStringList b2Items{QStringLiteral("m2")};
+  LibraryFixture f([&](const HttpRequest& r) {
+    if (r.path != QLatin1String("/Items")) return HttpResponse{404, {}, {}, 0};
+    const QString parent = r.query.queryItemValue(QStringLiteral("parentId"));
+    if (parent.isEmpty()) {
+      ++collectionListings;
+      return ok(page(R"({"Id": "b1", "Name": "Alpha", "Type": "BoxSet"},)"
+                     R"({"Id": "b2", "Name": "Beta", "Type": "BoxSet"})"));
+    }
+    if (parent == QLatin1String("b1")) return ok(page(R"({"Id": "m1"},{"Id": "m2"})"));
+    QByteArray items;
+    for (const QString& id : b2Items)
+      items += (items.isEmpty() ? "" : ",") + QByteArray(R"({"Id": ")") + id.toUtf8() + "\"}";
+    return ok(page(items));
+  });
+  library::CollectionIndex index(f.client);
+
+  auto ask = [&](const QString& id) {
+    QStringList names;
+    bool answered = false;
+    index.collectionsOf(id, &f.client, [&](const QList<api::Item>& collections) {
+      for (const api::Item& item : collections)
+        names.append(item.name);
+      answered = true;
+    });
+    REQUIRE(waitFor([&] { return answered; }));
+    return names;
+  };
+
+  CHECK(ask(QStringLiteral("m2")) == QStringList{QStringLiteral("Alpha"), QStringLiteral("Beta")});
+  CHECK(ask(QStringLiteral("m1")) == QStringList{QStringLiteral("Alpha")});
+  CHECK(ask(QStringLiteral("m9")).isEmpty());
+  CHECK(collectionListings == 1);
+
+  // A library change builds it again on the next question.
+  library::LibraryUpdates updates;
+  index.follow(updates);
+  b2Items = {QStringLiteral("m9")};
+  updates.handleMessage(QStringLiteral("LibraryChanged"),
+                        QJsonDocument::fromJson(R"({"ItemsUpdated": ["b2"]})").object());
+  CHECK_FALSE(index.ready());
+  CHECK(ask(QStringLiteral("m9")) == QStringList{QStringLiteral("Beta")});
+  CHECK(collectionListings == 2);
 }

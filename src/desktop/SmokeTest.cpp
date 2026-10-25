@@ -21,9 +21,10 @@ namespace jfd::desktop {
 
   SmokeTest::SmokeTest(QQuickWindow& window, ui::Navigator& navigator, QObject* parent)
       : QObject(parent), m_window(window), m_navigator(navigator) {
-    m_routes = {QStringLiteral("home"),     QStringLiteral("library/movies"), QStringLiteral("item/abc"),
-                QStringLiteral("search"),   QStringLiteral("group"),          QStringLiteral("settings"),
-                QStringLiteral("player")};
+    m_routes = {QStringLiteral("home"),     QStringLiteral("library/movies"),
+                QStringLiteral("item/abc"), QStringLiteral("collection/abc"),
+                QStringLiteral("search"),   QStringLiteral("group"),
+                QStringLiteral("settings"), QStringLiteral("player")};
     m_timeout.setSingleShot(true);
     m_timeout.setInterval(30000);
     connect(&m_timeout, &QTimer::timeout, this, [this] { fail(QStringLiteral("timed out")); });

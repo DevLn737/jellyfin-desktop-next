@@ -269,6 +269,16 @@ RoutePage {
             }
 
             CardRow {
+                objectName: "collectionsRow"
+                Layout.fillWidth: true
+                Layout.preferredHeight: implicitHeight
+                visible: count > 0
+                title: qsTr("In collections")
+                model: page.details ? page.details.collections : null
+                delegate: ItemCard {}
+            }
+
+            CardRow {
                 objectName: "similarRow"
                 Layout.fillWidth: true
                 Layout.preferredHeight: implicitHeight

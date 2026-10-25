@@ -1,5 +1,6 @@
 #include "jfd/ui/LibraryUi.h"
 
+#include <jfd/library/CollectionIndex.h>
 #include <jfd/library/ItemListModel.h>
 #include <jfd/library/LibraryUpdates.h>
 #include <jfd/ui/LibraryImageProvider.h>
@@ -32,16 +33,43 @@ namespace jfd::ui {
     Q_EMIT handlersChanged();
   }
 
-  library::LibraryModel* LibraryUi::createLibrary(const QString& libraryId, QObject* owner) {
-    if (m_services.client == nullptr) return nullptr;
+  library::LibraryModel* LibraryUi::newModel(QObject* owner) const {
     library::LibraryModel::Options options;
     options.devicePixelRatio = m_services.devicePixelRatio;
     auto* model = new library::LibraryModel(*m_services.client, options, owner);
     QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
+    if (m_services.updates != nullptr) model->follow(*m_services.updates);
+    return model;
+  }
+
+  library::LibraryModel* LibraryUi::createLibrary(const QString& libraryId, QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::LibraryModel* model = newModel(owner);
     // The collection type decides the item types, so it goes first.
     model->setCollectionType(collectionTypeOf(libraryId));
     model->setLibraryId(libraryId);
-    if (m_services.updates != nullptr) model->follow(*m_services.updates);
+    const QJsonObject saved = m_services.readFilters ? m_services.readFilters() : m_filters;
+    model->applyFilters(saved.value(libraryId).toObject());
+    connect(model, &library::LibraryModel::queryChanged, this, [this, model, libraryId] {
+      QJsonObject all = m_services.readFilters ? m_services.readFilters() : m_filters;
+      const QJsonObject filters = model->filters();
+      if (all.value(libraryId).toObject() == filters) return;
+      all.insert(libraryId, filters);
+      if (m_services.writeFilters)
+        m_services.writeFilters(all);
+      else
+        m_filters = all;
+    });
+    return model;
+  }
+
+  library::LibraryModel* LibraryUi::createCollection(const QString& collectionId, QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::LibraryModel* model = newModel(owner);
+    model->setCollectionType(library::LibraryModel::CollectionItems);
+    // By release date, oldest first: a film series in its order.
+    model->setSortBy(QStringLiteral("PremiereDate"));
+    model->setLibraryId(collectionId);
     return model;
   }
 
@@ -52,6 +80,7 @@ namespace jfd::ui {
     auto* details = new library::ItemDetails(*m_services.client, options, owner);
     QQmlEngine::setObjectOwnership(details, QQmlEngine::CppOwnership);
     details->setUpdates(m_services.updates);
+    details->setCollectionIndex(m_services.collections);
     connect(details, &library::ItemDetails::playRequested, this,
             [this, details](const QString& id, qint64 startTicks, bool together) {
               if (together) {
@@ -69,8 +98,9 @@ namespace jfd::ui {
   }
 
   QString LibraryUi::routeFor(const QString& itemId, const QString& type) const {
+    if (type == QLatin1String("BoxSet")) return QStringLiteral("collection/") + itemId;
     if (type == QLatin1String("CollectionFolder") || type == QLatin1String("UserView") ||
-        type == QLatin1String("BoxSet") || type == QLatin1String("Folder")) {
+        type == QLatin1String("Folder")) {
       return QStringLiteral("library/") + itemId;
     }
     return QStringLiteral("item/") + itemId;

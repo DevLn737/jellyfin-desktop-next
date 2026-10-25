@@ -175,6 +175,11 @@ namespace jfd::api {
     // series, as in Jellyfin Web.
     void latestItems(const QString& parentId, int limit, QObject* context, Callback<ItemPage> done);
     void similarItems(const QString& itemId, int limit, QObject* context, Callback<ItemPage> done);
+    // The ids of a collection's (BoxSet's) items, without images or user
+    // data. The server lists a collection's items but not an item's
+    // collections, so this is how the collections holding an item are found.
+    void collectionItemIds(const QString& collectionId, QObject* context,
+                           Callback<QStringList> done);
     // GET Items/Filters: genres, years and ratings present in a library.
     void itemFilters(const QString& parentId, const QStringList& includeItemTypes, QObject* context,
                      Callback<ItemFilters> done);

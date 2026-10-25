@@ -3,6 +3,7 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/LibraryUpdates.h>
 
+#include <QJsonArray>
 #include <QTimer>
 
 #include <algorithm>
@@ -21,6 +22,8 @@ namespace jfd::library {
     if (collectionType == QLatin1String("homevideos")) return {QStringLiteral("Video")};
     if (collectionType == QLatin1String("musicvideos")) return {QStringLiteral("MusicVideo")};
     if (collectionType == QLatin1String("boxsets")) return {QStringLiteral("BoxSet")};
+    // Whatever the collection holds.
+    if (collectionType == CollectionItems) return {};
     return {QStringLiteral("Movie"), QStringLiteral("Series"), QStringLiteral("Video")};
   }
 
@@ -63,7 +66,17 @@ namespace jfd::library {
   void LibraryModel::setLibraryId(const QString& id) {
     if (m_libraryId == id) return;
     m_libraryId = id;
+    if (!m_name.isEmpty()) {
+      m_name.clear();
+      Q_EMIT nameChanged();
+    }
     scheduleReload();
+    if (id.isEmpty()) return;
+    m_client.item(id, this, [this, id](api::Result<api::Item> result) {
+      if (id != m_libraryId || !result || result->name == m_name) return;
+      m_name = result->name;
+      Q_EMIT nameChanged();
+    });
   }
 
   void LibraryModel::setCollectionType(const QString& type) {
@@ -116,6 +129,64 @@ namespace jfd::library {
     if (m_years == parsed) return;
     m_years = parsed;
     scheduleReload();
+  }
+
+  void LibraryModel::setShowCollections(bool show) {
+    if (m_showCollections == show) return;
+    m_showCollections = show;
+    scheduleReload();
+  }
+
+  bool LibraryModel::canShowCollections() const {
+    return m_collectionType == QLatin1String("movies");
+  }
+
+  QStringList LibraryModel::itemTypes() const {
+    if (m_showCollections && canShowCollections()) return {QStringLiteral("BoxSet")};
+    return itemTypesFor(m_collectionType);
+  }
+
+  QJsonObject LibraryModel::filters() const {
+    QJsonObject out;
+    out.insert(QStringLiteral("sortBy"), m_sortBy);
+    out.insert(QStringLiteral("descending"), m_descending);
+    out.insert(QStringLiteral("played"), m_played == PlayedFilter::Played ? QStringLiteral("played")
+                                         : m_played == PlayedFilter::Unplayed
+                                             ? QStringLiteral("unplayed")
+                                             : QStringLiteral("all"));
+    out.insert(QStringLiteral("favorites"), m_favoritesOnly);
+    out.insert(QStringLiteral("genres"), QJsonArray::fromStringList(m_genres));
+    QJsonArray years;
+    for (int year : m_years)
+      years.append(year);
+    out.insert(QStringLiteral("years"), years);
+    out.insert(QStringLiteral("collections"), m_showCollections);
+    return out;
+  }
+
+  void LibraryModel::applyFilters(const QJsonObject& filters) {
+    if (const QJsonValue sortBy = filters.value(QStringLiteral("sortBy")); sortBy.isString())
+      setSortBy(sortBy.toString());
+    if (const QJsonValue descending = filters.value(QStringLiteral("descending"));
+        descending.isBool())
+      setDescending(descending.toBool());
+    const QString played = filters.value(QStringLiteral("played")).toString();
+    if (played == QLatin1String("played")) setPlayedFilter(PlayedFilter::Played);
+    if (played == QLatin1String("unplayed")) setPlayedFilter(PlayedFilter::Unplayed);
+    if (played == QLatin1String("all")) setPlayedFilter(PlayedFilter::All);
+    if (const QJsonValue favorites = filters.value(QStringLiteral("favorites")); favorites.isBool())
+      setFavoritesOnly(favorites.toBool());
+    if (const QJsonValue genres = filters.value(QStringLiteral("genres")); genres.isArray()) {
+      QStringList list;
+      for (const QJsonValue& genre : genres.toArray())
+        if (genre.isString()) list.append(genre.toString());
+      setGenres(list);
+    }
+    if (const QJsonValue years = filters.value(QStringLiteral("years")); years.isArray())
+      setYears(years.toArray().toVariantList());
+    if (const QJsonValue collections = filters.value(QStringLiteral("collections"));
+        collections.isBool())
+      setShowCollections(collections.toBool());
   }
 
   QVariantList LibraryModel::availableYears() const {
@@ -172,7 +243,7 @@ namespace jfd::library {
 
     loadPage(0);
     const quint64 generation = m_generation;
-    m_client.itemFilters(m_libraryId, itemTypesFor(m_collectionType), this,
+    m_client.itemFilters(m_libraryId, itemTypes(), this,
                          [this, generation](api::Result<api::ItemFilters> result) {
                            if (generation != m_generation || !result) return;
                            m_filters = result.value();
@@ -194,8 +265,10 @@ namespace jfd::library {
 
     api::ItemQuery query;
     query.parentId = m_libraryId;
-    query.includeItemTypes = itemTypesFor(m_collectionType);
-    query.recursive = true;
+    query.includeItemTypes = itemTypes();
+    // A collection's items are its own children; a library's are anywhere
+    // below it.
+    query.recursive = m_collectionType != CollectionItems;
     // A stable second key, so pages never overlap or skip items with equal
     // sort values.
     query.sortBy =

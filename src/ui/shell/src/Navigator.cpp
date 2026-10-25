@@ -9,7 +9,8 @@ namespace jfd::ui {
 
     // Routes that take an argument ("item/<id>"); the others take none.
     bool takesArgument(const QString& name) {
-      return name == QLatin1String("library") || name == QLatin1String("item");
+      return name == QLatin1String("library") || name == QLatin1String("collection") ||
+             name == QLatin1String("item");
     }
 
     bool isRoot(const QString& name) {
@@ -25,9 +26,9 @@ namespace jfd::ui {
 
   const QStringList& Navigator::routeNames() {
     static const QStringList names = {
-        QStringLiteral("login"),  QStringLiteral("home"),   QStringLiteral("library"),
-        QStringLiteral("item"),   QStringLiteral("search"), QStringLiteral("player"),
-        QStringLiteral("group"),  QStringLiteral("settings"),
+        QStringLiteral("login"),  QStringLiteral("home"),       QStringLiteral("library"),
+        QStringLiteral("item"),   QStringLiteral("collection"), QStringLiteral("search"),
+        QStringLiteral("player"), QStringLiteral("group"),      QStringLiteral("settings"),
     };
     return names;
   }
@@ -87,7 +88,7 @@ namespace jfd::ui {
     // stacking a second copy (home -> settings -> search -> settings).
     for (qsizetype i = 0; i < m_stack.size(); ++i) {
       if (m_stack[i].toString() == parsed.toString() && parsed.name != QLatin1String("item") &&
-          parsed.name != QLatin1String("library")) {
+          parsed.name != QLatin1String("library") && parsed.name != QLatin1String("collection")) {
         while (m_stack.size() > i + 1) {
           m_stack.removeLast();
           emitChange(Operation::Pop);

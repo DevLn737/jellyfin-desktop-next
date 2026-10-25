@@ -2,6 +2,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/CardImages.h>
+#include <jfd/library/CollectionIndex.h>
 #include <jfd/library/LibraryUpdates.h>
 
 namespace jfd::library {
@@ -130,6 +131,7 @@ namespace jfd::library {
       m_seasons.setEntries({});
       m_episodes.setEntries({});
       m_similar.setEntries({});
+      m_collections.setEntries({});
       m_seasonId.clear();
       setTarget(std::nullopt);
       m_posterUrl = m_backdropUrl = m_logoUrl = QUrl();
@@ -174,6 +176,16 @@ namespace jfd::library {
                               if (result) m_similar.setEntries(entries(result->items, false));
                               done();
                             });
+    }
+
+    if (m_collectionIndex != nullptr && !is(item, "BoxSet")) {
+      begin();
+      m_collectionIndex->collectionsOf(item.id, this,
+                                       [this, generation](const QList<api::Item>& collections) {
+                                         if (generation != m_generation) return;
+                                         m_collections.setEntries(entries(collections, false));
+                                         done();
+                                       });
     }
 
     const QString seriesId = is(item, "Series") ? item.id : item.seriesId;
@@ -350,6 +362,7 @@ namespace jfd::library {
     m_seasons.applyUserData(data);
     m_episodes.applyUserData(data);
     m_similar.applyUserData(data);
+    m_collections.applyUserData(data);
   }
 
 } // namespace jfd::library

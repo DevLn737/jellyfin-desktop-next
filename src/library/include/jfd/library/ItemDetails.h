@@ -15,6 +15,7 @@ namespace jfd::api {
 
 namespace jfd::library {
 
+  class CollectionIndex;
   class LibraryUpdates;
 
   // The page of one item: a movie, a series with its seasons and episodes, a
@@ -60,6 +61,7 @@ namespace jfd::library {
     Q_PROPERTY(jfd::library::ItemListModel* seasons READ seasons CONSTANT)
     Q_PROPERTY(jfd::library::ItemListModel* episodes READ episodes CONSTANT)
     Q_PROPERTY(jfd::library::ItemListModel* similar READ similar CONSTANT)
+    Q_PROPERTY(jfd::library::ItemListModel* collections READ collections CONSTANT)
     Q_PROPERTY(QString seasonId READ seasonId WRITE selectSeason NOTIFY seasonIdChanged)
 
   public:
@@ -110,10 +112,13 @@ namespace jfd::library {
     ItemListModel* seasons() { return &m_seasons; }
     ItemListModel* episodes() { return &m_episodes; }
     ItemListModel* similar() { return &m_similar; }
+    // The collections holding the item, once an index is set.
+    ItemListModel* collections() { return &m_collections; }
     QString seasonId() const { return m_seasonId; }
     void selectSeason(const QString& seasonId);
 
     void setUpdates(LibraryUpdates* updates);
+    void setCollectionIndex(CollectionIndex* index) { m_collectionIndex = index; }
 
     // Starts the play target from the beginning.
     Q_INVOKABLE void play();
@@ -153,6 +158,7 @@ namespace jfd::library {
     api::JellyfinClient& m_client;
     Options m_options;
     LibraryUpdates* m_updates = nullptr;
+    CollectionIndex* m_collectionIndex = nullptr;
     QString m_itemId;
     quint64 m_generation = 0;
     int m_pending = 0;
@@ -165,6 +171,7 @@ namespace jfd::library {
     ItemListModel m_seasons;
     ItemListModel m_episodes;
     ItemListModel m_similar;
+    ItemListModel m_collections;
     QString m_seasonId;
   };
 

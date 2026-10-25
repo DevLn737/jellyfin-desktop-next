@@ -58,8 +58,8 @@ keyboard.
 ## Pages and navigation
 
 Pages derive from `RoutePage` (`route`, `routeName`, `routeArgument`,
-`title`). Routes: `login`, `home`, `library/<id>`, `item/<id>`, `search`,
-`player`, `group`, `settings`. From QML: `Navigator.navigate("item/" + id)`,
+`title`). Routes: `login`, `home`, `library/<id>`, `collection/<id>`, `item/<id>`,
+`search`, `player`, `group`, `settings`. From QML: `Navigator.navigate("item/" + id)`,
 `Navigator.back()`, `Navigator.replace("home")`. `login` and `home` clear
 the stack. Back is Esc, Backspace (outside text fields), Alt+Left and the
 mouse back button; F11 toggles full screen. The sidebar is hidden on
@@ -83,8 +83,8 @@ To show a message: `shell.showError(text)` through the window's `AppShell`
 
 ## Library screens
 
-`Jfd.Ui.Library` holds the `login`, `home`, `library/<id>`, `item/<id>` and
-`search` pages. `ui::LibraryScreens` (installed by `installLibrary` in
+`Jfd.Ui.Library` holds the `login`, `home`, `library/<id>`,
+`collection/<id>`, `item/<id>` and `search` pages. `ui::LibraryScreens` (installed by `installLibrary` in
 `src/desktop`) owns the server connection: the `JellyfinClient` and
 `SessionSocket` in `AppServices::client` and `socket` are the ones the
 session and group modules should use. Signing in opens `home`, signing out
@@ -99,6 +99,17 @@ size). Play and Watch together on the item page call the handlers set with
 `AppServices::libraryUi->setPlayHandler(...)` and
 `setWatchTogetherHandler(...)`; without one the page says the feature is not
 available yet.
+
+Libraries remember their sort, watched state, favorites, genres (several at
+once; an item matches any of them), year and, for movie libraries, whether
+they list movies or collections. `Library.createLibrary` applies what the
+library had last time and keeps every change, through the `library/filters`
+setting (a JSON object keyed by library id). A collection (BoxSet) has its
+own page, `collection/<id>`, reached from a card in the collections list or
+from the "In collections" row of a movie's page. Jellyfin lists a
+collection's items but not an item's collections, so `CollectionIndex`
+lists every collection once, remembers who is in which, and builds again
+after a library change.
 
 ## Settings from QML
 

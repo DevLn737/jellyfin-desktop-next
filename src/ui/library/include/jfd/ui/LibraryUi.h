@@ -6,6 +6,7 @@
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
 
+#include <QJsonObject>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -18,6 +19,7 @@ namespace jfd::api {
 }
 
 namespace jfd::library {
+  class CollectionIndex;
   class LibraryUpdates;
 }
 
@@ -48,7 +50,11 @@ namespace jfd::ui {
       library::HomeModel* home = nullptr;
       library::SearchModel* search = nullptr;
       library::LibraryUpdates* updates = nullptr;
+      library::CollectionIndex* collections = nullptr;
       qreal devicePixelRatio = 1.0;
+      // Each library's sort and filters, keyed by library id.
+      std::function<QJsonObject()> readFilters;
+      std::function<void(const QJsonObject&)> writeFilters;
     };
 
     using PlayHandler = std::function<void(const QString& itemId, qint64 startPositionTicks)>;
@@ -67,15 +73,19 @@ namespace jfd::ui {
     bool canPlay() const { return bool(m_play); }
     bool canWatchTogether() const { return bool(m_watchTogether); }
 
-    // A grid for one library, owned by `owner` (the page). Null before
+    // A grid for one library, owned by `owner` (the page), with the sort
+    // and filters it had last time; changes to them are kept. Null before
     // attach.
     Q_INVOKABLE jfd::library::LibraryModel* createLibrary(const QString& libraryId, QObject* owner);
+    // A grid of one collection's items, owned by `owner`. Null before attach.
+    Q_INVOKABLE jfd::library::LibraryModel* createCollection(const QString& collectionId,
+                                                             QObject* owner);
     // An item page's model, owned by `owner`. Null before attach.
     Q_INVOKABLE jfd::library::ItemDetails* createDetails(const QString& itemId, QObject* owner);
     // The image provider's source for a server image URL.
     Q_INVOKABLE QString image(const QUrl& url) const;
-    // Where a card leads: "library/<id>" for a library or collection,
-    // "item/<id>" for anything else.
+    // Where a card leads: "library/<id>" for a library, "collection/<id>"
+    // for a collection, "item/<id>" for anything else.
     Q_INVOKABLE QString routeFor(const QString& itemId, const QString& type) const;
     // A library's title from the home page's list, for the grid's heading.
     Q_INVOKABLE QString libraryName(const QString& libraryId) const;
@@ -94,6 +104,10 @@ namespace jfd::ui {
 
   private:
     QString collectionTypeOf(const QString& libraryId) const;
+    library::LibraryModel* newModel(QObject* owner) const;
+
+    // Filters of the libraries opened this session, when there is no store.
+    QJsonObject m_filters;
 
     Services m_services;
     PlayHandler m_play;

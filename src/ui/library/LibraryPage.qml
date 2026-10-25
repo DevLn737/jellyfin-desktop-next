@@ -9,7 +9,9 @@ import Jfd.Ui.Library
 
 // One library as a grid: every card has its place from the start, so the
 // scroll bar and End work at once; pages of cards load as they come into
-// view. Sort, order, watched state, favorites and genre filter the grid.
+// view. Sort, order, watched state, favorites, genres and year filter the
+// grid; a movie library can list its collections instead. The library
+// remembers its choices (Library.createLibrary).
 RoutePage {
     id: page
 
@@ -18,7 +20,7 @@ RoutePage {
 
     Component.onCompleted: library = Library.createLibrary(routeArgument, page)
 
-    title: Library.libraryName(routeArgument) || qsTr("Library")
+    title: Library.libraryName(routeArgument) || (library ? library.name : "") || qsTr("Library")
 
     ColumnLayout {
         anchors.fill: parent
@@ -89,17 +91,53 @@ RoutePage {
                 onActivated: if (page.library) page.library.playedFilter = currentValue
             }
             ChoiceBox {
+                objectName: "libraryShow"
+                implicitWidth: 180
+                visible: page.library && page.library.canShowCollections
+                model: [
+                    { value: false, label: qsTr("Movies") },
+                    { value: true, label: qsTr("Collections") },
+                ]
+                currentIndex: page.library && page.library.showCollections ? 1 : 0
+                onActivated: if (page.library) page.library.showCollections = currentValue
+            }
+            GenrePicker {
                 objectName: "libraryGenre"
-                visible: page.library && page.library.availableGenres.length > 0
-                model: {
-                    const genres = [{ value: "", label: qsTr("All genres") }]
-                    if (page.library) {
-                        for (const genre of page.library.availableGenres)
-                            genres.push({ value: genre, label: genre })
-                    }
-                    return genres
+                visible: page.library && (page.library.availableGenres.length > 0 || page.library.genres.length > 0)
+                genres: page.library ? page.library.availableGenres : []
+                selected: page.library ? page.library.genres : []
+                onGenreToggled: (genre) => {
+                    const chosen = page.library.genres.slice()
+                    const at = chosen.indexOf(genre)
+                    if (at >= 0)
+                        chosen.splice(at, 1)
+                    else
+                        chosen.push(genre)
+                    page.library.genres = chosen
                 }
-                onActivated: if (page.library) page.library.genres = currentValue.length > 0 ? [currentValue] : []
+                onGenresCleared: page.library.genres = []
+            }
+            ChoiceBox {
+                objectName: "libraryYear"
+                implicitWidth: 160
+                visible: page.library && (page.library.availableYears.length > 0 || page.library.years.length > 0)
+                model: {
+                    const years = [{ value: 0, label: qsTr("All years") }]
+                    if (page.library) {
+                        const offered = page.library.availableYears.slice().sort((a, b) => b - a)
+                        // A remembered year the library no longer has stays choosable.
+                        for (const year of page.library.years) {
+                            if (offered.indexOf(year) < 0)
+                                offered.unshift(year)
+                        }
+                        for (const year of offered)
+                            years.push({ value: year, label: String(year) })
+                    }
+                    return years
+                }
+                currentIndex: page.library && page.library.years.length > 0
+                    ? Math.max(0, indexOfValue(page.library.years[0])) : 0
+                onActivated: if (page.library) page.library.years = currentValue > 0 ? [currentValue] : []
             }
             Row {
                 height: Theme.controlHeight

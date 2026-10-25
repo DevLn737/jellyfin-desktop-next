@@ -8,6 +8,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMetaObject>
 #include <QQmlApplicationEngine>
 #include <QScreen>
@@ -17,6 +19,7 @@ namespace jfd::desktop {
 
   namespace {
     const QString DeviceIdKey = QStringLiteral("library/deviceId");
+    const QString FiltersKey = QStringLiteral("library/filters");
 
     api::ClientIdentity identity(settings::Settings& settings) {
       api::ClientIdentity identity;
@@ -52,6 +55,14 @@ namespace jfd::desktop {
     deviceId.defaultValue = QString();
     deviceId.label = "deviceId";
     section.settings.append(deviceId);
+
+    // Each library's sort and filters as JSON, keyed by library id.
+    settings::SettingDescriptor filters;
+    filters.key = QStringLiteral("filters");
+    filters.type = settings::SettingType::String;
+    filters.defaultValue = QString();
+    filters.label = "filters";
+    section.settings.append(filters);
     return registry.registerSection(std::move(section));
   }
 
@@ -68,6 +79,14 @@ namespace jfd::desktop {
                                              : platform::createSystemCredentialStore();
     if (const QScreen* screen = QGuiApplication::primaryScreen())
       config.devicePixelRatio = screen->devicePixelRatio();
+    settings::Settings* store = services.settings.get();
+    config.readFilters = [store] {
+      return QJsonDocument::fromJson(store->value(FiltersKey).toString().toUtf8()).object();
+    };
+    config.writeFilters = [store](const QJsonObject& filters) {
+      store->setValue(FiltersKey,
+                      QString::fromUtf8(QJsonDocument(filters).toJson(QJsonDocument::Compact)));
+    };
 
     services.library = std::make_shared<LibraryServices>(std::move(config));
     ui::LibraryScreens& screens = services.library->screens;

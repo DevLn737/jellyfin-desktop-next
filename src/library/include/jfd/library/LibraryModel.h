@@ -5,6 +5,7 @@
 
 #include <QAbstractListModel>
 #include <QHash>
+#include <QJsonObject>
 #include <QList>
 #include <QSet>
 #include <QStringList>
@@ -37,6 +38,10 @@ namespace jfd::library {
     Q_PROPERTY(bool favoritesOnly READ favoritesOnly WRITE setFavoritesOnly NOTIFY queryChanged)
     Q_PROPERTY(QStringList genres READ genres WRITE setGenres NOTIFY queryChanged)
     Q_PROPERTY(QVariantList years READ years WRITE setYears NOTIFY queryChanged)
+    Q_PROPERTY(
+        bool showCollections READ showCollections WRITE setShowCollections NOTIFY queryChanged)
+    Q_PROPERTY(bool canShowCollections READ canShowCollections NOTIFY queryChanged)
+    Q_PROPERTY(QString name READ name NOTIFY nameChanged)
     Q_PROPERTY(QStringList availableGenres READ availableGenres NOTIFY filtersChanged)
     Q_PROPERTY(QVariantList availableYears READ availableYears NOTIFY filtersChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
@@ -66,6 +71,7 @@ namespace jfd::library {
     QString libraryId() const { return m_libraryId; }
     void setLibraryId(const QString& id);
     // The library's CollectionType; decides which item types are listed.
+    // CollectionItems lists the items of one collection (a BoxSet) instead.
     QString collectionType() const { return m_collectionType; }
     void setCollectionType(const QString& type);
     QString sortBy() const { return m_sortBy; }
@@ -80,6 +86,18 @@ namespace jfd::library {
     void setGenres(const QStringList& genres);
     QVariantList years() const;
     void setYears(const QVariantList& years);
+    // A movie library lists its collections instead of its movies, as the
+    // Collections tab of Jellyfin Web does.
+    bool showCollections() const { return m_showCollections; }
+    void setShowCollections(bool show);
+    bool canShowCollections() const;
+    // The library's or collection's name, from the server.
+    QString name() const { return m_name; }
+
+    // Sort, filters and the collections switch, to keep per library.
+    QJsonObject filters() const;
+    // Applies what filters() gave; unknown or missing keys keep their value.
+    void applyFilters(const QJsonObject& filters);
 
     QStringList availableGenres() const { return m_filters.genres; }
     QVariantList availableYears() const;
@@ -94,6 +112,7 @@ namespace jfd::library {
     // Item types listed for a library type: Movie for movies, Series for
     // shows, and so on.
     static QStringList itemTypesFor(const QString& collectionType);
+    static inline const QString CollectionItems = QStringLiteral("jfd-collection");
 
     void follow(LibraryUpdates& updates);
 
@@ -106,6 +125,7 @@ namespace jfd::library {
   Q_SIGNALS:
     void queryChanged();
     void filtersChanged();
+    void nameChanged();
     void countChanged();
     void loadingChanged();
     void errorTextChanged();
@@ -115,6 +135,7 @@ namespace jfd::library {
     void loadPage(int page);
     void setError(const QString& text);
     void setTotal(int total);
+    QStringList itemTypes() const;
 
     api::JellyfinClient& m_client;
     Options m_options;
@@ -126,6 +147,8 @@ namespace jfd::library {
     bool m_favoritesOnly = false;
     QStringList m_genres;
     QList<int> m_years;
+    bool m_showCollections = false;
+    QString m_name;
 
     quint64 m_generation = 0;
     bool m_reloadScheduled = false;
