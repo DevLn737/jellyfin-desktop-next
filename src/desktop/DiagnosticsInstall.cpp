@@ -238,7 +238,7 @@ namespace jfd::desktop {
               return;
             }
             qCInfo(lcDiagnostics).noquote() << "report saved:" << path;
-            showMessage(window, QCoreApplication::translate("Diagnostics", "Report saved: %1").arg(QDir::toNativeSeparators(path)),
+            showMessage(window, QCoreApplication::translate("Diagnostics", "Report saved: %1").arg(QFileInfo(path).fileName()),
                         false);
             if (!services.isolatedProfile) {
               QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
