@@ -132,6 +132,16 @@ namespace jfd::settings {
       openLogs.type = SettingType::Action;
       openLogs.label = QT_TRANSLATE_NOOP("CommonSettings", "Open log folder");
       section.settings.append(openLogs);
+
+      SettingDescriptor saveReport;
+      saveReport.key = key(keys::SaveReport);
+      saveReport.type = SettingType::Action;
+      saveReport.label = QT_TRANSLATE_NOOP("CommonSettings", "Save diagnostic report");
+      saveReport.description = QT_TRANSLATE_NOOP(
+          "CommonSettings",
+          "A zip with the logs, versions, graphics and session journal, without passwords, access keys or "
+          "server addresses. Nothing is sent anywhere.");
+      section.settings.append(saveReport);
       return section;
     }
 

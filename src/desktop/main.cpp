@@ -17,6 +17,7 @@
 #include <jfd/ui/WindowStateKeeper.h>
 
 #include <QCommandLineParser>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QEventLoop>
@@ -24,6 +25,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QTemporaryDir>
 #include <QtQml/qqmlextensionplugin.h>
 
@@ -201,6 +203,7 @@ int main(int argc, char* argv[]) {
 
     desktop::startEffects(services, engine, *window);
     desktop::announceLegacyImport(legacy, *window);
+    desktop::installDiagnostics(services, *window);
 
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
@@ -222,6 +225,13 @@ int main(int argc, char* argv[]) {
       // As MpvPlayer forwards mpv's own messages.
       qWarning().noquote() << "mpv ffmpeg http: HTTP error 404 Not Found for" <<
           QStringLiteral("https://jellyfin.example.org/Videos/x/master.m3u8?ApiKey=%1").arg(QLatin1String(PlantedKey));
+    }
+
+    // One press of "Save diagnostic report", checked after shutdown.
+    if (options.smoke) {
+      QTimer::singleShot(300, window, [&services] {
+        services.settings->trigger(settings::keys::SaveReport);
+      });
     }
 
     std::unique_ptr<desktop::SmokeTest> smoke;
@@ -283,6 +293,21 @@ int main(int argc, char* argv[]) {
     if (!written.contains("api_key=***") || !written.contains("https://***/Videos") ||
         written.contains("planted0access0key") || written.contains("jellyfin.example.org")) {
       std::printf("smoke: FAILED: the log file must hide access keys\n");
+      exitCode = 1;
+    }
+    const QStringList reports = QDir(services.logDirectory + QStringLiteral("/reports"))
+                                    .entryList({QStringLiteral("jfd-report-*.zip")}, QDir::Files);
+    bool reportOk = reports.size() == 1;
+    if (reportOk) {
+      QFile zip(services.logDirectory + QStringLiteral("/reports/") + reports.first());
+      const QByteArray bytes = zip.open(QIODevice::ReadOnly) ? zip.readAll() : QByteArray();
+      // Stored entries: secrets would be visible in the raw bytes.
+      reportOk = !bytes.isEmpty() && bytes.size() <= 10 * 1024 * 1024 && bytes.contains("report.txt") &&
+                 bytes.contains("log.txt") && !bytes.contains("planted0access0key") &&
+                 !bytes.contains("jellyfin.example.org");
+    }
+    std::printf("smoke: diagnostic report %s\n", reportOk ? "ok" : "FAILED");
+    if (!reportOk) {
       exitCode = 1;
     }
     std::printf("smoke: shutdown took %lld ms\n", static_cast<long long>(shutdownMs));

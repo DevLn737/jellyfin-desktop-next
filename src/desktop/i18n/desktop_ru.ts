@@ -137,6 +137,17 @@
     </message>
 </context>
 <context>
+    <name>Diagnostics</name>
+    <message>
+        <source>Could not save the report.</source>
+        <translation>Не удалось сохранить отчёт.</translation>
+    </message>
+    <message>
+        <source>Report saved: %1</source>
+        <translation>Отчёт сохранён: %1</translation>
+    </message>
+</context>
+<context>
     <name>GroupSettings</name>
     <message>
         <source>Watch together</source>

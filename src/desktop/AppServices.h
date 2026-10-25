@@ -60,6 +60,9 @@ namespace jfd::desktop {
     ui::AppSettings* appSettings = nullptr;
 
     QString logDirectory;
+    // The graphics API and GPU Qt renders on; set by startEffects when the
+    // scene graph is up, for the diagnostic report.
+    QString graphicsDescription;
     // Downloaded images; empty keeps them in memory only.
     QString cacheDirectory;
     // The smoke test's temporary profile: nothing goes to the system
@@ -95,6 +98,11 @@ namespace jfd::desktop {
   // registers the settings page and the placeholder, and handles the
   // diagnostics actions.
   void installShell(AppServices& services, QQmlEngine& engine);
+
+  // After the window loads: starts the frame and process statistics and
+  // saves a diagnostic report when Settings > Save diagnostic report is
+  // pressed (reports go to <logDirectory>/reports, the last five are kept).
+  void installDiagnostics(AppServices& services, QQuickWindow& window);
 
   // After the window loads: sets Theme.reducedEffects from the "Simplified
   // effects" setting; on automatic, from the GPU the window renders on.

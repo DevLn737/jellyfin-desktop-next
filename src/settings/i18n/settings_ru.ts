@@ -92,6 +92,14 @@
         <translation>Открыть папку журналов</translation>
     </message>
     <message>
+        <source>Save diagnostic report</source>
+        <translation>Сохранить отчёт для диагностики</translation>
+    </message>
+    <message>
+        <source>A zip with the logs, versions, graphics and session journal, without passwords, access keys or server addresses. Nothing is sent anywhere.</source>
+        <translation>Архив с журналами, версиями, данными о графике и журналом сеанса, без паролей, ключей доступа и адресов серверов. Никуда не отправляется.</translation>
+    </message>
+    <message>
         <source>Window</source>
         <translation>Окно</translation>
     </message>
