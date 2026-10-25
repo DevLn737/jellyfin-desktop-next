@@ -118,7 +118,17 @@ namespace {
       model->stop();
       waitFor([&] { return !model->active(); }, 5000);
       waitFor([&] { return !findSession().contains(QStringLiteral("NowPlayingItem")); }, 10000);
-      run<Empty>([&](auto done) { client->markUnplayed(itemId, nullptr, done); });
+      // The server saves the stop report's user data after it clears the
+      // session, and marks items under five minutes played then, so a mark
+      // sent too early is undone. Mark again until it stays.
+      const auto clean = [&] {
+        auto item = run<Item>([&](auto done) { client->item(itemId, nullptr, done); });
+        return item.ok() && !item->userData.played && item->userData.playbackPositionTicks == 0;
+      };
+      for (int attempt = 0; attempt < 5; ++attempt) {
+        run<Empty>([&](auto done) { client->markUnplayed(itemId, nullptr, done); });
+        if (!waitFor([&] { return !clean(); }, 2000)) break;
+      }
     }
 
     bool playing() const { return model->active() && !model->loading() && !model->paused(); }
