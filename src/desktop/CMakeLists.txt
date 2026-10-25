@@ -30,7 +30,7 @@ qt_add_qml_module(jellyfin-desktop
 target_link_libraries(jellyfin-desktop PRIVATE
   Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network
   jfd::settings jfd::integrations jfd::platform jfd::session jfd::jellyfin_api
-  jfd::library jfd::session_runtime jfd::media_backend
+  jfd::library jfd::session_runtime jfd::media_backend jfd::diagnostics
   jfd_ui_theme jfd_ui_themeplugin
   jfd_ui_controls jfd_ui_controlsplugin
   jfd_ui_shell jfd_ui_shellplugin

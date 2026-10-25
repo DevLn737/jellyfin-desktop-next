@@ -1,5 +1,7 @@
 #include "Logging.h"
 
+#include <jfd/diagnostics/Redact.h>
+
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -31,11 +33,16 @@ namespace jfd::desktop {
       return "?";
     }
 
-    void writeLine(QtMsgType type, const QMessageLogContext& context, const QString& message) {
+    void writeLine(QtMsgType type, const QMessageLogContext& context, const QString& raw) {
+      // Stream and socket addresses carry the server access key, and mpv
+      // prints them whole when a file does not open.
+      const QByteArray utf8 = raw.toUtf8();
+      const std::string redacted = diagnostics::redactSecrets(std::string_view(utf8.constData(), utf8.size()));
+      const QString message = QString::fromStdString(redacted);
       const QByteArray line =
           QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")).toUtf8() + ' ' +
           levelName(type) + " [" + QByteArray(context.category != nullptr ? context.category : "default") +
-          "] " + message.toUtf8() + '\n';
+          "] " + QByteArray::fromStdString(redacted) + '\n';
       {
         std::lock_guard lock(logMutex);
         if (logFile != nullptr) {

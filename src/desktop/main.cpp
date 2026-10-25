@@ -17,6 +17,7 @@
 
 #include <QCommandLineParser>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -205,6 +206,15 @@ int main(int argc, char* argv[]) {
       });
     }
 
+    // The smoke test checks below that the log file hides access keys.
+    constexpr const char* PlantedKey = "smoke0planted0access0key";
+    if (options.smoke) {
+      qWarning("smoke: planted http://127.0.0.1/Videos/x/stream?api_key=%s&Static=true", PlantedKey);
+      // As MpvPlayer forwards mpv's own messages.
+      qWarning().noquote() << "mpv ffmpeg http: HTTP error 404 Not Found for" <<
+          QStringLiteral("https://jellyfin.example.org/Videos/x/master.m3u8?ApiKey=%1").arg(QLatin1String(PlantedKey));
+    }
+
     std::unique_ptr<desktop::SmokeTest> smoke;
     std::unique_ptr<desktop::FlowCheck> flow;
     if (options.flow) {
@@ -251,6 +261,13 @@ int main(int argc, char* argv[]) {
 
   const qint64 shutdownMs = shutdown.elapsed();
   if (options.smoke) {
+    QFile log(services.logDirectory + QStringLiteral("/jellyfin-desktop.log"));
+    const QByteArray written = log.open(QIODevice::ReadOnly) ? log.readAll() : QByteArray();
+    if (!written.contains("api_key=***") || !written.contains("https://***/Videos") ||
+        written.contains("planted0access0key") || written.contains("jellyfin.example.org")) {
+      std::printf("smoke: FAILED: the log file must hide access keys\n");
+      exitCode = 1;
+    }
     std::printf("smoke: shutdown took %lld ms\n", static_cast<long long>(shutdownMs));
     if (shutdownMs >= 1000) {
       std::printf("smoke: FAILED: shutdown must take under 1 s\n");

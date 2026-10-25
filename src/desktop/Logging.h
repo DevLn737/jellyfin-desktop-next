@@ -5,7 +5,8 @@
 namespace jfd::desktop {
 
   // Writes Qt log output to <directory>/jellyfin-desktop.log (the previous
-  // run's log is kept as jellyfin-desktop.old.log) and to stderr.
+  // run's log is kept as jellyfin-desktop.old.log) and to stderr, with
+  // server access keys and passwords replaced by *** (diagnostics::redactSecrets).
   void startLogFile(const QString& directory);
   void stopLogFile();
 
