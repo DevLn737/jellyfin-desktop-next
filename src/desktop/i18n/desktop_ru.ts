@@ -34,6 +34,30 @@
         <source>Download page</source>
         <translation>Страница загрузки</translation>
     </message>
+    <message>
+        <source>Version %1 is ready to install.</source>
+        <translation>Версия %1 готова к установке.</translation>
+    </message>
+    <message>
+        <source>Restart and update</source>
+        <translation>Перезапустить и обновить</translation>
+    </message>
+    <message>
+        <source>Updated to version %1.</source>
+        <translation>Обновлено до версии %1.</translation>
+    </message>
+    <message>
+        <source>Version %1 did not start, so this version stays.</source>
+        <translation>Версия %1 не запустилась, поэтому осталась текущая.</translation>
+    </message>
+    <message>
+        <source>The update could not be installed.</source>
+        <translation>Не удалось установить обновление.</translation>
+    </message>
+    <message>
+        <source>The update restarts the app, so it waits until playback ends and you are not in a group.</source>
+        <translation>Обновление перезапускает приложение, поэтому ждёт конца просмотра и выхода из группы.</translation>
+    </message>
 </context>
 <context>
     <name>PlayerSettings</name>

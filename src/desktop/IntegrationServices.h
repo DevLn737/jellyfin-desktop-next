@@ -1,5 +1,6 @@
 #pragma once
 
+#include <jfd/integrations/AppImageUpdater.h>
 #include <jfd/integrations/DiscordPresence.h>
 #include <jfd/integrations/MediaSessionBridge.h>
 #include <jfd/integrations/UpdateChecker.h>
@@ -24,13 +25,19 @@ namespace jfd::desktop {
   struct AppServices;
 
   // The system media controls (SMTC, MPRIS), sleep inhibition while video
-  // plays, Discord Rich Presence and the update check, fed from the session.
+  // plays, Discord Rich Presence, the update check and the AppImage update,
+  // fed from the session.
   struct IntegrationServices {
     QNetworkAccessManager network;
     std::unique_ptr<platform::MediaControls> mediaControls;
     std::unique_ptr<platform::SleepInhibitor> sleepInhibitor;
     integrations::DiscordPresence presence;
     std::unique_ptr<integrations::UpdateChecker> updates;
+    std::unique_ptr<integrations::AppImageUpdater> appImage;
+    // Something plays or this client is in a group: no update restarts it.
+    bool busy = false;
+    // A downloaded update waits for playback to end before it is offered.
+    bool offerWhenIdle = false;
     // Set by connectIntegrations; the controls' commands go nowhere before.
     integrations::MediaSessionBridge::Post post;
     std::unique_ptr<integrations::MediaSessionBridge> bridge;

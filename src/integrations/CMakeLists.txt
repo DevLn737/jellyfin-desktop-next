@@ -28,6 +28,7 @@ add_library(jfd_integrations STATIC
   src/IntegrationsSettings.cpp
   src/NowPlayingItem.cpp
   src/ReleaseSignature.cpp
+  src/AppImageUpdater.cpp
   include/jfd/integrations/DiscordIpc.h
   include/jfd/integrations/DiscordActivity.h
   include/jfd/integrations/DiscordPresence.h
@@ -35,7 +36,8 @@ add_library(jfd_integrations STATIC
   include/jfd/integrations/MediaSessionBridge.h
   include/jfd/integrations/IntegrationsSettings.h
   include/jfd/integrations/NowPlayingItem.h
-  include/jfd/integrations/ReleaseSignature.h)
+  include/jfd/integrations/ReleaseSignature.h
+  include/jfd/integrations/AppImageUpdater.h)
 add_library(jfd::integrations ALIAS jfd_integrations)
 target_include_directories(jfd_integrations PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(jfd_integrations PUBLIC Qt6::Core Qt6::Network jfd::core jfd::platform
