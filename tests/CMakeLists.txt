@@ -134,8 +134,10 @@ if(TARGET jfd_jellyfin_api)
   endif()
 
   if(TARGET jfd_settings)
-    jfd_add_qt_test(jfd_settings_tests settings/SettingsTest.cpp)
+    jfd_add_qt_test(jfd_settings_tests settings/SettingsTest.cpp settings/LegacyImportTest.cpp)
     target_link_libraries(jfd_settings_tests PRIVATE jfd::settings)
+    target_compile_definitions(jfd_settings_tests PRIVATE
+      JFD_LEGACY_PROFILE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/settings/legacy-2x")
   endif()
 
   if(JFD_SERVER_TESTS)

@@ -1,5 +1,6 @@
 #include "AppServices.h"
 #include "IntegrationServices.h"
+#include "LegacyInstall.h"
 #include "Logging.h"
 #include "FlowCheck.h"
 #include "SmokeTest.h"
@@ -72,12 +73,13 @@ namespace {
   }
 
   // Each module's settings section, before the file opens.
-  bool registerSettings(settings::SettingsRegistry& registry) {
+  bool registerSettings(settings::SettingsRegistry& registry, const desktop::LegacyImport& legacy) {
     bool ok = settings::registerCommonSections(registry);
     ok = desktop::registerLibrarySettings(registry) && ok;
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
     ok = desktop::registerGroupSettings(registry) && ok;
+    ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
   }
@@ -102,12 +104,17 @@ int main(int argc, char* argv[]) {
   }
 
   desktop::AppServices services;
-  if (!registerSettings(services.settingsRegistry)) {
+  desktop::LegacyImport legacy = desktop::findLegacyImport(options.smoke);
+  if (!registerSettings(services.settingsRegistry, legacy)) {
     std::fprintf(stderr, "Invalid settings schema\n");
     return 2;
   }
-  services.settings = std::make_unique<settings::Settings>(
-      services.settingsRegistry, settingsFile.isEmpty() ? settings::Settings::defaultFilePath() : settingsFile);
+  if (settingsFile.isEmpty()) {
+    settingsFile = settings::Settings::defaultFilePath();
+  }
+  const bool firstStart = !QFile::exists(settingsFile);
+  services.settings = std::make_unique<settings::Settings>(services.settingsRegistry, settingsFile);
+  desktop::importLegacyAtFirstStart(services, legacy, firstStart);
 
   const double scale = services.settings->value(settings::keys::Scale).toDouble();
   if (scale != 1.0 && qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR")) {
@@ -167,6 +174,7 @@ int main(int argc, char* argv[]) {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
     desktop::installLibrary(services, engine);
+    desktop::installLegacy(services, legacy, !options.smoke);
     desktop::installSession(services);
     desktop::installPlayer(services, engine);
     desktop::installIntegrations(services, engine);
@@ -192,6 +200,7 @@ int main(int argc, char* argv[]) {
     }
 
     desktop::startEffects(services, engine, *window);
+    desktop::announceLegacyImport(legacy, *window);
 
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
@@ -260,6 +269,14 @@ int main(int argc, char* argv[]) {
   desktop::stopLogFile();
 
   const qint64 shutdownMs = shutdown.elapsed();
+  if (options.smoke && legacy.profile) {
+    std::printf("smoke: imported %d settings from 2.x, server %s\n", legacy.imported,
+                legacy.profile->serverAddress.isEmpty() ? "none" : "found");
+    if (legacy.imported <= 0 || legacy.profile->serverAddress.isEmpty()) {
+      std::printf("smoke: FAILED: the 2.x profile was not imported\n");
+      exitCode = 1;
+    }
+  }
   if (options.smoke) {
     QFile log(services.logDirectory + QStringLiteral("/jellyfin-desktop.log"));
     const QByteArray written = log.open(QIODevice::ReadOnly) ? log.readAll() : QByteArray();

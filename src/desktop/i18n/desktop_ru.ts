@@ -199,6 +199,29 @@
     </message>
 </context>
 <context>
+    <name>LegacySettings</name>
+    <message numerus="yes">
+        <source>Imported %n setting(s) from version 2.x.</source>
+        <translation>
+            <numerusform>Перенесена %n настройка из версии 2.x.</numerusform>
+            <numerusform>Перенесены %n настройки из версии 2.x.</numerusform>
+            <numerusform>Перенесено %n настроек из версии 2.x.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Version 2.x</source>
+        <translation>Версия 2.x</translation>
+    </message>
+    <message>
+        <source>Import settings from version 2.x</source>
+        <translation>Перенести настройки из версии 2.x</translation>
+    </message>
+    <message>
+        <source>The server address and the settings of the 2.x client on this computer. Settings changed here are replaced.</source>
+        <translation>Адрес сервера и настройки клиента 2.x на этом компьютере. Настройки, изменённые здесь, будут заменены.</translation>
+    </message>
+</context>
+<context>
     <name>PlayerSettings</name>
     <message>
         <source>Playback</source>

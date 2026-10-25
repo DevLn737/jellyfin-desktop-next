@@ -114,6 +114,17 @@ namespace jfd::settings {
           {QStringLiteral("debug"), QT_TRANSLATE_NOOP("CommonSettings", "Debug")},
       };
       logLevel.legacyKey = QStringLiteral("main.logLevel");
+      logLevel.fromLegacy = [](const QVariant& legacy) -> QVariant {
+        // "debug" is the 2.x default, and the setting was hidden there, so it
+        // says nothing about the user: keep this client's default.
+        const QString level = legacy.toString();
+        if (level == QLatin1String("trace")) return QStringLiteral("debug");
+        if (level == QLatin1String("info")) return QStringLiteral("info");
+        if (level == QLatin1String("warn")) return QStringLiteral("warning");
+        if (level == QLatin1String("error") || level == QLatin1String("fatal") || level == QLatin1String("disable"))
+          return QStringLiteral("error");
+        return {};
+      };
       section.settings.append(logLevel);
 
       SettingDescriptor openLogs;
@@ -137,6 +148,19 @@ namespace jfd::settings {
       geometry.defaultValue = QString();
       geometry.label = "geometry";
       geometry.legacyKey = QStringLiteral("state.geometry");
+      // 2.x: {"x", "y", "width", "height"}; here "x,y,width,height".
+      geometry.fromLegacy = [](const QVariant& legacy) -> QVariant {
+        const QVariantMap rect = legacy.toMap();
+        int values[4] = {};
+        const char* names[4] = {"x", "y", "width", "height"};
+        for (int i = 0; i < 4; ++i) {
+          bool ok = false;
+          values[i] = rect.value(QLatin1String(names[i])).toInt(&ok);
+          if (!ok) return {};
+        }
+        if (values[2] <= 0 || values[3] <= 0) return {};
+        return QStringLiteral("%1,%2,%3,%4").arg(values[0]).arg(values[1]).arg(values[2]).arg(values[3]);
+      };
       section.settings.append(geometry);
 
       SettingDescriptor screen;
@@ -151,6 +175,7 @@ namespace jfd::settings {
       maximized.type = SettingType::Bool;
       maximized.defaultValue = false;
       maximized.label = "maximized";
+      maximized.legacyKey = QStringLiteral("state.maximized");
       section.settings.append(maximized);
 
       SettingDescriptor fullScreen;

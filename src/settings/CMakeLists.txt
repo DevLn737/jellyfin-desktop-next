@@ -2,10 +2,12 @@
 # every other module can register its section.
 add_library(jfd_settings STATIC
   src/CommonSections.cpp
+  src/LegacyImport.cpp
   src/Schema.cpp
   src/Settings.cpp
   src/SettingsRegistry.cpp
   include/jfd/settings/CommonSections.h
+  include/jfd/settings/LegacyImport.h
   include/jfd/settings/Schema.h
   include/jfd/settings/Settings.h
   include/jfd/settings/SettingsRegistry.h)

@@ -6,6 +6,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   FlowCheck.cpp FlowCheck.h
   IntegrationServices.cpp IntegrationServices.h
   GroupInstall.cpp
+  LegacyInstall.cpp LegacyInstall.h
   LibraryInstall.cpp
   SessionInstall.cpp
   PlayerInstall.cpp
@@ -45,6 +46,10 @@ if(JFD_BUILD_TESTS)
   # quits, and fails if shutdown takes a second or more.
   add_test(NAME desktop_smoke COMMAND jellyfin-desktop --smoke)
   set_tests_properties(desktop_smoke PROPERTIES TIMEOUT 60)
+  # First start next to a 2.x profile: its settings and server come over.
+  add_test(NAME desktop_smoke_legacy COMMAND jellyfin-desktop --smoke)
+  set_tests_properties(desktop_smoke_legacy PROPERTIES TIMEOUT 60
+    ENVIRONMENT "JFD_LEGACY_PROFILE=${PROJECT_SOURCE_DIR}/tests/settings/legacy-2x")
   if(WIN32)
     # The HDR10 setting on a runner without an HDR display: Qt Quick falls
     # back to SDR and the app has to work as without it.
