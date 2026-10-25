@@ -150,7 +150,7 @@ namespace jfd::desktop {
     volume.minimum = 0;
     volume.maximum = 100;
     volume.step = 5;
-    volume.unit = QStringLiteral("%");
+    volume.unit = "%";
     volume.label = QT_TRANSLATE_NOOP("PlayerSettings", "Volume at start");
     volume.description = QT_TRANSLATE_NOOP(
         "PlayerSettings", "The player's volume when the app starts. Changes in the player last until you quit.");

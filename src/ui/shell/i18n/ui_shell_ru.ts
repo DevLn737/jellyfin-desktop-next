@@ -20,7 +20,7 @@
     </message>
     <message>
         <source>Watch together</source>
-        <translation>Совместный просмотр</translation>
+        <translation>Смотреть вместе</translation>
     </message>
     <message>
         <source>Settings</source>

@@ -47,8 +47,9 @@ namespace jfd::settings {
     double minimum = 0;
     double maximum = 0;
     double step = 1;
-    // Unit shown after the value, for example "%" or "ms"; not translated.
-    QString unit;
+    // Unit shown after the value, for example "%" or "ms"; translated in the
+    // section's context like the label, so mark it with QT_TRANSLATE_NOOP.
+    const char* unit = nullptr;
     // The key of the same setting in the 2.x client
     // (resources/settings/settings_description.json, "section.value"), for
     // the import planned in stage 2b. Empty when 2.x had none.

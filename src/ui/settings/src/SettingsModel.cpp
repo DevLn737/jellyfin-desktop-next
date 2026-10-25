@@ -97,7 +97,7 @@ namespace jfd::ui {
     case StepRole:
       return setting.step;
     case UnitRole:
-      return setting.unit;
+      return translated(context, setting.unit);
     case RequiresRestartRole:
       return setting.requiresRestart;
     case IsDefaultRole:

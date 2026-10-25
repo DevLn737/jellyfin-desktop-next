@@ -48,12 +48,12 @@
         <translation>Упрощённые эффекты</translation>
     </message>
     <message>
-        <source>No blur and shorter animations, for slower graphics.</source>
-        <translation>Без размытия и с более короткой анимацией, для слабой графики.</translation>
+        <source>No blur and shorter animations, for slower graphics. Automatic: on with integrated graphics.</source>
+        <translation>Без размытия и с более короткой анимацией, для слабой графики. «Автоматически»: включены на встроенной графике.</translation>
     </message>
     <message>
-        <source>Automatic (on with integrated graphics)</source>
-        <translation>Автоматически (включены на встроенной графике)</translation>
+        <source>Automatic</source>
+        <translation>Автоматически</translation>
     </message>
     <message>
         <source>On</source>
