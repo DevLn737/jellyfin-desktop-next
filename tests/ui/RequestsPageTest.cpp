@@ -2,7 +2,6 @@
 
 #include "../support/FakeSeerr.h"
 
-#include <cstdio>
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/seerr/SeerrService.h>
 #include <jfd/ui/Navigator.h>
@@ -32,8 +31,6 @@ using namespace jfd;
 using jfd::test::FakeSeerr;
 using jfd::test::waitFor;
 
-// Progress marks for a crash that CI shows without a stack.
-#define STEP(n) (std::printf("[requests-test] step %d\n", n), std::fflush(stdout))
 
 namespace {
 
@@ -143,67 +140,40 @@ TEST_CASE("Signed out, the page offers the sign-in and shows no titles") {
 }
 
 TEST_CASE("The sign-in page names the server and asks before sending the password") {
-  STEP(0);
   Scene scene;
-  STEP(1);
   QQuickItem* page = scene.open(QStringLiteral("seerr-signin"));
-  STEP(2);
   QQuickItem* host = find(page, "seerrHost");
-  STEP(3);
   REQUIRE(host != nullptr);
-  STEP(4);
   CHECK(host->property("text").toString() == scene.service.serverHost());
-  STEP(5);
   // Local test server on loopback: no warning about plain http.
   CHECK_FALSE(visible(page, "seerrCleartextWarning"));
-  STEP(6);
 
   auto* user = find(page, "seerrUser");
-  STEP(7);
   auto* password = find(page, "seerrPassword");
-  STEP(8);
   REQUIRE(user != nullptr);
-  STEP(9);
   REQUIRE(password != nullptr);
-  STEP(10);
   user->setProperty("text", QStringLiteral("alice"));
-  STEP(11);
   password->setProperty("text", QStringLiteral("wrong"));
-  STEP(12);
   QMetaObject::invokeMethod(page, "submit");
-  STEP(13);
   QObject* confirm = child(page, "seerrConfirm");
-  STEP(14);
   REQUIRE(confirm != nullptr);
-  STEP(15);
   // Nothing has been sent yet.
   CHECK(scene.seerr.server().requests().isEmpty());
-  STEP(16);
   const bool shown = confirm->property("opened").toBool() || confirm->property("visible").toBool();
-  STEP(17);
   CHECK(shown);
-  STEP(18);
   QMetaObject::invokeMethod(confirm, "accept");
-  STEP(19);
   REQUIRE(scene.until([&] {
     QQuickItem* error = find(page, "seerrSignInError");
     return error != nullptr && error->isVisible();
   }));
-  STEP(20);
   CHECK_FALSE(scene.service.signedIn());
-  STEP(21);
   // The password field is emptied after the answer.
   CHECK(password->property("text").toString().isEmpty());
-  STEP(22);
 
   password->setProperty("text", QStringLiteral("pw-alice"));
-  STEP(23);
   QMetaObject::invokeMethod(page, "submit");
-  STEP(24);
   QMetaObject::invokeMethod(child(page, "seerrConfirm"), "accept");
-  STEP(25);
   REQUIRE(scene.until([&] { return scene.service.signedIn(); }));
-  STEP(26);
 }
 
 TEST_CASE("Browsing shows the rows, search shows results") {
@@ -261,7 +231,7 @@ TEST_CASE("Requesting seasons asks first, all seasons asks separately") {
   CHECK_FALSE(find(page, "season1")->isEnabled());
   CHECK(find(page, "season2")->isEnabled());
 
-  QMetaObject::invokeMethod(find(page, "season2"), "toggle");
+  QMetaObject::invokeMethod(find(page, "season2"), "click");
   REQUIRE(scene.until([&] { return visible(page, "requestButton"); }));
   QMetaObject::invokeMethod(find(page, "requestButton"), "clicked");
   QObject* confirm = child(page, "confirmRequest");
