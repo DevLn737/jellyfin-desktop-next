@@ -43,6 +43,42 @@ on-screen display) uses `Overlay` instead of `Theme`: the same colour names,
 fixed dark, the same in every theme. The video stays dark whatever the page
 theme is.
 
+### Themes
+
+Settings > Appearance: the theme (dark, light, like the system, or a theme
+file), the accent colour (eight presets or a custom `#rrggbb`) and
+"Simplified effects". Everything changes at once, with no restart. A theme
+is a palette (`Theme.colors`) made in C++ by `ThemePalette.h`
+(`darkPalette()`, `lightPalette()`, `withAccent()`), which also derives
+`accentHover`, `accentText` (black or white, whichever reads better),
+`focusRing` and `progress` from the accent and checks WCAG AA contrast.
+`Palettes.qml` must equal the C++ palettes (a test checks).
+
+Theme files are JSON in the `themes` folder next to the settings file
+(at most 64 KiB; `ThemeFile.h` has the format): `format` 1, `name`, `base`
+("dark" or "light"), `colors` by the names above, optionally `radius` and
+`fontFamily` (an installed font's name, never a path). Unknown keys are
+ignored, a newer `format` is refused with a message, low contrast is
+accepted with a warning. Drop a `.json` on the window to add one; "Save the
+current theme as a file" writes a starting point. If a theme makes the
+interface unreadable: Ctrl+K "Reset theme", or start with `--reset-theme`.
+
+Controls take their colours from `Theme.colorsFor(item)`, which uses the
+`colorScope` of the nearest ancestor that has one (the player sets
+`Overlay.colors`), so a page can be light while the video's controls stay
+dark. `Icon` shows the dark twin from `icons-dark/` when its `color` (the
+text colour by default) is dark: add both files for a new icon.
+
+### Window sizes
+
+Sizes are logical pixels (the system scale and the interface scale are
+already applied). `Theme.sizeClass` is `compact` under 900, `normal`, or
+`spacious` over 1600, from the window width (the shell sets
+`Theme.windowWidth`). In a compact window the sidebar is an icon rail and
+the menu button opens it over the page; `posterWidth` (110 to 220 px),
+`thumbWidth` and `pageMargin` follow the class, so use them instead of
+fixed numbers. The smallest window is 640 by 420.
+
 ## Controls
 
 | Component | Main properties and signals |
