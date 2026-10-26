@@ -158,7 +158,8 @@ TEST_CASE("The sign-in page names the server and asks before sending the passwor
   REQUIRE(confirm != nullptr);
   // Nothing has been sent yet.
   CHECK(scene.seerr.server().requests().isEmpty());
-  CHECK(confirm->property("opened").toBool() || confirm->property("visible").toBool());
+  const bool shown = confirm->property("opened").toBool() || confirm->property("visible").toBool();
+  CHECK(shown);
   QMetaObject::invokeMethod(confirm, "accept");
   REQUIRE(scene.until([&] { return find(page, "seerrSignInError")->isVisible(); }));
   CHECK_FALSE(scene.service.signedIn());
