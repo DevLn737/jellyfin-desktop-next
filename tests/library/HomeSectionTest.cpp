@@ -80,3 +80,28 @@ TEST_CASE("A section's model goes away with its owner without a crash") {
   }
   CHECK(sections.find(QStringLiteral("music.recent"))->model.isNull());
 }
+
+TEST_CASE("The arrangement is read and written as a list with the hidden ones marked") {
+  const HomeArrangement parsed = parseArrangement(QStringLiteral(R"(["resume","-nextUp","latest/abc","resume",""])"));
+  CHECK(parsed.order == QStringList{QStringLiteral("resume"), QStringLiteral("nextUp"), QStringLiteral("latest/abc")});
+  CHECK(parsed.hidden == QStringList{QStringLiteral("nextUp")});
+  CHECK(parseArrangement(formatArrangement(parsed)) == parsed);
+  CHECK(formatArrangement(parsed) == QStringLiteral(R"(["resume","-nextUp","latest/abc"])"));
+}
+
+TEST_CASE("Anything that is not a list gives no arrangement") {
+  const HomeArrangement empty;
+  CHECK(parseArrangement(QString()) == empty);
+  CHECK(parseArrangement(QStringLiteral("{\"a\":1}")) == empty);
+  CHECK(parseArrangement(QStringLiteral("not json")) == empty);
+  CHECK(parseArrangement(QStringLiteral("[1,null,{}]")) == empty);
+}
+
+TEST_CASE("The saved order skips unknown sections and puts new ones last") {
+  HomeSections sections;
+  sections.add(section("resume", 10));
+  sections.add(section("nextUp", 20));
+  sections.add(section("seerr.popular", 90));
+  const QStringList order = sections.displayOrder(QStringList{QStringLiteral("gone"), QStringLiteral("nextUp"), QStringLiteral("resume"), QStringLiteral("nextUp")});
+  CHECK(order == QStringList{QStringLiteral("nextUp"), QStringLiteral("resume"), QStringLiteral("seerr.popular")});
+}

@@ -97,6 +97,7 @@ namespace jfd::desktop {
     Q_ASSERT(installed);
     Q_UNUSED(installed);
     services.libraryUi = screens.ui();
+    services.homeSections = screens.home().sections();
 
     // Messages for the shell's toast; the window exists by the time one is
     // sent.
@@ -111,9 +112,27 @@ namespace jfd::desktop {
                                                  Q_ARG(QVariant, QVariant(text)));
                      });
 
+    // The home screen's rows as the user arranged them, kept in step both
+    // ways.
+    library::HomeModel& home = screens.home();
+    settings::Settings* settingsStore = services.settings.get();
+    home.setArrangement(library::parseArrangement(settingsStore->value(settings::keys::HomeSections).toString()));
+    QObject::connect(&home, &library::HomeModel::arrangementChanged, settingsStore, [&home, settingsStore] {
+      settingsStore->setValue(settings::keys::HomeSections, library::formatArrangement(home.arrangement()));
+    });
+    QObject::connect(settingsStore, &settings::Settings::valueChanged, &home,
+                     [&home](const QString& key, const QVariant& value) {
+                       if (key == settings::keys::HomeSections) {
+                         home.setArrangement(library::parseArrangement(value.toString()));
+                       }
+                     });
+
+    ui::Navigator* navigator = services.navigator;
     QObject::connect(services.settings.get(), &settings::Settings::actionTriggered,
-                     services.navigator, [&screens](const QString& key) {
-                       if (key == settings::keys::SignOut) {
+                     services.navigator, [&screens, navigator](const QString& key) {
+                       if (key == settings::keys::CustomizeHome) {
+                         navigator->navigate(QStringLiteral("customizeHome"));
+                       } else if (key == settings::keys::SignOut) {
                          screens.signIn().signOut();
                        } else if (key == settings::keys::ChangeServer) {
                          screens.signIn().signOut();

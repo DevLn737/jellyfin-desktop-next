@@ -202,6 +202,27 @@ collection's items but not an item's collections, so `CollectionIndex`
 lists every collection once, remembers who is in which, and builds again
 after a library change.
 
+### Home sections and recommendations
+
+Every row of the home screen is a `library::HomeSection` (id, translated
+title, card shape, default order, a model, an optional `reload`). The
+built-in rows (`resume`, `nextUp`, `latest/<library>`) and the ones other
+modules add through `HomeModel::sections()->add(...)` ("music.recent",
+"seerr.popular") are treated alike. The user's arrangement is the hidden
+setting `appearance/homeSections`, a JSON array of ids with `-` in front of
+the rows switched off (`["resume","-nextUp"]`); ids that are not registered
+are skipped and new sections come after the arranged ones, so modules can
+come and go. "Customize home" (button on the home page, a setting and a
+Ctrl+K command) edits it with `HomeModel::moveSection`,
+`setSectionVisible` and `resetArrangement`.
+
+`library::RecommendationRows` adds the recommendation rows: the server's
+`Movies/Recommendations` ("Because you watched ...", "Directed by ..."),
+"Because you watched <series>" from `Items/{id}/Similar` for the last
+watched series, and "Picks" from `Items/Suggestions`. It is best effort: a
+failed or slow request (8 s) leaves its rows out, empty rows are not shown,
+and answers are kept for 5 minutes.
+
 ## Settings from QML
 
 `AppSettings.value("interface/language")`, `AppSettings.setValue(key,

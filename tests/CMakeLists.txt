@@ -103,6 +103,7 @@ if(TARGET jfd_jellyfin_api)
     library/ItemBrowserTest.cpp
     library/HomeModelTest.cpp
     library/HomeSectionTest.cpp
+    library/RecommendationRowsTest.cpp
     library/LibraryModelTest.cpp
     library/DetailsSearchTest.cpp
     library/ImageCacheTest.cpp

@@ -33,6 +33,10 @@ namespace jfd::settings {
     // "auto" (on with integrated or software graphics), "on", "off".
     // (Was interface/effects.)
     inline constexpr QLatin1String Effects{"appearance/effects"};
+    // The home screen's rows: a JSON array of section ids in the user's
+    // order, a hidden one with "-" in front (hidden setting).
+    inline constexpr QLatin1String HomeSections{"appearance/homeSections"};
+    inline constexpr QLatin1String CustomizeHome{"appearance/customizeHome"};
     inline constexpr QLatin1String OpenThemeFolder{"appearance/openThemeFolder"};
     inline constexpr QLatin1String ReloadThemes{"appearance/reloadThemes"};
     inline constexpr QLatin1String ExportTheme{"appearance/exportTheme"};

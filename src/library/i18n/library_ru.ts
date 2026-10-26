@@ -2,6 +2,29 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>jfd::library</name>
+    <message>
+        <source>Recommended for you</source>
+        <translation>Рекомендуем вам</translation>
+    </message>
+    <message>
+        <source>Because you watched %1</source>
+        <translation>Потому что вы смотрели «%1»</translation>
+    </message>
+    <message>
+        <source>Because you liked %1</source>
+        <translation>Потому что вам понравилось «%1»</translation>
+    </message>
+    <message>
+        <source>Directed by %1</source>
+        <translation>Режиссёр: %1</translation>
+    </message>
+    <message>
+        <source>Starring %1</source>
+        <translation>В ролях: %1</translation>
+    </message>
+</context>
+<context>
     <name>jfd::library::HomeModel</name>
     <message>
         <source>Continue watching</source>
@@ -14,6 +37,21 @@
     <message>
         <source>Latest in %1</source>
         <translation>Новое в «%1»</translation>
+    </message>
+</context>
+<context>
+    <name>jfd::library::RecommendationRows</name>
+    <message>
+        <source>Because you watched this</source>
+        <translation>Потому что вы смотрели это</translation>
+    </message>
+    <message>
+        <source>Because you watched %1</source>
+        <translation>Потому что вы смотрели «%1»</translation>
+    </message>
+    <message>
+        <source>Picks</source>
+        <translation>Подборки</translation>
     </message>
 </context>
 <context>

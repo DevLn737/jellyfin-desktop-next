@@ -22,6 +22,10 @@ namespace jfd::library {
   class SignIn;
 }
 
+namespace jfd::library {
+  class HomeSections;
+}
+
 namespace jfd::media {
   class MpvPlayer;
 }
@@ -80,6 +84,10 @@ namespace jfd::desktop {
     // Play and Watch together from the library screens go to the handlers
     // set on it (setPlayHandler, setWatchTogetherHandler).
     ui::LibraryUi* libraryUi = nullptr;
+    // The rows of the home screen: modules add theirs with
+    // homeSections->add(...) ("music.recent", "seerr.popular"). The cards'
+    // type picks the page they open (LibraryUi::routeFor).
+    library::HomeSections* homeSections = nullptr;
 
     // Playback (installSession): one mpv player and the session on it,
     // on the library's client and socket. The group and player modules

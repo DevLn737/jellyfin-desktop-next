@@ -43,6 +43,7 @@ namespace jfd::ui {
     add("item", true, false, true);
     add("collection", true, false, true);
     addListed("search", "search", QT_TRANSLATE_NOOP("Sidebar", "Search"), 200);
+    add("customizeHome", false, false, true);
     add("player", false, false, false);
     addListed("group", "group", QT_TRANSLATE_NOOP("Sidebar", "Watch together"), 300);
     addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900);

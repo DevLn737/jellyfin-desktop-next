@@ -28,6 +28,13 @@ namespace jfd::desktop {
     back.run = [navigator] { navigator->back(); };
     commands->add(std::move(back));
 
+    ui::CommandRegistry::Command customize;
+    customize.id = QStringLiteral("home.customize");
+    customize.title = QCoreApplication::translate("Commands", "Customize home");
+    customize.available = [navigator] { return navigator->chromeVisible(); };
+    customize.run = [navigator] { navigator->navigate(QStringLiteral("customizeHome")); };
+    commands->add(std::move(customize));
+
     // One "Open <name>" for each destination in the sidebar, kept in step
     // with it as modules register theirs.
     auto known = std::make_shared<QSet<QString>>();
