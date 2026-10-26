@@ -32,6 +32,9 @@ using namespace jfd;
 using jfd::test::FakeSeerr;
 using jfd::test::waitFor;
 
+// Progress marks for a crash that CI shows without a stack.
+#define STEP(n) (std::printf("[requests-test] step %d\n", n), std::fflush(stdout))
+
 namespace {
 
   QQuickItem* find(QQuickItem* root, const char* name) {
@@ -140,66 +143,67 @@ TEST_CASE("Signed out, the page offers the sign-in and shows no titles") {
 }
 
 TEST_CASE("The sign-in page names the server and asks before sending the password") {
+  STEP(0);
   Scene scene;
-  std::fprintf(stderr, "[requests-test] step 1\n");
+  STEP(1);
   QQuickItem* page = scene.open(QStringLiteral("seerr-signin"));
-  std::fprintf(stderr, "[requests-test] step 2\n");
+  STEP(2);
   QQuickItem* host = find(page, "seerrHost");
-  std::fprintf(stderr, "[requests-test] step 3\n");
+  STEP(3);
   REQUIRE(host != nullptr);
-  std::fprintf(stderr, "[requests-test] step 4\n");
+  STEP(4);
   CHECK(host->property("text").toString() == scene.service.serverHost());
-  std::fprintf(stderr, "[requests-test] step 5\n");
+  STEP(5);
   // Local test server on loopback: no warning about plain http.
   CHECK_FALSE(visible(page, "seerrCleartextWarning"));
-  std::fprintf(stderr, "[requests-test] step 6\n");
+  STEP(6);
 
   auto* user = find(page, "seerrUser");
-  std::fprintf(stderr, "[requests-test] step 7\n");
+  STEP(7);
   auto* password = find(page, "seerrPassword");
-  std::fprintf(stderr, "[requests-test] step 8\n");
+  STEP(8);
   REQUIRE(user != nullptr);
-  std::fprintf(stderr, "[requests-test] step 9\n");
+  STEP(9);
   REQUIRE(password != nullptr);
-  std::fprintf(stderr, "[requests-test] step 10\n");
+  STEP(10);
   user->setProperty("text", QStringLiteral("alice"));
-  std::fprintf(stderr, "[requests-test] step 11\n");
+  STEP(11);
   password->setProperty("text", QStringLiteral("wrong"));
-  std::fprintf(stderr, "[requests-test] step 12\n");
+  STEP(12);
   QMetaObject::invokeMethod(page, "submit");
-  std::fprintf(stderr, "[requests-test] step 13\n");
+  STEP(13);
   QObject* confirm = child(page, "seerrConfirm");
-  std::fprintf(stderr, "[requests-test] step 14\n");
+  STEP(14);
   REQUIRE(confirm != nullptr);
-  std::fprintf(stderr, "[requests-test] step 15\n");
+  STEP(15);
   // Nothing has been sent yet.
   CHECK(scene.seerr.server().requests().isEmpty());
-  std::fprintf(stderr, "[requests-test] step 16\n");
+  STEP(16);
   const bool shown = confirm->property("opened").toBool() || confirm->property("visible").toBool();
-  std::fprintf(stderr, "[requests-test] step 17\n");
+  STEP(17);
   CHECK(shown);
-  std::fprintf(stderr, "[requests-test] step 18\n");
+  STEP(18);
   QMetaObject::invokeMethod(confirm, "accept");
-  std::fprintf(stderr, "[requests-test] step 19\n");
+  STEP(19);
   REQUIRE(scene.until([&] {
     QQuickItem* error = find(page, "seerrSignInError");
     return error != nullptr && error->isVisible();
   }));
-  std::fprintf(stderr, "[requests-test] step 20\n");
+  STEP(20);
   CHECK_FALSE(scene.service.signedIn());
-  std::fprintf(stderr, "[requests-test] step 21\n");
+  STEP(21);
   // The password field is emptied after the answer.
   CHECK(password->property("text").toString().isEmpty());
-  std::fprintf(stderr, "[requests-test] step 22\n");
+  STEP(22);
 
   password->setProperty("text", QStringLiteral("pw-alice"));
-  std::fprintf(stderr, "[requests-test] step 23\n");
+  STEP(23);
   QMetaObject::invokeMethod(page, "submit");
-  std::fprintf(stderr, "[requests-test] step 24\n");
+  STEP(24);
   QMetaObject::invokeMethod(child(page, "seerrConfirm"), "accept");
-  std::fprintf(stderr, "[requests-test] step 25\n");
+  STEP(25);
   REQUIRE(scene.until([&] { return scene.service.signedIn(); }));
-  std::fprintf(stderr, "[requests-test] step 26\n");
+  STEP(26);
 }
 
 TEST_CASE("Browsing shows the rows, search shows results") {
