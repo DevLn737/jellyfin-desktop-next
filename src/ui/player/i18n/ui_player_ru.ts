@@ -17,6 +17,25 @@
     </message>
 </context>
 <context>
+    <name>PipWindow</name>
+    <message>
+        <source>Play</source>
+        <translation>Воспроизвести</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translation>Пауза</translation>
+    </message>
+    <message>
+        <source>Back to the player</source>
+        <translation>Назад в плеер</translation>
+    </message>
+    <message>
+        <source>Your desktop does not let applications keep a window on top. Use the window menu&apos;s Always on top.</source>
+        <translation>Ваш рабочий стол не позволяет приложениям держать окно поверх остальных. Включите «Поверх всех окон» в меню окна.</translation>
+    </message>
+</context>
+<context>
     <name>PlayerPage</name>
     <message>
         <source>s</source>
@@ -113,6 +132,10 @@
     <message>
         <source>Playback settings</source>
         <translation>Настройки воспроизведения</translation>
+    </message>
+    <message>
+        <source>Picture in picture</source>
+        <translation>Картинка в картинке</translation>
     </message>
     <message>
         <source>Exit fullscreen</source>

@@ -83,6 +83,9 @@ namespace jfd::ui {
     // name, season, number, played and current. Empty for anything but an
     // episode, and in a group (the group's queue is the server's).
     Q_PROPERTY(QVariantList episodes READ episodes NOTIFY queueChanged)
+    // The video is in the small picture-in-picture window; the player page
+    // is not shown and must not stop the playback.
+    Q_PROPERTY(bool pip READ pip NOTIFY pipChanged)
     // The server has thumbnails for the seek bar (trickplayFrame).
     Q_PROPERTY(bool hasTrickplay READ hasTrickplay NOTIFY trickplayChanged)
 
@@ -135,6 +138,7 @@ namespace jfd::ui {
     bool hasNext() const { return !m_nextId.isEmpty(); }
     bool hasPrevious() const { return !m_previousId.isEmpty(); }
     QVariantList episodes() const { return inGroup() ? QVariantList() : m_episodes; }
+    bool pip() const { return m_pip; }
     bool hasTrickplay() const { return m_trickplayInfo.has_value(); }
 
     // Plays an item alone. Waits for the video renderer when the page has
@@ -154,6 +158,11 @@ namespace jfd::ui {
     // Plays one of `episodes` from the start, alone.
     Q_INVOKABLE void playEpisode(const QString& itemId);
     Q_INVOKABLE void stop();
+    // The video moves to the picture-in-picture window (its host calls
+    // attachVideo) and back; playback goes on. leavePip() also emits
+    // leftPip() so the application shows the player page again.
+    Q_INVOKABLE void enterPip();
+    Q_INVOKABLE void leavePip();
     // The seek bar thumbnail at `seconds`: {source, x, y, width, height,
     // tileWidth, tileHeight} in tile pixels, where source is the tile image
     // (image://jfd/...) and x, y, width, height the thumbnail inside it.
@@ -176,6 +185,8 @@ namespace jfd::ui {
     void maxBitrateChanged();
     void delaysChanged();
     void queueChanged();
+    void pipChanged();
+    void leftPip();
     void trickplayChanged();
     // A play request could not be resolved, or the renderer failed.
     void failed(const QString& message);
@@ -199,6 +210,11 @@ namespace jfd::ui {
     // A track the viewer picked: remembered for the next file.
     void selectTrack(core::TrackKind kind, std::optional<int> streamIndex);
     void videoReady();
+    // The video item goes away and mpv's video track is switched off, which
+    // lets the next window create the render context (freeing the context of
+    // a playing video would end the file).
+    void suspendVideo();
+    void setPip(bool on);
     void loadEpisodes(const api::Item& item);
     void step(bool forward);
     void loadTrickplay(const QString& itemId);
@@ -245,6 +261,9 @@ namespace jfd::ui {
     QHash<QString, QList<api::TrickplayInfo>> m_trickplay;
     std::optional<api::TrickplayInfo> m_trickplayInfo;
     bool m_videoReady = false;
+    bool m_pip = false;
+    bool m_videoSuspended = false;
+    QPointer<QQuickItem> m_video;
     std::optional<std::pair<QString, qint64>> m_waitingPlay;
   };
 

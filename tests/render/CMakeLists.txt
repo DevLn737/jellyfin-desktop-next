@@ -19,3 +19,10 @@ if(WIN32 AND TARGET jfd_media_backend)
     set_tests_properties(jfd_render_test_d3d11 PROPERTIES TIMEOUT 90)
   endif()
 endif()
+
+# Picture in picture moves the one video item between two windows; the render
+# context must be created again in the second window on the same mpv core.
+qt_add_executable(jfd_pip_move_test PipMoveTest.cpp)
+target_link_libraries(jfd_pip_move_test PRIVATE Qt6::Gui Qt6::Quick jfd::media_backend jfd::playback)
+add_test(NAME jfd_pip_move_test COMMAND jfd_pip_move_test)
+set_tests_properties(jfd_pip_move_test PROPERTIES TIMEOUT 90)

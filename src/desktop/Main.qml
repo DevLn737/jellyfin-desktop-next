@@ -30,6 +30,21 @@ Window {
     color: scene.hdr ? "black" : Theme.background
     title: shell.title.length > 0 ? shell.title + " — Jellyfin" : "Jellyfin"
 
+    // The picture-in-picture window is a window of its own (not transient
+    // for this one, so it stays when this one is minimised).
+    property Window pip: PipWindow {}
+
+    // Back from the picture-in-picture window: the player page again.
+    Connections {
+        target: PlayerSession
+        function onLeftPip() {
+            Navigator.navigate("player")
+            window.show()
+            window.raise()
+            window.requestActivate()
+        }
+    }
+
     // The interface layer, encoded to PQ with HDR10 output; the player's
     // video goes underneath.
     HdrScene {

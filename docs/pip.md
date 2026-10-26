@@ -1,7 +1,8 @@
 # Picture in picture
 
-Research for the PiP idea (stage 2c, player package). Nothing here is
-implemented yet. "Verified" below means checked in this repository's code;
+Research and design of the PiP window (stage 2c, player package); the
+Linux/OpenGL path is implemented and tested, Windows (D3D11) and the
+platform rows marked "to verify" are not. "Verified" below means checked in this repository's code;
 platform behaviour that I could not run here is marked "to verify" and has
 a test on real hardware listed at the end.
 
@@ -48,6 +49,23 @@ stop), as the stage 2c table says.
    shared GL context or a shared D3D11 device between two Qt Quick windows
    and a second scene graph reading a texture made in the first. More code
    and more platform risk than option 1 for the same result.
+
+## Measured: moving the video (tests/render/PipMoveTest.cpp)
+
+- Freeing the render context while a file plays **ends the file** ("video
+  output initialization failed", end of file). A plain move therefore stops
+  playback.
+- Switching mpv's video track off (`vid=no`) before the item goes away, and
+  back (`vid=auto`) once the new window's context is ready, keeps the file
+  and the audio playing; the position goes on across three moves in a row
+  (OpenGL, Xvfb/llvmpipe).
+- The old window frees its context on its own render thread, so the new one
+  may ask first. Both video items now ask again on the next frame (up to 100
+  tries) instead of failing for good.
+- `PlayerModel` owns this: `enterPip()`/`leavePip()` switch the track off and
+  delete the item, `attachVideo` (called by the page or by `PipWindow`) makes
+  the new one, `videoReady` switches the track back on. Not done for HDR10
+  output: the PiP button is hidden then.
 
 ## What has to change besides the window
 

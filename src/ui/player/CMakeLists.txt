@@ -20,6 +20,7 @@ qt_add_qml_module(jfd_ui_player
     EpisodesPanel.qml
     HdrScene.qml
     PlayerIcons.qml
+    PipWindow.qml
     PlayerPage.qml
     TrackMenu.qml
     TuneMenu.qml
@@ -31,6 +32,7 @@ qt_add_qml_module(jfd_ui_player
     icons/fullscreenExit.svg
     icons/next.svg
     icons/pause.svg
+    icons/pip.svg
     icons/previous.svg
     icons/replay.svg
     icons/subtitles.svg

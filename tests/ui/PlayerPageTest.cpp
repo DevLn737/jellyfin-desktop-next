@@ -14,6 +14,7 @@
 
 #include <QKeyEvent>
 #include <QQmlComponent>
+#include <QSignalSpy>
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -236,4 +237,55 @@ TEST_CASE("The header shows the clock and when the file ends; the episodes butto
 
   if (const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS"); !dir.isEmpty())
     f.window.grabWindow().save(dir + QStringLiteral("/player-header.png"));
+}
+
+TEST_CASE("Picture in picture keeps the file playing; its window is small, frameless and on top, and goes back") {
+  Fixture f;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  CHECK_FALSE(f.player->pip());
+  QQuickItem* button = find(f.page, "pip");
+  REQUIRE(button != nullptr);
+  CHECK(button->isVisible());
+
+  QQmlComponent component(&f.engine, QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Player/PipWindow.qml")));
+  std::unique_ptr<QObject> made(component.create());
+  REQUIRE_MESSAGE(made != nullptr, component.errorString().toStdString());
+  auto* pip = qobject_cast<QQuickWindow*>(made.get());
+  REQUIRE(pip != nullptr);
+  CHECK_FALSE(pip->isVisible());
+  CHECK(pip->flags().testFlag(Qt::WindowStaysOnTopHint));
+  CHECK(pip->flags().testFlag(Qt::FramelessWindowHint));
+  CHECK(pip->width() < 800);
+
+  QSignalSpy left(f.player.get(), &ui::PlayerModel::leftPip);
+  QKeyEvent press(QEvent::KeyPress, Qt::Key_P, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &press);
+  CHECK(f.player->pip());
+  REQUIRE(waitFor([&] { return pip->isVisible(); }, 2000));
+  CHECK(pip->title().startsWith(QStringLiteral("Jellyfin Desktop Next")));
+  // Playback goes on in the small window, and its controls work.
+  const double before = f.player->position();
+  REQUIRE(waitFor([&] { return f.player->position() > before + 0.2; }, 3000));
+  CHECK(f.player->active());
+  QQuickItem* playPause = find(pip->contentItem(), "pipPlayPause");
+  REQUIRE(playPause != nullptr);
+  f.player->togglePause();
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+  f.player->togglePause();
+  REQUIRE(waitFor([&] { return !f.player->paused(); }, 2000));
+
+  // Esc goes back to the player page, and the file still plays.
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(pip, &escape);
+  CHECK_FALSE(f.player->pip());
+  CHECK(left.count() == 1);
+  REQUIRE(waitFor([&] { return !pip->isVisible(); }, 2000));
+  CHECK(f.player->active());
+
+  // Stopping from the small window clears it.
+  f.player->enterPip();
+  CHECK(f.player->pip());
+  f.player->stop();
+  CHECK_FALSE(f.player->pip());
 }

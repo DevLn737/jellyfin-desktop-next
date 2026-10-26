@@ -255,3 +255,16 @@ scrolls a 1000-item grid on an in-process fake server and reports the frame
 intervals; on Xvfb that number is only a preliminary for the laptop
 threshold. The Library screens workflow runs it under Xvfb and puts the
 table in the job summary.
+
+## Picture in picture
+
+The player page has a PiP button (key P). The video moves to a small frameless
+window that stays on top (`PipWindow.qml`, created once by `Main.qml`); the
+main window goes back to the library and the file keeps playing. Controls show
+on hover: play/pause and back to the player page. Space pauses, Esc, the back
+button or closing the window return to the player page. Drag anywhere to move,
+the corner to resize. Not offered with HDR10 output. On Wayland the window
+cannot be forced on top or placed: it opens where the compositor puts it, a
+hint says to use the window menu's Always on top, and the title is fixed
+(`Jellyfin Desktop Next - Picture in picture`) for compositor rules. Details:
+`docs/pip.md`.

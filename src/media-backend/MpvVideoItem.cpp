@@ -153,8 +153,16 @@ private:
       {MPV_RENDER_PARAM_INVALID, nullptr}};
     if (const int error = mpv_render_context_create(&m_context, m_handle.get(), params); error < 0)
     {
-      m_failed = true;
       m_context = nullptr;
+      // Moving the video to another window frees the old window's context on
+      // its own render thread, possibly a moment after this one asks for a
+      // new one (mpv allows one per core): ask again on the next frame.
+      if (++m_attempts < MaxAttempts)
+      {
+        QMetaObject::invokeMethod(item, [item] { item->update(); }, Qt::QueuedConnection);
+        return;
+      }
+      m_failed = true;
       item->reportRenderError(QString::fromUtf8(mpv_error_string(error)));
       return;
     }
@@ -175,6 +183,8 @@ private:
   GLuint m_samplerUnits = 0;
   bool m_rendered = false;
   bool m_failed = false;
+  int m_attempts = 0;
+  static constexpr int MaxAttempts = 100;
 };
 
 }
