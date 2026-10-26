@@ -71,6 +71,7 @@ if(JFD_BUILD_APP)
   add_subdirectory(tools/prototype)
   # Modules that need Qt Quick or mpv, and the application itself.
   jfd_add_module(src/session)
+  jfd_add_module(src/music)
   jfd_add_module(src/ui/theme)
   jfd_add_module(src/ui/controls)
   jfd_add_module(src/ui/shell)

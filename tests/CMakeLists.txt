@@ -121,6 +121,17 @@ if(TARGET jfd_jellyfin_api)
     target_link_libraries(jfd_integrations_tests PRIVATE jfd::integrations Qt6::WebSockets)
   endif()
 
+  if(TARGET jfd_music)
+    jfd_add_qt_test(jfd_music_tests music/MusicQueueTest.cpp)
+    target_link_libraries(jfd_music_tests PRIVATE jfd::music)
+    if(JFD_SERVER_TESTS)
+      # The music player on headless mpv against the extras server.
+      jfd_add_qt_test(jfd_music_server_tests music/MusicServerTest.cpp)
+      target_link_libraries(jfd_music_server_tests PRIVATE jfd::music jfd::media_backend)
+      set_tests_properties(jfd_music_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+    endif()
+  endif()
+
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
   find_package(Qt6 QUIET COMPONENTS DBus)
