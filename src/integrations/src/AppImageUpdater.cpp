@@ -6,9 +6,6 @@
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QProcess>
 #include <QProcessEnvironment>
 
@@ -58,12 +55,7 @@ exec "$app"
   AppImageUpdater::AppImageUpdater(QNetworkAccessManager* network, QString appImage, QString stateDirectory,
                                    std::optional<MinisignPublicKey> key, QObject* parent)
       : QObject(parent), m_network(network), m_appImage(std::move(appImage)),
-        m_stateDirectory(std::move(stateDirectory)), m_key(key) {}
-
-  AppImageUpdater::~AppImageUpdater() {
-    if (m_reply) m_reply->abort();
-    delete m_file;
-  }
+        m_stateDirectory(std::move(stateDirectory)), m_key(key), m_download(network, this) {}
 
   bool AppImageUpdater::supported() const {
     if (m_appImage.isEmpty() || !m_key) return false;
@@ -75,87 +67,37 @@ exec "$app"
     return QDir(m_stateDirectory).filePath(QStringLiteral("update-pending.json"));
   }
 
-  void AppImageUpdater::fail(const QString& reason) {
-    m_preparing.clear();
-    QFile::remove(m_appImage + QStringLiteral(".new.part"));
-    Q_EMIT failed(reason);
-  }
-
-  void AppImageUpdater::download(const QUrl& url, const QString& path, qint64 size, std::function<void()> done) {
-    delete m_file;
-    m_file = new QFile(path);
-    if (!m_file->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-      fail(QStringLiteral("cannot write %1").arg(path));
-      return;
-    }
-    QNetworkRequest request(url);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    QNetworkReply* reply = m_network->get(request);
-    m_reply = reply;
-    connect(reply, &QNetworkReply::readyRead, this, [this, reply] {
-      if (m_file->write(reply->readAll()) < 0) reply->abort();
-    });
-    connect(reply, &QNetworkReply::finished, this, [this, reply, size, done = std::move(done)] {
-      reply->deleteLater();
-      m_file->write(reply->readAll());
-      const qint64 written = m_file->size();
-      const bool flushed = m_file->flush();
-      m_file->close();
-      if (reply->error() != QNetworkReply::NoError) {
-        fail(QStringLiteral("download failed: %1").arg(reply->errorString()));
-      } else if (!flushed || (size > 0 && written != size)) {
-        fail(QStringLiteral("download incomplete: %1 of %2 bytes").arg(written).arg(size));
-      } else {
-        done();
-      }
-    });
-  }
-
   void AppImageUpdater::prepare(const Release& release) {
     if (!supported() || !m_preparing.isEmpty() || m_readyVersion == release.version) return;
     const QString name = assetName(release.version);
-    const ReleaseAsset* file = nullptr;
-    const ReleaseAsset* signature = nullptr;
-    for (const ReleaseAsset& asset : release.assets) {
-      if (asset.name == name) file = &asset;
-      if (asset.name == name + QStringLiteral(".minisig")) signature = &asset;
-    }
+    const ReleaseAsset* file = SignedDownload::findAsset(release, name);
+    const ReleaseAsset* signature = SignedDownload::findAsset(release, name + QStringLiteral(".minisig"));
     if (file == nullptr || signature == nullptr) {
       Q_EMIT failed(QStringLiteral("release %1 has no signed AppImage").arg(release.version));
       return;
     }
     m_preparing = release.version;
     const QString part = m_appImage + QStringLiteral(".new.part");
-    const QString signaturePath = part + QStringLiteral(".minisig");
-    const QUrl signatureUrl = signature->url;
-    const qint64 signatureSize = signature->size;
-    download(file->url, part, file->size, [this, part, signaturePath, signatureUrl, signatureSize, name] {
-      download(signatureUrl, signaturePath, signatureSize, [this, part, signaturePath, name] {
-        QFile signatureFile(signaturePath);
-        QFile data(part);
-        const bool opened = signatureFile.open(QIODevice::ReadOnly) && data.open(QIODevice::ReadOnly);
-        const QByteArray signatureText = opened ? signatureFile.read(4096) : QByteArray();
-        const SignatureCheck check =
-            opened ? verifyReleaseFile(data, signatureText, name, *m_key) : SignatureCheck{false, QStringLiteral("cannot read the download"), {}};
-        data.close();
-        QFile::remove(signaturePath);
-        if (!check.valid) {
-          fail(QStringLiteral("signature check failed: %1").arg(check.error));
-          return;
-        }
-        const QString next = m_appImage + QStringLiteral(".new");
-        QFile::remove(next);
-        if (!QFile::rename(part, next) ||
-            !QFile::setPermissions(next, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
-                                             QFileDevice::ReadGroup | QFileDevice::ExeGroup |
-                                             QFileDevice::ReadOther | QFileDevice::ExeOther)) {
-          fail(QStringLiteral("cannot keep the download"));
-          return;
-        }
-        m_readyVersion = m_preparing;
+    m_download.start(*file, *signature, part, name, *m_key, [this, part](const QString& error) {
+      if (!error.isEmpty()) {
         m_preparing.clear();
-        Q_EMIT ready(m_readyVersion);
-      });
+        Q_EMIT failed(error);
+        return;
+      }
+      const QString next = m_appImage + QStringLiteral(".new");
+      QFile::remove(next);
+      if (!QFile::rename(part, next) ||
+          !QFile::setPermissions(next, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+                                           QFileDevice::ReadGroup | QFileDevice::ExeGroup |
+                                           QFileDevice::ReadOther | QFileDevice::ExeOther)) {
+        QFile::remove(part);
+        m_preparing.clear();
+        Q_EMIT failed(QStringLiteral("cannot keep the download"));
+        return;
+      }
+      m_readyVersion = m_preparing;
+      m_preparing.clear();
+      Q_EMIT ready(m_readyVersion);
     });
   }
 

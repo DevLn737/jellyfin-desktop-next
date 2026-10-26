@@ -3,6 +3,7 @@
 #include <jfd/integrations/AppImageUpdater.h>
 #include <jfd/integrations/DiscordPresence.h>
 #include <jfd/integrations/MediaSessionBridge.h>
+#include <jfd/integrations/MsiUpdater.h>
 #include <jfd/integrations/UpdateChecker.h>
 #include <jfd/platform/MediaControls.h>
 #include <jfd/platform/SleepInhibitor.h>
@@ -11,6 +12,7 @@
 #include <QNetworkAccessManager>
 #include <QString>
 
+#include <functional>
 #include <memory>
 
 class QQmlEngine;
@@ -25,7 +27,7 @@ namespace jfd::desktop {
   struct AppServices;
 
   // The system media controls (SMTC, MPRIS), sleep inhibition while video
-  // plays, Discord Rich Presence, the update check and the AppImage update,
+  // plays, Discord Rich Presence, the update check and the in-place update (AppImage, MSI),
   // fed from the session.
   struct IntegrationServices {
     QNetworkAccessManager network;
@@ -33,8 +35,14 @@ namespace jfd::desktop {
     std::unique_ptr<platform::SleepInhibitor> sleepInhibitor;
     integrations::DiscordPresence presence;
     std::unique_ptr<integrations::UpdateChecker> updates;
+    // Linux: the AppImage updater; Windows: the MSI updater. Only one exists.
     std::unique_ptr<integrations::AppImageUpdater> appImage;
-    // Something plays or this client is in a group: no update restarts it.
+    std::unique_ptr<integrations::MsiUpdater> msi;
+    // Set by the updater that exists; empty until startIntegrations.
+    std::function<bool()> updateSupported;
+    std::function<void(const integrations::Release&)> prepareUpdate;
+    // Offers the downloaded update again (playback ended).
+    std::function<void()> offerReadyUpdate;    // Something plays or this client is in a group: no update restarts it.
     bool busy = false;
     // A downloaded update waits for playback to end before it is offered.
     bool offerWhenIdle = false;

@@ -274,6 +274,10 @@
         <source>The update restarts the app, so it waits until playback ends and you are not in a group.</source>
         <translation>Обновление перезапускает приложение, поэтому ждёт конца просмотра и выхода из группы.</translation>
     </message>
+    <message>
+        <source>Version %1 did not install, so this version stays.</source>
+        <translation>Версия %1 не установилась, поэтому осталась текущая.</translation>
+    </message>
 </context>
 <context>
     <name>LegacySettings</name>
