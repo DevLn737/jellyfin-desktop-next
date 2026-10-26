@@ -471,6 +471,10 @@
         <source>Connected to Seerr as %1.</source>
         <translation>Подключено к Seerr как %1.</translation>
     </message>
+    <message>
+        <source>Popular in Seerr</source>
+        <translation>Популярное в Seerr</translation>
+    </message>
 </context>
 <context>
     <name>SubtitleSettings</name>

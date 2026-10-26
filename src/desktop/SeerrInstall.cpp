@@ -1,5 +1,7 @@
 #include "AppServices.h"
 
+#include <algorithm>
+
 #include <jfd/diagnostics/Redact.h>
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/seerr/SeerrService.h>
@@ -8,9 +10,15 @@
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/RequestsUi.h>
 
+#include <jfd/library/HomeSection.h>
+#include <jfd/library/ItemListModel.h>
+#include <jfd/seerr/TitleListModel.h>
+
+#include <QAbstractListModel>
 #include <QCoreApplication>
 #include <QMetaObject>
 #include <QQmlApplicationEngine>
+#include <QUrl>
 
 namespace jfd::desktop {
 
@@ -36,6 +44,58 @@ namespace jfd::desktop {
         diagnostics::addProtectedAddress(service.serverUrl().toString().toStdString());
       }
     }
+
+    // The Popular row on the home screen: the first titles of the popular
+    // list, under the roles the home rows read (the ones of ItemListModel).
+    // Seerr titles carry the type "SeerrTitle" so a card opens the Seerr
+    // title page.
+    class PopularRow : public QAbstractListModel {
+    public:
+      static constexpr int MaxCards = 20;
+
+      PopularRow(seerr::SeerrService& service, QObject* parent)
+          : QAbstractListModel(parent),
+            m_titles(new seerr::TitleListModel(service, seerr::TitleListModel::Source::PopularMovies, this)) {
+        const auto sync = [this] {
+          beginResetModel();
+          endResetModel();
+        };
+        connect(m_titles, &QAbstractItemModel::modelReset, this, sync);
+        connect(m_titles, &QAbstractItemModel::rowsInserted, this, sync);
+        connect(m_titles, &QAbstractItemModel::rowsRemoved, this, sync);
+        connect(m_titles, &QAbstractItemModel::dataChanged, this, sync);
+      }
+
+      void reload() { m_titles->reload(); }
+
+      int rowCount(const QModelIndex& parent = {}) const override {
+        return parent.isValid() ? 0 : std::min(m_titles->count(), MaxCards);
+      }
+
+      QVariant data(const QModelIndex& index, int role) const override {
+        if (!index.isValid() || index.row() >= rowCount()) return {};
+        const QModelIndex source = m_titles->index(index.row());
+        using Src = seerr::TitleListModel;
+        using Dst = library::ItemListModel;
+        switch (role) {
+        case Dst::IdRole: return source.data(Src::KeyRole);
+        case Dst::NameRole: return source.data(Src::NameRole);
+        case Dst::TypeRole: return QStringLiteral("SeerrTitle");
+        case Dst::SubtitleRole: return source.data(Src::SubtitleRole);
+        case Dst::ImageUrlRole: return QUrl(source.data(Src::ImageUrlRole).toString());
+        case Dst::OverviewRole: return source.data(Src::OverviewRole);
+        case Dst::CommunityRatingRole: return source.data(Src::RatingRole);
+        default: return {};
+        }
+      }
+
+      QHash<int, QByteArray> roleNames() const override { return library::ItemListModel::itemRoleNames(); }
+
+    private:
+      seerr::TitleListModel* m_titles;
+    };
+
+    const QString PopularId = QStringLiteral("seerr.popular");
   } // namespace
 
   bool registerSeerrSettings(settings::SettingsRegistry& registry) {
@@ -89,6 +149,31 @@ namespace jfd::desktop {
     QObject::connect(&store, &settings::Settings::valueChanged, &service, [apply](const QString& key) {
       if (key == AddressKey) apply();
     });
+
+    // The Popular row exists while an address is set and the user is signed
+    // in; without either there is nothing from Seerr on the home page.
+    if (services.homeSections != nullptr) {
+      library::HomeSections* sections = services.homeSections;
+      auto* popular = new PopularRow(service, &service);
+      const auto syncRow = [&service, sections, popular] {
+        if (service.configured() && service.signedIn()) {
+          library::HomeSection row;
+          row.id = PopularId;
+          row.title = QCoreApplication::translate("SeerrSettings", "Popular in Seerr");
+          row.defaultOrder = 300;
+          row.model = popular;
+          row.reload = [popular] { popular->reload(); };
+          if (!sections->contains(PopularId)) {
+            sections->add(std::move(row));
+            popular->reload();
+          }
+        } else {
+          sections->remove(PopularId);
+        }
+      };
+      QObject::connect(&service, &seerr::SeerrService::stateChanged, &service, syncRow);
+      syncRow();
+    }
 
     ui::Navigator* navigator = services.navigator;
     QObject::connect(&store, &settings::Settings::actionTriggered, &service,
