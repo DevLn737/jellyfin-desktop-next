@@ -52,6 +52,9 @@ namespace jfd::api {
     std::optional<bool> isPlayed;
     std::optional<bool> isFavorite;
     QStringList ids;
+    // Music: tracks and albums of these (album) artists.
+    QStringList albumArtistIds;
+    QStringList artistIds;
   };
 
   // Image types the server keeps per item: "Primary", "Backdrop", "Thumb",

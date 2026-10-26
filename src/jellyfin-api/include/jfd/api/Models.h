@@ -94,6 +94,12 @@ namespace jfd::api {
   // The frame shown at `positionMs`; nullopt when the info is empty.
   std::optional<TrickplayFrame> trickplayFrame(const TrickplayInfo& info, std::int64_t positionMs);
 
+  // An artist as a track or album names them.
+  struct NamedId {
+    QString id;
+    QString name;
+  };
+
   struct Item {
     QString id;
     QString name;
@@ -130,6 +136,22 @@ namespace jfd::api {
     QStringList parentBackdropImageTags;
     QString parentThumbItemId;
     QString parentThumbImageTag;
+    // Music: tracks carry their album and artists; artists and genres their
+    // counts (the server leaves them out for other types).
+    QString album;
+    QString albumId;
+    QString albumArtist;
+    QString albumPrimaryImageTag;
+    QStringList artists;
+    QList<NamedId> artistItems;
+    QList<NamedId> albumArtists;
+    // ReplayGain-style gain in dB the server read from the file's tags.
+    std::optional<double> normalizationGain;
+    std::optional<int> songCount;
+    std::optional<int> albumCount;
+    // The entry of a playlist's item list (Playlists/{id}/Items); removing
+    // an entry names it, not the track.
+    QString playlistItemId;
     // Asked for with the Trickplay field: resolutions by media source id.
     QHash<QString, QList<TrickplayInfo>> trickplay;
     UserItemData userData;

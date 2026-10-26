@@ -3,6 +3,7 @@ add_library(jfd_jellyfin_api STATIC
   src/DeviceProfile.cpp
   src/JellyfinClient.cpp
   src/Models.cpp
+  src/MusicApi.cpp
   src/Playback.cpp
   src/ServerDiscovery.cpp
   src/ServerTime.cpp
@@ -13,6 +14,7 @@ add_library(jfd_jellyfin_api STATIC
   include/jfd/api/DeviceProfile.h
   include/jfd/api/JellyfinClient.h
   include/jfd/api/Models.h
+  include/jfd/api/MusicApi.h
   include/jfd/api/Playback.h
   include/jfd/api/Result.h
   include/jfd/api/ServerDiscovery.h
