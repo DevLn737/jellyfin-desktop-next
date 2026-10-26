@@ -1,7 +1,9 @@
 import QtQuick
+import QtQuick.Window
 import Jfd.Ui.Theme
 
-// A small label shown below its parent after a short hover.
+// A small label shown below its parent after a short hover, or above it when
+// there is no room below in the window (the player's bottom bar).
 Rectangle {
     id: tip
     // Colours of the nearest colour scope (the video player has its own).
@@ -10,8 +12,14 @@ Rectangle {
     property alias text: label.text
     property bool shown: false
 
-    anchors.top: parent.bottom
-    anchors.topMargin: Theme.spacingTiny
+    // Decided when it is about to show.
+    property bool above: false
+    onShownChanged: {
+        if (!shown || !parent || !Window.window) return
+        above = parent.mapToItem(null, 0, parent.height).y + Theme.spacingTiny + height > Window.window.height
+    }
+
+    y: above ? -height - Theme.spacingTiny : parent.height + Theme.spacingTiny
     anchors.horizontalCenter: parent.horizontalCenter
     width: label.implicitWidth + 2 * Theme.spacingSmall
     height: label.implicitHeight + Theme.spacingTiny * 2

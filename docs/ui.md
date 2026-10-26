@@ -268,3 +268,17 @@ cannot be forced on top or placed: it opens where the compositor puts it, a
 hint says to use the window menu's Always on top, and the title is fixed
 (`Jellyfin Desktop Next - Picture in picture`) for compositor rules. Details:
 `docs/pip.md`.
+
+## Scrolling, item pages and episodes
+
+- The plain mouse wheel always scrolls the page, also over a card row; a row
+  scrolls sideways with Shift + wheel, a touchpad swipe, dragging or the arrow
+  keys (`CardRow`).
+- The item page's backdrop is part of the scrolling content: it sits at the top
+  and scrolls away, fading into the page background with a gradient.
+- An episode has no page in normal use: clicking an episode card (home, search,
+  latest) or an episode row on a series or season page plays it, resuming where
+  it stopped. The series page lists the episodes with their stills and
+  overviews.
+- In the player, the audio, subtitle and settings menus open just above the
+  button row. A tooltip that would not fit below its button shows above it.
