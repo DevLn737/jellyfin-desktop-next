@@ -46,7 +46,7 @@ namespace jfd::desktop {
     // After an update the new version opens the screen the old one showed,
     // once the saved session has signed in (home).
     void reopen(ui::Navigator& navigator, const QString& route) {
-      const ui::Navigator::Route target = ui::Navigator::parse(route);
+      const ui::Navigator::Route target = navigator.parse(route);
       if (target.name.isEmpty() || target.name == QStringLiteral("login") || target.name == QStringLiteral("home"))
         return;
       if (navigator.currentName() == QStringLiteral("home")) {

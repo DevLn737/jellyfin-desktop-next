@@ -150,7 +150,7 @@ RoutePage {
         Text {
             id: noticeText
             anchors.centerIn: parent
-            color: Theme.text
+            color: Overlay.text
             font.pixelSize: Theme.fontSizeLarge
         }
         Timer {
@@ -169,7 +169,7 @@ RoutePage {
         width: Math.min(parent.width - 2 * Theme.spacingHuge, 640)
         visible: page.player.error.length > 0
         text: qsTr("Playback failed: %1").arg(page.player.error)
-        color: Theme.text
+        color: Overlay.text
         font.pixelSize: Theme.fontSizeLarge
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
@@ -207,7 +207,7 @@ RoutePage {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - 2 * Theme.controlHeight - groupOsd.width - 3 * Theme.spacing
                 text: page.player.title
-                color: Theme.text
+                color: Overlay.text
                 font.pixelSize: Theme.fontSizeLarge
                 elide: Text.ElideRight
             }
@@ -304,7 +304,7 @@ RoutePage {
             anchors.bottom: column.top
             anchors.bottomMargin: Theme.spacingSmall
             color: "black"
-            border.color: Theme.surfaceHover
+            border.color: Overlay.surfaceHover
             border.width: 1
             radius: 4
 
@@ -334,7 +334,7 @@ RoutePage {
                 anchors.bottom: parent.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: page.clock(preview.seconds)
-                color: Theme.text
+                color: Overlay.text
                 font.pixelSize: Theme.fontSizeBody
                 padding: 2
             }
@@ -404,7 +404,7 @@ RoutePage {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         text: page.clock(timeline.value) + " / " + page.clock(page.player.duration)
-                        color: Theme.text
+                        color: Overlay.text
                         font.pixelSize: Theme.fontSizeBody
                     }
                 }

@@ -1,5 +1,6 @@
 #include "../support/DoctestQt.h"
 
+#include <jfd/ui/CommandRegistry.h>
 #include <jfd/ui/GraphicsInfo.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/WindowPlacement.h>
@@ -9,14 +10,115 @@
 using namespace jfd::ui;
 
 TEST_CASE("Routes parse with and without arguments") {
-  CHECK(Navigator::parse(QStringLiteral("home")).name == QStringLiteral("home"));
-  const auto item = Navigator::parse(QStringLiteral("item/abc"));
+  Navigator navigator;
+  CHECK(navigator.parse(QStringLiteral("home")).name == QStringLiteral("home"));
+  const auto item = navigator.parse(QStringLiteral("item/abc"));
   CHECK(item.name == QStringLiteral("item"));
   CHECK(item.argument == QStringLiteral("abc"));
-  CHECK(Navigator::parse(QStringLiteral("item")).name.isEmpty());
-  CHECK(Navigator::parse(QStringLiteral("home/x")).name.isEmpty());
-  CHECK(Navigator::parse(QStringLiteral("item/a/b")).name.isEmpty());
-  CHECK(Navigator::parse(QStringLiteral("nowhere")).name.isEmpty());
+  CHECK(navigator.parse(QStringLiteral("item")).name.isEmpty());
+  CHECK(navigator.parse(QStringLiteral("home/x")).name.isEmpty());
+  CHECK(navigator.parse(QStringLiteral("item/a/b")).name.isEmpty());
+  CHECK(navigator.parse(QStringLiteral("nowhere")).name.isEmpty());
+}
+
+TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
+  Navigator navigator;
+  const auto ids = [&] {
+    QStringList routes;
+    for (const QVariant& entry : navigator.sidebarEntries()) {
+      routes.append(entry.toMap().value(QStringLiteral("route")).toString());
+    }
+    return routes;
+  };
+  // The built-in entries, in their order.
+  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("search"), QStringLiteral("group"),
+                             QStringLiteral("settings")});
+  CHECK_FALSE(navigator.navigate(QStringLiteral("music")));
+
+  RouteSpec music;
+  music.name = QStringLiteral("music");
+  music.hasSidebarEntry = true;
+  music.sidebar = {QStringLiteral("music"), QStringLiteral("Music"), nullptr, 400};
+  navigator.registerRoute(music);
+  RouteSpec album;
+  album.name = QStringLiteral("album");
+  album.takesArgument = true;
+  navigator.registerRoute(album);
+  navigator.registerPage(QStringLiteral("album"), QUrl(QStringLiteral("qrc:/Album.qml")));
+
+  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("search"), QStringLiteral("group"),
+                             QStringLiteral("music"), QStringLiteral("settings")});
+  const QVariantMap entry = navigator.sidebarEntries().at(3).toMap();
+  CHECK(entry.value(QStringLiteral("text")).toString() == QStringLiteral("Music"));
+  CHECK(entry.value(QStringLiteral("icon")).toString() == QStringLiteral("music"));
+
+  navigator.reset(QStringLiteral("home"));
+  CHECK(navigator.navigate(QStringLiteral("music")));
+  CHECK(navigator.navigate(QStringLiteral("album/a1")));
+  CHECK(navigator.navigate(QStringLiteral("album/a2")));
+  // An argument route may stack, an argument-less one is returned to.
+  CHECK(navigator.navigate(QStringLiteral("album/a1")));
+  CHECK(navigator.depth() == 5);
+  CHECK(navigator.navigate(QStringLiteral("music")));
+  CHECK(navigator.depth() == 2);
+  CHECK(navigator.pageFor(QStringLiteral("album")) == QUrl(QStringLiteral("qrc:/Album.qml")));
+  CHECK_FALSE(navigator.navigate(QStringLiteral("album")));
+  CHECK_FALSE(navigator.navigate(QStringLiteral("music/x")));
+
+  // A route that is not available (no Seerr address) has no sidebar entry
+  // but is still a route.
+  QSignalSpy sidebar(&navigator, &Navigator::sidebarChanged);
+  navigator.setRouteAvailable(QStringLiteral("music"), false);
+  CHECK(sidebar.count() == 1);
+  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("search"), QStringLiteral("group"),
+                             QStringLiteral("settings")});
+  navigator.setRouteAvailable(QStringLiteral("music"), false);
+  CHECK(sidebar.count() == 1);
+  navigator.setRouteAvailable(QStringLiteral("music"), true);
+  CHECK(ids().contains(QStringLiteral("music")));
+
+  // A route without the shell around it, like the player.
+  RouteSpec bare;
+  bare.name = QStringLiteral("fullscreen");
+  bare.chrome = false;
+  navigator.registerRoute(bare);
+  navigator.navigate(QStringLiteral("fullscreen"));
+  CHECK_FALSE(navigator.chromeVisible());
+}
+
+TEST_CASE("Commands are listed when available and run by id") {
+  CommandRegistry commands;
+  bool signedIn = false;
+  QStringList ran;
+  commands.add({QStringLiteral("navigate.home"), QStringLiteral("Go home"), {}, [&] { ran << QStringLiteral("home"); }});
+  commands.add({QStringLiteral("account.signOut"), QStringLiteral("Sign out"), [&] { return signedIn; },
+                [&] { ran << QStringLiteral("signOut"); }});
+  // Without a way to run it, a command is not added.
+  commands.add({QStringLiteral("broken"), QStringLiteral("Broken"), {}, {}});
+  CHECK_FALSE(commands.contains(QStringLiteral("broken")));
+
+  CHECK(commands.commands().size() == 1);
+  CHECK_FALSE(commands.run(QStringLiteral("account.signOut")));
+  signedIn = true;
+  CHECK(commands.commands().size() == 2);
+  CHECK(commands.commands(QStringLiteral("SIGN")).size() == 1);
+  CHECK(commands.commands(QStringLiteral("SIGN")).at(0).toMap().value(QStringLiteral("id")).toString() ==
+        QStringLiteral("account.signOut"));
+  CHECK(commands.run(QStringLiteral("account.signOut")));
+  CHECK_FALSE(commands.run(QStringLiteral("nowhere")));
+  CHECK(ran == QStringList{QStringLiteral("signOut")});
+
+  // The same id replaces the command.
+  commands.add({QStringLiteral("navigate.home"), QStringLiteral("Home screen"), {}, [&] { ran << QStringLiteral("again"); }});
+  CHECK(commands.commands().size() == 2);
+  CHECK(commands.commands().at(0).toMap().value(QStringLiteral("title")).toString() == QStringLiteral("Home screen"));
+  commands.run(QStringLiteral("navigate.home"));
+  CHECK(ran.last() == QStringLiteral("again"));
+
+  QSignalSpy changes(&commands, &CommandRegistry::changed);
+  commands.remove(QStringLiteral("navigate.home"));
+  commands.remove(QStringLiteral("navigate.home"));
+  CHECK(changes.count() == 1);
 }
 
 TEST_CASE("The navigator keeps a stack and tells the view what to do") {

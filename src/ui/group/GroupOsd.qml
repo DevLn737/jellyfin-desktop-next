@@ -10,9 +10,9 @@ Row {
     id: osd
 
     readonly property var group: GroupSession
-    readonly property color dotColor: !group.connected ? Theme.error
+    readonly property color dotColor: !group.connected ? Overlay.error
                                       : group.correction.length > 0 ? "#d29922"
-                                      : Theme.success
+                                      : Overlay.success
 
     visible: group.inGroup
     spacing: Theme.spacingSmall
@@ -36,7 +36,7 @@ Row {
         objectName: "memberCount"
         anchors.verticalCenter: parent.verticalCenter
         text: osd.group.participants.length
-        color: Theme.text
+        color: Overlay.text
         font.pixelSize: Theme.fontSizeBody
     }
 }

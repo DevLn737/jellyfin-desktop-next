@@ -1,42 +1,79 @@
 #include "jfd/ui/Navigator.h"
 
+#include <QCoreApplication>
 #include <QLoggingCategory>
+
+#include <algorithm>
 
 namespace jfd::ui {
 
   namespace {
     Q_LOGGING_CATEGORY(lcNavigator, "jfd.ui.navigator")
-
-    // Routes that take an argument ("item/<id>"); the others take none.
-    bool takesArgument(const QString& name) {
-      return name == QLatin1String("library") || name == QLatin1String("collection") ||
-             name == QLatin1String("item");
-    }
-
-    bool isRoot(const QString& name) {
-      return name == QLatin1String("login") || name == QLatin1String("home");
-    }
   } // namespace
 
   QString Navigator::Route::toString() const {
     return argument.isEmpty() ? name : name + QLatin1Char('/') + argument;
   }
 
-  Navigator::Navigator(QObject* parent) : QObject(parent) {}
+  Navigator::Navigator(QObject* parent) : QObject(parent) { registerBuiltinRoutes(); }
 
-  const QStringList& Navigator::routeNames() {
-    static const QStringList names = {
-        QStringLiteral("login"),  QStringLiteral("home"),       QStringLiteral("library"),
-        QStringLiteral("item"),   QStringLiteral("collection"), QStringLiteral("search"),
-        QStringLiteral("player"), QStringLiteral("group"),      QStringLiteral("settings"),
+  void Navigator::registerBuiltinRoutes() {
+    const auto add = [this](const char* name, bool takesArgument, bool root, bool chrome) {
+      RouteSpec spec;
+      spec.name = QLatin1String(name);
+      spec.takesArgument = takesArgument;
+      spec.root = root;
+      spec.chrome = chrome;
+      registerRoute(spec);
     };
-    return names;
+    const auto addListed = [this](const char* name, const char* icon, const char* text, int order) {
+      RouteSpec spec;
+      spec.name = QLatin1String(name);
+      spec.hasSidebarEntry = true;
+      spec.sidebar.icon = QLatin1String(icon);
+      spec.sidebar.text = QString::fromUtf8(text);
+      spec.sidebar.translationContext = "Sidebar";
+      spec.sidebar.order = order;
+      registerRoute(spec);
+    };
+    add("login", false, true, false);
+    addListed("home", "home", QT_TRANSLATE_NOOP("Sidebar", "Home"), 100);
+    m_routes[QStringLiteral("home")].root = true;
+    add("library", true, false, true);
+    add("item", true, false, true);
+    add("collection", true, false, true);
+    addListed("search", "search", QT_TRANSLATE_NOOP("Sidebar", "Search"), 200);
+    add("player", false, false, false);
+    addListed("group", "group", QT_TRANSLATE_NOOP("Sidebar", "Watch together"), 300);
+    addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900);
   }
 
-  Navigator::Route Navigator::parse(const QString& route) {
+  void Navigator::registerRoute(const RouteSpec& spec) {
+    if (spec.name.isEmpty() || spec.name.contains(QLatin1Char('/'))) {
+      qCWarning(lcNavigator) << "invalid route name" << spec.name;
+      return;
+    }
+    const auto existing = m_routes.constFind(spec.name);
+    RouteSpec stored = spec;
+    if (existing != m_routes.cend()) {
+      // Registering a route again keeps the page registered for it.
+      if (stored.page.isEmpty()) {
+        stored.page = existing->page;
+      }
+    } else {
+      m_registered.append(spec.name);
+    }
+    m_routes.insert(spec.name, stored);
+    Q_EMIT sidebarChanged();
+  }
+
+  QStringList Navigator::routeNames() const { return m_registered; }
+
+  Navigator::Route Navigator::parse(const QString& route) const {
     const qsizetype slash = route.indexOf(QLatin1Char('/'));
     Route parsed{slash < 0 ? route : route.left(slash), slash < 0 ? QString() : route.mid(slash + 1)};
-    if (!routeNames().contains(parsed.name) || takesArgument(parsed.name) == parsed.argument.isEmpty() ||
+    const auto spec = m_routes.constFind(parsed.name);
+    if (spec == m_routes.cend() || spec->takesArgument == parsed.argument.isEmpty() ||
         parsed.argument.contains(QLatin1Char('/'))) {
       return {};
     }
@@ -44,14 +81,64 @@ namespace jfd::ui {
   }
 
   void Navigator::registerPage(const QString& name, const QUrl& page) {
-    if (!routeNames().contains(name)) {
+    const auto spec = m_routes.find(name);
+    if (spec == m_routes.end()) {
       qCWarning(lcNavigator) << "no route named" << name;
       return;
     }
-    m_pages.insert(name, page);
+    spec->page = page;
   }
 
-  QUrl Navigator::pageFor(const QString& name) const { return m_pages.value(name, m_placeholder); }
+  void Navigator::setRouteAvailable(const QString& name, bool available) {
+    if (available == !m_unavailable.contains(name)) {
+      return;
+    }
+    if (available) {
+      m_unavailable.removeAll(name);
+    } else {
+      m_unavailable.append(name);
+    }
+    Q_EMIT sidebarChanged();
+  }
+
+  bool Navigator::routeAvailable(const QString& name) const {
+    return m_routes.contains(name) && !m_unavailable.contains(name);
+  }
+
+  QVariantList Navigator::sidebarEntries() const {
+    struct Listed {
+      int order;
+      qsizetype registered;
+      const RouteSpec* spec;
+    };
+    QList<Listed> listed;
+    for (qsizetype i = 0; i < m_registered.size(); ++i) {
+      const RouteSpec& spec = *m_routes.constFind(m_registered[i]);
+      if (spec.hasSidebarEntry && routeAvailable(spec.name)) {
+        listed.append({spec.sidebar.order, i, &spec});
+      }
+    }
+    std::stable_sort(listed.begin(), listed.end(), [](const Listed& a, const Listed& b) {
+      return a.order != b.order ? a.order < b.order : a.registered < b.registered;
+    });
+    QVariantList entries;
+    for (const Listed& entry : listed) {
+      const auto& sidebar = entry.spec->sidebar;
+      const QString text = sidebar.translationContext
+                               ? QCoreApplication::translate(sidebar.translationContext, sidebar.text.toUtf8().constData())
+                               : sidebar.text;
+      entries.append(QVariantMap{{QStringLiteral("route"), entry.spec->name},
+                                 {QStringLiteral("text"), text},
+                                 {QStringLiteral("icon"), sidebar.icon},
+                                 {QStringLiteral("order"), sidebar.order}});
+    }
+    return entries;
+  }
+
+  QUrl Navigator::pageFor(const QString& name) const {
+    const auto spec = m_routes.constFind(name);
+    return spec != m_routes.cend() && !spec->page.isEmpty() ? spec->page : m_placeholder;
+  }
 
   QString Navigator::currentRoute() const {
     return m_stack.isEmpty() ? QString() : m_stack.last().toString();
@@ -60,8 +147,8 @@ namespace jfd::ui {
   QString Navigator::currentName() const { return m_stack.isEmpty() ? QString() : m_stack.last().name; }
 
   bool Navigator::chromeVisible() const {
-    const QString name = currentName();
-    return !name.isEmpty() && name != QLatin1String("login") && name != QLatin1String("player");
+    const auto spec = m_routes.constFind(currentName());
+    return spec != m_routes.cend() && spec->chrome;
   }
 
   QStringList Navigator::stack() const {
@@ -78,7 +165,7 @@ namespace jfd::ui {
       qCWarning(lcNavigator) << "invalid route" << route;
       return false;
     }
-    if (isRoot(parsed.name)) {
+    if (m_routes.value(parsed.name).root) {
       return reset(route);
     }
     if (currentRoute() == parsed.toString()) {
@@ -87,8 +174,7 @@ namespace jfd::ui {
     // Going to a page already in the stack goes back to it instead of
     // stacking a second copy (home -> settings -> search -> settings).
     for (qsizetype i = 0; i < m_stack.size(); ++i) {
-      if (m_stack[i].toString() == parsed.toString() && parsed.name != QLatin1String("item") &&
-          parsed.name != QLatin1String("library") && parsed.name != QLatin1String("collection")) {
+      if (m_stack[i].toString() == parsed.toString() && !m_routes.value(parsed.name).takesArgument) {
         while (m_stack.size() > i + 1) {
           m_stack.removeLast();
           emitChange(Operation::Pop);

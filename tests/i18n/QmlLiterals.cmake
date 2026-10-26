@@ -3,7 +3,8 @@
 # Fails on a QML property that people read (text, title, labels, tooltips,
 # accessible names) set to a plain string literal instead of qsTr(...): such
 # a string never reaches the .ts files, so translations_check cannot see it.
-# Allowed: the product name "Jellyfin", addresses (they contain "://"), and a
+# Allowed: the product name "Jellyfin", addresses (they contain "://"), hex
+# colours ("#f2f2f2": a palette entry named text is not a string), and a
 # line that ends with "// untranslated: <why>".
 
 file(GLOB_RECURSE qml_files RELATIVE "${SOURCE_DIR}" "${SOURCE_DIR}/src/*.qml")
@@ -18,7 +19,7 @@ foreach(path IN LISTS qml_files)
       continue()
     endif()
     set(value "${CMAKE_MATCH_2}")
-    if(NOT value MATCHES "[A-Za-z]" OR value STREQUAL "Jellyfin" OR value MATCHES "://"
+    if(NOT value MATCHES "[A-Za-z]" OR value STREQUAL "Jellyfin" OR value MATCHES "://" OR value MATCHES "^#[0-9A-Fa-f]+$"
        OR line MATCHES "// untranslated: ")
       continue()
     endif()

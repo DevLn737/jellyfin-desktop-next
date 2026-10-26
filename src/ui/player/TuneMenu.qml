@@ -11,8 +11,8 @@ Rectangle {
     width: 340
     height: column.implicitHeight + 2 * Theme.spacing
     radius: Theme.radius
-    color: Theme.surface
-    border.color: Theme.border
+    color: Overlay.surface
+    border.color: Overlay.border
 
     component DelayRow: Column {
         id: row
@@ -24,7 +24,7 @@ Rectangle {
 
         Text {
             text: row.label + ": " + (row.value > 0 ? "+" : "") + row.value.toFixed(1) + " " + qsTr("s")
-            color: Theme.text
+            color: Overlay.text
             font.pixelSize: Theme.fontSizeBody
         }
         Row {
@@ -54,7 +54,7 @@ Rectangle {
 
             Text {
                 text: qsTr("Speed")
-                color: Theme.text
+                color: Overlay.text
                 font.pixelSize: Theme.fontSizeBody
             }
             Flow {
@@ -80,7 +80,7 @@ Rectangle {
                 text: PlayerSession.playMethod === "Transcode"
                     ? qsTr("Quality (the server converts this video)")
                     : qsTr("Quality")
-                color: Theme.text
+                color: Overlay.text
                 font.pixelSize: Theme.fontSizeBody
             }
             Flow {
@@ -119,7 +119,7 @@ Rectangle {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTr("Skip intros and credits automatically")
-                color: Theme.text
+                color: Overlay.text
                 font.pixelSize: Theme.fontSizeBody
             }
         }

@@ -24,11 +24,24 @@ parallel look and behave alike. Each module is a static library linked into
 `fontWeightNormal` / `Bold`; `spacingTiny` (4) / `spacingSmall` (8) /
 `spacing` (12) / `spacingLarge` (20) / `spacingHuge` (32), `radius`,
 `controlHeight`, `iconSize`, `posterWidth`, `thumbWidth`, `squareWidth`,
-`posterAspect`, `thumbAspect`; `durationFast` / `Normal` / `Slow` and
+`posterAspect`, `thumbAspect`, `squareAspect`; `cardWidthFor(shape)` and
+`cardAspectFor(shape)` for the card shapes `poster` (2:3), `thumb` (16:9),
+`square` and `circle` (the same size as square, cut round, for artists);
+`durationFast` / `Normal` / `Slow` and
 `easing`. Durations are halved when `Theme.reducedEffects` is on (the
 "Simplified effects" setting, automatically on with integrated or software
 graphics), so always animate with them; blur only when `Theme.blurEnabled`. The interface scale
 setting applies through `QT_SCALE_FACTOR`; do not scale sizes by hand.
+
+The colours come from a palette: `Theme.colors` is a map from the names
+above to colours (`Palettes.dark` is the built-in one). Screens use only the
+names, never literal colours. **Names in `Theme` are only added, never
+renamed or removed**, while other branches build screens on them.
+
+What is drawn over the video (the player's controls and menus, the group's
+on-screen display) uses `Overlay` instead of `Theme`: the same colour names,
+fixed dark, the same in every theme. The video stays dark whatever the page
+theme is.
 
 ## Controls
 
@@ -59,11 +72,39 @@ keyboard.
 
 Pages derive from `RoutePage` (`route`, `routeName`, `routeArgument`,
 `title`). Routes: `login`, `home`, `library/<id>`, `collection/<id>`, `item/<id>`,
-`search`, `player`, `group`, `settings`. From QML: `Navigator.navigate("item/" + id)`,
+`search`, `player`, `group`, `settings`, and the routes other modules
+register. From QML: `Navigator.navigate("item/" + id)`,
 `Navigator.back()`, `Navigator.replace("home")`. `login` and `home` clear
 the stack. Back is Esc, Backspace (outside text fields), Alt+Left and the
 mouse back button; F11 toggles full screen. The sidebar is hidden on
 `login` and `player`.
+
+A module declares a route with a `RouteSpec`: the name, whether it takes an
+argument (`album/<id>`; such routes may stack), whether it is a root, whether
+the shell shows its sidebar and mini player around it (`chrome`), a page, and
+optionally a sidebar entry (an icon name from `Icons` or a file URL, text,
+order). `Navigator.setRouteAvailable(name, false)` hides the entry (and the
+module's commands should follow) until the feature is configured:
+
+```cpp
+ui::RouteSpec music;
+music.name = QStringLiteral("music");
+music.hasSidebarEntry = true;
+music.sidebar = {QStringLiteral("music"), QCoreApplication::translate("Music", "Music"), nullptr, 400};
+services.navigator->registerRoute(music);
+services.navigator->registerPage(QStringLiteral("music"), QUrl(...));
+```
+
+The shell has a strip under the pages for the mini player,
+`shell.miniPlayerSlot`: a module puts its item in it (`parent:
+shell.miniPlayerSlot`); the strip is as tall as the item and shows wherever
+the sidebar shows.
+
+`CommandRegistry` (a QML singleton, like `Navigator`) holds the commands of
+the Ctrl+K palette: an id, an already translated title, an optional
+availability test and the action. `library::HomeSections` (no Qt Quick, in
+`jfd/library/HomeSection.h`) holds the rows of the home screen the same
+way; each module registers its own rows and the user's order applies to all.
 
 A module registers its pages in its install function in `src/desktop`:
 

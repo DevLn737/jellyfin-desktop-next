@@ -11,6 +11,11 @@ FocusScope {
 
     readonly property alias stack: stack
     readonly property alias toast: toast
+    // The strip under the pages for the mini player. A module puts its item
+    // in it (`parent: shell.miniPlayerSlot`); the strip is as tall as its
+    // content and shows wherever the shell shows its sidebar, so not on the
+    // sign-in page and not in the video player.
+    readonly property alias miniPlayerSlot: miniPlayerSlot
     readonly property Item currentPage: stack.currentItem
     readonly property string title: currentPage && currentPage.title ? currentPage.title : ""
     // Off while something under the shell must show through (the video with
@@ -58,11 +63,21 @@ FocusScope {
         KeyNavigation.right: stack
     }
 
+    Item {
+        id: miniPlayerSlot
+        objectName: "miniPlayerSlot"
+        anchors.left: stack.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: Navigator.chromeVisible ? childrenRect.height : 0
+        visible: height > 0
+    }
+
     Basic.StackView {
         id: stack
         objectName: "pageStack"
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        anchors.bottom: miniPlayerSlot.top
         anchors.right: parent.right
         anchors.left: sidebar.visible ? sidebar.right : parent.left
         focus: true

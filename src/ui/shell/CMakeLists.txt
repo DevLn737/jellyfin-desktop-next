@@ -5,9 +5,11 @@
 find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
 qt_add_library(jfd_ui_shell STATIC
   src/GraphicsInfo.cpp
+  src/CommandRegistry.cpp
   src/Navigator.cpp
   src/WindowPlacement.cpp
   src/WindowStateKeeper.cpp
+  include/jfd/ui/CommandRegistry.h
   include/jfd/ui/GraphicsInfo.h
   include/jfd/ui/Navigator.h
   include/jfd/ui/WindowPlacement.h

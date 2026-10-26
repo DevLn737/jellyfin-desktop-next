@@ -33,8 +33,8 @@ Rectangle {
     width: 340
     height: Math.min(column.implicitHeight + 2 * Theme.spacing, 420)
     radius: Theme.radius
-    color: Theme.surface
-    border.color: Theme.border
+    color: Overlay.surface
+    border.color: Overlay.border
 
     Flickable {
         anchors.fill: parent
@@ -67,7 +67,7 @@ Rectangle {
             Text {
                 visible: menu.rows.length === 0
                 text: qsTr("No tracks")
-                color: Theme.textSecondary
+                color: Overlay.textSecondary
                 font.pixelSize: Theme.fontSizeBody
             }
         }
