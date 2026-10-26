@@ -14,7 +14,7 @@ import Jfd.Ui.Player
 // menus, fullscreen. A skip button shows during intros and credits.
 //
 // Keys: Space or K play/pause, ←/→ ∓10 s, ↑/↓ volume, M mute, F fullscreen,
-// S skip, N next, E episodes, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
+// S skip, N next, E episodes, P picture in picture, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
 // Shift+J/L audio delay, Esc back.
 RoutePage {
     id: page
@@ -97,6 +97,17 @@ RoutePage {
         notify(qsTr("Audio delay %1").arg(delayText(player.audioDelay)))
     }
 
+    // The small window needs the video on screen and a way to draw it twice:
+    // not with HDR10 output, where the video lives under the interface layer.
+    readonly property bool pipAvailable: !HdrOutput.active && player.active && !player.loading
+
+    function enterPip() {
+        if (!pipAvailable) return
+        if (fullscreen) toggleFullscreen()
+        player.enterPip()
+        Navigator.back()
+    }
+
     function leave() {
         if (fullscreen) toggleFullscreen()
         Navigator.back()
@@ -107,7 +118,8 @@ RoutePage {
     readonly property bool videoUnder: HdrOutput.active && HdrOutput.videoLayer !== null
 
     Component.onCompleted: player.attachVideo(videoUnder ? HdrOutput.videoLayer : videoHost, page)
-    Component.onDestruction: player.stop()
+    // Leaving for the picture-in-picture window keeps the file playing.
+    Component.onDestruction: if (!player.pip) player.stop()
 
     Connections {
         target: page.player
@@ -514,6 +526,13 @@ RoutePage {
                         onClicked: page.toggleMenu("tune")
                     }
                     IconButton {
+                        objectName: "pip"
+                        visible: page.pipAvailable
+                        iconSource: PlayerIcons.pip
+                        toolTipText: qsTr("Picture in picture")
+                        onClicked: page.enterPip()
+                    }
+                    IconButton {
                         iconSource: page.fullscreen ? PlayerIcons.fullscreenExit : PlayerIcons.fullscreen
                         toolTipText: page.fullscreen ? qsTr("Exit fullscreen") : qsTr("Fullscreen")
                         onClicked: page.toggleFullscreen()
@@ -533,6 +552,8 @@ RoutePage {
         case Qt.Key_Space:
         case Qt.Key_K:
             page.player.togglePause(); break
+        case Qt.Key_P:
+            page.enterPip(); break
         case Qt.Key_Left:
             page.player.seekBy(-10); break
         case Qt.Key_Right:

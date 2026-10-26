@@ -144,6 +144,8 @@ namespace jfd::ui {
   }
 
   void PlayerModel::play(const QString& itemId, qint64 startTicks) {
+    // A new video opens in the player page (the caller shows it).
+    if (m_pip) setPip(false);
     // Without a player (tests) nothing renders, so nothing to wait for.
     if (!m_videoReady && m_player) {
       // mpv opens its video output only once the render context exists.
@@ -255,11 +257,40 @@ namespace jfd::ui {
     m_waitingPlay.reset();
     m_runtime.launcher().cancel();
     if (m_current) m_runtime.post(core::intent::Stop{});
+    if (m_pip) setPip(false);
     Q_EMIT stateChanged();
+  }
+
+  void PlayerModel::setPip(bool on) {
+    if (m_pip == on) return;
+    m_pip = on;
+    Q_EMIT pipChanged();
+  }
+
+  void PlayerModel::enterPip() {
+    if (m_pip || !m_current) return;
+    suspendVideo();
+    setPip(true);
+  }
+
+  void PlayerModel::leavePip() {
+    if (!m_pip) return;
+    suspendVideo();
+    setPip(false);
+    Q_EMIT leftPip();
+  }
+
+  void PlayerModel::suspendVideo() {
+    if (!m_player || !m_video) return;
+    m_player->setStringProperty("vid", "no");
+    m_videoSuspended = true;
+    delete m_video.data();
   }
 
   void PlayerModel::attachVideo(QQuickItem* host, QQuickItem* owner) {
     if (!host || !host->window()) return;
+    // Only one item at a time can hold mpv's render context.
+    if (m_video) suspendVideo();
     const auto ready = [this] { videoReady(); };
     QQuickItem* video = nullptr;
 #ifdef JFD_HAVE_D3D11_VIDEO
@@ -274,11 +305,16 @@ namespace jfd::ui {
       watchVideo(item, this, ready);
       video = item;
     }
+    m_video = video;
     if (owner && owner != host) connect(owner, &QObject::destroyed, video, &QObject::deleteLater);
   }
 
   void PlayerModel::videoReady() {
     m_videoReady = true;
+    if (m_videoSuspended && m_player) {
+      m_videoSuspended = false;
+      m_player->setStringProperty("vid", "auto");
+    }
     if (auto waiting = std::exchange(m_waitingPlay, std::nullopt))
       m_runtime.play(waiting->first, waiting->second);
   }

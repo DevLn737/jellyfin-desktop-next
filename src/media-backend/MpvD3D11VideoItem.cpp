@@ -122,6 +122,12 @@ private:
     if (const int error = mpv_render_context_create(&m_context, m_handle.get(), params); error < 0)
     {
       m_context = nullptr;
+      // See MpvVideoItem: the old window's context may not be freed yet.
+      if (++m_attempts < MaxAttempts)
+      {
+        QMetaObject::invokeMethod(item, [item] { item->update(); }, Qt::QueuedConnection);
+        return;
+      }
       return fail(item, QString::fromUtf8(mpv_error_string(error)));
     }
     m_repaint = new RepaintRequest(item);
@@ -220,6 +226,8 @@ private:
   bool m_renderPending = false;
   bool m_rendered = false;
   bool m_failed = false;
+  int m_attempts = 0;
+  static constexpr int MaxAttempts = 100;
 };
 
 }
