@@ -201,6 +201,18 @@
         <source>Open %1</source>
         <translation>Открыть: %1</translation>
     </message>
+    <message>
+        <source>Play or pause music</source>
+        <translation>Играть или пауза (музыка)</translation>
+    </message>
+    <message>
+        <source>Next track</source>
+        <translation>Следующий трек</translation>
+    </message>
+    <message>
+        <source>Previous track</source>
+        <translation>Предыдущий трек</translation>
+    </message>
 </context>
 <context>
     <name>Diagnostics</name>

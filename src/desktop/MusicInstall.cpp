@@ -6,11 +6,13 @@
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/Settings.h>
 #include <jfd/settings/SettingsRegistry.h>
+#include <jfd/ui/CommandRegistry.h>
 #include <jfd/ui/MusicUi.h>
 #include <jfd/ui/Navigator.h>
 
 #include <MpvPlayer.h>
 
+#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
@@ -99,7 +101,7 @@ namespace jfd::desktop {
     return registry.registerSection(std::move(section));
   }
 
-  void installMusic(AppServices& services, QQmlEngine&) {
+  void installMusic(AppServices& services, QQmlEngine& engine) {
     Q_ASSERT(services.session && services.client != nullptr && services.navigator != nullptr);
     settings::Settings& settings = *services.settings;
     services.music = std::make_unique<music::MusicPlayer>(*services.session, *services.client);
@@ -167,6 +169,25 @@ namespace jfd::desktop {
     registerPageRoute(navigator, QStringLiteral("playlist"), QStringLiteral("PlaylistPage.qml"), true);
     registerPageRoute(navigator, QStringLiteral("genre"), QStringLiteral("GenrePage.qml"), true);
     registerPageRoute(navigator, QStringLiteral("nowplaying"), QStringLiteral("NowPlayingPage.qml"), false);
+
+    // The palette's music commands; "Open Music" comes with the sidebar entry.
+    if (auto* commands = engine.singletonInstance<ui::CommandRegistry*>("Jfd.Ui.Shell", "CommandRegistry")) {
+      const auto add = [commands, &player](const char* id, const char* title, std::function<bool()> available,
+                                           std::function<void()> run) {
+        ui::CommandRegistry::Command command;
+        command.id = QString::fromLatin1(id);
+        command.title = QCoreApplication::translate("Commands", title);
+        command.available = std::move(available);
+        command.run = std::move(run);
+        commands->add(std::move(command));
+      };
+      add("music.playpause", QT_TRANSLATE_NOOP("Commands", "Play or pause music"), [&player] { return player.queueSize() > 0; },
+          [&player] { player.active() ? player.togglePause() : player.resume(); });
+      add("music.next", QT_TRANSLATE_NOOP("Commands", "Next track"), [&player] { return player.active() && player.hasNext(); },
+          [&player] { player.next(); });
+      add("music.previous", QT_TRANSLATE_NOOP("Commands", "Previous track"), [&player] { return player.active(); },
+          [&player] { player.previous(); });
+    }
 
     // The sidebar lists Music once the server has a music library.
     navigator.setRouteAvailable(QStringLiteral("music"), services.musicUi->available());

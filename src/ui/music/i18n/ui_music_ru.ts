@@ -120,7 +120,11 @@
     </message>
     <message numerus="yes">
         <source>%n item(s)</source>
-        <translation><numerusform>%n элемент</numerusform><numerusform>%n элемента</numerusform><numerusform>%n элементов</numerusform></translation>
+        <translation>
+            <numerusform>%n элемент</numerusform>
+            <numerusform>%n элемента</numerusform>
+            <numerusform>%n элементов</numerusform>
+        </translation>
     </message>
     <message>
         <source>Search</source>
@@ -233,7 +237,11 @@
     </message>
     <message numerus="yes">
         <source>%n track(s)</source>
-        <translation><numerusform>%n трек</numerusform><numerusform>%n трека</numerusform><numerusform>%n треков</numerusform></translation>
+        <translation>
+            <numerusform>%n трек</numerusform>
+            <numerusform>%n трека</numerusform>
+            <numerusform>%n треков</numerusform>
+        </translation>
     </message>
     <message>
         <source>Play</source>
