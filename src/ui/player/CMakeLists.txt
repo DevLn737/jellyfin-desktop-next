@@ -17,6 +17,7 @@ qt_add_qml_module(jfd_ui_player
   URI Jfd.Ui.Player
   VERSION 1.0
   QML_FILES
+    EpisodesPanel.qml
     HdrScene.qml
     PlayerIcons.qml
     PlayerPage.qml
@@ -24,6 +25,7 @@ qt_add_qml_module(jfd_ui_player
     TuneMenu.qml
   RESOURCES
     icons/audio.svg
+    icons/episodes.svg
     icons/forward.svg
     icons/fullscreen.svg
     icons/fullscreenExit.svg

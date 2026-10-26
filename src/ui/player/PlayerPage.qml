@@ -14,7 +14,7 @@ import Jfd.Ui.Player
 // menus, fullscreen. A skip button shows during intros and credits.
 //
 // Keys: Space or K play/pause, ←/→ ∓10 s, ↑/↓ volume, M mute, F fullscreen,
-// S skip, N next, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
+// S skip, N next, E episodes, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
 // Shift+J/L audio delay, Esc back.
 RoutePage {
     id: page
@@ -26,7 +26,7 @@ RoutePage {
     readonly property var player: PlayerSession
     readonly property bool fullscreen: Window.window !== null && Window.window.visibility === Window.FullScreen
     property bool osdVisible: true
-    // "audio", "subtitles", "tune" or "".
+    // "audio", "subtitles", "tune", "episodes" or "".
     property string openMenu: ""
     readonly property bool osdShown: osdVisible || openMenu.length > 0 || player.paused || !player.active
 
@@ -41,6 +41,14 @@ RoutePage {
         const pad = (n) => n < 10 ? "0" + n : "" + n
         return h > 0 ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s)
     }
+
+    // The time now, for the clock and for when the file ends.
+    property date now: new Date()
+    readonly property bool hasEnd: player.active && player.duration > 0
+    // Remaining media time at the playback speed.
+    readonly property date endsAt: new Date(now.getTime()
+        + Math.max(0, player.duration - player.position) / Math.max(0.1, player.rate) * 1000)
+    readonly property bool hasEpisodes: !player.inGroup && player.episodes.length > 1
 
     function poke() {
         osdVisible = true
@@ -118,6 +126,15 @@ RoutePage {
     Item {
         id: videoHost
         anchors.fill: parent
+    }
+
+    Timer {
+        // Once a second while the display shows; the minute is what matters.
+        interval: 1000
+        running: page.osdShown
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: page.now = new Date()
     }
 
     Timer {
@@ -209,11 +226,31 @@ RoutePage {
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(0, parent.width - 2 * Theme.controlHeight - groupOsd.width - 3 * Theme.spacing)
+                width: Math.max(0, parent.width - Theme.controlHeight - groupOsd.width - timeInfo.width - 4 * Theme.spacing)
                 text: page.player.title
                 color: Overlay.text
                 font.pixelSize: Theme.fontSizeLarge
                 elide: Text.ElideRight
+            }
+            // Time now and when the file ends, at the playback speed.
+            Column {
+                id: timeInfo
+                objectName: "timeInfo"
+                anchors.verticalCenter: parent.verticalCenter
+                visible: width > 0 && page.width >= 560
+                Text {
+                    anchors.right: parent.right
+                    text: Qt.formatTime(page.now, Locale.ShortFormat)
+                    color: Overlay.text
+                    font.pixelSize: Theme.fontSizeBody
+                }
+                Text {
+                    anchors.right: parent.right
+                    visible: page.hasEnd
+                    text: qsTr("Ends at %1").arg(Qt.formatTime(page.endsAt, Locale.ShortFormat))
+                    color: Overlay.textSecondary
+                    font.pixelSize: Theme.fontSizeSmall
+                }
             }
             // Only in a group: GroupSession exists once the group module
             // is installed.
@@ -247,7 +284,8 @@ RoutePage {
         anchors.bottom: bottomBar.top
         anchors.margins: Theme.spacing
         active: page.openMenu.length > 0
-        sourceComponent: page.openMenu === "tune" ? tuneMenu : trackMenu
+        sourceComponent: page.openMenu === "tune" ? tuneMenu
+            : page.openMenu === "episodes" ? episodesMenu : trackMenu
     }
     Component {
         id: trackMenu
@@ -260,6 +298,16 @@ RoutePage {
             onChosen: (streamIndex) => {
                 if (audio) page.player.selectAudio(streamIndex)
                 else page.player.selectSubtitle(streamIndex)
+                page.openMenu = ""
+            }
+        }
+    }
+    Component {
+        id: episodesMenu
+        EpisodesPanel {
+            episodes: page.player.episodes
+            onChosen: (itemId) => {
+                page.player.playEpisode(itemId)
                 page.openMenu = ""
             }
         }
@@ -444,6 +492,13 @@ RoutePage {
                         }
                     }
                     IconButton {
+                        objectName: "episodes"
+                        visible: page.hasEpisodes
+                        iconSource: PlayerIcons.episodes
+                        toolTipText: qsTr("Episodes")
+                        onClicked: page.toggleMenu("episodes")
+                    }
+                    IconButton {
                         iconSource: PlayerIcons.audio
                         toolTipText: qsTr("Audio")
                         onClicked: page.toggleMenu("audio")
@@ -502,6 +557,9 @@ RoutePage {
             page.player.skipSegment(); break
         case Qt.Key_N:
             page.player.next(); break
+        case Qt.Key_E:
+            if (!page.hasEpisodes) return
+            page.toggleMenu("episodes"); break
         case Qt.Key_A:
             page.toggleMenu("audio"); break
         case Qt.Key_C:

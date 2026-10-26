@@ -2,6 +2,21 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>EpisodesPanel</name>
+    <message>
+        <source>S%1 E%2</source>
+        <translation>С%1 Э%2</translation>
+    </message>
+    <message>
+        <source>E%1</source>
+        <translation>Э%1</translation>
+    </message>
+    <message>
+        <source>Episodes</source>
+        <translation>Серии</translation>
+    </message>
+</context>
+<context>
     <name>PlayerPage</name>
     <message>
         <source>s</source>
@@ -30,6 +45,10 @@
     <message>
         <source>Back</source>
         <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Ends at %1</source>
+        <translation>Закончится в %1</translation>
     </message>
     <message>
         <source>Skip intro</source>
@@ -86,6 +105,10 @@
     <message>
         <source>Mute</source>
         <translation>Выключить звук</translation>
+    </message>
+    <message>
+        <source>Episodes</source>
+        <translation>Серии</translation>
     </message>
     <message>
         <source>Playback settings</source>

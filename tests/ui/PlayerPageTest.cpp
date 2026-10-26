@@ -213,3 +213,27 @@ TEST_CASE("Keys seek, change the volume and the delays, and the speed applies al
   f.player->setRate(1.5);
   REQUIRE(waitFor([&] { return f.player->baseRate() == doctest::Approx(1.5); }, 2000));
 }
+
+TEST_CASE("The header shows the clock and when the file ends; the episodes button waits for a list") {
+  Fixture f;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  QQuickItem* info = find(f.page, "timeInfo");
+  REQUIRE(info != nullptr);
+  REQUIRE(waitFor([&] { return info->isVisible() && info->childItems().size() == 2; }, 2000));
+  const auto text = [](QQuickItem* item) { return item->property("text").toString(); };
+  const QList<QQuickItem*> lines = info->childItems();
+  CHECK_FALSE(text(lines[0]).isEmpty());
+  CHECK(text(lines[1]).startsWith(QStringLiteral("Ends at ")));
+  // No series list for this file: no button.
+  QQuickItem* episodes = find(f.page, "episodes");
+  REQUIRE(episodes != nullptr);
+  CHECK_FALSE(episodes->isVisible());
+  // E does nothing then.
+  QKeyEvent press(QEvent::KeyPress, Qt::Key_E, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &press);
+  CHECK(f.page->property("openMenu").toString().isEmpty());
+
+  if (const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS"); !dir.isEmpty())
+    f.window.grabWindow().save(dir + QStringLiteral("/player-header.png"));
+}
