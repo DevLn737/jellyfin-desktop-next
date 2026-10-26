@@ -37,7 +37,7 @@ reports (`addProtectedAddress`).
 | Purpose | Request | Notes |
 | --- | --- | --- |
 | Version | `GET /status` | no sign-in; `version`, `commitTag`, `updateAvailable` |
-| Server kind | `GET /settings/public` | no sign-in; `initialized` is in the spec, `mediaServerType` is checked by the probe |
+| Server kind | `GET /settings/public` | no sign-in; **seen** `mediaServerType` (4 on a server with no media server set up; 2 is Jellyfin, the only value the client signs in to), `initialized`, `mediaServerLogin`, `localLogin`, `partialRequestsEnabled`, `movie4kEnabled`, `series4kEnabled`, `applicationTitle`, `jellyfinExternalHost` (not in the OpenAPI file) |
 | Popular | `GET /discover/movies`, `GET /discover/tv` (`page`, `language`) | paged: `page`, `totalPages`, `totalResults`, `results[]` |
 | Trending | `GET /discover/trending` (`page`, `mediaType`, `timeWindow`) | results mix `movie`, `tv`, `person`; the client drops `person` |
 | Search | `GET /search?query=...&page=` | same result shapes |
@@ -58,12 +58,28 @@ reports (`addProtectedAddress`).
 
 ## Refusals the client must handle
 
-Signed out or expired session: 401 or 403 on any call below `/status` and
-`/settings/public`. No right to request: 403 on `POST /request`; a quota or a
+Signed out or expired session: **seen** 401 with
+`{"message":"cookie 'connect.sid' required", ...}` on any call below `/status`
+and `/settings/public` (the client treats 403 the same way). A wrong `X-Api-Key`
+is 403. No right to request: 403 on `POST /request`; a quota or a
 duplicate request: 4xx with a `message` field. Every refusal becomes a plain
 sentence in the user's language; the response body is never shown raw and never
 logged.
 
 ## Seen on a running server
 
-The table is filled from the "Seerr API" workflow run (see the job summary).
+Seerr 3.5.1 (image `ghcr.io/seerr-team/seerr:3.5.1`, workflow "Seerr API"),
+a fresh server with no media server set up, no sign-in:
+
+| Request | Status | Note |
+| --- | --- | --- |
+| `GET /status` | 200 | keys `version`, `commitTag`, `updateAvailable`, `commitsBehind`, `restartRequired` |
+| `GET /settings/public` | 200 | `mediaServerType` is 4 |
+| `GET /auth/me`, `/discover/trending`, `/search`, `/request`, `/movie/{id}` without a session | 401 | `cookie 'connect.sid' required` |
+| `GET /auth/me` with a wrong `X-Api-Key` | 403 | |
+| `POST /auth/jellyfin` with a wrong user, server not set up | 500 | no `Set-Cookie`; the client reads any non-200 as "sign-in failed" |
+| `POST /auth/logout` without a session | 401 | |
+
+Not covered here (needs a Jellyfin behind Seerr, added with the client's live
+test): the `Set-Cookie` of a good sign-in and its attributes, the `User`
+object, `permissions` values, and the refusals of `POST /request`.

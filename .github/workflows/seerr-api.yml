@@ -30,7 +30,7 @@ jobs:
 
       - name: Start Seerr
         run: |
-          docker run -d --name seerr -p 5055:5055 -e LOG_LEVEL=info ghcr.io/seerr-team/seerr:latest
+          docker run -d --name seerr -p 5055:5055 -e LOG_LEVEL=info ghcr.io/seerr-team/seerr:3.5.1
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:5055/api/v1/status >/dev/null 2>&1; then break; fi
             sleep 2
