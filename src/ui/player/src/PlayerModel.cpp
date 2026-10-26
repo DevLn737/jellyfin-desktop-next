@@ -72,8 +72,9 @@ namespace jfd::ui {
         m_skipper([&runtime](core::SessionInput input) { runtime.post(std::move(input)); }) {
     connect(&runtime.launcher(), &session::PlaybackLauncher::resolved, this, &PlayerModel::onResolved);
     // Every file opens with the viewer's own tracks, in a group too.
-    runtime.setTrackChooser([this](const api::Item&, const api::MediaSource& source,
+    runtime.setTrackChooser([this](const api::Item& item, const api::MediaSource& source,
                                    session::PlaybackLauncher::Request& request) {
+      if (item.mediaType == QLatin1String("Audio")) return;
       m_trackPreference.choose(source, request.audioStreamIndex, request.subtitleStreamIndex);
     });
     connect(&runtime.launcher(), &session::PlaybackLauncher::failed, this,
@@ -154,6 +155,7 @@ namespace jfd::ui {
   }
 
   void PlayerModel::togglePause() {
+    if (!m_current) return;
     if (paused())
       m_runtime.post(core::intent::Play{});
     else
@@ -161,6 +163,7 @@ namespace jfd::ui {
   }
 
   void PlayerModel::seek(double seconds) {
+    if (!m_current) return;
     const double clamped = std::max(0.0, duration() > 0 ? std::min(seconds, duration()) : seconds);
     if (const auto position =
             core::MediaTicks::fromTicks(static_cast<std::int64_t>(clamped * TicksPerSecond)))
@@ -170,6 +173,7 @@ namespace jfd::ui {
   void PlayerModel::seekBy(double seconds) { seek(position() + seconds); }
 
   void PlayerModel::setRate(double rate) {
+    if (!m_current) return;
     if (const auto value = core::PlaybackRate::base(rate)) m_runtime.post(core::intent::SetRate{*value});
   }
 
@@ -233,16 +237,24 @@ namespace jfd::ui {
     m_tracks.select(kind, streamIndex);
   }
 
-  void PlayerModel::skipSegment() { m_skipper.skip(); }
+  void PlayerModel::skipSegment() {
+    if (m_current) m_skipper.skip();
+  }
 
-  void PlayerModel::next() { m_runtime.post(core::intent::Next{}); }
+  void PlayerModel::next() {
+    if (m_current) m_runtime.post(core::intent::Next{});
+  }
 
-  void PlayerModel::previous() { m_runtime.post(core::intent::Previous{}); }
+  void PlayerModel::previous() {
+    if (m_current) m_runtime.post(core::intent::Previous{});
+  }
 
+  // Stops the player's own file. Music (or anything else the session plays)
+  // is not the video player's to stop.
   void PlayerModel::stop() {
     m_waitingPlay.reset();
     m_runtime.launcher().cancel();
-    m_runtime.post(core::intent::Stop{});
+    if (m_current) m_runtime.post(core::intent::Stop{});
     Q_EMIT stateChanged();
   }
 
@@ -273,6 +285,13 @@ namespace jfd::ui {
 
   void PlayerModel::onResolved(const session::PlaybackLauncher::Request& request, const api::Item& item,
                                const api::MediaSource& source, const api::PlaybackStream& stream) {
+    // Music has its own player: the session opens it, the video player
+    // neither shows nor reports it. The launcher drops an older request in
+    // its favour, so a video still waiting will not open.
+    if (item.mediaType == QLatin1String("Audio")) {
+      m_pending.reset();
+      return;
+    }
     m_pending = Pending{request, source, stream};
     loadEpisodes(item);
     loadTrickplay(request.itemId);
@@ -371,6 +390,7 @@ namespace jfd::ui {
   }
 
   void PlayerModel::step(bool forward) {
+    if (!m_current) return;
     const QString target = forward ? m_nextId : m_previousId;
     if (!target.isEmpty()) play(target, 0);
   }
@@ -407,7 +427,48 @@ namespace jfd::ui {
     m_runtime.launcher().open(request);
   }
 
+  bool PlayerModel::belongsToPlayer(const core::SessionSnapshot& snapshot) const {
+    // Idle: nothing is open. An ended session no longer names its file; it
+    // is ours only if we were showing one.
+    if (!snapshot.media.isValid()) return snapshot.phase == PlaybackPhase::Idle || m_current.has_value();
+    if (m_epoch && snapshot.media == *m_epoch) return true;
+    // A file this player asked for, opening now.
+    return m_pending && snapshot.media != m_snapshot.media &&
+           snapshot.item.value() == m_pending->request.itemId.toStdString();
+  }
+
+  void PlayerModel::releaseFile(const core::SessionSnapshot& snapshot) {
+    // The reporter ends the replaced file's report (Stopped, at its last
+    // position) when it sees another file.
+    m_reporter.snapshotChanged(snapshot);
+    m_epoch.reset();
+    m_current.reset();
+    const bool hadQueue = hasNext() || hasPrevious();
+    m_nextId.clear();
+    m_previousId.clear();
+    if (hadQueue) Q_EMIT queueChanged();
+    // What stays true while someone else plays: the group, the personal rate.
+    core::SessionSnapshot idle;
+    idle.revision = snapshot.revision;
+    idle.group = snapshot.group;
+    idle.personalRate = snapshot.personalRate;
+    core::SessionSnapshot before = m_snapshot;
+    before.revision = idle.revision;
+    if (before == idle) return;
+    m_snapshot = idle;
+    if (!m_segment.isEmpty()) {
+      m_segment.clear();
+      Q_EMIT segmentChanged();
+    }
+    Q_EMIT positionChanged();
+    Q_EMIT stateChanged();
+  }
+
   void PlayerModel::onSnapshot(const core::SessionSnapshot& snapshot) {
+    if (!belongsToPlayer(snapshot)) {
+      releaseFile(snapshot);
+      return;
+    }
     const bool positionOnly = [&] {
       core::SessionSnapshot copy = snapshot;
       copy.position = m_snapshot.position;
@@ -438,7 +499,7 @@ namespace jfd::ui {
 
     // The next episode follows; a group's server moves its own queue. The
     // ended session no longer names its file: the one begun last ended.
-    if (justEnded && m_autoNext && !inGroup() && m_current) step(true);
+    if (justEnded && m_autoNext && !inGroup()) step(true);
   }
 
   QVariantList PlayerModel::tracks(TrackKind kind) const {

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # A second throwaway Jellyfin 12.2 for the player checks that would upset the
 # shared stand's item and track counts (stock-server.sh): a movie with an
-# external audio file, and media segments (intro, credits) from a test
+# external audio file, a two-episode show, a small music library (two
+# artists, three albums, one of them a continuous tone cut into tracks for
+# measuring gaps), and media segments (intro, credits) from a test
 # provider plugin (segments-plugin/). Prints the environment for the extras
 # tests. Never point this at a real server.
 #
@@ -78,6 +80,54 @@ JSON
   '
 }
 
+make_show() {
+  # Two 8 s episodes: "music after an episode must not start the next one".
+  $DOCKER exec "$NAME" bash -euc '
+    ff=/usr/lib/jellyfin-ffmpeg/ffmpeg
+    dir="/media/Shows/Extras Show (2024)/Season 01"
+    mkdir -p "$dir"
+    for n in 1 2; do
+      $ff -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=24 -f lavfi -i sine=frequency=$((300 + n * 100)) -t 8 \
+        -c:v libx264 -preset ultrafast -c:a aac "$dir/Extras Show (2024) S01E0$n.mkv"
+    done
+  '
+}
+
+make_music() {
+  # Alpha Artist: "First Album" (2020, 3 tracks, FLAC) and "Second Album"
+  # (2021, 2 tracks, MP3). Beta Artist: "Tone Album" (2022): one 48 kHz sine
+  # cut into three consecutive 6 s FLAC files, so any gap or click between
+  # tracks shows in the output. All have a cover.cover.jpg next to them.
+  $DOCKER exec "$NAME" bash -euc '
+    ff=/usr/lib/jellyfin-ffmpeg/ffmpeg
+    root=/media/Music
+    track() { # dir number title artist album year frequency seconds codec
+      local file="$1/$2 - $3.$9"
+      $ff -loglevel error -y -f lavfi -i "sine=frequency=$7:sample_rate=48000" -t "$8" \
+        -metadata title="$3" -metadata artist="$4" -metadata album_artist="$4" -metadata album="$5" \
+        -metadata date="$6" -metadata track="$2" "${@:10}" "$file"
+    }
+    cover() { $ff -loglevel error -y -f lavfi -i "color=c=$2:size=300x300" -frames:v 1 "$1/cover.jpg"; }
+    d="$root/Alpha Artist/First Album (2020)"; mkdir -p "$d"
+    track "$d" 01 "Alpha One" "Alpha Artist" "First Album" 2020 440 20 flac -c:a flac
+    track "$d" 02 "Alpha Two" "Alpha Artist" "First Album" 2020 523 20 flac -c:a flac
+    track "$d" 03 "Alpha Three" "Alpha Artist" "First Album" 2020 659 20 flac -c:a flac
+    cover "$d" red
+    d="$root/Alpha Artist/Second Album (2021)"; mkdir -p "$d"
+    track "$d" 01 "Second One" "Alpha Artist" "Second Album" 2021 330 20 mp3 -c:a libmp3lame -b:a 128k
+    track "$d" 02 "Second Two" "Alpha Artist" "Second Album" 2021 392 20 mp3 -c:a libmp3lame -b:a 128k
+    cover "$d" green
+    d="$root/Beta Artist/Tone Album (2022)"; mkdir -p "$d"
+    for n in 1 2 3; do
+      $ff -loglevel error -y -f lavfi -i "sine=frequency=1000:sample_rate=48000" \
+        -af "atrim=start=$(( (n - 1) * 6 )):end=$(( n * 6 )),asetpts=PTS-STARTPTS" -c:a flac \
+        -metadata title="Tone $n" -metadata artist="Beta Artist" -metadata album_artist="Beta Artist" \
+        -metadata album="Tone Album" -metadata date=2022 -metadata track=$n "$d/0$n - Tone $n.flac"
+    done
+    cover "$d" blue
+  '
+}
+
 up() {
   $DOCKER rm -f "$NAME" >/dev/null 2>&1 || true
   log "building the segment provider"
@@ -91,6 +141,8 @@ up() {
   $DOCKER start "$NAME" >/dev/null
   wait_for "the server" 120 curl -fsS "$URL/System/Info/Public"
   make_media
+  make_show
+  make_music
 
   log "completing the startup wizard"
   wait_for "the startup wizard" 60 api GET /Startup/User
@@ -110,10 +162,18 @@ up() {
   log "adding the library"
   api POST "/Library/VirtualFolders?name=Movies&collectionType=movies&paths=%2Fmedia%2FMovies&refreshLibrary=false" \
     '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
+  api POST "/Library/VirtualFolders?name=Shows&collectionType=tvshows&paths=%2Fmedia%2FShows&refreshLibrary=false" \
+    '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
+  api POST "/Library/VirtualFolders?name=Music&collectionType=music&paths=%2Fmedia%2FMusic&refreshLibrary=false" \
+    '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
   api POST /Library/Refresh '' "$token" >/dev/null
   local query="$URL/Items?recursive=true&includeItemTypes=Movie"
   wait_for "the library scan" 180 bash -c \
     "[[ \$(curl -fsS '$query' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 1 ]]"
+  wait_for "the episodes" 120 bash -c \
+    "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Episode' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 2 ]]"
+  wait_for "the music" 120 bash -c \
+    "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Audio' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 8 ]]"
   local id
   id=$(api GET "/Items?recursive=true&includeItemTypes=Movie" '' "$token" | jq -r '.Items[0].Id')
   # The providers run in their own scheduled task, not in the scan.

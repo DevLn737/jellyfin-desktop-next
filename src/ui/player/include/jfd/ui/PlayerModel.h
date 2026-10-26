@@ -181,6 +181,10 @@ namespace jfd::ui {
     };
 
     void onSnapshot(const core::SessionSnapshot& snapshot);
+    // Files the session plays that this player did not open (music) are not
+    // shown, reported, stepped past or stopped by it.
+    bool belongsToPlayer(const core::SessionSnapshot& snapshot) const;
+    void releaseFile(const core::SessionSnapshot& snapshot);
     void onResolved(const session::PlaybackLauncher::Request& request, const api::Item& item,
                     const api::MediaSource& source, const api::PlaybackStream& stream);
     void beginFile(core::MediaEpoch epoch);
