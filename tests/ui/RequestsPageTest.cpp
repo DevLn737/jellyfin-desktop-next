@@ -297,9 +297,10 @@ TEST_CASE("Every control on the requests pages has a name for screen readers") {
     for (QQuickItem* item : focusable) {
       QAccessibleInterface* iface = QAccessible::queryAccessibleInterface(item);
       if (iface == nullptr) continue;
-      CHECK_MESSAGE(!iface->text(QAccessible::Name).isEmpty(),
-                    std::string(route) + ": " + item->metaObject()->className() + " " +
-                        item->objectName().toStdString() + " has no accessible name");
+      const std::string what = std::string(route) + ": " + item->metaObject()->className() + " " +
+                               item->objectName().toStdString() + " has no accessible name";
+      CAPTURE(what);
+      CHECK(!iface->text(QAccessible::Name).isEmpty());
     }
   }
 }
