@@ -225,6 +225,26 @@ if(JFD_BUILD_APP)
     add_test(NAME jfd_ui_library_tests COMMAND jfd_ui_library_tests)
   endif()
 
+  if(TARGET jfd_ui_requests AND TARGET jfd_ui_shell AND TARGET jfd_ui_library)
+    # The requests screens on a fake Seerr, in an offscreen window.
+    add_executable(jfd_ui_requests_tests support/QtGuiTestMain.cpp ui/RequestsPageTest.cpp)
+    target_include_directories(jfd_ui_requests_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_requests_tests PRIVATE
+      jfd_ui_requests jfd_ui_requestsplugin
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      jfd::seerr Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_requests_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    # FakeSeerr.h writes its JSON fixtures as plain literals.
+    if(NOT MSVC)
+      target_compile_options(jfd_ui_requests_tests PRIVATE -UQT_NO_CAST_FROM_ASCII)
+    else()
+      target_compile_options(jfd_ui_requests_tests PRIVATE /UQT_NO_CAST_FROM_ASCII)
+    endif()
+    add_test(NAME jfd_ui_requests_tests COMMAND jfd_ui_requests_tests)
+    set_tests_properties(jfd_ui_requests_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
   if(TARGET jfd_ui_player)
     # The player page on the session runtime with a virtual backend.
     add_executable(jfd_ui_player_tests support/QtGuiTestMain.cpp ui/PlayerPageTest.cpp)
