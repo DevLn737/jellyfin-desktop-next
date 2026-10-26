@@ -145,6 +145,13 @@ namespace jfd::desktop {
                      });
   }
 
+  void refreshDetails(AppServices& services) {
+    if (!services.integrations || !services.integrations->details || !services.integrations->bridge) return;
+    IntegrationServices& integrations = *services.integrations;
+    if (integrations.completeDetails) integrations.completeDetails(*integrations.details);
+    integrations.bridge->setDetails(*integrations.details);
+  }
+
   void connectIntegrations(AppServices& services, session::SessionHub& hub,
                            integrations::MediaSessionBridge::Post post, api::JellyfinClient& client) {
     IntegrationServices& integrations = *services.integrations;
@@ -165,7 +172,10 @@ namespace jfd::desktop {
             qCInfo(lcIntegrations) << "No details for the item that plays:" << result.error().message;
             return;
           }
-          integrations.bridge->setDetails(integrations::nowPlayingDetails(*result, client));
+          integrations::NowPlayingDetails details = integrations::nowPlayingDetails(*result, client);
+          if (integrations.completeDetails) integrations.completeDetails(details);
+          integrations.details = details;
+          integrations.bridge->setDetails(std::move(details));
         });
       }
       integrations.bridge->update(snapshot);

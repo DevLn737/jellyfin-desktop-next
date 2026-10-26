@@ -6,17 +6,19 @@
 
 #include <optional>
 
-// The Rich Presence card for what plays: title, season and episode or year,
+// The Rich Presence card for what plays ("Listening" for music): title, season and episode or year,
 // a time bar, the poster when the server is public, and "watching together
 // (N)" in a SyncPlay group. Pure functions; DiscordPresence feeds them.
 namespace jfd::integrations {
 
   struct PresenceInfo {
-    enum class Kind { Movie, Episode };
+    enum class Kind { Movie, Episode, Music };
 
     Kind kind = Kind::Movie;
     QString title;      // Movie or episode name.
     QString seriesName; // Episodes: shown as the main line.
+    QString artist;     // Music: the artist(s); album is the line after it.
+    QString album;
     std::optional<int> season;
     std::optional<int> episode;
     std::optional<int> episodeEnd; // Double episodes.

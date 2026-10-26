@@ -27,6 +27,17 @@ namespace jfd::integrations {
       }
     }
 
+    if (item.type == QLatin1String("Audio")) {
+      details.kind = PresenceInfo::Kind::Music;
+      details.artist = item.artists.isEmpty() ? item.albumArtist : item.artists.join(QStringLiteral(", "));
+      details.album = item.album;
+      // The cover is the album's.
+      if (!item.albumId.isEmpty() && !item.albumPrimaryImageTag.isEmpty()) {
+        posterItem = item.albumId;
+        posterTag = item.albumPrimaryImageTag;
+      }
+    }
+
     if (!posterTag.isEmpty()) {
       api::ImageRequest poster;
       poster.itemId = posterItem;

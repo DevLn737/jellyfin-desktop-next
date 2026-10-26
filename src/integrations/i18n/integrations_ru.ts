@@ -20,6 +20,14 @@
         <translation>Просмотр</translation>
     </message>
     <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
+    </message>
+    <message>
+        <source>Listening</source>
+        <translation>Слушает</translation>
+    </message>
+    <message>
         <source>Paused</source>
         <translation>Пауза</translation>
     </message>

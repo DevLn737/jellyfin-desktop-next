@@ -81,6 +81,13 @@ TEST_CASE("Media controls show the item, its position and what the queue allows"
   CHECK(mediaControlsState(SessionSnapshot{}, nullptr) == MediaControlsState{});
 }
 
+TEST_CASE("A track shows its artist under the title") {
+  auto details = episode();
+  details.kind = PresenceInfo::Kind::Music;
+  details.artist = QStringLiteral("Artist");
+  CHECK(mediaControlsState(playing(), &details).subtitle == QStringLiteral("Artist"));
+}
+
 TEST_CASE("A group can always step its queue; movies show their year") {
   auto snapshot = playing();
   snapshot.group.emplace();
