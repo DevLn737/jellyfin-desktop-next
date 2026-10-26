@@ -115,6 +115,8 @@ namespace jfd::ui {
     if (type == QLatin1String("BoxSet")) return QStringLiteral("collection/") + itemId;
     if (type == QLatin1String("CollectionFolder") || type == QLatin1String("UserView") ||
         type == QLatin1String("Folder")) {
+      // Music libraries have screens of their own (src/ui/music).
+      if (collectionTypeOf(itemId) == QLatin1String("music")) return QStringLiteral("music");
       return QStringLiteral("library/") + itemId;
     }
     // A Seerr title (id like "movie:603"), added to the home screen by the

@@ -250,6 +250,21 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_ui_player_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
+  if(TARGET jfd_ui_music)
+    # The music screens on a virtual backend and a fake server: 10,000
+    # albums and 50,000 tracks by pages, the mini-player, groups and the
+    # question before music replaces a movie.
+    add_executable(jfd_ui_music_tests support/QtGuiTestMain.cpp ui/MusicUiTest.cpp)
+    target_include_directories(jfd_ui_music_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_music_tests PRIVATE
+      jfd_ui_music jfd_ui_musicplugin jfd_ui_library jfd_ui_libraryplugin
+      jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
+      jfd::session_runtime Qt6::Gui Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
+    target_compile_options(jfd_ui_music_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_music_tests COMMAND jfd_ui_music_tests)
+    set_tests_properties(jfd_ui_music_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
   if(JFD_SERVER_TESTS AND TARGET jfd_ui_player)
     # The player screen's model on headless mpv against the server: tracks,
     # a transcoded seek and the server's playback reports.

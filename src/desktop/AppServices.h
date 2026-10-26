@@ -28,6 +28,14 @@ namespace jfd::media {
   class MpvPlayer;
 }
 
+namespace jfd::music {
+  class MusicPlayer;
+}
+
+namespace jfd::ui {
+  class MusicUi;
+}
+
 namespace jfd::session {
   class GroupModel;
   class SessionRuntime;
@@ -98,6 +106,11 @@ namespace jfd::desktop {
     // session. Declared after it so it goes first.
     std::unique_ptr<session::GroupModel> group;
 
+    // Music (installMusic): the queue and player on the session above, and
+    // the screens' lists. Declared after the session so they go first.
+    std::unique_ptr<music::MusicPlayer> music;
+    std::unique_ptr<ui::MusicUi> musicUi;
+
     // installIntegrations; complete in main.cpp, which destroys it.
     std::unique_ptr<IntegrationServices> integrations;
   };
@@ -151,6 +164,16 @@ namespace jfd::desktop {
   // gone, drops the model before the session it reads.
   void installGroup(AppServices& services, QQmlEngine& engine);
   void uninstallGroup(AppServices& services);
+
+  // The music settings section (volume, normalization, keeping the queue).
+  bool registerMusicSettings(settings::SettingsRegistry& registry);
+  // The music screens' routes (music, album, artist, playlist, genre,
+  // nowplaying), the player and its saved queue. Needs installSession.
+  // uninstallMusic, before the session goes, drops them.
+  void installMusic(AppServices& services, QQmlEngine& engine);
+  // After the window loads: the mini-player in the shell's strip.
+  void installMiniPlayer(AppServices& services, QQmlEngine& engine);
+  void uninstallMusic(AppServices& services);
 
   // Leaves a SyncPlay group before quitting; calls done when the server
   // answered or after a short timeout, so quitting never hangs on the

@@ -218,12 +218,24 @@ TEST_CASE("Next, previous, repeat and the queue's edits") {
   const QList<Item> tracks = s.tracksOf(album);
   REQUIRE(tracks.size() == 3);
 
+  // A track change is measured from the press to the track playing; the
+  // stand's limit is 300 ms (docs thresholds, stage 2c, music).
+  QElapsedTimer change;
+  change.start();
   s.player->playAlbum(album.id);
   REQUIRE(waitFor([&] { return s.player->playing(); }, 60000));
+  const qint64 firstMs = change.elapsed();
+  change.restart();
   s.player->next();
-  REQUIRE(waitFor([&] { return s.player->currentIndex() == 1 && s.player->playing(); }, 30000));
+  REQUIRE(waitFor([&] { return s.player->currentIndex() == 1 && s.player->playing() && !s.player->loading(); }, 30000));
+  const qint64 nextMs = change.elapsed();
+  change.restart();
   s.player->next();
-  REQUIRE(waitFor([&] { return s.player->currentIndex() == 2 && s.player->playing(); }, 30000));
+  REQUIRE(waitFor([&] { return s.player->currentIndex() == 2 && s.player->playing() && !s.player->loading(); }, 30000));
+  const qint64 secondMs = change.elapsed();
+  MESSAGE("music: album to sound " << firstMs << " ms, next " << nextMs << " ms, next " << secondMs << " ms");
+  CHECK(nextMs < 1000);
+  CHECK(secondMs < 1000);
 
   // Past the first seconds Previous restarts the track; then it goes back.
   REQUIRE(waitFor([&] { return s.player->position() > 3.5; }, 20000));

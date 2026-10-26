@@ -299,6 +299,44 @@
     </message>
 </context>
 <context>
+    <name>MusicNav</name>
+    <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
+    </message>
+</context>
+<context>
+    <name>MusicSettings</name>
+    <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
+    </message>
+    <message>
+        <source>Volume at start</source>
+        <translation>Громкость при запуске</translation>
+    </message>
+    <message>
+        <source>The music volume when the app starts.</source>
+        <translation>Громкость музыки при запуске приложения.</translation>
+    </message>
+    <message>
+        <source>Even out loudness between tracks</source>
+        <translation>Выравнивать громкость треков</translation>
+    </message>
+    <message>
+        <source>Uses the ReplayGain tags of the files; for files without them, the gain the server worked out. Tracks the server converts to another format are not changed.</source>
+        <translation>Используются теги ReplayGain из файлов, а для файлов без них — значение, которое посчитал сервер. Треки, которые сервер конвертирует в другой формат, не меняются.</translation>
+    </message>
+    <message>
+        <source>Remember the queue</source>
+        <translation>Помнить очередь</translation>
+    </message>
+    <message>
+        <source>The queue and the place in the track stay when the app is closed; Play picks them up.</source>
+        <translation>Очередь и место в треке сохраняются при закрытии приложения; «Играть» продолжает с них.</translation>
+    </message>
+</context>
+<context>
     <name>PlayerSettings</name>
     <message>
         <source>Playback</source>
