@@ -438,6 +438,45 @@
     </message>
 </context>
 <context>
+    <name>SeerrSettings</name>
+    <message>
+        <source>Requests (Seerr)</source>
+        <translation>Запросы (Seerr)</translation>
+    </message>
+    <message>
+        <source>Seerr address</source>
+        <translation>Адрес Seerr</translation>
+    </message>
+    <message>
+        <source>The address of your Seerr server, for example https://seerr.example.org. Empty: no Requests in the sidebar and nothing from Seerr on the home page. You sign in with your Jellyfin account; the password is not saved.</source>
+        <translation>Адрес вашего сервера Seerr, например https://seerr.example.org. Пусто: в боковой панели нет «Запросов», на главной ничего от Seerr. Вход выполняется учётной записью Jellyfin; пароль не сохраняется.</translation>
+    </message>
+    <message>
+        <source>Sign in to Seerr</source>
+        <translation>Войти в Seerr</translation>
+    </message>
+    <message>
+        <source>Check the connection</source>
+        <translation>Проверить подключение</translation>
+    </message>
+    <message>
+        <source>Sign out of Seerr</source>
+        <translation>Выйти из Seerr</translation>
+    </message>
+    <message>
+        <source>Signed out of Seerr.</source>
+        <translation>Вы вышли из Seerr.</translation>
+    </message>
+    <message>
+        <source>Connected to Seerr as %1.</source>
+        <translation>Подключено к Seerr как %1.</translation>
+    </message>
+    <message>
+        <source>Popular in Seerr</source>
+        <translation>Популярное в Seerr</translation>
+    </message>
+</context>
+<context>
     <name>SubtitleSettings</name>
     <message>
         <source>White</source>

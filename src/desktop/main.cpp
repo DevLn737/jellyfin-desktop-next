@@ -43,6 +43,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_PlayerPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_RequestsPlugin)
 
 using namespace jfd;
 
@@ -88,6 +89,7 @@ namespace {
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
     ok = desktop::registerGroupSettings(registry) && ok;
+    ok = desktop::registerSeerrSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
@@ -202,6 +204,7 @@ int main(int argc, char* argv[]) {
         [session = services.session.get()](core::SessionInput input) { session->post(std::move(input)); },
         *services.client);
     desktop::installGroup(services, engine);
+    desktop::installSeerr(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
     // Home when the saved session was restored.
@@ -289,6 +292,7 @@ int main(int argc, char* argv[]) {
   ui::PlayerSession::setInstance(nullptr);
   services.playerModel.reset();
   desktop::uninstallGroup(services);
+  desktop::uninstallSeerr(services);
   services.session.reset();
   services.player.reset();
   services.library.reset();

@@ -51,6 +51,7 @@ FocusScope {
             selectedTextColor: colors.accentText
             font.pixelSize: Theme.fontSizeBody
             echoMode: root.password ? TextInput.Password : TextInput.Normal
+            Accessible.name: root.label.length > 0 ? root.label : placeholderText
             onAccepted: root.accepted()
 
             // Placeholder drawn by hand: the template does not draw one.

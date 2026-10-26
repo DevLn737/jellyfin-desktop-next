@@ -66,6 +66,36 @@ duplicate request: 4xx with a `message` field. Every refusal becomes a plain
 sentence in the user's language; the response body is never shown raw and never
 logged.
 
+## In the app
+
+- **Setting up.** Settings > Requests (Seerr) has the address, "Sign in to
+  Seerr", "Check the connection" and "Sign out of Seerr". The address is the
+  user's own setting and is kept out of logs and diagnostic reports
+  (`addProtectedAddress`). Empty: no "Requests" in the sidebar, no row on the
+  home page, nothing sent anywhere.
+- **Signing in.** The sign-in page shows the server's host and says the
+  Jellyfin password goes to that Seerr server, not to the Jellyfin server; the
+  password is sent only after a confirmation, and only to a server whose
+  `/status` and `/settings/public` say it is initialised with Jellyfin as its
+  media server. A plain `http` address outside the local network gets a
+  warning on the page. The password is not kept; the session is the
+  `connect.sid` cookie, stored in the platform credential storage under the
+  address (a different address has its own session) and dropped when Seerr
+  answers 401.
+- **Screens.** `requests` (sidebar; trending, popular films and series,
+  search), `seerr-title/<movie|tv>:<tmdbId>` (facts, status, seasons,
+  Request), `requests-mine` (own requests, cancel while waiting for approval)
+  and `seerr-signin`. Nothing is requested without a question first; all
+  seasons of a series need a question of their own. Statuses are words and a
+  symbol, never colour alone.
+- **Posters** come from the TMDB image CDN (`image.tmdb.org`), as Seerr's own
+  pages do, through the app's image cache. They are fetched without any
+  cookie.
+- **Tests.** `tests/seerr` runs the client, the service and the models against
+  `tests/support/FakeSeerr.h`; `tests/ui/RequestsPageTest.cpp` drives the
+  screens in an offscreen window. Nothing in the repository names a real
+  Seerr server.
+
 ## Seen on a running server
 
 Seerr 3.5.1 (image `ghcr.io/seerr-team/seerr` at digest `sha256:d8fab675b55ad293ded98fd71efcfd46054cbad9746534ae1cc4794a88c0b3be`, workflow "Seerr API"),
