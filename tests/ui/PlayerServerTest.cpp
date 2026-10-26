@@ -578,3 +578,106 @@ TEST_CASE("The intro shows a Skip button that jumps past it; credits skip on the
   REQUIRE(waitFor([&] { return p.model->position() >= 57.9 || p.model->ended(); }, 30000));
   CHECK_FALSE(insideCredits);
 }
+
+namespace {
+  // The extras stand's music: Alpha Artist's first album, in track order.
+  QList<Item> albumTracks(Player& p) {
+    ItemQuery query;
+    query.includeItemTypes = {QStringLiteral("Audio")};
+    query.sortBy = QStringLiteral("SortName");
+    auto page = run<ItemPage>([&](auto done) { p.client->items(query, nullptr, done); });
+    REQUIRE(page.ok());
+    REQUIRE(page->items.size() >= 8);
+    return page->items;
+  }
+
+  bool playingItem(Player& p, const QString& id) {
+    const core::SessionSnapshot snapshot = p.runtime->snapshot();
+    return snapshot.media.isValid() && snapshot.item.value() == id.toStdString() && snapshot.phase == core::PlaybackPhase::Playing;
+  }
+
+  void seekNearEnd(Player& p, const Item& track, double secondsLeft) {
+    const auto position = core::MediaTicks::fromSeconds(static_cast<double>(track.runTimeTicks.value_or(0)) / 1e7 - secondsLeft);
+    REQUIRE(position.has_value());
+    p.runtime->post(core::intent::Seek{*position});
+  }
+} // namespace
+
+TEST_CASE("Music after an episode does not start the next episode, and the model lets go of it") {
+  if (!hasExtrasStand()) return;
+  Player p(QStringLiteral("jfd-player-music-after-episode"), {}, QStringLiteral("JFD_EXTRAS"));
+  ItemQuery query;
+  query.includeItemTypes = {QStringLiteral("Episode")};
+  query.sortBy = QStringLiteral("SortName");
+  auto page = run<ItemPage>([&](auto done) { p.client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  REQUIRE(page->items.size() == 2);
+  const QList<Item> tracks = albumTracks(p);
+  const Item track = tracks.front();
+  struct Restore {
+    Player& p;
+    QStringList ids;
+    ~Restore() {
+      for (const QString& id : ids) p.restore(id);
+    }
+  } restore{p, {page->items[0].id, page->items[1].id}};
+
+  p.model->setAutoNext(true);
+  p.model->play(page->items[0].id, 0);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  REQUIRE(waitFor([&] { return p.model->hasNext(); }, 10000));
+  REQUIRE(waitFor([&] { return p.model->position() > 2; }, 30000));
+
+  // Music replaces the episode: the model has nothing to show or step.
+  p.runtime->launcher().open({track.id, 0, {}, false, {}, std::nullopt, std::nullopt});
+  REQUIRE(waitFor([&] { return playingItem(p, track.id); }, 60000));
+  CHECK(waitFor([&] { return !p.model->active(); }, 5000));
+  CHECK_FALSE(p.model->hasNext());
+  CHECK_FALSE(p.model->hasPrevious());
+
+  // The episode's report ended with a resume point (it was left, not finished).
+  std::string lastData;
+  INFO("the episode's last user data: " << lastData);
+  CHECK(waitFor(
+      [&] {
+        auto item = run<Item>([&](auto done) { p.client->item(page->items[0].id, nullptr, done); });
+        if (item.ok())
+          lastData = "played=" + std::to_string(item->userData.played) +
+                     " ticks=" + std::to_string(item->userData.playbackPositionTicks);
+        return item.ok() && (item->userData.playbackPositionTicks > 0 || item->userData.played);
+      },
+      8000));
+
+  // The model's controls do nothing to music, and the end of the track does not
+  // start the second episode.
+  p.model->togglePause();
+  p.model->next();
+  p.model->stop();
+  waitFor([] { return false; }, 500);
+  CHECK(playingItem(p, track.id));
+  seekNearEnd(p, track, 2);
+  waitFor([] { return false; }, 5000);
+  CHECK_FALSE(p.runtime->snapshot().item.value() == page->items[1].id.toStdString());
+  CHECK_FALSE(p.model->active());
+}
+
+TEST_CASE("A video started during music replaces it") {
+  if (!hasExtrasStand()) return;
+  Player p(QStringLiteral("jfd-player-video-over-music"), {}, QStringLiteral("JFD_EXTRAS"));
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  const Item track = albumTracks(p).front();
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+
+  p.runtime->launcher().open({track.id, 0, {}, false, {}, std::nullopt, std::nullopt});
+  REQUIRE(waitFor([&] { return playingItem(p, track.id); }, 60000));
+  CHECK_FALSE(p.model->active());
+
+  p.model->play(movie.id, 0);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  CHECK(p.runtime->snapshot().item.value() == movie.id.toStdString());
+  CHECK(p.model->active());
+}
