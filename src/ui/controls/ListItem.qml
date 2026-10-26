@@ -6,6 +6,8 @@ import Jfd.Ui.Theme
 // right (an episode, a group member, a server).
 T.ItemDelegate {
     id: item
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(item)
 
     property string subtitle
     property string trailingText
@@ -44,7 +46,7 @@ T.ItemDelegate {
                 Text {
                     width: parent.width
                     text: item.text
-                    color: item.enabled ? Theme.text : Theme.textDisabled
+                    color: item.enabled ? colors.text : colors.textDisabled
                     font.pixelSize: Theme.fontSizeBody
                     elide: Text.ElideRight
                 }
@@ -52,7 +54,7 @@ T.ItemDelegate {
                     width: parent.width
                     visible: item.subtitle.length > 0
                     text: item.subtitle
-                    color: Theme.textSecondary
+                    color: colors.textSecondary
                     font.pixelSize: Theme.fontSizeSmall
                     elide: Text.ElideRight
                 }
@@ -63,14 +65,14 @@ T.ItemDelegate {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: item.trailingText
-            color: Theme.textSecondary
+            color: colors.textSecondary
             font.pixelSize: Theme.fontSizeSmall
         }
     }
 
     background: Rectangle {
         radius: Theme.radius
-        color: item.down ? Theme.surfaceHover : item.hovered || item.highlighted ? Theme.surfaceRaised : "transparent"
+        color: item.down ? colors.surfaceHover : item.hovered || item.highlighted ? colors.surfaceRaised : "transparent"
         FocusFrame { shown: item.visualFocus; inset: 0 }
     }
 }

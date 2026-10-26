@@ -22,6 +22,18 @@ QtObject {
     // screen: they are only ever added, never renamed or removed.
     property var colors: Palettes.dark
 
+    // The palette for an item: the `colorScope` of the nearest ancestor that
+    // sets one (the video player sets Overlay.colors, so its controls stay
+    // dark in a light theme), otherwise `colors`. Controls bind their
+    // colours through it.
+    function colorsFor(item) {
+        for (let node = item; node; node = node.parent) {
+            if (node.colorScope)
+                return node.colorScope
+        }
+        return colors
+    }
+
     // Colours
     readonly property color background: colors.background
     readonly property color surface: colors.surface
@@ -42,7 +54,11 @@ QtObject {
 
     // Type: sizes in device-independent pixels; the interface scale setting
     // scales everything through QT_SCALE_FACTOR.
-    readonly property string fontFamily: Qt.application.font.family
+    // A theme file may set a corner radius and an installed font family; the
+    // application sets these two (-1 / empty: not set).
+    property int radiusOverride: 6
+    property string fontFamilyOverride: ""
+    readonly property string fontFamily: fontFamilyOverride.length > 0 ? fontFamilyOverride : Qt.application.font.family
     readonly property int fontSizeSmall: 12
     readonly property int fontSizeBody: 14
     readonly property int fontSizeLarge: 17
@@ -57,8 +73,8 @@ QtObject {
     readonly property int spacing: 12
     readonly property int spacingLarge: 20
     readonly property int spacingHuge: 32
-    readonly property int radius: 6
-    readonly property int radiusSmall: 3
+    readonly property int radius: radiusOverride
+    readonly property int radiusSmall: Math.max(1, Math.round(radiusOverride / 2))
     readonly property int focusRingWidth: 2
 
     // Sizes

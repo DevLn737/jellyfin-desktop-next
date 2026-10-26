@@ -6,6 +6,8 @@ import Jfd.Ui.Theme
 // screen (filled with the accent colour). Enter and Space activate it.
 T.Button {
     id: control
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(control)
 
     property bool primary: false
     property url iconSource
@@ -35,7 +37,7 @@ T.Button {
         Text {
             text: control.text
             font: control.font
-            color: control.primary ? Theme.accentText : Theme.text
+            color: control.primary ? colors.accentText : colors.text
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideRight
         }
@@ -45,8 +47,8 @@ T.Button {
         implicitWidth: 96
         radius: Theme.radius
         color: control.primary
-            ? (control.down || control.hovered ? Theme.accentHover : Theme.accent)
-            : (control.down ? Theme.surfaceHover : control.hovered ? Theme.surfaceHover : Theme.surfaceRaised)
+            ? (control.down || control.hovered ? colors.accentHover : colors.accent)
+            : (control.down ? colors.surfaceHover : control.hovered ? colors.surfaceHover : colors.surfaceRaised)
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
         FocusFrame { shown: control.visualFocus }

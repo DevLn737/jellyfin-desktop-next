@@ -4,6 +4,8 @@
 
 #include <QLatin1String>
 
+#include <functional>
+
 // Sections that belong to the application as a whole. Playback, SyncPlay,
 // Discord and library sections are registered by their own modules.
 namespace jfd::settings {
@@ -18,9 +20,22 @@ namespace jfd::settings {
     inline constexpr QLatin1String Language{"interface/language"};
     // Interface scale on top of the system's, 0.75 to 2.0.
     inline constexpr QLatin1String Scale{"interface/scale"};
+
+    // appearance
+    // "dark", "light", "system" or "file:<name>" for a file in the themes
+    // folder.
+    inline constexpr QLatin1String Theme{"appearance/theme"};
+    // A preset id ("blue", ...) or "custom".
+    inline constexpr QLatin1String Accent{"appearance/accent"};
+    // "#rrggbb", used when the accent is "custom".
+    inline constexpr QLatin1String AccentCustom{"appearance/accentCustom"};
     // Shorter or no animations, for slow graphics.
     // "auto" (on with integrated or software graphics), "on", "off".
-    inline constexpr QLatin1String Effects{"interface/effects"};
+    // (Was interface/effects.)
+    inline constexpr QLatin1String Effects{"appearance/effects"};
+    inline constexpr QLatin1String OpenThemeFolder{"appearance/openThemeFolder"};
+    inline constexpr QLatin1String ReloadThemes{"appearance/reloadThemes"};
+    inline constexpr QLatin1String ExportTheme{"appearance/exportTheme"};
 
     // diagnostics
     // "error", "warning", "info" or "debug".
@@ -38,8 +53,13 @@ namespace jfd::settings {
     inline constexpr QLatin1String WindowFullScreen{"window/fullScreen"};
   } // namespace keys
 
-  // Registers account, interface, diagnostics and window. Returns false if
-  // any of them is already registered.
-  bool registerCommonSections(SettingsRegistry& registry);
+  // The themes the user can pick besides the built-in ones, as choices
+  // ("file:<name>" with the theme's name as `text`). Called whenever the
+  // settings screen reads the list.
+  using ThemeChoices = std::function<QList<Choice>()>;
+
+  // Registers account, interface, appearance, diagnostics and window.
+  // Returns false if any of them is already registered.
+  bool registerCommonSections(SettingsRegistry& registry, ThemeChoices themeFiles = {});
 
 } // namespace jfd::settings

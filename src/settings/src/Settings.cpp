@@ -141,6 +141,19 @@ namespace jfd::settings {
       }
       m_store->setValue(versionKey(section.id), section.version);
     }
+    // A value that changed sections (after the old section's own migrations,
+    // which may have made it).
+    for (const SectionDescriptor& section : m_registry.sections()) {
+      for (const Adoption& adoption : section.adoptions) {
+        const QString target = section.id + QLatin1Char('/') + adoption.key;
+        if (m_store->contains(adoption.fromKey)) {
+          if (!m_store->contains(target)) {
+            m_store->setValue(target, m_store->value(adoption.fromKey));
+          }
+          m_store->remove(adoption.fromKey);
+        }
+      }
+    }
   }
 
 } // namespace jfd::settings

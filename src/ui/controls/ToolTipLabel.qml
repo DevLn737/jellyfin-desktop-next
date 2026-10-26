@@ -4,6 +4,8 @@ import Jfd.Ui.Theme
 // A small label shown below its parent after a short hover.
 Rectangle {
     id: tip
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(tip)
 
     property alias text: label.text
     property bool shown: false
@@ -14,8 +16,8 @@ Rectangle {
     width: label.implicitWidth + 2 * Theme.spacingSmall
     height: label.implicitHeight + Theme.spacingTiny * 2
     radius: Theme.radiusSmall
-    color: Theme.surfaceRaised
-    border.color: Theme.border
+    color: colors.surfaceRaised
+    border.color: colors.border
     z: 200
     opacity: 0
     visible: opacity > 0
@@ -34,7 +36,7 @@ Rectangle {
     Text {
         id: label
         anchors.centerIn: parent
-        color: Theme.text
+        color: colors.text
         font.pixelSize: Theme.fontSizeSmall
     }
 }

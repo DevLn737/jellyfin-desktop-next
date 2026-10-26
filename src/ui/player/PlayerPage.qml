@@ -19,6 +19,10 @@ import Jfd.Ui.Player
 RoutePage {
     id: page
 
+    // Everything on the video, the controls included, keeps the dark palette
+    // in every theme (see Theme.colorsFor).
+    readonly property var colorScope: Overlay.colors
+
     readonly property var player: PlayerSession
     readonly property bool fullscreen: Window.window !== null && Window.window.visibility === Window.FullScreen
     property bool osdVisible: true

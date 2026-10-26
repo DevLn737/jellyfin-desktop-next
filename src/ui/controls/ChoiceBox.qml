@@ -6,6 +6,8 @@ import Jfd.Ui.Theme
 // `currentValue` is the chosen value. Up/Down change it when focused.
 T.ComboBox {
     id: control
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(control)
 
     implicitWidth: 220
     implicitHeight: Theme.controlHeight
@@ -26,13 +28,13 @@ T.ComboBox {
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: option.modelData.label
-            color: Theme.text
+            color: colors.text
             font: control.font
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
         }
         background: Rectangle {
-            color: option.highlighted ? Theme.surfaceHover : "transparent"
+            color: option.highlighted ? colors.surfaceHover : "transparent"
         }
     }
 
@@ -40,13 +42,13 @@ T.ComboBox {
         x: control.width - width - Theme.spacing
         anchors.verticalCenter: parent.verticalCenter
         text: "▾"
-        color: Theme.textSecondary
+        color: colors.textSecondary
         font.pixelSize: Theme.fontSizeBody
     }
 
     contentItem: Text {
         text: control.displayText
-        color: control.enabled ? Theme.text : Theme.textDisabled
+        color: control.enabled ? colors.text : colors.textDisabled
         font: control.font
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
@@ -54,8 +56,8 @@ T.ComboBox {
 
     background: Rectangle {
         radius: Theme.radius
-        color: control.hovered ? Theme.surfaceHover : Theme.surfaceRaised
-        border.color: Theme.border
+        color: control.hovered ? colors.surfaceHover : colors.surfaceRaised
+        border.color: colors.border
         FocusFrame { shown: control.visualFocus }
     }
 
@@ -75,8 +77,8 @@ T.ComboBox {
 
         background: Rectangle {
             radius: Theme.radius
-            color: Theme.surfaceRaised
-            border.color: Theme.border
+            color: colors.surfaceRaised
+            border.color: colors.border
         }
     }
 }

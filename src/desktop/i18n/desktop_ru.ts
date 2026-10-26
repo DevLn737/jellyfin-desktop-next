@@ -2,6 +2,57 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>Appearance</name>
+    <message>
+        <source>The file cannot be read or is too large.</source>
+        <translation>Файл не читается или слишком большой.</translation>
+    </message>
+    <message>
+        <source>The theme file is too large (the limit is 64 KiB).</source>
+        <translation>Файл темы слишком большой (предел 64 КиБ).</translation>
+    </message>
+    <message>
+        <source>The themes folder cannot be created.</source>
+        <translation>Не удалось создать папку с темами.</translation>
+    </message>
+    <message>
+        <source>The theme file cannot be saved.</source>
+        <translation>Не удалось сохранить файл темы.</translation>
+    </message>
+    <message>
+        <source>Reset theme</source>
+        <translation>Сбросить тему</translation>
+    </message>
+    <message>
+        <source>The theme is back to the default.</source>
+        <translation>Тема сброшена на стандартную.</translation>
+    </message>
+    <message>
+        <source>Themes reloaded.</source>
+        <translation>Темы перечитаны.</translation>
+    </message>
+    <message>
+        <source>Themes reloaded. Problem: %1</source>
+        <translation>Темы перечитаны. Проблема: %1</translation>
+    </message>
+    <message>
+        <source>My theme</source>
+        <translation>Моя тема</translation>
+    </message>
+    <message>
+        <source>Saved as %1.json in the themes folder.</source>
+        <translation>Сохранено в папке тем как %1.json.</translation>
+    </message>
+    <message>
+        <source>The theme file cannot be read or is too large.</source>
+        <translation>Файл темы не читается или слишком большой.</translation>
+    </message>
+    <message>
+        <source>Theme “%1” added.</source>
+        <translation>Тема «%1» добавлена.</translation>
+    </message>
+</context>
+<context>
     <name>AudioSettings</name>
     <message>
         <source>As on the server</source>

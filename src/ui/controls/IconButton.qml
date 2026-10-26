@@ -5,6 +5,8 @@ import Jfd.Ui.Theme
 // A round button with only an icon. `toolTipText` is also the accessible name.
 T.Button {
     id: control
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(control)
 
     property url iconSource
     property string toolTipText
@@ -27,7 +29,7 @@ T.Button {
 
     background: Rectangle {
         radius: width / 2
-        color: control.down || control.hovered ? Theme.surfaceHover : "transparent"
+        color: control.down || control.hovered ? colors.surfaceHover : "transparent"
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
         FocusFrame { shown: control.visualFocus; radius: width / 2 }

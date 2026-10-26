@@ -173,6 +173,13 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_session_mpv_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
   endif()
 
+  if(TARGET jfd_ui_theme)
+    # Palettes, accent colours, contrast and theme files.
+    add_executable(jfd_ui_theme_tests support/QtTestMain.cpp ui/ThemeTest.cpp)
+    target_link_libraries(jfd_ui_theme_tests PRIVATE jfd_ui_theme doctest Qt6::Test)
+    add_test(NAME jfd_ui_theme_tests COMMAND jfd_ui_theme_tests)
+  endif()
+
   if(TARGET jfd_ui_shell)
     add_executable(jfd_ui_tests support/QtTestMain.cpp ui/ShellTest.cpp)
     target_link_libraries(jfd_ui_tests PRIVATE jfd_ui_shell doctest Qt6::Test)

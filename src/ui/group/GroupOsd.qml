@@ -9,6 +9,9 @@ import Jfd.Ui.Group
 Row {
     id: osd
 
+    // On the video: the dark palette in every theme (see Theme.colorsFor).
+    readonly property var colorScope: Overlay.colors
+
     readonly property var group: GroupSession
     readonly property color dotColor: !group.connected ? Overlay.error
                                       : group.correction.length > 0 ? "#d29922"

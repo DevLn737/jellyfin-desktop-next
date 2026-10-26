@@ -2,9 +2,11 @@
 
 #include <jfd/ui/CommandRegistry.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/ThemePalette.h>
 
 #include <QColor>
 #include <QQmlComponent>
+#include <QJSValue>
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -138,4 +140,111 @@ QtObject {
   CHECK(object->property("accent").value<QColor>() == QColor(QStringLiteral("#cc3300")));
   // The player's colours stay as they were.
   CHECK(object->property("overlayText").value<QColor>() == QColor(QStringLiteral("#f2f2f2")));
+}
+
+TEST_CASE("The palettes in QML are the ones C++ makes") {
+  QQmlEngine engine;
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Theme
+QtObject {
+  property var dark: Palettes.dark
+  property var light: Palettes.light
+}
+)");
+  const auto same = [](const QVariantMap& made, const QVariant& fromQml) {
+    QVariant value = fromQml;
+    if (value.metaType() == QMetaType::fromType<QJSValue>()) value = value.value<QJSValue>().toVariant();
+    const QVariantMap qml = value.toMap();
+    CHECK(qml.size() == made.size());
+    for (auto it = made.cbegin(); it != made.cend(); ++it) {
+      CHECK_MESSAGE(QColor(qml.value(it.key()).toString()) == QColor(it.value().toString()), it.key().toStdString());
+    }
+  };
+  same(ui::darkPalette(), object->property("dark"));
+  same(ui::lightPalette(), object->property("light"));
+}
+
+TEST_CASE("Controls in a colour scope keep that palette when the theme changes") {
+  QQmlEngine engine;
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Controls
+Item {
+  property color outside: outsideHeading.color
+  property color inside: insideHeading.color
+  function useLight() { Theme.colors = Palettes.light }
+  Heading { id: outsideHeading; text: "Page" }
+  Item {
+    readonly property var colorScope: Overlay.colors
+    Item { Heading { id: insideHeading; text: "On the video" } }
+  }
+}
+)");
+  CHECK(object->property("outside").value<QColor>() == QColor(QStringLiteral("#f2f2f2")));
+  CHECK(object->property("inside").value<QColor>() == QColor(QStringLiteral("#f2f2f2")));
+  QMetaObject::invokeMethod(object.get(), "useLight");
+  CHECK(object->property("outside").value<QColor>() == QColor(QStringLiteral("#16181c")));
+  CHECK(object->property("inside").value<QColor>() == QColor(QStringLiteral("#f2f2f2")));
+}
+
+#include <QElapsedTimer>
+#include <QFile>
+
+namespace {
+  // Resident memory in bytes (Linux; elsewhere 0, and the growth check is skipped).
+  qint64 residentBytes() {
+    QFile statm(QStringLiteral("/proc/self/statm"));
+    if (!statm.open(QIODevice::ReadOnly)) return 0;
+    const QList<QByteArray> fields = statm.readAll().split(' ');
+    return fields.size() > 1 ? fields.at(1).toLongLong() * 4096 : 0;
+  }
+} // namespace
+
+TEST_CASE("Switching the theme with a thousand cards on screen is quick and does not grow memory") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  window.resize(1280, 720);
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Controls
+Item {
+  width: 1280; height: 720
+  function useLight() { Theme.colors = Palettes.light }
+  function useDark() { Theme.colors = Palettes.dark }
+  CardGrid {
+    anchors.fill: parent
+    model: 1000
+    delegate: PosterCard { title: "Title " + index; subtitle: "2024" }
+  }
+}
+)");
+  auto* root = qobject_cast<QQuickItem*>(object.get());
+  root->setParentItem(window.contentItem());
+  window.show();
+  QCoreApplication::processEvents();
+  window.grabWindow();
+
+  // The first switches allocate caches that stay; the 20 that count follow.
+  for (int i = 0; i < 4; ++i) {
+    QMetaObject::invokeMethod(object.get(), i % 2 == 0 ? "useLight" : "useDark");
+    QCoreApplication::processEvents();
+    window.grabWindow();
+  }
+  const qint64 before = residentBytes();
+  qint64 slowest = 0;
+  for (int i = 0; i < 20; ++i) {
+    QElapsedTimer timer;
+    timer.start();
+    QMetaObject::invokeMethod(object.get(), i % 2 == 0 ? "useLight" : "useDark");
+    QCoreApplication::processEvents();
+    window.grabWindow();
+    slowest = std::max(slowest, timer.elapsed());
+  }
+  const qint64 growth = residentBytes() - before;
+  MESSAGE("slowest switch ", slowest, " ms, memory growth ", growth / 1024, " KiB");
+  CHECK(slowest <= 100);
+  if (before > 0) CHECK(growth <= 5 * 1024 * 1024);
 }

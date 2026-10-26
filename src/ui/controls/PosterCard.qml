@@ -9,6 +9,8 @@ import Jfd.Ui.Theme
 // draws a watched bar; `played` a check mark; `unplayedCount` a badge.
 T.AbstractButton {
     id: card
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(card)
 
     property string title
     property string subtitle
@@ -18,7 +20,7 @@ T.AbstractButton {
     property bool played: false
     property int unplayedCount: 0
     // The page colour a circle card's corners are cut out to.
-    property color cutoutColor: Theme.background
+    property color cutoutColor: colors.background
 
     // The image width; the card's height follows from the shape.
     property int cardWidth: Theme.cardWidthFor(shape)
@@ -38,7 +40,7 @@ T.AbstractButton {
         width: card.cardWidth
         height: Math.round(card.cardWidth / card.imageAspect)
         radius: card.shape === "circle" ? width / 2 : Theme.radius
-        color: Theme.surfaceRaised
+        color: colors.surfaceRaised
         clip: true
         scale: card.hovered || card.visualFocus ? 1.03 : 1
         Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
@@ -60,7 +62,7 @@ T.AbstractButton {
             anchors.centerIn: parent
             visible: image.status !== Image.Ready
             text: card.title.length > 0 ? card.title.charAt(0).toUpperCase() : ""
-            color: Theme.textDisabled
+            color: colors.textDisabled
             font.pixelSize: Theme.fontSizeHeadline
         }
 
@@ -87,11 +89,11 @@ T.AbstractButton {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: 4
-            color: Theme.scrim
+            color: colors.scrim
             Rectangle {
                 width: parent.width * Math.min(Math.max(card.progress, 0), 1)
                 height: parent.height
-                color: Theme.progress
+                color: colors.progress
             }
         }
 
@@ -103,13 +105,13 @@ T.AbstractButton {
             width: Math.max(height, badgeText.implicitWidth + Theme.spacingSmall * 2)
             height: 24
             radius: height / 2
-            color: Theme.accent
+            color: colors.accent
             Text {
                 id: badgeText
                 anchors.centerIn: parent
                 visible: !card.played
                 text: card.unplayedCount
-                color: Theme.accentText
+                color: colors.accentText
                 font.pixelSize: Theme.fontSizeSmall
                 font.weight: Theme.fontWeightBold
             }
@@ -134,7 +136,7 @@ T.AbstractButton {
         Text {
             width: parent.width
             text: card.title
-            color: Theme.text
+            color: colors.text
             font.pixelSize: Theme.fontSizeBody
             elide: Text.ElideRight
             horizontalAlignment: Text.AlignHCenter
@@ -143,7 +145,7 @@ T.AbstractButton {
             width: parent.width
             visible: card.subtitle.length > 0
             text: card.subtitle
-            color: Theme.textSecondary
+            color: colors.textSecondary
             font.pixelSize: Theme.fontSizeSmall
             elide: Text.ElideRight
             horizontalAlignment: Text.AlignHCenter
