@@ -119,6 +119,7 @@ T.AbstractButton {
                 anchors.centerIn: parent
                 visible: card.played
                 source: Icons.check
+                color: colors.accentText
                 size: 16
             }
         }

@@ -77,15 +77,29 @@ QtObject {
     readonly property int radiusSmall: Math.max(1, Math.round(radiusOverride / 2))
     readonly property int focusRingWidth: 2
 
+    // Window size classes, by the window's width in logical pixels (the
+    // application sets windowWidth): "compact" under 900 (the sidebar
+    // becomes an icon rail, cards and margins shrink), "normal", and
+    // "spacious" over 1600 (larger cards and margins).
+    readonly property int compactBelow: 900
+    readonly property int spaciousAbove: 1600
+    property int windowWidth: 1280
+    readonly property string sizeClass: windowWidth < compactBelow ? "compact"
+                                      : windowWidth > spaciousAbove ? "spacious" : "normal"
+    readonly property bool compact: sizeClass === "compact"
+    // Left and right margin of a page.
+    readonly property int pageMargin: compact ? spacingLarge : sizeClass === "spacious" ? 48 : spacingHuge
+
     // Sizes
     readonly property int controlHeight: 38
     readonly property int iconSize: 22
     readonly property int sidebarWidth: 220
     readonly property int sidebarCollapsedWidth: 64
     // Card widths; heights follow from the aspect ratios.
-    readonly property int posterWidth: 160
-    readonly property int thumbWidth: 280
-    readonly property int squareWidth: 160
+    // Poster-shaped cards are 110 to 220 px wide in every size class.
+    readonly property int posterWidth: compact ? 130 : sizeClass === "spacious" ? 190 : 160
+    readonly property int thumbWidth: compact ? 220 : sizeClass === "spacious" ? 320 : 280
+    readonly property int squareWidth: posterWidth
     readonly property real posterAspect: 2 / 3
     readonly property real thumbAspect: 16 / 9
     readonly property real squareAspect: 1

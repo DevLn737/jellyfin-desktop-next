@@ -19,8 +19,8 @@ RoutePage {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.leftMargin: Theme.spacingHuge
-        anchors.rightMargin: Theme.spacingHuge
+        anchors.leftMargin: Theme.pageMargin
+        anchors.rightMargin: Theme.pageMargin
         anchors.topMargin: Theme.spacingLarge
         spacing: Theme.spacingLarge
 

@@ -18,6 +18,10 @@ FocusScope {
     readonly property alias miniPlayerSlot: miniPlayerSlot
     readonly property Item currentPage: stack.currentItem
     readonly property string title: currentPage && currentPage.title ? currentPage.title : ""
+    // In a compact window the sidebar is an icon rail; the menu button opens
+    // it over the page with the names (closed again by choosing, Esc or a
+    // click outside).
+    property bool menuOpen: false
     // Off while something under the shell must show through (the video with
     // HDR10 output).
     property bool backgroundVisible: true
@@ -45,6 +49,13 @@ FocusScope {
 
     focus: true
 
+    // The size classes follow the window's width (logical pixels).
+    Binding { target: Theme; property: "windowWidth"; value: shell.width }
+    Connections {
+        target: Theme
+        function onCompactChanged() { shell.menuOpen = false }
+    }
+
     Rectangle {
         anchors.fill: parent
         color: Theme.background
@@ -58,9 +69,22 @@ FocusScope {
         anchors.bottom: parent.bottom
         x: Navigator.chromeVisible ? 0 : -width
         visible: x > -width
-        collapsed: shell.width < 900
+        z: 2
+        collapsed: Theme.compact && !shell.menuOpen
+        menuButton: Theme.compact
+        onMenuToggled: shell.menuOpen = !shell.menuOpen
+        onChosen: shell.menuOpen = false
         Behavior on x { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
         KeyNavigation.right: stack
+    }
+
+    // The room the sidebar takes from the pages: the full sidebar, or only
+    // the rail while the menu is open over them.
+    Item {
+        id: rail
+        x: sidebar.x
+        width: Theme.compact ? Theme.sidebarCollapsedWidth : Theme.sidebarWidth
+        height: parent.height
     }
 
     Item {
@@ -79,7 +103,7 @@ FocusScope {
         anchors.top: parent.top
         anchors.bottom: miniPlayerSlot.top
         anchors.right: parent.right
-        anchors.left: sidebar.visible ? sidebar.right : parent.left
+        anchors.left: sidebar.visible ? rail.right : parent.left
         focus: true
         clip: true
 
@@ -89,6 +113,15 @@ FocusScope {
         popExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
         replaceEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
         replaceExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
+    }
+
+    // Dims the page while the menu is open over it.
+    Rectangle {
+        anchors.fill: stack
+        z: 1
+        color: Theme.scrim
+        visible: shell.menuOpen && sidebar.visible
+        TapHandler { onTapped: shell.menuOpen = false }
     }
 
     Connections {
@@ -118,7 +151,10 @@ FocusScope {
     Component.onCompleted: Navigator.replay()
 
     Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_F11) {
+        if (event.key === Qt.Key_Escape && shell.menuOpen) {
+            shell.menuOpen = false
+            event.accepted = true
+        } else if (event.key === Qt.Key_F11) {
             shell.toggleFullScreen()
             event.accepted = true
         } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace

@@ -31,6 +31,7 @@ T.Button {
         Icon {
             visible: control.iconSource.toString().length > 0
             source: control.iconSource
+            color: control.primary ? colors.accentText : colors.text
             size: Theme.iconSize - 4
             anchors.verticalCenter: parent.verticalCenter
         }
