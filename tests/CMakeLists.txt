@@ -121,6 +121,17 @@ if(TARGET jfd_jellyfin_api)
     target_link_libraries(jfd_integrations_tests PRIVATE jfd::integrations Qt6::WebSockets)
   endif()
 
+  if(TARGET jfd_seerr)
+    jfd_add_qt_test(jfd_seerr_tests seerr/SeerrClientTest.cpp)
+    target_link_libraries(jfd_seerr_tests PRIVATE jfd::seerr)
+  # FakeSeerr.h writes its JSON fixtures as plain literals.
+  if(NOT MSVC)
+    target_compile_options(jfd_seerr_tests PRIVATE -UQT_NO_CAST_FROM_ASCII)
+  else()
+    target_compile_options(jfd_seerr_tests PRIVATE /UQT_NO_CAST_FROM_ASCII)
+  endif()
+  endif()
+
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
   find_package(Qt6 QUIET COMPONENTS DBus)
