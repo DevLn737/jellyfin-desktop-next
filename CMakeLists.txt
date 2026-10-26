@@ -81,6 +81,7 @@ if(JFD_BUILD_APP)
   jfd_add_module(src/ui/music)
   jfd_add_module(src/ui/player)
   jfd_add_module(src/ui/group)
+  jfd_add_module(src/ui/requests)
   # The SyncPlay agent with real playback (headless mpv and the player's model).
   if(UNIX)
     add_subdirectory(tools/syncplay-agent/app)

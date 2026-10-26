@@ -46,6 +46,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_PlayerPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_MusicPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_RequestsPlugin)
 
 using namespace jfd;
 
@@ -92,6 +93,7 @@ namespace {
     ok = desktop::registerPlayerSettings(registry) && ok;
     ok = desktop::registerGroupSettings(registry) && ok;
     ok = desktop::registerMusicSettings(registry) && ok;
+    ok = desktop::registerSeerrSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
@@ -207,6 +209,7 @@ int main(int argc, char* argv[]) {
         *services.client);
     desktop::installGroup(services, engine);
     desktop::installMusic(services, engine);
+    desktop::installSeerr(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
     // Home when the saved session was restored.
@@ -296,6 +299,7 @@ int main(int argc, char* argv[]) {
   services.playerModel.reset();
   desktop::uninstallGroup(services);
   desktop::uninstallMusic(services);
+  desktop::uninstallSeerr(services);
   services.session.reset();
   services.player.reset();
   services.library.reset();
