@@ -137,7 +137,12 @@ void MpvMediaBackend::preload(core::MediaEpoch epoch, const core::BackendLoad& r
   m_starting.push_back(epoch);
   // Per-file options: the property is global, and the current file keeps its own.
   const char* options = request.rebaseStartTime ? "rebase-start-time=yes" : "rebase-start-time=no";
-  command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "append", "-1", options});
+  // mpv 0.38 (client API 2.3) added the index between the flags and the
+  // options; older ones take the options right after the flags.
+  if (mpv_client_api_version() >= MPV_MAKE_VERSION(2, 3))
+    command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "append", "-1", options});
+  else
+    command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "append", options});
 }
 
 void MpvMediaBackend::dropPreload()
