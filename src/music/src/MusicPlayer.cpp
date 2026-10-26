@@ -411,7 +411,6 @@ namespace jfd::music {
       const auto entry = m_preloaded->entryId;
       QTimer::singleShot(600, this, [this, entry] {
         if (!m_preloaded || m_preloaded->entryId != entry) return;
-        if (m_snapshot.phase != PlaybackPhase::Ended) return;
         m_preloaded.reset();
         m_epoch.reset();
         if (const auto index = m_queue.nextIndex(true)) open(*index);
