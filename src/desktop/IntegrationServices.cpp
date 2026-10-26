@@ -15,6 +15,8 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 
+#include <type_traits>
+
 Q_LOGGING_CATEGORY(lcIntegrations, "jfd.integrations")
 
 namespace jfd::desktop {
@@ -62,18 +64,15 @@ namespace jfd::desktop {
                                      });
     }
 
-    // Downloads and installs AppImage updates in place (AppImageUpdater):
-    // offered in the toast once downloaded and checked, never while
-    // something plays or in a group.
-    void startAppImageUpdates(AppServices& services, QQuickWindow& window) {
+    // Downloads and installs updates in place (AppImageUpdater on Linux,
+    // MsiUpdater on Windows, the same flow): offered in the toast once
+    // downloaded and checked, never while something plays or in a group.
+    // Updater: either class; they share the restart link and the start state.
+    template <typename Updater>
+    void startUpdates(AppServices& services, QQuickWindow& window, Updater& updater) {
       IntegrationServices& integrations = *services.integrations;
-      integrations.appImage = std::make_unique<integrations::AppImageUpdater>(
-          &integrations.network, qEnvironmentVariable("APPIMAGE"),
-          QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/update"),
-          integrations::releasePublicKey());
-      integrations::AppImageUpdater& updater = *integrations.appImage;
 
-      using Kind = integrations::AppImageUpdater::StartState::Kind;
+      using Kind = typename Updater::StartState::Kind;
       const auto start = updater.confirmStart(QCoreApplication::applicationVersion());
       if (start.kind == Kind::Updated) {
         qCInfo(lcIntegrations) << "Updated to" << start.version;
@@ -81,44 +80,70 @@ namespace jfd::desktop {
                   QCoreApplication::translate("Integrations", "Updated to version %1.").arg(start.version));
         if (services.navigator != nullptr) reopen(*services.navigator, start.route);
       } else if (start.kind == Kind::RolledBack) {
-        qCWarning(lcIntegrations) << "Version" << start.version << "did not start; rolled back";
-        callShell(window, "showError",
-                  QCoreApplication::translate("Integrations", "Version %1 did not start, so this version stays.")
-                      .arg(start.version));
+        qCWarning(lcIntegrations) << "Version" << start.version << "was not installed; this version stays";
+        if constexpr (std::is_same_v<Updater, integrations::MsiUpdater>) {
+          callShell(window, "showError",
+                    QCoreApplication::translate("Integrations", "Version %1 did not install, so this version stays.")
+                        .arg(start.version));
+        } else {
+          callShell(window, "showError",
+                    QCoreApplication::translate("Integrations", "Version %1 did not start, so this version stays.")
+                        .arg(start.version));
+        }
       }
 
-      QDesktopServices::setUrlHandler(integrations::AppImageUpdater::urlScheme(), &updater, "handleUrl");
-      QObject::connect(&updater, &integrations::AppImageUpdater::ready, &window,
-                       [&integrations, &window](const QString& version) {
-                         qCInfo(lcIntegrations) << "Update" << version << "downloaded and verified";
-                         integrations.offerWhenIdle = integrations.busy;
-                         if (!integrations.busy) offerRestart(window, version);
-                       });
-      QObject::connect(&updater, &integrations::AppImageUpdater::failed, &window,
-                       [&integrations, &window](const QString& reason) {
-                         qCInfo(lcIntegrations) << "AppImage update failed:" << reason;
-                         if (integrations.updates && integrations.updates->available())
-                           showDownloadPage(window, integrations.updates->available()->version,
-                                            integrations.updates->available()->page);
-                       });
-      QObject::connect(&updater, &integrations::AppImageUpdater::restartRequested, &window,
-                       [&services, &integrations, &window] {
-                         if (integrations.busy) {
-                           integrations.offerWhenIdle = true;
-                           callShell(window, "showMessage",
-                                     QCoreApplication::translate(
-                                         "Integrations", "The update restarts the app, so it waits until playback ends and you are not in a group."));
-                           return;
-                         }
-                         const QString route = services.navigator ? services.navigator->currentRoute() : QString();
-                         if (integrations.appImage->apply(route)) {
-                           qCInfo(lcIntegrations) << "Restarting into" << integrations.appImage->readyVersion();
-                           window.close();
-                         } else {
-                           callShell(window, "showError",
-                                     QCoreApplication::translate("Integrations", "The update could not be installed."));
-                         }
-                       });
+      integrations.updateSupported = [&updater] { return updater.supported(); };
+      integrations.prepareUpdate = [&updater](const integrations::Release& release) { updater.prepare(release); };
+      integrations.offerReadyUpdate = [&updater] {
+        if (!updater.readyVersion().isEmpty()) Q_EMIT updater.ready(updater.readyVersion());
+      };
+      if (!updater.supported()) return;
+
+      QDesktopServices::setUrlHandler(Updater::urlScheme(), &updater, "handleUrl");
+      QObject::connect(&updater, &Updater::ready, &window, [&integrations, &window](const QString& version) {
+        qCInfo(lcIntegrations) << "Update" << version << "downloaded and verified";
+        integrations.offerWhenIdle = integrations.busy;
+        if (!integrations.busy) offerRestart(window, version);
+      });
+      QObject::connect(&updater, &Updater::failed, &window, [&integrations, &window](const QString& reason) {
+        qCInfo(lcIntegrations) << "Update failed:" << reason;
+        if (integrations.updates && integrations.updates->available())
+          showDownloadPage(window, integrations.updates->available()->version,
+                           integrations.updates->available()->page);
+      });
+      QObject::connect(&updater, &Updater::restartRequested, &window, [&services, &integrations, &window, &updater] {
+        if (integrations.busy) {
+          integrations.offerWhenIdle = true;
+          callShell(window, "showMessage",
+                    QCoreApplication::translate(
+                        "Integrations", "The update restarts the app, so it waits until playback ends and you are not in a group."));
+          return;
+        }
+        const QString route = services.navigator ? services.navigator->currentRoute() : QString();
+        if (updater.apply(route)) {
+          qCInfo(lcIntegrations) << "Restarting into" << updater.readyVersion();
+          window.close();
+        } else {
+          callShell(window, "showError",
+                    QCoreApplication::translate("Integrations", "The update could not be installed."));
+        }
+      });
+    }
+
+    void startPlatformUpdates(AppServices& services, QQuickWindow& window) {
+      IntegrationServices& integrations = *services.integrations;
+      const QString state =
+          QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/update");
+#ifdef Q_OS_WIN
+      integrations.msi = std::make_unique<integrations::MsiUpdater>(
+          &integrations.network, QCoreApplication::applicationFilePath(), integrations::MsiUpdater::installedFolder(),
+          state, integrations::releasePublicKey());
+      startUpdates(services, window, *integrations.msi);
+#else
+      integrations.appImage = std::make_unique<integrations::AppImageUpdater>(
+          &integrations.network, qEnvironmentVariable("APPIMAGE"), state, integrations::releasePublicKey());
+      startUpdates(services, window, *integrations.appImage);
+#endif
     }
   } // namespace
 
@@ -153,9 +178,8 @@ namespace jfd::desktop {
       const bool busy = snapshot.group.has_value() ||
                         (snapshot.phase != core::PlaybackPhase::Idle && snapshot.phase != core::PlaybackPhase::Ended &&
                          snapshot.phase != core::PlaybackPhase::Failed);
-      if (integrations.busy && !busy && integrations.offerWhenIdle && integrations.appImage &&
-          !integrations.appImage->readyVersion().isEmpty())
-        Q_EMIT integrations.appImage->ready(integrations.appImage->readyVersion());
+      if (integrations.busy && !busy && integrations.offerWhenIdle && integrations.offerReadyUpdate)
+        integrations.offerReadyUpdate();
       integrations.busy = busy;
       const QString item = QString::fromStdString(snapshot.item.value());
       if (!item.isEmpty() && item != integrations.detailsItem) {
@@ -186,7 +210,7 @@ namespace jfd::desktop {
 
     if (!checkForUpdates) return;
     // Also confirms an update that started this version.
-    startAppImageUpdates(services, window);
+    startPlatformUpdates(services, window);
     if (!services.settings->value(integrations::keys::CheckForUpdates).toBool()) return;
     integrations.updates = std::make_unique<integrations::UpdateChecker>(
         &integrations.network, QCoreApplication::applicationVersion(),
@@ -194,8 +218,8 @@ namespace jfd::desktop {
     auto* checker = integrations.updates.get();
     QObject::connect(checker, &integrations::UpdateChecker::updateAvailable, &window,
                      [&integrations, &window, checker](const QString& version, const QUrl& downloadPage) {
-                       if (integrations.appImage->supported() && checker->available()) {
-                         integrations.appImage->prepare(*checker->available());
+                       if (integrations.updateSupported && integrations.updateSupported() && checker->available()) {
+                         integrations.prepareUpdate(*checker->available());
                        } else {
                          showDownloadPage(window, version, downloadPage);
                        }
