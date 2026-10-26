@@ -68,7 +68,7 @@ logged.
 
 ## Seen on a running server
 
-Seerr 3.5.1 (image `ghcr.io/seerr-team/seerr:3.5.1`, workflow "Seerr API"),
+Seerr 3.5.1 (image `ghcr.io/seerr-team/seerr` at digest `sha256:d8fab675b55ad293ded98fd71efcfd46054cbad9746534ae1cc4794a88c0b3be`, workflow "Seerr API"),
 a fresh server with no media server set up, no sign-in:
 
 | Request | Status | Note |
