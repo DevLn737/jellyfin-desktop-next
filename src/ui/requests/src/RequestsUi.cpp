@@ -22,6 +22,11 @@ namespace jfd::ui {
     }
   }
 
+  RequestsUi::~RequestsUi() {
+    // The engine deletes the singleton; a later setService must not reach it.
+    if (s_instance == this) s_instance = nullptr;
+  }
+
   void RequestsUi::setService(seerr::SeerrService* service) {
     s_service = service;
     if (s_instance != nullptr && service != nullptr) {

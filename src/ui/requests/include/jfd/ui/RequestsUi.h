@@ -35,6 +35,7 @@ namespace jfd::ui {
 
   public:
     explicit RequestsUi(QObject* parent = nullptr);
+    ~RequestsUi() override;
 
     // The application owns the service; null detaches.
     static void setService(seerr::SeerrService* service);
