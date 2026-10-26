@@ -118,6 +118,7 @@ void MpvMediaBackend::load(core::MediaEpoch epoch, const core::BackendLoad& requ
   releaseHook();
   // loadfile replace clears the playlist, the queued file with it.
   dropPreload();
+  m_followedOn = false;
   mpv_set_property_string(m_mpv, "rebase-start-time", request.rebaseStartTime ? "yes" : "no");
   int pause = request.startPaused ? 1 : 0;
   mpv_set_property(m_mpv, "pause", MPV_FORMAT_FLAG, &pause);
@@ -340,6 +341,7 @@ void MpvMediaBackend::handle(const mpv_event& event)
         if (left.reason == core::backend::EndReason::EndOfFile)
         {
           m_gapless = *m_current;
+          m_followedOn = true;
           m_post(core::backend::Advanced {left.epoch, *m_current});
         }
         else
@@ -484,9 +486,17 @@ void MpvMediaBackend::flush()
   const core::MediaEpoch epoch = *m_current;
   if (m_restartPending)
   {
+    core::backend::Sample now = sample();
+    // mpv before 0.38 can report the restart of a file it went on to by itself
+    // before time-pos exists; the session needs a position to call it ready,
+    // so wait for the property change that follows.
+    if (!now.position)
+      return;
+    if (m_followedOn && now.position && now.position->value < 0)
+      now.position = core::BackendSeconds {0};
+    m_followedOn = false;
     m_restartPending = false;
     m_stateChanged = m_positionChanged = false;
-    const core::backend::Sample now = sample();
     m_lastProgress = now.sampledAt;
     m_post(core::backend::PlaybackRestarted {epoch, now});
     return;
