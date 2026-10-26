@@ -302,7 +302,10 @@ TEST_CASE("Every control on the requests pages has a name for screen readers") {
       QAccessibleInterface* iface = QAccessible::queryAccessibleInterface(item);
       if (iface == nullptr) continue;
       const std::string what = std::string(route) + ": " + item->metaObject()->className() + " " +
-                               item->objectName().toStdString() + " has no accessible name";
+                               item->objectName().toStdString() + " in " +
+                               (item->parentItem() ? item->parentItem()->objectName().toStdString() : std::string()) +
+                               " (echoMode " + std::to_string(item->property("echoMode").toInt()) + ", property " +
+                               item->property("accessibleName").toString().toStdString() + ") has no accessible name";
       CAPTURE(what);
       CHECK(!iface->text(QAccessible::Name).isEmpty());
     }
