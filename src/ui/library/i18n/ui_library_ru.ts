@@ -52,6 +52,33 @@
     </message>
 </context>
 <context>
+    <name>CustomizeHomePage</name>
+    <message>
+        <source>Customize home</source>
+        <translation>Настроить главную</translation>
+    </message>
+    <message>
+        <source>Show %1</source>
+        <translation>Показывать «%1»</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Выше</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Ниже</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Вернуть по умолчанию</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>Готово</translation>
+    </message>
+</context>
+<context>
     <name>EpisodeRow</name>
     <message>
         <source>Play</source>
@@ -78,6 +105,10 @@
     <message>
         <source>Home</source>
         <translation>Главная</translation>
+    </message>
+    <message>
+        <source>Customize home</source>
+        <translation>Настроить главную</translation>
     </message>
     <message>
         <source>My media</source>

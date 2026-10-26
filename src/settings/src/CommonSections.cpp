@@ -150,6 +150,20 @@ namespace jfd::settings {
       };
       section.settings.append(effects);
 
+      SettingDescriptor homeSections;
+      homeSections.key = key(keys::HomeSections);
+      homeSections.type = SettingType::String;
+      homeSections.defaultValue = QStringLiteral("[]");
+      homeSections.label = QT_TRANSLATE_NOOP("CommonSettings", "Home screen rows");
+      homeSections.hidden = true;
+      section.settings.append(homeSections);
+
+      SettingDescriptor customizeHome;
+      customizeHome.key = key(keys::CustomizeHome);
+      customizeHome.type = SettingType::Action;
+      customizeHome.label = QT_TRANSLATE_NOOP("CommonSettings", "Customize home");
+      section.settings.append(customizeHome);
+
       for (const auto& [fullKey, text] :
            {std::pair{keys::OpenThemeFolder, QT_TRANSLATE_NOOP("CommonSettings", "Open the themes folder")},
             std::pair{keys::ReloadThemes, QT_TRANSLATE_NOOP("CommonSettings", "Reload themes")},

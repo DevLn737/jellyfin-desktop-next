@@ -612,6 +612,38 @@ namespace jfd::api {
          });
   }
 
+  void JellyfinClient::movieRecommendations(int categoryLimit, int itemLimit, QObject* context,
+                                            Callback<QList<RecommendationGroup>> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("categoryLimit"), QString::number(categoryLimit));
+    query.addQueryItem(QStringLiteral("itemLimit"), QString::number(itemLimit));
+    query.addQueryItem(Fields, ItemFields);
+    send(Method::Get, QStringLiteral("Movies/Recommendations"), query, std::nullopt, context,
+         [done = std::move(done)](Result<RawResponse> result) {
+           if (!result) {
+             done(result.error());
+             return;
+           }
+           const auto document = QJsonDocument::fromJson(result->body);
+           if (!document.isArray()) {
+             done(invalidResponse(QStringLiteral("Movies/Recommendations is not a JSON array")));
+             return;
+           }
+           done(json::recommendationGroups(document.array()));
+         });
+  }
+
+  void JellyfinClient::suggestions(int limit, const QStringList& types, QObject* context,
+                                   Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+    if (!types.isEmpty()) query.addQueryItem(QStringLiteral("type"), types.join(QLatin1Char(',')));
+    query.addQueryItem(Fields, ItemFields);
+    query.addQueryItem(QStringLiteral("enableTotalRecordCount"), QStringLiteral("false"));
+    sendJson(Method::Get, QStringLiteral("Items/Suggestions"), query, std::nullopt, context,
+             parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
   void JellyfinClient::similarItems(const QString& itemId, int limit, QObject* context,
                                     Callback<ItemPage> done) {
     QUrlQuery query = userQuery();

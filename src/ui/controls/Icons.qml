@@ -15,4 +15,6 @@ QtObject {
     readonly property url error: Qt.resolvedUrl("icons/error.svg")
     readonly property url library: Qt.resolvedUrl("icons/library.svg")
     readonly property url menu: Qt.resolvedUrl("icons/menu.svg")
+    readonly property url up: Qt.resolvedUrl("icons/up.svg")
+    readonly property url down: Qt.resolvedUrl("icons/down.svg")
 }

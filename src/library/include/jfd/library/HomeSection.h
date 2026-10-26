@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QStringList>
 
 #include <functional>
 
@@ -65,5 +66,19 @@ namespace jfd::library {
   private:
     QList<HomeSection> m_sections;
   };
+
+  // The user's arrangement of the home screen: the order of the sections
+  // and the ones switched off. Stored as the setting "appearance/homeSections"
+  // (a JSON array of ids, a hidden one with a "-" in front: ["resume",
+  // "-nextUp", "latest/abc"]). Reading is forgiving: anything that is not a
+  // list of text gives no arrangement, so the defaults apply.
+  struct HomeArrangement {
+    QStringList order;
+    QStringList hidden;
+
+    bool operator==(const HomeArrangement&) const = default;
+  };
+  HomeArrangement parseArrangement(const QString& stored);
+  QString formatArrangement(const HomeArrangement& arrangement);
 
 } // namespace jfd::library

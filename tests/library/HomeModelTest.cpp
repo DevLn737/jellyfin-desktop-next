@@ -148,3 +148,32 @@ TEST_CASE("Watched state from the server updates the cards and reloads the rows"
   waitFor([] { return false; }, 150);
   CHECK(f.count(QStringLiteral("/UserItems/Resume")) == resumeCalls + 1);
 }
+
+TEST_CASE("The user's arrangement orders the rows, hides some and tolerates unknown ones") {
+  Server routes;
+  LibraryFixture f([&routes](const HttpRequest& r) { return routes(r); });
+  HomeModel home(f.client);
+  home.reload();
+  REQUIRE(waitFor([&] { return !home.loading(); }));
+  REQUIRE(home.count() == 3);
+  const auto id = [&](int row) { return home.data(home.index(row), HomeModel::SectionIdRole).toString(); };
+  CHECK(id(0) == QStringLiteral("resume"));
+
+  jfd::library::HomeArrangement arrangement;
+  arrangement.order = {QStringLiteral("gone"), QStringLiteral("latest/movies"), QStringLiteral("resume")};
+  arrangement.hidden = {QStringLiteral("resume")};
+  home.setArrangement(arrangement);
+  REQUIRE(home.count() == 2);
+  CHECK(id(0) == QStringLiteral("latest/movies"));
+  CHECK(id(1) == QStringLiteral("latest/shows"));
+
+  home.setSectionVisible(QStringLiteral("resume"), true);
+  CHECK(home.count() == 3);
+  QSignalSpy saved(&home, &HomeModel::arrangementChanged);
+  home.moveSection(0, 2);
+  CHECK(saved.count() == 1);
+
+  home.resetArrangement();
+  CHECK(id(0) == QStringLiteral("resume"));
+  CHECK(home.arrangement() == jfd::library::HomeArrangement{});
+}

@@ -1,5 +1,8 @@
 #include "jfd/library/HomeSection.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+
 #include <algorithm>
 
 namespace jfd::library {
@@ -60,6 +63,37 @@ namespace jfd::library {
       }
     }
     return order;
+  }
+
+  HomeArrangement parseArrangement(const QString& stored) {
+    HomeArrangement arrangement;
+    const QJsonDocument document = QJsonDocument::fromJson(stored.toUtf8());
+    if (!document.isArray()) {
+      return arrangement;
+    }
+    for (const QJsonValue& value : document.array()) {
+      QString id = value.toString();
+      const bool hidden = id.startsWith(QLatin1Char('-'));
+      if (hidden) {
+        id.remove(0, 1);
+      }
+      if (id.isEmpty() || arrangement.order.contains(id)) {
+        continue;
+      }
+      arrangement.order.append(id);
+      if (hidden) {
+        arrangement.hidden.append(id);
+      }
+    }
+    return arrangement;
+  }
+
+  QString formatArrangement(const HomeArrangement& arrangement) {
+    QJsonArray array;
+    for (const QString& id : arrangement.order) {
+      array.append(arrangement.hidden.contains(id) ? QLatin1Char('-') + id : id);
+    }
+    return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Compact));
   }
 
 } // namespace jfd::library

@@ -194,6 +194,10 @@
         <translation>Назад</translation>
     </message>
     <message>
+        <source>Customize home</source>
+        <translation>Настроить главную</translation>
+    </message>
+    <message>
         <source>Open %1</source>
         <translation>Открыть: %1</translation>
     </message>

@@ -139,6 +139,14 @@
         <translation>Выключены</translation>
     </message>
     <message>
+        <source>Home screen rows</source>
+        <translation>Ряды главного экрана</translation>
+    </message>
+    <message>
+        <source>Customize home</source>
+        <translation>Настроить главную</translation>
+    </message>
+    <message>
         <source>Open the themes folder</source>
         <translation>Открыть папку с темами</translation>
     </message>

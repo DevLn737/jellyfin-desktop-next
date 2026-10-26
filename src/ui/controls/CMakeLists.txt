@@ -39,6 +39,8 @@ qt_add_qml_module(jfd_ui_controls
     icons/play.svg
     icons/search.svg
     icons/settings.svg
+    icons/up.svg
+    icons/down.svg
     icons-dark/back.svg
     icons-dark/check.svg
     icons-dark/close.svg
@@ -50,6 +52,8 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/play.svg
     icons-dark/search.svg
     icons-dark/settings.svg
+    icons-dark/up.svg
+    icons-dark/down.svg
   DEPENDENCIES Jfd.Ui.Theme)
 target_link_libraries(jfd_ui_controls PRIVATE Qt6::Quick jfd_ui_theme)
 jfd_add_translations(jfd_ui_controls)
