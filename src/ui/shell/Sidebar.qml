@@ -7,12 +7,10 @@ FocusScope {
     id: sidebar
 
     property bool collapsed: false
-    readonly property var entries: [
-        { route: "home", text: qsTr("Home"), icon: Icons.home },
-        { route: "search", text: qsTr("Search"), icon: Icons.search },
-        { route: "group", text: qsTr("Watch together"), icon: Icons.group },
-        { route: "settings", text: qsTr("Settings"), icon: Icons.settings },
-    ]
+    // Registered by the screens' modules (Navigator.registerRoute).
+    readonly property var entries: Navigator.sidebarEntries
+    // An entry's icon is a name from Icons or a file URL.
+    function iconFor(name) { return Icons[name] !== undefined ? Icons[name] : name }
 
     width: collapsed ? Theme.sidebarCollapsedWidth : Theme.sidebarWidth
     activeFocusOnTab: true
@@ -48,7 +46,7 @@ FocusScope {
                 objectName: "nav_" + modelData.route
                 width: parent.width
                 text: sidebar.collapsed ? "" : modelData.text
-                iconSource: modelData.icon
+                iconSource: sidebar.iconFor(modelData.icon)
                 highlighted: Navigator.currentName === modelData.route
                 Accessible.name: modelData.text
                 focus: index === 0

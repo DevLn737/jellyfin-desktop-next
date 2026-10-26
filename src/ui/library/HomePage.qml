@@ -85,8 +85,7 @@ RoutePage {
             width: rows.width
             focus: ListView.isCurrentItem
             model: items
-            cardHeight: cardShape === "thumb" ? Math.round(Theme.thumbWidth / Theme.thumbAspect) + 52
-                                              : Math.round(Theme.posterWidth / Theme.posterAspect) + 52
+            cardHeight: Math.round(Theme.cardWidthFor(cardShape) / Theme.cardAspectFor(cardShape)) + 52
             delegate: ItemCard { shape: row.cardShape }
         }
 

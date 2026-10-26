@@ -4,7 +4,8 @@ import Jfd.Ui.Theme
 
 // A library item: image with title and subtitle below. `shape` picks the
 // image's aspect ratio: "poster" (2:3, films and series), "thumb" (16:9,
-// episodes and "continue watching") or "square" (music). `progress` (0..1)
+// episodes and "continue watching"), "square" (album covers) or "circle"
+// (artists: a square image cut round). `progress` (0..1)
 // draws a watched bar; `played` a check mark; `unplayedCount` a badge.
 T.AbstractButton {
     id: card
@@ -16,12 +17,12 @@ T.AbstractButton {
     property real progress: 0
     property bool played: false
     property int unplayedCount: 0
+    // The page colour a circle card's corners are cut out to.
+    property color cutoutColor: Theme.background
 
     // The image width; the card's height follows from the shape.
-    property int cardWidth: shape === "thumb" ? Theme.thumbWidth
-        : shape === "square" ? Theme.squareWidth : Theme.posterWidth
-    readonly property real imageAspect: shape === "thumb" ? Theme.thumbAspect
-        : shape === "square" ? 1 : Theme.posterAspect
+    property int cardWidth: Theme.cardWidthFor(shape)
+    readonly property real imageAspect: Theme.cardAspectFor(shape)
 
     implicitWidth: cardWidth
     implicitHeight: frame.height + captions.implicitHeight + Theme.spacingSmall
@@ -36,7 +37,7 @@ T.AbstractButton {
         id: frame
         width: card.cardWidth
         height: Math.round(card.cardWidth / card.imageAspect)
-        radius: Theme.radius
+        radius: card.shape === "circle" ? width / 2 : Theme.radius
         color: Theme.surfaceRaised
         clip: true
         scale: card.hovered || card.visualFocus ? 1.03 : 1
@@ -61,6 +62,23 @@ T.AbstractButton {
             text: card.title.length > 0 ? card.title.charAt(0).toUpperCase() : ""
             color: Theme.textDisabled
             font.pixelSize: Theme.fontSizeHeadline
+        }
+
+        // A circle card: a ring of the page colour over the square image
+        // (Qt Quick's clip is a rectangle, whatever the radius). The frame
+        // clips the ring's outer part.
+        Rectangle {
+            readonly property real ring: Math.ceil(frame.width * 0.22)
+            visible: card.shape === "circle"
+            x: -ring
+            y: -ring
+            width: frame.width + 2 * ring
+            height: frame.height + 2 * ring
+            radius: width / 2
+            color: "transparent"
+            border.width: ring
+            border.color: card.cutoutColor
+            antialiasing: true
         }
 
         Rectangle {

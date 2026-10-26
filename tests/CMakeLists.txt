@@ -101,6 +101,7 @@ if(TARGET jfd_jellyfin_api)
   jfd_add_qt_test(jfd_library_tests
     library/ItemBrowserTest.cpp
     library/HomeModelTest.cpp
+    library/HomeSectionTest.cpp
     library/LibraryModelTest.cpp
     library/DetailsSearchTest.cpp
     library/ImageCacheTest.cpp
@@ -176,6 +177,15 @@ if(JFD_BUILD_APP)
     add_executable(jfd_ui_tests support/QtTestMain.cpp ui/ShellTest.cpp)
     target_link_libraries(jfd_ui_tests PRIVATE jfd_ui_shell doctest Qt6::Test)
     add_test(NAME jfd_ui_tests COMMAND jfd_ui_tests)
+    # The shell's connection points in a window: the mini player strip,
+    # card shapes, the palette.
+    add_executable(jfd_ui_shell_page_tests support/QtGuiTestMain.cpp ui/ShellPageTest.cpp)
+    target_link_libraries(jfd_ui_shell_page_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_shell_page_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_shell_page_tests COMMAND jfd_ui_shell_page_tests)
+    set_tests_properties(jfd_ui_shell_page_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(TARGET jfd_ui_library)

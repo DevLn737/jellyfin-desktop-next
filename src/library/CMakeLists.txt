@@ -6,6 +6,7 @@ add_library(jfd_library STATIC
   src/CardImages.cpp
   src/CollectionIndex.cpp
   src/HomeModel.cpp
+  src/HomeSections.cpp
   src/ImageCache.cpp
   src/ItemBrowser.cpp
   src/ItemDetails.cpp
@@ -18,6 +19,7 @@ add_library(jfd_library STATIC
   include/jfd/library/CardImages.h
   include/jfd/library/CollectionIndex.h
   include/jfd/library/HomeModel.h
+  include/jfd/library/HomeSection.h
   include/jfd/library/ImageCache.h
   include/jfd/library/ItemBrowser.h
   include/jfd/library/ItemDetails.h
