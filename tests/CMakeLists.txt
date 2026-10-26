@@ -122,7 +122,7 @@ if(TARGET jfd_jellyfin_api)
   endif()
 
   if(TARGET jfd_seerr)
-    jfd_add_qt_test(jfd_seerr_tests seerr/SeerrClientTest.cpp)
+    jfd_add_qt_test(jfd_seerr_tests seerr/SeerrClientTest.cpp seerr/SeerrServiceTest.cpp)
     target_link_libraries(jfd_seerr_tests PRIVATE jfd::seerr)
   # FakeSeerr.h writes its JSON fixtures as plain literals.
   if(NOT MSVC)
