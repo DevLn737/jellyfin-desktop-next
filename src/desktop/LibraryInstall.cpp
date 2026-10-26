@@ -97,6 +97,7 @@ namespace jfd::desktop {
     Q_ASSERT(installed);
     Q_UNUSED(installed);
     services.libraryUi = screens.ui();
+    services.homeSections = screens.home().sections();
 
     // Messages for the shell's toast; the window exists by the time one is
     // sent.
