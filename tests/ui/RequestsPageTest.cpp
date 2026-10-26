@@ -34,6 +34,8 @@ using jfd::test::waitFor;
 
 namespace {
 
+  constexpr int QLineEdit_Password = 2; // TextInput.Password
+
   QQuickItem* find(QQuickItem* root, const char* name) {
     if (root == nullptr) return nullptr;
     if (root->objectName() == QLatin1String(name)) return root;
@@ -302,12 +304,18 @@ TEST_CASE("Every control on the requests pages has a name for screen readers") {
       QAccessibleInterface* iface = QAccessible::queryAccessibleInterface(item);
       if (iface == nullptr) continue;
       const std::string what = std::string(route) + ": " + item->metaObject()->className() + " " +
-                               item->objectName().toStdString() + " in " +
-                               (item->parentItem() ? item->parentItem()->objectName().toStdString() : std::string()) +
-                               " (echoMode " + std::to_string(item->property("echoMode").toInt()) + ", property " +
-                               item->property("accessibleName").toString().toStdString() + ") has no accessible name";
+                               item->objectName().toStdString() + " has no accessible name";
       CAPTURE(what);
-      CHECK(!iface->text(QAccessible::Name).isEmpty());
+      QString name = iface->text(QAccessible::Name);
+      // Qt gives a password field no name of its own; the labelled
+      // InputField around it carries the name.
+      if (name.isEmpty() && item->property("echoMode").toInt() == QLineEdit_Password) {
+        for (QQuickItem* up = item->parentItem(); up != nullptr && name.isEmpty(); up = up->parentItem()) {
+          if (QAccessibleInterface* outer = QAccessible::queryAccessibleInterface(up))
+            name = outer->text(QAccessible::Name);
+        }
+      }
+      CHECK(!name.isEmpty());
     }
   }
 }
