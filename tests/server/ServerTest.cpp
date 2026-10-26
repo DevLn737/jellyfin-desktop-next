@@ -8,8 +8,10 @@
 #include <jfd/library/HomeModel.h>
 #include <jfd/library/ImageCache.h>
 #include <jfd/library/ItemBrowser.h>
+#include <jfd/library/HomeSection.h>
 #include <jfd/library/ItemDetails.h>
 #include <jfd/library/LibraryModel.h>
+#include <jfd/library/RecommendationRows.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
 #include <jfd/platform/CredentialStore.h>
@@ -639,4 +641,43 @@ TEST_CASE("SyncPlay playback rate: 409 for unsupported members, Unsupported on a
   }
   run<Empty>([&](auto done) { legacy.syncPlay->leaveGroup(nullptr, done); });
   CHECK(run<Empty>([&](auto done) { host.syncPlay->leaveGroup(nullptr, done); }).ok());
+}
+
+TEST_CASE("Recommendations, suggestions and the recommendation rows after some watching") {
+  auto client = signedIn(QStringLiteral("jfd-recommend"));
+  // A little history (undone at the end: other tests count unplayed items).
+  const Item episode = findItem(*client, QStringLiteral("Episode"));
+  const Item movie = findItem(*client, QStringLiteral("Movie"));
+  REQUIRE(run<Empty>([&](auto done) { client->markPlayed(episode.id, nullptr, done); }).ok());
+  REQUIRE(run<Empty>([&](auto done) { client->markPlayed(movie.id, nullptr, done); }).ok());
+
+  auto groups = run<QList<RecommendationGroup>>(
+      [&](auto done) { client->movieRecommendations(4, 16, nullptr, done); });
+  REQUIRE_MESSAGE(groups.ok(), (groups.ok() ? QString() : groups.error().message).toStdString());
+  for (const RecommendationGroup& group : *groups) CHECK_FALSE(group.items.isEmpty());
+
+  auto picks = run<ItemPage>([&](auto done) {
+    client->suggestions(16, {QStringLiteral("Movie"), QStringLiteral("Series")}, nullptr, done);
+  });
+  CHECK(picks.ok());
+
+  library::HomeSections sections;
+  library::RecommendationRows::Options options;
+  options.timeoutMs = 10000;
+  library::RecommendationRows rows(*client, sections, options);
+  rows.refresh();
+  // The parts finish in any order; give them time, then whatever is there is
+  // consistent: every section has a model with cards.
+  waitFor([&] { return false; }, 3000);
+  MESSAGE("recommendation sections: " << sections.byDefaultOrder().size() << ", groups: " << groups->size()
+                                      << ", picks: " << (picks.ok() ? picks->items.size() : -1));
+  for (const library::HomeSection* section : sections.byDefaultOrder()) {
+    CHECK(section->id.startsWith(QStringLiteral("recommend/")));
+    REQUIRE_FALSE(section->model.isNull());
+    CHECK(section->model->rowCount() > 0);
+    CHECK_FALSE(section->title.isEmpty());
+  }
+
+  CHECK(run<Empty>([&](auto done) { client->markUnplayed(episode.id, nullptr, done); }).ok());
+  CHECK(run<Empty>([&](auto done) { client->markUnplayed(movie.id, nullptr, done); }).ok());
 }
