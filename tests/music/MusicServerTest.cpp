@@ -237,8 +237,16 @@ TEST_CASE("Next, previous, repeat and the queue's edits") {
   s.player->jumpTo(2);
   REQUIRE(waitFor([&] { return s.player->currentIndex() == 2 && s.player->playing(); }, 30000));
   CHECK(s.player->hasNext());
+  // The wrap is queued behind the track before it ends, as it is in use.
+  REQUIRE(waitFor([&] { return s.player->nextQueued(); }, 20000));
   s.seekNearEnd(2);
-  REQUIRE(waitFor([&] { return s.player->currentIndex() == 0 && s.player->playing(); }, 30000));
+  const bool wrapped = waitFor([&] { return s.player->currentIndex() == 0 && s.player->playing(); }, 30000);
+  if (!wrapped)
+    MESSAGE("repeat wrap: index " << s.player->currentIndex() << " playing " << s.player->playing() << " loading "
+                                   << s.player->loading() << " active " << s.player->active() << " position "
+                                   << s.player->position() << " handovers " << s.player->handoverCount() << " opens "
+                                   << s.player->openCount() << " error " << s.player->error().toStdString());
+  REQUIRE(wrapped);
   s.player->setRepeat(QStringLiteral("none"));
 
   // Removing the playing track plays the one that followed it.

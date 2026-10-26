@@ -80,6 +80,8 @@ namespace jfd::music {
     QString error() const { return m_error; }
     // How many tracks the backend moved on to by itself (queued behind the
     // one before), and how many were opened one by one; for diagnostics.
+    // The next track is queued behind the current one.
+    bool nextQueued() const { return m_preloaded.has_value(); }
     int handoverCount() const { return m_handovers; }
     int openCount() const { return m_opens; }
 
