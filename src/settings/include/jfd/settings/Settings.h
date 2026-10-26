@@ -38,6 +38,9 @@ namespace jfd::settings {
     // Back to the default; the stored entry is removed.
     Q_INVOKABLE void reset(const QString& key);
     Q_INVOKABLE bool isDefault(const QString& key) const;
+    // For a setting with dynamic choices: tells the settings screen to read
+    // them again.
+    void notifyChoicesChanged(const QString& key) { Q_EMIT choicesChanged(key); }
 
     // For Action settings; emits actionTriggered.
     Q_INVOKABLE void trigger(const QString& key);
@@ -48,6 +51,7 @@ namespace jfd::settings {
   Q_SIGNALS:
     void valueChanged(const QString& key, const QVariant& value);
     void actionTriggered(const QString& key);
+    void choicesChanged(const QString& key);
 
   private:
     void migrate();

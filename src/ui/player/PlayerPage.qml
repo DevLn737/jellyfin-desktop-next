@@ -19,6 +19,10 @@ import Jfd.Ui.Player
 RoutePage {
     id: page
 
+    // Everything on the video, the controls included, keeps the dark palette
+    // in every theme (see Theme.colorsFor).
+    readonly property var colorScope: Overlay.colors
+
     readonly property var player: PlayerSession
     readonly property bool fullscreen: Window.window !== null && Window.window.visibility === Window.FullScreen
     property bool osdVisible: true
@@ -205,7 +209,7 @@ RoutePage {
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 2 * Theme.controlHeight - groupOsd.width - 3 * Theme.spacing
+                width: Math.max(0, parent.width - 2 * Theme.controlHeight - groupOsd.width - 3 * Theme.spacing)
                 text: page.player.title
                 color: Overlay.text
                 font.pixelSize: Theme.fontSizeLarge
@@ -384,11 +388,13 @@ RoutePage {
                         onClicked: page.player.togglePause()
                     }
                     IconButton {
+                        visible: page.width >= 720
                         iconSource: PlayerIcons.replay
                         toolTipText: qsTr("Back 10 seconds")
                         onClicked: page.player.seekBy(-10)
                     }
                     IconButton {
+                        visible: page.width >= 720
                         iconSource: PlayerIcons.forward
                         toolTipText: qsTr("Forward 10 seconds")
                         onClicked: page.player.seekBy(10)
@@ -424,6 +430,8 @@ RoutePage {
                     ValueSlider {
                         objectName: "volume"
                         anchors.verticalCenter: parent.verticalCenter
+                        // The mute button stays when the window is narrow.
+                        visible: page.width >= 800
                         width: 96
                         from: 0
                         to: 100
@@ -461,6 +469,11 @@ RoutePage {
     }
 
     Keys.onPressed: (event) => {
+        // Ctrl+K (the command palette) and the like are not player keys.
+        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) {
+            event.accepted = false
+            return
+        }
         switch (event.key) {
         case Qt.Key_Space:
         case Qt.Key_K:

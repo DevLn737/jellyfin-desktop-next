@@ -64,6 +64,8 @@ T.ItemDelegate {
                 anchors.right: parent.right
                 anchors.margins: Theme.spacingSmall
                 source: Icons.check
+                // On the picture, whatever the theme.
+                color: Overlay.text
                 size: 18
             }
         }

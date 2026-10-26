@@ -82,6 +82,9 @@ namespace jfd::ui {
                                                              QObject* owner);
     // An item page's model, owned by `owner`. Null before attach.
     Q_INVOKABLE jfd::library::ItemDetails* createDetails(const QString& itemId, QObject* owner);
+    // A search of its own (the command palette's), owned by `owner`; the
+    // search page keeps using `search`. Null before attach.
+    Q_INVOKABLE jfd::library::SearchModel* createSearch(QObject* owner);
     // The image provider's source for a server image URL.
     Q_INVOKABLE QString image(const QUrl& url) const;
     // Where a card leads: "library/<id>" for a library, "collection/<id>"

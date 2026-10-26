@@ -174,6 +174,13 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_session_mpv_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
   endif()
 
+  if(TARGET jfd_ui_theme)
+    # Palettes, accent colours, contrast and theme files.
+    add_executable(jfd_ui_theme_tests support/QtTestMain.cpp ui/ThemeTest.cpp)
+    target_link_libraries(jfd_ui_theme_tests PRIVATE jfd_ui_theme doctest Qt6::Test)
+    add_test(NAME jfd_ui_theme_tests COMMAND jfd_ui_theme_tests)
+  endif()
+
   if(TARGET jfd_ui_shell)
     add_executable(jfd_ui_tests support/QtTestMain.cpp ui/ShellTest.cpp)
     target_link_libraries(jfd_ui_tests PRIVATE jfd_ui_shell doctest Qt6::Test)
@@ -187,6 +194,17 @@ if(JFD_BUILD_APP)
     target_compile_options(jfd_ui_shell_page_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_shell_page_tests COMMAND jfd_ui_shell_page_tests)
     set_tests_properties(jfd_ui_shell_page_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
+  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+    # Ctrl+K: the command palette over the shell.
+    add_executable(jfd_ui_palette_tests support/QtGuiTestMain.cpp ui/PaletteTest.cpp)
+    target_link_libraries(jfd_ui_palette_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_palette_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_palette_tests COMMAND jfd_ui_palette_tests)
+    set_tests_properties(jfd_ui_palette_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(TARGET jfd_ui_library)

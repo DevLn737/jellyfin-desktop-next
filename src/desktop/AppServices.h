@@ -99,6 +99,11 @@ namespace jfd::desktop {
   // diagnostics actions.
   void installShell(AppServices& services, QQmlEngine& engine);
 
+  // The Ctrl+K commands of the shell itself: Go back and one "Open <name>"
+  // for each sidebar destination (kept in step with the sidebar). Needs
+  // installShell.
+  void installCommands(AppServices& services, QQmlEngine& engine);
+
   // After the window loads: starts the frame and process statistics and
   // saves a diagnostic report when Settings > Save diagnostic report is
   // pressed (reports go to <logDirectory>/reports, the last five are kept).

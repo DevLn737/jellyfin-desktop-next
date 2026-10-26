@@ -42,6 +42,20 @@ namespace jfd::ui {
     return model;
   }
 
+  library::SearchModel* LibraryUi::createSearch(QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::SearchModel::Options options;
+    // The palette shows a few results and answers quickly.
+    options.delayMs = 200;
+    options.limit = 12;
+    options.cardWidth = 80;
+    options.devicePixelRatio = m_services.devicePixelRatio;
+    auto* model = new library::SearchModel(*m_services.client, options, owner);
+    QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
+    if (m_services.updates != nullptr) model->follow(*m_services.updates);
+    return model;
+  }
+
   library::LibraryModel* LibraryUi::createLibrary(const QString& libraryId, QObject* owner) {
     if (m_services.client == nullptr) return nullptr;
     library::LibraryModel* model = newModel(owner);

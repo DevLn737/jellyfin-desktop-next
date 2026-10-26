@@ -4,6 +4,7 @@
 #include "Logging.h"
 #include "FlowCheck.h"
 #include "SmokeTest.h"
+#include "ThemeInstall.h"
 #include "Translations.h"
 
 #include <jfd/integrations/IntegrationsSettings.h>
@@ -20,6 +21,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -50,6 +52,8 @@ namespace {
     bool smoke = false;
     // --flow: the smoke test's server path (FlowCheck); implies --smoke.
     bool flow = false;
+    // --reset-theme: dark theme, blue accent.
+    bool resetTheme = false;
     QString settingsFile;
   };
 
@@ -65,6 +69,8 @@ namespace {
       } else if (arg == QLatin1String("--flow")) {
         options.smoke = true;
         options.flow = true;
+      } else if (arg == QLatin1String("--reset-theme")) {
+        options.resetTheme = true;
       } else if (arg == QLatin1String("--settings-file") && i + 1 < argc) {
         options.settingsFile = QString::fromLocal8Bit(argv[++i]);
       } else if (arg.startsWith(QLatin1String("--settings-file="))) {
@@ -75,8 +81,9 @@ namespace {
   }
 
   // Each module's settings section, before the file opens.
-  bool registerSettings(settings::SettingsRegistry& registry, const desktop::LegacyImport& legacy) {
-    bool ok = settings::registerCommonSections(registry);
+  bool registerSettings(settings::SettingsRegistry& registry, const desktop::LegacyImport& legacy,
+                        settings::ThemeChoices themeFiles) {
+    bool ok = settings::registerCommonSections(registry, std::move(themeFiles));
     ok = desktop::registerLibrarySettings(registry) && ok;
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
@@ -107,16 +114,22 @@ int main(int argc, char* argv[]) {
 
   desktop::AppServices services;
   desktop::LegacyImport legacy = desktop::findLegacyImport(options.smoke);
-  if (!registerSettings(services.settingsRegistry, legacy)) {
-    std::fprintf(stderr, "Invalid settings schema\n");
-    return 2;
-  }
   if (settingsFile.isEmpty()) {
     settingsFile = settings::Settings::defaultFilePath();
+  }
+  // Theme files live next to the settings.
+  desktop::ThemeCatalog themeCatalog(QDir(QFileInfo(settingsFile).absolutePath() + QStringLiteral("/themes")));
+  if (!registerSettings(services.settingsRegistry, legacy, desktop::themeChoices(themeCatalog))) {
+    std::fprintf(stderr, "Invalid settings schema\n");
+    return 2;
   }
   const bool firstStart = !QFile::exists(settingsFile);
   services.settings = std::make_unique<settings::Settings>(services.settingsRegistry, settingsFile);
   desktop::importLegacyAtFirstStart(services, legacy, firstStart);
+  // For when a theme left nothing readable on screen.
+  if (options.resetTheme) {
+    desktop::resetThemeSettings(*services.settings);
+  }
 
   const double scale = services.settings->value(settings::keys::Scale).toDouble();
   if (scale != 1.0 && qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR")) {
@@ -134,6 +147,8 @@ int main(int argc, char* argv[]) {
   parser.addOption({QStringLiteral("flow"),
                     QStringLiteral("Sign in to JFD_TEST_SERVER_URL, open a series and an episode, play them, "
                                    "switch tracks, quit.")});
+  parser.addOption({QStringLiteral("reset-theme"),
+                    QStringLiteral("Go back to the dark theme with the blue accent, then start.")});
   parser.addOption({QStringLiteral("settings-file"), QStringLiteral("Use this settings file."), QStringLiteral("path")});
   parser.process(app);
   if (options.flow && !desktop::FlowCheck::configured()) {
@@ -175,6 +190,7 @@ int main(int argc, char* argv[]) {
   {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
+    desktop::installCommands(services, engine);
     desktop::installLibrary(services, engine);
     desktop::installLegacy(services, legacy, !options.smoke);
     desktop::installSession(services);
@@ -201,6 +217,7 @@ int main(int argc, char* argv[]) {
       return 3;
     }
 
+    desktop::installAppearance(services, themeCatalog, engine, *window);
     desktop::startEffects(services, engine, *window);
     desktop::announceLegacyImport(legacy, *window);
     desktop::installDiagnostics(services, *window);

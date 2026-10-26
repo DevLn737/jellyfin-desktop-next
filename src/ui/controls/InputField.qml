@@ -6,6 +6,8 @@ import Jfd.Ui.Theme
 // Set `password` for hidden input. `accepted` fires on Enter.
 FocusScope {
     id: root
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(root)
 
     property string label
     property alias text: field.text
@@ -31,7 +33,7 @@ FocusScope {
         Text {
             visible: root.label.length > 0
             text: root.label
-            color: Theme.textSecondary
+            color: colors.textSecondary
             font.pixelSize: Theme.fontSizeSmall
         }
 
@@ -43,10 +45,10 @@ FocusScope {
             leftPadding: Theme.spacing
             rightPadding: Theme.spacing
             verticalAlignment: TextInput.AlignVCenter
-            color: Theme.text
-            placeholderTextColor: Theme.textDisabled
-            selectionColor: Theme.accent
-            selectedTextColor: Theme.accentText
+            color: colors.text
+            placeholderTextColor: colors.textDisabled
+            selectionColor: colors.accent
+            selectedTextColor: colors.accentText
             font.pixelSize: Theme.fontSizeBody
             echoMode: root.password ? TextInput.Password : TextInput.Normal
             onAccepted: root.accepted()
@@ -66,10 +68,10 @@ FocusScope {
 
             background: Rectangle {
                 radius: Theme.radius
-                color: Theme.surfaceRaised
+                color: colors.surfaceRaised
                 border.width: field.activeFocus || root.errorText.length > 0 ? Theme.focusRingWidth : 1
-                border.color: root.errorText.length > 0 ? Theme.error
-                    : field.activeFocus ? Theme.focusRing : Theme.border
+                border.color: root.errorText.length > 0 ? colors.error
+                    : field.activeFocus ? colors.focusRing : colors.border
             }
         }
 
@@ -77,7 +79,7 @@ FocusScope {
             visible: root.errorText.length > 0
             width: parent.width
             text: root.errorText
-            color: Theme.error
+            color: colors.error
             font.pixelSize: Theme.fontSizeSmall
             wrapMode: Text.Wrap
         }

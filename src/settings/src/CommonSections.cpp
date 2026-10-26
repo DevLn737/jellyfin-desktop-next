@@ -66,6 +66,76 @@ namespace jfd::settings {
       scale.requiresRestart = true;
       section.settings.append(scale);
 
+      // Version 1 had a "Reduce animations" switch; on becomes "on", off
+      // becomes automatic.
+      section.version = 2;
+      section.migrations = {
+          {1,
+           [](QVariantMap& values) {
+             const QVariant reduced = values.take(QStringLiteral("reduceMotion"));
+             if (reduced.isValid() && reduced.toBool()) {
+               values.insert(QStringLiteral("effects"), QStringLiteral("on"));
+             }
+           }},
+      };
+      return section;
+    }
+
+    SectionDescriptor appearanceSection(ThemeChoices themeFiles) {
+      SectionDescriptor section;
+      section.id = QStringLiteral("appearance");
+      section.context = Context;
+      section.title = QT_TRANSLATE_NOOP("CommonSettings", "Appearance");
+      section.order = 11;
+      // The simplified-effects switch used to be in the interface section.
+      section.adoptions = {{QString(QLatin1String("interface/effects")), key(keys::Effects)}};
+
+      SettingDescriptor theme;
+      theme.key = key(keys::Theme);
+      theme.type = SettingType::Choice;
+      theme.defaultValue = QStringLiteral("dark");
+      theme.label = QT_TRANSLATE_NOOP("CommonSettings", "Theme");
+      theme.description = QT_TRANSLATE_NOOP("CommonSettings", "Changes at once, no restart needed. The video player is always dark.");
+      theme.dynamicChoices = [themeFiles = std::move(themeFiles)] {
+        QList<Choice> choices = {
+            {QStringLiteral("dark"), QT_TRANSLATE_NOOP("CommonSettings", "Dark")},
+            {QStringLiteral("light"), QT_TRANSLATE_NOOP("CommonSettings", "Light")},
+            {QStringLiteral("system"), QT_TRANSLATE_NOOP("CommonSettings", "Like the system")},
+        };
+        if (themeFiles) {
+          choices.append(themeFiles());
+        }
+        return choices;
+      };
+      section.settings.append(theme);
+
+      SettingDescriptor accent;
+      accent.key = key(keys::Accent);
+      accent.type = SettingType::Choice;
+      accent.defaultValue = QStringLiteral("blue");
+      accent.label = QT_TRANSLATE_NOOP("CommonSettings", "Accent colour");
+      // The ids and names of the presets in jfd::ui::accentPresets().
+      accent.choices = {
+          {QStringLiteral("blue"), QT_TRANSLATE_NOOP("Appearance", "Blue")},
+          {QStringLiteral("purple"), QT_TRANSLATE_NOOP("Appearance", "Purple")},
+          {QStringLiteral("pink"), QT_TRANSLATE_NOOP("Appearance", "Pink")},
+          {QStringLiteral("red"), QT_TRANSLATE_NOOP("Appearance", "Red")},
+          {QStringLiteral("orange"), QT_TRANSLATE_NOOP("Appearance", "Orange")},
+          {QStringLiteral("yellow"), QT_TRANSLATE_NOOP("Appearance", "Yellow")},
+          {QStringLiteral("green"), QT_TRANSLATE_NOOP("Appearance", "Green")},
+          {QStringLiteral("teal"), QT_TRANSLATE_NOOP("Appearance", "Teal")},
+          {QStringLiteral("custom"), QT_TRANSLATE_NOOP("CommonSettings", "Custom")},
+      };
+      section.settings.append(accent);
+
+      SettingDescriptor custom;
+      custom.key = key(keys::AccentCustom);
+      custom.type = SettingType::String;
+      custom.defaultValue = QStringLiteral("#00a4dc");
+      custom.label = QT_TRANSLATE_NOOP("CommonSettings", "Custom accent colour");
+      custom.description = QT_TRANSLATE_NOOP("CommonSettings", "Like #00a4dc. Used when the accent colour is Custom.");
+      section.settings.append(custom);
+
       SettingDescriptor effects;
       effects.key = key(keys::Effects);
       effects.type = SettingType::Choice;
@@ -80,18 +150,16 @@ namespace jfd::settings {
       };
       section.settings.append(effects);
 
-      // Version 1 had a "Reduce animations" switch; on becomes "on", off
-      // becomes automatic.
-      section.version = 2;
-      section.migrations = {
-          {1,
-           [](QVariantMap& values) {
-             const QVariant reduced = values.take(QStringLiteral("reduceMotion"));
-             if (reduced.isValid() && reduced.toBool()) {
-               values.insert(QStringLiteral("effects"), QStringLiteral("on"));
-             }
-           }},
-      };
+      for (const auto& [fullKey, text] :
+           {std::pair{keys::OpenThemeFolder, QT_TRANSLATE_NOOP("CommonSettings", "Open the themes folder")},
+            std::pair{keys::ReloadThemes, QT_TRANSLATE_NOOP("CommonSettings", "Reload themes")},
+            std::pair{keys::ExportTheme, QT_TRANSLATE_NOOP("CommonSettings", "Save the current theme as a file")}}) {
+        SettingDescriptor action;
+        action.key = key(fullKey);
+        action.type = SettingType::Action;
+        action.label = text;
+        section.settings.append(action);
+      }
       return section;
     }
 
@@ -199,9 +267,10 @@ namespace jfd::settings {
     }
   } // namespace
 
-  bool registerCommonSections(SettingsRegistry& registry) {
+  bool registerCommonSections(SettingsRegistry& registry, ThemeChoices themeFiles) {
     bool ok = true;
-    for (SectionDescriptor section : {accountSection(), interfaceSection(), diagnosticsSection(), windowSection()}) {
+    for (SectionDescriptor section : {accountSection(), interfaceSection(), appearanceSection(std::move(themeFiles)),
+                                      diagnosticsSection(), windowSection()}) {
       ok = registry.registerSection(std::move(section)) && ok;
     }
     return ok;
