@@ -1,0 +1,47 @@
+name: Seerr API
+
+# Starts the Seerr Docker image and asks it, without any sign-in, what the
+# client relies on: the version and public settings, and the refusals a
+# signed-out client gets. The table of real answers goes to the job summary
+# and docs/seerr.md. Runs only when the probe, this file or the Seerr docs
+# change.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/seerr-api.yml'
+      - 'scripts/test-server/seerr-probe.py'
+      - 'docs/seerr.md'
+  pull_request:
+    paths:
+      - '.github/workflows/seerr-api.yml'
+      - 'scripts/test-server/seerr-probe.py'
+      - 'docs/seerr.md'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Seerr API (Docker)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Start Seerr
+        run: |
+          docker run -d --name seerr -p 5055:5055 -e LOG_LEVEL=info ghcr.io/seerr-team/seerr:latest
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5055/api/v1/status >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:5055/api/v1/status
+
+      - name: Probe
+        run: |
+          python3 scripts/test-server/seerr-probe.py http://127.0.0.1:5055 | tee probe.md
+          { echo '### Seerr answers'; cat probe.md; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Server log
+        if: always()
+        run: docker logs seerr 2>&1 | tail -n 60
