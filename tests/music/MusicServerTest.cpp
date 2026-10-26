@@ -188,8 +188,15 @@ TEST_CASE("An album plays through in order; each track is reported when it ends"
   CHECK_FALSE(s.player->hasPrevious());
 
   for (int index = 1; index < 3; ++index) {
+    REQUIRE(waitFor([&] { return s.player->nextQueued(); }, 20000));
     s.seekNearEnd(2);
-    REQUIRE(waitFor([&] { return s.player->currentIndex() == index && s.player->playing(); }, 30000));
+    const bool advanced = waitFor([&] { return s.player->currentIndex() == index && s.player->playing(); }, 30000);
+    if (!advanced)
+      MESSAGE("album step " << index << ": index " << s.player->currentIndex() << " playing " << s.player->playing()
+                            << " loading " << s.player->loading() << " active " << s.player->active() << " position "
+                            << s.player->position() << " handovers " << s.player->handoverCount() << " opens "
+                            << s.player->openCount() << " error " << s.player->error().toStdString());
+    REQUIRE(advanced);
     // The previous track played to its end: the server shows it played.
     CHECK(waitFor([&] { return s.played(tracks[index - 1].id); }, 20000));
   }
