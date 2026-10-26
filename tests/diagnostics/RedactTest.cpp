@@ -93,3 +93,49 @@ TEST_CASE("server addresses are hidden, this computer's are kept")
   CHECK(redactSecrets("file:///home/user/video.mkv") == "file:///home/user/video.mkv");
   CHECK(redactSecrets("ratio 16:9 at 00:01:02") == "ratio 16:9 at 00:01:02");
 }
+
+TEST_CASE("Seerr secrets: API key header, cookies and addresses without a scheme are hidden")
+{
+  const std::string s = Secret;
+  for (const std::string& line : {
+           "X-Api-Key: " + s,
+           "x-api-key=" + s,
+           "GET /api/v1/settings/main x-api-key: " + s + " 200",
+           "Cookie: connect.sid=" + s + "; theme=dark",
+           "Set-Cookie: connect.sid=s%3A" + s + ".sig; Path=/; HttpOnly",
+           "set-cookie: other=1; connect.sid=" + s,
+           "{\"connect.sid\":\"" + s + "\"}",
+           "connect.sid=" + s,
+       }) {
+    CAPTURE(line);
+    CHECK_FALSE(leaks(redactSecrets(line)));
+  }
+  CHECK(redactSecrets("Cookie: a=1; b=2\r\nHost: x") == "Cookie: ***\r\nHost: x");
+  CHECK(redactSecrets("cookies: 3") == "cookies: 3");
+
+  CHECK(redactSecrets("connect to 192.168.1.50:5055 failed") == "connect to *** failed");
+  CHECK(redactSecrets("seerr.example.org:5055/api/v1") == "***/api/v1");
+  CHECK(redactSecrets("proxy=Seerr.Home.Lan:443,") == "proxy=***,");
+  CHECK(redactSecrets("http://10.0.0.5:5055/api") == "http://***/api");
+  CHECK(redactSecrets("127.0.0.1:18096 up") == "127.0.0.1:18096 up");
+  CHECK(redactSecrets("localhost:5055") == "localhost:5055");
+  CHECK(redactSecrets("Redact.cpp:42: failed") == "Redact.cpp:42: failed");
+  CHECK(redactSecrets("movie.mkv:12 at 00:01:02") == "movie.mkv:12 at 00:01:02");
+  CHECK(redactSecrets("version 0.38.0.1 ratio 16:9") == "version 0.38.0.1 ratio 16:9");
+}
+
+TEST_CASE("configured addresses are hidden wherever they appear")
+{
+  clearProtectedAddresses();
+  addProtectedAddress("https://Seerr.Example.Org/");
+  addProtectedAddress("media.lan");
+  addProtectedAddress("localhost:5055");
+  addProtectedAddress("");
+  CHECK(redactSecrets("redirect to seerr.example.org/login") == "redirect to ***/login");
+  CHECK(redactSecrets("Host: SEERR.EXAMPLE.ORG") == "Host: ***");
+  CHECK(redactSecrets("resolve media.lan failed") == "resolve *** failed");
+  CHECK(redactSecrets("localhost:5055") == "localhost:5055");
+  CHECK(redactSecrets("nothing here") == "nothing here");
+  clearProtectedAddresses();
+  CHECK(redactSecrets("resolve media.lan failed") == "resolve media.lan failed");
+}
