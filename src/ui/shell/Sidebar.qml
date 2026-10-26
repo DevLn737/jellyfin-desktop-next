@@ -7,6 +7,11 @@ FocusScope {
     id: sidebar
 
     property bool collapsed: false
+    // The button that opens the names over the page (compact windows).
+    property bool menuButton: false
+    signal menuToggled()
+    // A destination was chosen.
+    signal chosen()
     // Registered by the screens' modules (Navigator.registerRoute).
     readonly property var entries: Navigator.sidebarEntries
     // An entry's icon is a name from Icons or a file URL.
@@ -37,6 +42,15 @@ FocusScope {
             onClicked: Navigator.back()
         }
 
+        IconButton {
+            objectName: "menuButton"
+            visible: sidebar.menuButton
+            iconSource: Icons.menu
+            toolTipText: qsTr("Menu")
+            x: (sidebar.collapsed ? (parent.width - width) / 2 : Theme.spacingTiny)
+            onClicked: sidebar.menuToggled()
+        }
+
         Item { width: 1; height: Theme.spacingSmall }
 
         Repeater {
@@ -51,7 +65,10 @@ FocusScope {
                 Accessible.name: modelData.text
                 focus: index === 0
                 required property int index
-                onClicked: Navigator.navigate(modelData.route)
+                onClicked: {
+                    Navigator.navigate(modelData.route)
+                    sidebar.chosen()
+                }
             }
         }
     }

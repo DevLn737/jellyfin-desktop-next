@@ -30,5 +30,9 @@
         <source>Back</source>
         <translation>Назад</translation>
     </message>
+    <message>
+        <source>Menu</source>
+        <translation>Меню</translation>
+    </message>
 </context>
 </TS>

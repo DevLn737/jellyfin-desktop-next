@@ -16,6 +16,7 @@
 #include <jfd/ui/Navigator.h>
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -70,11 +71,13 @@ namespace {
       engine.loadData(R"(
         import QtQuick
         import Jfd.Ui.Shell
+        import Jfd.Ui.Library
         Window {
             width: 1280
             height: 800
             visible: true
-            AppShell { objectName: "shell"; anchors.fill: parent }
+            AppShell { objectName: "shell"; anchors.fill: parent; onPaletteRequested: palette.toggle() }
+            CommandPalette { id: palette; objectName: "palette"; anchors.fill: parent }
         })");
       REQUIRE_FALSE(engine.rootObjects().isEmpty());
       window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
@@ -246,6 +249,21 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   screens.find("searchField")->setProperty("text", QStringLiteral("Test"));
   REQUIRE(screens.waitCount("searchResults", 1));
   screens.screenshot(QStringLiteral("search"));
+
+  // The command palette (Ctrl+K) finds the same media, quickly.
+  auto* palette = screens.window->findChild<QQuickItem*>(QStringLiteral("palette"));
+  REQUIRE(palette != nullptr);
+  QMetaObject::invokeMethod(palette, "open");
+  QQuickItem* paletteInput = palette->findChild<QQuickItem*>(QStringLiteral("paletteInput"));
+  REQUIRE(paletteInput != nullptr);
+  QElapsedTimer paletteTimer;
+  paletteTimer.start();
+  paletteInput->setProperty("text", QStringLiteral("Test"));
+  REQUIRE(waitFor([&] { return palette->property("mediaCount").toInt() >= 1; }, 5000));
+  MESSAGE("palette search answered in ", paletteTimer.elapsed(), " ms");
+  CHECK(paletteTimer.elapsed() < 2000);
+  screens.screenshot(QStringLiteral("palette"));
+  QMetaObject::invokeMethod(palette, "close");
 
   // Signing out goes back to the login page.
   screens.screens->signIn().signOut();

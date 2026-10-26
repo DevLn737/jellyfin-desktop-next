@@ -29,6 +29,29 @@
     </message>
 </context>
 <context>
+    <name>CommandPalette</name>
+    <message>
+        <source>Commands and search</source>
+        <translation>Команды и поиск</translation>
+    </message>
+    <message>
+        <source>Type a command or search your media</source>
+        <translation>Введите команду или найдите фильм или сериал</translation>
+    </message>
+    <message>
+        <source>Commands</source>
+        <translation>Команды</translation>
+    </message>
+    <message>
+        <source>Media</source>
+        <translation>Медиа</translation>
+    </message>
+    <message>
+        <source>Nothing found.</source>
+        <translation>Ничего не найдено.</translation>
+    </message>
+</context>
+<context>
     <name>EpisodeRow</name>
     <message>
         <source>Play</source>

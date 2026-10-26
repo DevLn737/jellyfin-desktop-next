@@ -272,3 +272,46 @@ TEST_CASE("The old Reduce animations switch becomes Simplified effects") {
     CHECK_FALSE(raw.contains(QStringLiteral("interface/reduceMotion")));
   }
 }
+
+TEST_CASE("Simplified effects moves from Interface to Appearance with its value") {
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  {
+    QFile file(iniPath(dir));
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    file.write("[schema]\ninterface=2\n[interface]\nscale=1.25\neffects=off\n");
+  }
+  SettingsRegistry registry;
+  REQUIRE(registerCommonSections(registry));
+  Settings settings(registry, iniPath(dir));
+  CHECK(settings.value(keys::Effects).toString() == QLatin1String("off"));
+  CHECK(settings.value(keys::Scale).toDouble() == 1.25);
+  QSettings raw(iniPath(dir), QSettings::IniFormat);
+  CHECK_FALSE(raw.contains(QStringLiteral("interface/effects")));
+  CHECK(raw.value(QStringLiteral("appearance/effects")).toString() == QLatin1String("off"));
+  // The new section's own value wins over a stale old one.
+  settings.setValue(keys::Effects, QStringLiteral("on"));
+  raw.setValue(QStringLiteral("interface/effects"), QStringLiteral("off"));
+  raw.sync();
+  Settings again(registry, iniPath(dir));
+  CHECK(again.value(keys::Effects).toString() == QLatin1String("on"));
+  QSettings raw2(iniPath(dir), QSettings::IniFormat);
+  CHECK_FALSE(raw2.contains(QStringLiteral("interface/effects")));
+}
+
+TEST_CASE("The appearance defaults and the theme choices") {
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  SettingsRegistry registry;
+  auto files = std::make_shared<QList<Choice>>();
+  REQUIRE(registerCommonSections(registry, [files] { return *files; }));
+  Settings settings(registry, iniPath(dir));
+  CHECK(settings.value(keys::Theme).toString() == QLatin1String("dark"));
+  CHECK(settings.value(keys::Accent).toString() == QLatin1String("blue"));
+  CHECK(choicesOf(*registry.setting(keys::Theme)).size() == 3);
+  // A theme file that is not there yet cannot be chosen; once it is, it can.
+  CHECK_FALSE(settings.setValue(keys::Theme, QStringLiteral("file:midnight")));
+  files->append(Choice(QStringLiteral("file:midnight"), nullptr, QStringLiteral("Midnight")));
+  CHECK(settings.setValue(keys::Theme, QStringLiteral("file:midnight")));
+  CHECK(choicesOf(*registry.setting(keys::Theme)).size() == 4);
+}

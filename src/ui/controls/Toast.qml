@@ -7,6 +7,8 @@ import Jfd.Ui.Theme
 // the link in the browser, and stays longer.
 Rectangle {
     id: toast
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(toast)
 
     property string message
     property string kind: "info"
@@ -31,9 +33,9 @@ Rectangle {
     width: Math.min(row.implicitWidth + 2 * Theme.spacingLarge, parent.width - 2 * Theme.spacingHuge)
     height: row.implicitHeight + 2 * Theme.spacing
     radius: Theme.radius
-    color: Theme.surfaceRaised
+    color: colors.surfaceRaised
     border.width: 1
-    border.color: kind === "error" ? Theme.error : Theme.border
+    border.color: kind === "error" ? colors.error : colors.border
     opacity: 0
     visible: opacity > 0
     z: 1000
@@ -70,7 +72,7 @@ Rectangle {
             width: Math.min(implicitWidth, row.width - (toast.kind === "error" ? 18 + row.spacing : 0)
                             - (linkButton.visible ? linkButton.implicitWidth + row.spacing : 0))
             text: toast.message
-            color: Theme.text
+            color: colors.text
             font.pixelSize: Theme.fontSizeBody
             wrapMode: Text.Wrap
             anchors.verticalCenter: parent.verticalCenter

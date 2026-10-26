@@ -36,6 +36,8 @@ namespace jfd::test {
     QByteArray body;
     QByteArray contentType = "application/json";
     int delayMs = 0;
+    // Extra headers (Set-Cookie, Location, ...), in order.
+    QList<QPair<QByteArray, QByteArray>> headers = {};
   };
 
   class FakeServer : public QObject {
@@ -108,6 +110,8 @@ namespace jfd::test {
       auto reply = [socket, response]() {
         QByteArray out = "HTTP/1.1 " + QByteArray::number(response.status) + " X\r\n";
         if (!response.body.isEmpty()) out += "Content-Type: " + response.contentType + "\r\n";
+        for (const auto& [name, value] : response.headers)
+          out += name + ": " + value + "\r\n";
         out += "Content-Length: " + QByteArray::number(response.body.size()) + "\r\n";
         out += "Connection: close\r\n\r\n";
         out += response.body;

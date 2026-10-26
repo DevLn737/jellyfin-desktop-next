@@ -60,7 +60,7 @@ RoutePage {
     Text {
         objectName: "itemError"
         anchors.centerIn: parent
-        width: Math.min(parent.width - 2 * Theme.spacingHuge, 600)
+        width: Math.min(parent.width - 2 * Theme.pageMargin, 600)
         visible: page.details && !page.details.loaded && text.length > 0
         text: page.details ? page.details.errorText : ""
         color: Theme.error
@@ -79,9 +79,9 @@ RoutePage {
 
         ColumnLayout {
             id: content
-            x: Theme.spacingHuge
+            x: Theme.pageMargin
             y: Theme.spacingHuge
-            width: flick.width - 2 * Theme.spacingHuge
+            width: flick.width - 2 * Theme.pageMargin
             spacing: Theme.spacingHuge
 
             RowLayout {

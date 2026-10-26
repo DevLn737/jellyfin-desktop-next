@@ -5,6 +5,8 @@ import Jfd.Ui.Theme
 // A horizontal slider. Left/Right move it by `stepSize` when focused.
 T.Slider {
     id: control
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(control)
 
     implicitWidth: 220
     implicitHeight: Theme.controlHeight
@@ -17,13 +19,13 @@ T.Slider {
         width: control.availableWidth
         height: 4
         radius: 2
-        color: Theme.surfaceHover
+        color: colors.surfaceHover
 
         Rectangle {
             width: control.visualPosition * parent.width
             height: parent.height
             radius: 2
-            color: Theme.accent
+            color: colors.accent
         }
     }
 
@@ -33,7 +35,7 @@ T.Slider {
         width: 18
         height: 18
         radius: 9
-        color: control.pressed ? Theme.accentHover : Theme.text
+        color: control.pressed ? colors.accentHover : colors.text
         FocusFrame { shown: control.visualFocus; radius: 9 + Theme.focusRingWidth }
     }
 }

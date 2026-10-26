@@ -24,8 +24,8 @@ RoutePage {
         id: rows
         objectName: "homeRows"
         anchors.fill: parent
-        anchors.leftMargin: Theme.spacingHuge
-        anchors.rightMargin: Theme.spacingHuge
+        anchors.leftMargin: Theme.pageMargin
+        anchors.rightMargin: Theme.pageMargin
         focus: true
         clip: true
         spacing: Theme.spacingHuge

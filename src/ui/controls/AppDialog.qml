@@ -6,6 +6,8 @@ import Jfd.Ui.Theme
 // `rejectText` (empty for none) closes it. Esc rejects.
 T.Dialog {
     id: dialog
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(dialog)
 
     property string text
     property string acceptText: qsTr("OK")
@@ -26,11 +28,11 @@ T.Dialog {
 
     background: Rectangle {
         radius: Theme.radius
-        color: Theme.surface
-        border.color: Theme.border
+        color: colors.surface
+        border.color: colors.border
     }
 
-    T.Overlay.modal: Rectangle { color: Theme.scrim }
+    T.Overlay.modal: Rectangle { color: colors.scrim }
 
     header: Heading {
         text: dialog.title
@@ -43,7 +45,7 @@ T.Dialog {
 
     contentItem: Text {
         text: dialog.text
-        color: Theme.textSecondary
+        color: colors.textSecondary
         font.pixelSize: Theme.fontSizeBody
         wrapMode: Text.Wrap
     }

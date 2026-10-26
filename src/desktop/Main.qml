@@ -2,6 +2,7 @@ import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Shell
 import Jfd.Ui.Player
+import Jfd.Ui.Library
 
 // The main window. The application places and shows it (WindowStateKeeper).
 Window {
@@ -11,8 +12,20 @@ Window {
     width: 1280
     height: 800
     minimumWidth: 640
-    minimumHeight: 480
+    minimumHeight: 420
     visible: false
+
+    // Theme files dropped on the window (the application imports them).
+    signal themeFilesDropped(var urls)
+    DropArea {
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        onDropped: drop => {
+            if (drop.hasUrls) {
+                window.themeFilesDropped(drop.urls)
+            }
+        }
+    }
     // With HDR10 output the clear colour reaches the display unencoded.
     color: scene.hdr ? "black" : Theme.background
     title: shell.title.length > 0 ? shell.title + " — Jellyfin" : "Jellyfin"
@@ -28,6 +41,12 @@ Window {
             objectName: "shell"
             anchors.fill: parent
             backgroundVisible: !HdrOutput.videoShown
+            onPaletteRequested: palette.toggle()
+        }
+
+        CommandPalette {
+            id: palette
+            anchors.fill: parent
         }
     }
 }

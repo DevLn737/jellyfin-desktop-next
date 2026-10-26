@@ -44,7 +44,7 @@ namespace jfd::settings {
       if (setting.type == SettingType::Action) {
         continue;
       }
-      if (setting.type == SettingType::Choice && setting.choices.isEmpty()) {
+      if (setting.type == SettingType::Choice && choicesOf(setting).isEmpty()) {
         qCWarning(lcRegistry) << "choice setting without choices:" << section.id << setting.key;
         return false;
       }

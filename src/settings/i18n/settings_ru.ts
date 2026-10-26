@@ -2,6 +2,41 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>Appearance</name>
+    <message>
+        <source>Blue</source>
+        <translation>Синий</translation>
+    </message>
+    <message>
+        <source>Purple</source>
+        <translation>Фиолетовый</translation>
+    </message>
+    <message>
+        <source>Pink</source>
+        <translation>Розовый</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>Красный</translation>
+    </message>
+    <message>
+        <source>Orange</source>
+        <translation>Оранжевый</translation>
+    </message>
+    <message>
+        <source>Yellow</source>
+        <translation>Жёлтый</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>Зелёный</translation>
+    </message>
+    <message>
+        <source>Teal</source>
+        <translation>Бирюзовый</translation>
+    </message>
+</context>
+<context>
     <name>CommonSettings</name>
     <message>
         <source>Account</source>
@@ -44,6 +79,46 @@
         <translation>Дополнительно к масштабу, заданному в системе.</translation>
     </message>
     <message>
+        <source>Appearance</source>
+        <translation>Оформление</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>Тема</translation>
+    </message>
+    <message>
+        <source>Changes at once, no restart needed. The video player is always dark.</source>
+        <translation>Меняется сразу, перезапуск не нужен. Видеоплеер всегда тёмный.</translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation>Тёмная</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>Светлая</translation>
+    </message>
+    <message>
+        <source>Like the system</source>
+        <translation>Как в системе</translation>
+    </message>
+    <message>
+        <source>Accent colour</source>
+        <translation>Цвет акцента</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>Свой цвет</translation>
+    </message>
+    <message>
+        <source>Custom accent colour</source>
+        <translation>Свой цвет акцента</translation>
+    </message>
+    <message>
+        <source>Like #00a4dc. Used when the accent colour is Custom.</source>
+        <translation>Вида #00a4dc. Применяется, когда выбран свой цвет акцента.</translation>
+    </message>
+    <message>
         <source>Simplified effects</source>
         <translation>Упрощённые эффекты</translation>
     </message>
@@ -62,6 +137,18 @@
     <message>
         <source>Off</source>
         <translation>Выключены</translation>
+    </message>
+    <message>
+        <source>Open the themes folder</source>
+        <translation>Открыть папку с темами</translation>
+    </message>
+    <message>
+        <source>Reload themes</source>
+        <translation>Перечитать темы</translation>
+    </message>
+    <message>
+        <source>Save the current theme as a file</source>
+        <translation>Сохранить текущую тему в файл</translation>
     </message>
     <message>
         <source>Diagnostics</source>

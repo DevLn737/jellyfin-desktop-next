@@ -35,6 +35,12 @@ namespace jfd::ui {
     }
     connect(&settings, &settings::Settings::valueChanged, this,
             [this](const QString& key) { onValueChanged(key); });
+    connect(&settings, &settings::Settings::choicesChanged, this, [this](const QString& key) {
+      const int row = indexOf(key);
+      if (row >= 0) {
+        Q_EMIT dataChanged(index(row), index(row), {ChoicesRole});
+      }
+    });
   }
 
   int SettingsModel::rowCount(const QModelIndex& parent) const {
@@ -84,9 +90,10 @@ namespace jfd::ui {
       return m_settings.value(row.key);
     case ChoicesRole: {
       QVariantList choices;
-      for (const settings::Choice& choice : setting.choices) {
+      for (const settings::Choice& choice : settings::choicesOf(setting)) {
         choices.append(QVariantMap{{QStringLiteral("value"), choice.value},
-                                   {QStringLiteral("label"), translated(context, choice.label)}});
+                                   {QStringLiteral("label"),
+                                    choice.label ? translated(context, choice.label) : choice.text}});
       }
       return choices;
     }

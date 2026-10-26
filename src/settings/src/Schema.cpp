@@ -64,7 +64,7 @@ namespace jfd::settings {
       return QVariant(value.toString());
     case SettingType::Choice: {
       const QString text = value.toString();
-      for (const Choice& choice : setting.choices) {
+      for (const Choice& choice : choicesOf(setting)) {
         if (choice.value == text) {
           return QVariant(text);
         }
@@ -75,6 +75,10 @@ namespace jfd::settings {
       return {};
     }
     return {};
+  }
+
+  QList<Choice> choicesOf(const SettingDescriptor& setting) {
+    return setting.dynamicChoices ? setting.dynamicChoices() : setting.choices;
   }
 
 } // namespace jfd::settings

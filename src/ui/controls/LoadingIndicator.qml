@@ -4,6 +4,8 @@ import Jfd.Ui.Theme
 // Three pulsing dots while something loads. Static with reduced motion.
 Row {
     id: root
+    // Colours of the nearest colour scope (the video player has its own).
+    readonly property var colors: Theme.colorsFor(root)
 
     property bool running: visible
 
@@ -19,7 +21,7 @@ Row {
             width: 10
             height: 10
             radius: 5
-            color: Theme.accent
+            color: colors.accent
             opacity: 0.3
 
             SequentialAnimation on opacity {

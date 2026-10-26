@@ -33,6 +33,13 @@ namespace jfd::settings {
   struct Choice {
     QString value;
     const char* label = nullptr;
+    // Shown as it is, when there is no `label` (the name of a file the user
+    // added).
+    QString text;
+
+    Choice() = default;
+    Choice(QString choiceValue, const char* choiceLabel, QString choiceText = {})
+        : value(std::move(choiceValue)), label(choiceLabel), text(std::move(choiceText)) {}
   };
 
   struct SettingDescriptor {
@@ -43,6 +50,10 @@ namespace jfd::settings {
     const char* label = nullptr;
     const char* description = nullptr;
     QList<Choice> choices;
+    // Choices that change while the app runs (theme files in a folder):
+    // when set, called instead of reading `choices`. The owner calls
+    // Settings::notifyChoicesChanged(key) when the list changes.
+    std::function<QList<Choice>()> dynamicChoices;
     // Int and Double only; inclusive. Equal bounds mean unbounded.
     double minimum = 0;
     double maximum = 0;
@@ -71,6 +82,14 @@ namespace jfd::settings {
     std::function<void(QVariantMap& values)> apply;
   };
 
+  // A value that moved from another section: at startup, after every
+  // migration, `fromKey` ("interface/effects") is copied to `key` of this
+  // section if that is not stored yet, and removed.
+  struct Adoption {
+    QString fromKey;
+    QString key;
+  };
+
   struct SectionDescriptor {
     QString id;
     // Translation context of the labels in this section.
@@ -83,9 +102,13 @@ namespace jfd::settings {
     int version = 1;
     QList<SettingDescriptor> settings;
     QList<Migration> migrations;
+    QList<Adoption> adoptions;
     // Not shown on the settings screen.
     bool hidden = false;
   };
+
+  // The setting's choices now: `dynamicChoices()` if set, else `choices`.
+  QList<Choice> choicesOf(const SettingDescriptor& setting);
 
   // A value converted to the setting's type, or an invalid QVariant when it
   // cannot be (wrong type, out of range, unknown choice).
