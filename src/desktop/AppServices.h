@@ -1,5 +1,7 @@
 #pragma once
 
+#include <jfd/platform/CredentialStore.h>
+#include <jfd/seerr/SeerrService.h>
 #include <jfd/settings/Settings.h>
 #include <jfd/settings/SettingsRegistry.h>
 
@@ -22,14 +24,6 @@ namespace jfd::library {
 
 namespace jfd::media {
   class MpvPlayer;
-}
-
-namespace jfd::platform {
-  class CredentialStore;
-}
-
-namespace jfd::seerr {
-  class SeerrService;
 }
 
 namespace jfd::session {

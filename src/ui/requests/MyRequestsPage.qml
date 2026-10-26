@@ -11,16 +11,13 @@ import Jfd.Ui.Shell
 RoutePage {
     id: page
 
-    property var mine: null
+    readonly property var mine: Requests.createMine(page)
     property string errorText
     property int cancelRow: -1
 
     title: qsTr("My requests")
 
-    Component.onCompleted: {
-        mine = Requests.createMine(page)
-        mine.reload()
-    }
+    Component.onCompleted: mine.reload()
 
     Connections {
         target: page.mine

@@ -14,7 +14,7 @@ import Jfd.Ui.Shell
 RoutePage {
     id: page
 
-    property var details: null
+    readonly property var details: Requests.createDetails(page)
     // Season number -> chosen.
     property var chosen: ({})
     readonly property var chosenNumbers: {
@@ -28,14 +28,11 @@ RoutePage {
     }
     property string resultText
     property bool resultIsError: false
-    readonly property bool isSeries: details && details.mediaType === "tv"
+    readonly property bool isSeries: details.mediaType === "tv"
 
-    title: details && details.loaded ? details.name : qsTr("Request")
+    title: details.loaded ? details.name : qsTr("Request")
 
-    Component.onCompleted: {
-        details = Requests.createDetails(page)
-        details.load(routeArgument)
-    }
+    Component.onCompleted: details.load(routeArgument)
 
     Connections {
         target: page.details

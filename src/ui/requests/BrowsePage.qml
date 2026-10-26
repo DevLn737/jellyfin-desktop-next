@@ -12,10 +12,10 @@ RoutePage {
     id: page
 
     readonly property bool searching: field.text.trim().length > 0
-    property var trending: null
-    property var movies: null
-    property var series: null
-    property var found: null
+    readonly property var trending: Requests.createTitles("trending", page)
+    readonly property var movies: Requests.createTitles("popularMovies", page)
+    readonly property var series: Requests.createTitles("popularTv", page)
+    readonly property var found: Requests.createTitles("search", page)
 
     title: qsTr("Requests")
 
@@ -27,13 +27,7 @@ RoutePage {
         series.reload()
     }
 
-    Component.onCompleted: {
-        trending = Requests.createTitles("trending", page)
-        movies = Requests.createTitles("popularMovies", page)
-        series = Requests.createTitles("popularTv", page)
-        found = Requests.createTitles("search", page)
-        load()
-    }
+    Component.onCompleted: load()
     // Signing in (or out) from the sign-in page or Settings.
     property bool wasSignedIn: Requests.signedIn
     Connections {
