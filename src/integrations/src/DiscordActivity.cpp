@@ -61,6 +61,7 @@ namespace jfd::integrations {
 
   QJsonObject buildActivity(const PresenceInfo& info, qint64 start) {
     const bool episode = info.kind == PresenceInfo::Kind::Episode;
+    const bool music = info.kind == PresenceInfo::Kind::Music;
     QString title = episode && !info.seriesName.trimmed().isEmpty() ? info.seriesName : info.title;
     if (title.trimmed().isEmpty()) return {};
 
@@ -75,11 +76,16 @@ namespace jfd::integrations {
         number << e;
       }
       state << (number.isEmpty() ? QCoreApplication::translate("DiscordActivity", "Series") : QCoreApplication::translate("DiscordActivity", "Series") + QStringLiteral(" · ") + number.join(QLatin1Char(' ')));
+    } else if (music) {
+      QStringList line;
+      if (!info.artist.trimmed().isEmpty()) line << info.artist;
+      if (!info.album.trimmed().isEmpty()) line << info.album;
+      state << (line.isEmpty() ? QCoreApplication::translate("DiscordActivity", "Music") : line.join(QStringLiteral(" · ")));
     } else {
       state << (info.year > 0 ? QCoreApplication::translate("DiscordActivity", "Movie") + QStringLiteral(" · ") + QString::number(info.year) : QCoreApplication::translate("DiscordActivity", "Movie"));
     }
-    const QString status = info.buffering ? QCoreApplication::translate("DiscordActivity", "Loading") : info.playing ? QCoreApplication::translate("DiscordActivity", "Watching") : QCoreApplication::translate("DiscordActivity", "Paused");
-    if (info.groupSize > 1) state << QCoreApplication::translate("DiscordActivity", "Watching together (%1)").arg(info.groupSize);
+    const QString status = info.buffering ? QCoreApplication::translate("DiscordActivity", "Loading") : info.playing ? (music ? QCoreApplication::translate("DiscordActivity", "Listening") : QCoreApplication::translate("DiscordActivity", "Watching")) : QCoreApplication::translate("DiscordActivity", "Paused");
+    if (info.groupSize > 1 && !music) state << QCoreApplication::translate("DiscordActivity", "Watching together (%1)").arg(info.groupSize);
     // Discord's timer cannot stop: when paused, the position is in the text.
     if (!info.playing) state << status + QStringLiteral(" · ") + clockText(info.positionMs);
 
@@ -90,8 +96,8 @@ namespace jfd::integrations {
     QJsonObject timestamps{{QStringLiteral("start"), static_cast<double>(start)}};
     if (info.durationMs >= 1000)
       timestamps.insert(QStringLiteral("end"), static_cast<double>(start + info.durationMs / 1000));
-    // Type 3: "Watching".
-    return QJsonObject{{QStringLiteral("type"), 3},
+    // Type 3: "Watching"; type 2: "Listening".
+    return QJsonObject{{QStringLiteral("type"), music ? 2 : 3},
                        {QStringLiteral("details"), clipped(title)},
                        {QStringLiteral("state"), clipped(state.join(QStringLiteral(" · ")))},
                        {QStringLiteral("assets"), assets},

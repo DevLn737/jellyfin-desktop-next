@@ -111,7 +111,9 @@ FocusScope {
         anchors.left: stack.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Navigator.chromeVisible ? childrenRect.height : 0
+        // The first child's height: childrenRect would loop, since it counts
+        // visible children only and the strip is visible by its height.
+        height: Navigator.chromeVisible && children.length > 0 ? children[0].height : 0
         visible: height > 0
     }
 

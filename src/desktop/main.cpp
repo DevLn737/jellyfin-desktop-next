@@ -9,9 +9,11 @@
 
 #include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/platform/SingleInstance.h>
+#include <jfd/music/MusicPlayer.h>
 #include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
+#include <jfd/ui/MusicUi.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/PlayerSession.h>
@@ -43,6 +45,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_PlayerPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_MusicPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_RequestsPlugin)
 
 using namespace jfd;
@@ -89,6 +92,7 @@ namespace {
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
     ok = desktop::registerGroupSettings(registry) && ok;
+    ok = desktop::registerMusicSettings(registry) && ok;
     ok = desktop::registerSeerrSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
@@ -204,6 +208,7 @@ int main(int argc, char* argv[]) {
         [session = services.session.get()](core::SessionInput input) { session->post(std::move(input)); },
         *services.client);
     desktop::installGroup(services, engine);
+    desktop::installMusic(services, engine);
     desktop::installSeerr(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
@@ -221,6 +226,7 @@ int main(int argc, char* argv[]) {
     }
 
     desktop::installAppearance(services, themeCatalog, engine, *window);
+    desktop::installMiniPlayer(services, engine);
     desktop::startEffects(services, engine, *window);
     desktop::announceLegacyImport(legacy, *window);
     desktop::installDiagnostics(services, *window);
@@ -292,6 +298,7 @@ int main(int argc, char* argv[]) {
   ui::PlayerSession::setInstance(nullptr);
   services.playerModel.reset();
   desktop::uninstallGroup(services);
+  desktop::uninstallMusic(services);
   desktop::uninstallSeerr(services);
   services.session.reset();
   services.player.reset();

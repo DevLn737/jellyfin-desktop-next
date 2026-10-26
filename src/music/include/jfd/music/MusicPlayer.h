@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QVariantMap>
 
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -55,6 +56,8 @@ namespace jfd::music {
     Q_PROPERTY(int queueSize READ queueSize NOTIFY queueChanged)
     Q_PROPERTY(jfd::music::MusicQueueModel* queue READ queueModel CONSTANT)
     Q_PROPERTY(QString error READ error NOTIFY stateChanged)
+    // 0..100, applied to the player's output when a track opens and at once.
+    Q_PROPERTY(int volume READ volume WRITE setVolume NOTIFY volumeChanged)
 
   public:
     MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent = nullptr);
@@ -84,6 +87,15 @@ namespace jfd::music {
     bool nextQueued() const { return m_preloaded.has_value(); }
     int handoverCount() const { return m_handovers; }
     int openCount() const { return m_opens; }
+
+    int volume() const { return m_volume; }
+    void setVolume(int volume);
+    // The app's hooks into the player: `applyVolume` sets the output volume,
+    // `beforeOpen` gets each track just before it opens (normalization).
+    void setOutputHooks(std::function<void(int)> applyVolume, std::function<void(const Track&)> beforeOpen) {
+      m_applyVolume = std::move(applyVolume);
+      m_beforeOpen = std::move(beforeOpen);
+    }
 
     void setRepeat(const QString& mode);
     void setShuffle(bool on);
@@ -131,6 +143,7 @@ namespace jfd::music {
     void currentChanged();
     void queueChanged();
     void modeChanged();
+    void volumeChanged();
     void failed(const QString& message);
 
   private:
@@ -165,6 +178,9 @@ namespace jfd::music {
     session::SessionHub::Subscription m_subscription;
     QTimer m_saveTimer;
     std::function<void(const QByteArray&)> m_save;
+    std::function<void(int)> m_applyVolume;
+    std::function<void(const Track&)> m_beforeOpen;
+    int m_volume = 100;
 
     MusicQueue m_queue;
     MusicQueueModel m_model;

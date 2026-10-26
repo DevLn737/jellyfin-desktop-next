@@ -44,7 +44,7 @@ namespace jfd::music {
       const Track* track = m_queue.currentTrack();
       if (!m_requested || !track || track->id != itemId) return;
       m_requested.reset();
-      m_error = tr("This track could not be played.");
+      m_error = QStringLiteral("This track could not be played.");
       Q_EMIT failed(m_error);
       Q_EMIT stateChanged();
     });
@@ -82,6 +82,14 @@ namespace jfd::music {
             {QStringLiteral("imageItemId"), track->imageItemId},
             {QStringLiteral("imageTag"), track->imageTag},
             {QStringLiteral("duration"), static_cast<double>(track->runTimeTicks) / TicksPerSecond}};
+  }
+
+  void MusicPlayer::setVolume(int volume) {
+    volume = std::clamp(volume, 0, 100);
+    if (volume == m_volume) return;
+    m_volume = volume;
+    if (m_applyVolume && (active() || m_requested)) m_applyVolume(m_volume);
+    Q_EMIT volumeChanged();
   }
 
   QString MusicPlayer::repeat() const {
@@ -204,6 +212,8 @@ namespace jfd::music {
     m_pending.reset();
     m_preloaded.reset();
     m_preloadAsked.reset();
+    if (m_beforeOpen) m_beforeOpen(track);
+    if (m_applyVolume) m_applyVolume(m_volume);
     session::PlaybackLauncher::Request request;
     request.itemId = track.id;
     request.startTicks = startTicks;

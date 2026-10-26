@@ -11,7 +11,9 @@
 #include <QNetworkAccessManager>
 #include <QString>
 
+#include <functional>
 #include <memory>
+#include <optional>
 
 class QQmlEngine;
 class QQuickWindow;
@@ -41,14 +43,21 @@ namespace jfd::desktop {
     // Set by connectIntegrations; the controls' commands go nowhere before.
     integrations::MediaSessionBridge::Post post;
     std::unique_ptr<integrations::MediaSessionBridge> bridge;
-    // The item whose details were asked for last.
+    // The item whose details were asked for last, and what came back.
     QString detailsItem;
+    std::optional<integrations::NowPlayingDetails> details;
+    // Fills in what only the app knows (the music queue's next and previous).
+    std::function<void(integrations::NowPlayingDetails&)> completeDetails;
     // Last: released first, before what its handler uses.
     session::SessionHub::Subscription subscription;
   };
 
   // Creates the services and follows the Discord setting.
   void installIntegrations(AppServices& services, QQmlEngine& engine);
+
+  // Publishes the details of the item that plays again, after
+  // completeDetails would give other answers (the music queue changed).
+  void refreshDetails(AppServices& services);
 
   // Feeds the session's snapshots to the bridge and its commands back to
   // post; asks the server for each new item's details (series, poster).

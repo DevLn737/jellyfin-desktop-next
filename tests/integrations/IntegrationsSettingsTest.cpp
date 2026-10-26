@@ -75,3 +75,24 @@ TEST_CASE("A movie shows its year; without a poster neither image is set") {
   CHECK(details.artUrl.isEmpty());
   CHECK(details.publicPoster.isEmpty());
 }
+
+TEST_CASE("A track shows its artists and album, with the album's cover") {
+  jfd::api::JellyfinClient client(jfd::api::ClientIdentity{});
+  client.setServerUrl(QUrl(QStringLiteral("https://media.example.org/jellyfin")));
+
+  jfd::api::Item track;
+  track.id = QStringLiteral("track1");
+  track.type = QStringLiteral("Audio");
+  track.name = QStringLiteral("Song");
+  track.artists = {QStringLiteral("A"), QStringLiteral("B")};
+  track.album = QStringLiteral("Record");
+  track.albumId = QStringLiteral("album1");
+  track.albumPrimaryImageTag = QStringLiteral("covertag");
+
+  const auto details = nowPlayingDetails(track, client);
+  CHECK(details.kind == PresenceInfo::Kind::Music);
+  CHECK(details.artist == QStringLiteral("A, B"));
+  CHECK(details.album == QStringLiteral("Record"));
+  CHECK(details.artUrl.path() == QStringLiteral("/jellyfin/Items/album1/Images/Primary"));
+  CHECK(QUrlQuery(details.artUrl).queryItemValue(QStringLiteral("tag")) == QStringLiteral("covertag"));
+}

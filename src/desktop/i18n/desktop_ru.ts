@@ -201,6 +201,18 @@
         <source>Open %1</source>
         <translation>Открыть: %1</translation>
     </message>
+    <message>
+        <source>Play or pause music</source>
+        <translation>Играть или пауза (музыка)</translation>
+    </message>
+    <message>
+        <source>Next track</source>
+        <translation>Следующий трек</translation>
+    </message>
+    <message>
+        <source>Previous track</source>
+        <translation>Предыдущий трек</translation>
+    </message>
 </context>
 <context>
     <name>Diagnostics</name>
@@ -296,6 +308,44 @@
     <message>
         <source>The server address and the settings of the 2.x client on this computer. Settings changed here are replaced.</source>
         <translation>Адрес сервера и настройки клиента 2.x на этом компьютере. Настройки, изменённые здесь, будут заменены.</translation>
+    </message>
+</context>
+<context>
+    <name>MusicNav</name>
+    <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
+    </message>
+</context>
+<context>
+    <name>MusicSettings</name>
+    <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
+    </message>
+    <message>
+        <source>Volume at start</source>
+        <translation>Громкость при запуске</translation>
+    </message>
+    <message>
+        <source>The music volume when the app starts.</source>
+        <translation>Громкость музыки при запуске приложения.</translation>
+    </message>
+    <message>
+        <source>Even out loudness between tracks</source>
+        <translation>Выравнивать громкость треков</translation>
+    </message>
+    <message>
+        <source>Uses the ReplayGain tags of the files; for files without them, the gain the server worked out. Tracks the server converts to another format are not changed.</source>
+        <translation>Используются теги ReplayGain из файлов, а для файлов без них — значение, которое посчитал сервер. Треки, которые сервер конвертирует в другой формат, не меняются.</translation>
+    </message>
+    <message>
+        <source>Remember the queue</source>
+        <translation>Помнить очередь</translation>
+    </message>
+    <message>
+        <source>The queue and the place in the track stay when the app is closed; Play picks them up.</source>
+        <translation>Очередь и место в треке сохраняются при закрытии приложения; «Играть» продолжает с них.</translation>
     </message>
 </context>
 <context>
