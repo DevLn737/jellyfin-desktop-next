@@ -483,6 +483,10 @@ namespace jfd::api {
     if (q.isPlayed) query.addQueryItem(QStringLiteral("isPlayed"), boolText(*q.isPlayed));
     if (q.isFavorite) query.addQueryItem(QStringLiteral("isFavorite"), boolText(*q.isFavorite));
     if (!q.ids.isEmpty()) query.addQueryItem(QStringLiteral("ids"), q.ids.join(QLatin1Char(',')));
+    if (!q.albumArtistIds.isEmpty())
+      query.addQueryItem(QStringLiteral("albumArtistIds"), q.albumArtistIds.join(QLatin1Char(',')));
+    if (!q.artistIds.isEmpty())
+      query.addQueryItem(QStringLiteral("artistIds"), q.artistIds.join(QLatin1Char(',')));
     query.addQueryItem(QStringLiteral("recursive"), boolText(q.recursive));
     query.addQueryItem(QStringLiteral("startIndex"), QString::number(q.startIndex));
     query.addQueryItem(QStringLiteral("limit"), QString::number(q.limit));

@@ -186,6 +186,25 @@ namespace jfd::api::json {
     i.parentBackdropImageTags = strings(o, "ParentBackdropImageTags");
     i.parentThumbItemId = text(o, "ParentThumbItemId");
     i.parentThumbImageTag = text(o, "ParentThumbImageTag");
+    i.album = text(o, "Album");
+    i.albumId = text(o, "AlbumId");
+    i.albumArtist = text(o, "AlbumArtist");
+    i.albumPrimaryImageTag = text(o, "AlbumPrimaryImageTag");
+    i.artists = strings(o, "Artists");
+    const auto namedIds = [&o](const char* key) {
+      QList<NamedId> out;
+      for (const auto& value : o.value(QLatin1String(key)).toArray()) {
+        const QJsonObject entry = value.toObject();
+        out.append({text(entry, "Id"), text(entry, "Name")});
+      }
+      return out;
+    };
+    i.artistItems = namedIds("ArtistItems");
+    i.albumArtists = namedIds("AlbumArtists");
+    i.normalizationGain = number(o, "NormalizationGain");
+    i.songCount = smallInteger(o, "SongCount");
+    i.albumCount = smallInteger(o, "AlbumCount");
+    i.playlistItemId = text(o, "PlaylistItemId");
     i.trickplay = trickplay(o.value(QLatin1String("Trickplay")).toObject());
     readUserData(o.value(QLatin1String("UserData")).toObject(), i.userData);
     if (i.id.isEmpty()) return invalid(QStringLiteral("Item has no Id"));
