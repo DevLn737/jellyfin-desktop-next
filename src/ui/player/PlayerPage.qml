@@ -469,6 +469,11 @@ RoutePage {
     }
 
     Keys.onPressed: (event) => {
+        // Ctrl+K (the command palette) and the like are not player keys.
+        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) {
+            event.accepted = false
+            return
+        }
         switch (event.key) {
         case Qt.Key_Space:
         case Qt.Key_K:

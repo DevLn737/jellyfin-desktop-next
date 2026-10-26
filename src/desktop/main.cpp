@@ -190,6 +190,7 @@ int main(int argc, char* argv[]) {
   {
     QQmlApplicationEngine engine;
     desktop::installShell(services, engine);
+    desktop::installCommands(services, engine);
     desktop::installLibrary(services, engine);
     desktop::installLegacy(services, legacy, !options.smoke);
     desktop::installSession(services);

@@ -2,6 +2,7 @@ import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Shell
 import Jfd.Ui.Player
+import Jfd.Ui.Library
 
 // The main window. The application places and shows it (WindowStateKeeper).
 Window {
@@ -40,6 +41,12 @@ Window {
             objectName: "shell"
             anchors.fill: parent
             backgroundVisible: !HdrOutput.videoShown
+            onPaletteRequested: palette.toggle()
+        }
+
+        CommandPalette {
+            id: palette
+            anchors.fill: parent
         }
     }
 }

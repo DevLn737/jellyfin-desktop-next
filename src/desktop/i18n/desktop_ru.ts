@@ -188,6 +188,17 @@
     </message>
 </context>
 <context>
+    <name>Commands</name>
+    <message>
+        <source>Go back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Open %1</source>
+        <translation>Открыть: %1</translation>
+    </message>
+</context>
+<context>
     <name>Diagnostics</name>
     <message>
         <source>Could not save the report.</source>

@@ -26,6 +26,24 @@ FocusScope {
     // HDR10 output).
     property bool backgroundVisible: true
 
+    // Ctrl+K (or Ctrl+/): the application shows the command palette.
+    signal paletteRequested()
+
+    // The K key whatever the keyboard layout: its native codes, as well as
+    // the letter (a Russian layout gives another letter on that key).
+    function isPaletteKey(event) {
+        if (!(event.modifiers & Qt.ControlModifier) || (event.modifiers & (Qt.AltModifier | Qt.ShiftModifier)))
+            return false
+        if (event.key === Qt.Key_K || event.key === Qt.Key_Slash)
+            return true
+        switch (Qt.platform.os) {
+        case "windows": return event.nativeVirtualKey === 0x4B
+        // X11 and Wayland: the evdev code of K (37) plus 8.
+        case "linux": return event.nativeScanCode === 45
+        default: return false
+        }
+    }
+
     function showMessage(text) { toast.show(text, "info") }
     function showError(text) { toast.show(text, "error") }
     // A message with a button that opens url in the browser.
@@ -151,7 +169,10 @@ FocusScope {
     Component.onCompleted: Navigator.replay()
 
     Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_Escape && shell.menuOpen) {
+        if (shell.isPaletteKey(event)) {
+            shell.paletteRequested()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Escape && shell.menuOpen) {
             shell.menuOpen = false
             event.accepted = true
         } else if (event.key === Qt.Key_F11) {

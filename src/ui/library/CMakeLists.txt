@@ -18,6 +18,7 @@ qt_add_qml_module(jfd_ui_library
   VERSION 1.0
   QML_FILES
     CollectionPage.qml
+    CommandPalette.qml
     EpisodeRow.qml
     GenrePicker.qml
     HomePage.qml

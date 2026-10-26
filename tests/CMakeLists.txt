@@ -195,6 +195,17 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_ui_shell_page_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
+  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+    # Ctrl+K: the command palette over the shell.
+    add_executable(jfd_ui_palette_tests support/QtGuiTestMain.cpp ui/PaletteTest.cpp)
+    target_link_libraries(jfd_ui_palette_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_palette_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_palette_tests COMMAND jfd_ui_palette_tests)
+    set_tests_properties(jfd_ui_palette_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
   if(TARGET jfd_ui_library)
     add_executable(jfd_ui_library_tests support/QtTestMain.cpp ui/LibraryUiTest.cpp)
     target_link_libraries(jfd_ui_library_tests PRIVATE jfd_ui_library doctest Qt6::Test)

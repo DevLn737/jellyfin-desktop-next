@@ -79,6 +79,20 @@ the menu button opens it over the page; `posterWidth` (110 to 220 px),
 `thumbWidth` and `pageMargin` follow the class, so use them instead of
 fixed numbers. The smallest window is 640 by 420.
 
+### Ctrl+K
+
+`CommandPalette` (in `Jfd.Ui.Library`, placed over the shell in `Main.qml`)
+opens with Ctrl+K, or Ctrl+/ when that is taken, on any page, the video
+player included. The K key is recognised by its native code, so it works on
+a Russian layout on Windows and Wayland. The key is fixed, not a setting.
+The first block, "Commands", lists what `CommandRegistry` offers at that
+moment (a module adds its own: `commands.add({id, title, available, run})`
+with a title already translated; the shell registers Go back and one
+"Open <name>" for each sidebar destination); the second, "Media", is a
+search of its own (`Library.createSearch`, 200 ms after typing stops, old
+answers dropped). Up, Down, Enter and Esc work; the last command used comes
+first next time. While it is open the player's keys do not reach the player.
+
 ## Controls
 
 | Component | Main properties and signals |
