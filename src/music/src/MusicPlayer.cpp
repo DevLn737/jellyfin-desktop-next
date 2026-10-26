@@ -405,6 +405,19 @@ namespace jfd::music {
     Q_EMIT positionChanged();
     if (!positionOnly) Q_EMIT stateChanged();
 
+    if (justEnded && m_preloaded) {
+      // Older mpv reports the end of the file before it starts the queued one.
+      // Give the handover a moment before opening the next track ourselves.
+      const auto entry = m_preloaded->entryId;
+      QTimer::singleShot(600, this, [this, entry] {
+        if (!m_preloaded || m_preloaded->entryId != entry) return;
+        if (m_snapshot.phase != PlaybackPhase::Ended) return;
+        m_preloaded.reset();
+        m_epoch.reset();
+        if (const auto index = m_queue.nextIndex(true)) open(*index);
+      });
+      return;
+    }
     if (justEnded) {
       m_epoch.reset();
       if (const auto index = m_queue.nextIndex(true)) {
