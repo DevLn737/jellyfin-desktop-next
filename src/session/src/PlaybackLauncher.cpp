@@ -19,6 +19,8 @@ namespace jfd::session {
 
   void PlaybackLauncher::open(const Request& request) {
     const std::uint64_t serial = ++m_serial;
+    // What was queued behind the old file goes with it.
+    ++m_preloadSerial;
     m_client.item(request.itemId, this, [this, serial, request](api::Result<api::Item> item) {
       if (serial != m_serial) return;
       if (!item) {
@@ -26,6 +28,18 @@ namespace jfd::session {
         return;
       }
       openWithItem(serial, request, *item);
+    });
+  }
+
+  void PlaybackLauncher::preloadNext(const Request& request) {
+    const std::uint64_t serial = ++m_preloadSerial;
+    m_client.item(request.itemId, this, [this, serial, request](api::Result<api::Item> item) {
+      if (serial != m_preloadSerial) return;
+      if (!item) {
+        Q_EMIT failed(request.itemId, item.error().message);
+        return;
+      }
+      openWithItem(serial, request, *item, true, true);
     });
   }
 
@@ -45,7 +59,7 @@ namespace jfd::session {
   }
 
   void PlaybackLauncher::openWithItem(std::uint64_t serial, const Request& request,
-                                      const api::Item& item, bool chosen) {
+                                      const api::Item& item, bool chosen, bool preload) {
     api::PlaybackInfoRequest info;
     info.itemId = request.itemId;
     info.mediaSourceId = request.mediaSourceId;
@@ -53,8 +67,8 @@ namespace jfd::session {
     info.audioStreamIndex = request.audioStreamIndex;
     info.subtitleStreamIndex = request.subtitleStreamIndex;
     info.deviceProfile = m_deviceProfile;
-    m_client.playbackInfo(info, this, [this, serial, request, item, chosen](api::Result<api::PlaybackInfo> result) {
-      if (serial != m_serial) return;
+    m_client.playbackInfo(info, this, [this, serial, request, item, chosen, preload](api::Result<api::PlaybackInfo> result) {
+      if (serial != (preload ? m_preloadSerial : m_serial)) return;
       if (!result) {
         Q_EMIT failed(request.itemId, result.error().message);
         return;
@@ -81,18 +95,19 @@ namespace jfd::session {
         // with them. A direct stream plays all tracks; the player selects.
         if (changed && stream->method == api::PlayMethod::Transcode) {
           withTracks.mediaSourceId = source->id;
-          openWithItem(serial, withTracks, item, true);
+          openWithItem(serial, withTracks, item, true, preload);
           return;
         }
-        openResolved(withTracks, item, *source, *stream);
+        openResolved(withTracks, item, *source, *stream, preload);
         return;
       }
-      openResolved(request, item, *source, *stream);
+      openResolved(request, item, *source, *stream, preload);
     });
   }
 
   void PlaybackLauncher::openResolved(const Request& request, const api::Item& item,
-                                      const api::MediaSource& source, const api::PlaybackStream& stream) {
+                                      const api::MediaSource& source, const api::PlaybackStream& stream,
+                                      bool preload) {
     const auto start = core::MediaTicks::fromTicks(request.startTicks).value_or(core::MediaTicks{});
     std::optional<core::MediaTicks> runTime;
     if (source.runTimeTicks) runTime = core::MediaTicks::fromTicks(*source.runTimeTicks);
@@ -100,6 +115,11 @@ namespace jfd::session {
         stream, item.mediaType == QLatin1String("Audio"), start, runTime, request.startPaused);
     media.playlistItem = request.playlistItem;
     media.title = titleOf(item).toStdString();
+    if (preload) {
+      Q_EMIT preloaded(request, item, source, stream);
+      m_post(core::intent::PreloadNext{std::move(media)});
+      return;
+    }
     Q_EMIT resolved(request, item, source, stream);
     m_post(core::intent::Open{std::move(media)});
   }

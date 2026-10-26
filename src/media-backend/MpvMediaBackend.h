@@ -100,6 +100,9 @@ private:
   std::optional<core::backend::Ended> m_leaving;
   // The queued file that has just become current: not held at its start.
   std::optional<core::MediaEpoch> m_gapless;
+  // The file mpv went on to by itself: its first restart can report a
+  // position just before zero (timestamps carry on from the file before).
+  bool m_followedOn = false;
   std::map<std::uint64_t, Pending> m_pending;
   std::uint64_t m_nextToken = 1;
 

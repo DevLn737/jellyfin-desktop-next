@@ -47,13 +47,21 @@ namespace jfd::session {
                      QObject* parent = nullptr);
 
     void open(const Request& request);
+    // Resolves an item the way open() does and queues it behind the file
+    // playing now (intent::PreloadNext), for a gapless transition. Another
+    // preloadNext, an open() and cancel() drop one still resolving. Tracks
+    // are the request's own: the track chooser is not asked.
+    void preloadNext(const Request& request);
     void setTrackChooser(TrackChooser chooser) { m_chooseTracks = std::move(chooser); }
     // Used from the next open on (a playback setting changed); a request
     // already resolving keeps the profile it was sent with.
     void setDeviceProfile(QJsonObject deviceProfile) { m_deviceProfile = std::move(deviceProfile); }
     const QJsonObject& deviceProfile() const { return m_deviceProfile; }
     // Forgets any request still resolving.
-    void cancel() { ++m_serial; }
+    void cancel() {
+      ++m_serial;
+      ++m_preloadSerial;
+    }
 
     static QString titleOf(const api::Item& item);
 
@@ -63,15 +71,18 @@ namespace jfd::session {
     void resolved(const jfd::session::PlaybackLauncher::Request& request,
                   const jfd::api::Item& item, const jfd::api::MediaSource& source,
                   const jfd::api::PlaybackStream& stream);
+    // Like resolved, right before the PreloadNext intent is posted.
+    void preloaded(const jfd::session::PlaybackLauncher::Request& request, const jfd::api::Item& item,
+                   const jfd::api::MediaSource& source, const jfd::api::PlaybackStream& stream);
     void failed(const QString& itemId, const QString& message);
 
   private:
     // `chosen`: the chooser already ran for this request.
     void openWithItem(std::uint64_t serial, const Request& request, const api::Item& item,
-                      bool chosen = false);
+                      bool chosen = false, bool preload = false);
     // The request with the chooser's indices where the request has none.
     void openResolved(const Request& request, const api::Item& item, const api::MediaSource& source,
-                      const api::PlaybackStream& stream);
+                      const api::PlaybackStream& stream, bool preload);
     Request withChosenTracks(const Request& request, const api::Item& item,
                              const api::MediaSource& source) const;
 
@@ -80,6 +91,7 @@ namespace jfd::session {
     Post m_post;
     TrackChooser m_chooseTracks;
     std::uint64_t m_serial = 0;
+    std::uint64_t m_preloadSerial = 0;
   };
 
 } // namespace jfd::session

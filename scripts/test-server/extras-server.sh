@@ -96,7 +96,7 @@ make_show() {
 make_music() {
   # Alpha Artist: "First Album" (2020, 3 tracks, FLAC) and "Second Album"
   # (2021, 2 tracks, MP3). Beta Artist: "Tone Album" (2022): one 48 kHz sine
-  # cut into three consecutive 6 s FLAC files, so any gap or click between
+  # cut into three consecutive 240 s FLAC files, so any gap or click between
   # tracks shows in the output. All have a cover.cover.jpg next to them.
   $DOCKER exec "$NAME" bash -euc '
     ff=/usr/lib/jellyfin-ffmpeg/ffmpeg
@@ -120,7 +120,7 @@ make_music() {
     d="$root/Beta Artist/Tone Album (2022)"; mkdir -p "$d"
     for n in 1 2 3; do
       $ff -loglevel error -y -f lavfi -i "sine=frequency=1000:sample_rate=48000" \
-        -af "atrim=start=$(( (n - 1) * 6 )):end=$(( n * 6 )),asetpts=PTS-STARTPTS" -c:a flac \
+        -af "atrim=start=$(( (n - 1) * 240 )):end=$(( n * 240 )),asetpts=PTS-STARTPTS" -c:a flac \
         -metadata title="Tone $n" -metadata artist="Beta Artist" -metadata album_artist="Beta Artist" \
         -metadata album="Tone Album" -metadata date=2022 -metadata track=$n "$d/0$n - Tone $n.flac"
     done

@@ -84,12 +84,12 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
-        run: cmake --build build --parallel --target jfd_session_mpv_server_tests jfd_ui_group_server_tests jfd_ui_player_server_tests jfd_syncplay_app_agent
+        run: cmake --build build --parallel --target jfd_session_mpv_server_tests jfd_ui_group_server_tests jfd_ui_player_server_tests jfd_music_server_tests jfd_syncplay_app_agent
 
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build --output-on-failure -V -R 'jfd_session_mpv_server_tests|jfd_ui_group_server_tests|jfd_ui_player_server_tests'
+        run: ctest --test-dir build --output-on-failure -V -R 'jfd_session_mpv_server_tests|jfd_ui_group_server_tests|jfd_ui_player_server_tests|jfd_music_server_tests'
 
       - uses: actions/setup-node@v4
         if: matrix.server.fork == '0'
