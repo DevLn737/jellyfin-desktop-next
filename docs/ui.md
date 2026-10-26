@@ -12,7 +12,7 @@ parallel look and behave alike. Each module is a static library linked into
 | `Jfd.Ui.Shell` | `src/ui/shell` | shell branch | `Navigator`, `AppShell`, `RoutePage` |
 | `Jfd.Ui.Settings` | `src/ui/settings` | shell branch | `AppSettings`, settings screen |
 | `Jfd.Ui.Library` | `src/ui/library` | library branch | home, library, item, search pages |
-| `Jfd.Ui.Player` | `src/ui/player` | player branch | player page, OSD, track menus |
+| `Jfd.Ui.Player` | `src/ui/player` | player branch | player page, OSD, track menus, episodes panel |
 | `Jfd.Ui.Group` | `src/ui/group` | SyncPlay branch | group page and OSD |
 
 ## Theme
@@ -222,6 +222,16 @@ Ctrl+K command) edits it with `HomeModel::moveSection`,
 watched series, and "Picks" from `Items/Suggestions`. It is best effort: a
 failed or slow request (8 s) leaves its rows out, empty rows are not shown,
 and answers are kept for 5 minutes.
+
+### Player header and episodes
+
+The player's top bar shows the time now and "Ends at HH:MM": the time left
+at the current playback speed added to the clock, in the system's short time
+format. The bottom bar has an Episodes button (key E) that opens
+`EpisodesPanel` with the series' episodes in order (`PlayerSession.episodes`,
+the list `PlayerModel` already loads for Next and Previous); choosing one
+plays it from the start with `playEpisode`. Neither the button nor the key
+exists for a movie or in a SyncPlay group, where the queue is the server's.
 
 ## Settings from QML
 

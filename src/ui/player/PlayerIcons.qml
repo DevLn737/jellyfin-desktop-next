@@ -13,6 +13,7 @@ QtObject {
     readonly property url fullscreen: Qt.resolvedUrl("icons/fullscreen.svg")
     readonly property url fullscreenExit: Qt.resolvedUrl("icons/fullscreenExit.svg")
     readonly property url tune: Qt.resolvedUrl("icons/tune.svg")
+    readonly property url episodes: Qt.resolvedUrl("icons/episodes.svg")
     readonly property url volume: Qt.resolvedUrl("icons/volume.svg")
     readonly property url volumeOff: Qt.resolvedUrl("icons/volumeOff.svg")
 }

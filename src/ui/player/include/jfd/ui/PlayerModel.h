@@ -79,6 +79,10 @@ namespace jfd::ui {
     Q_PROPERTY(bool hasNext READ hasNext NOTIFY queueChanged)
     Q_PROPERTY(bool hasPrevious READ hasPrevious NOTIFY queueChanged)
     Q_PROPERTY(bool autoNext READ autoNext WRITE setAutoNext NOTIFY autoNextChanged)
+    // The series' episodes in order, for the episodes panel: maps with id,
+    // name, season, number, played and current. Empty for anything but an
+    // episode, and in a group (the group's queue is the server's).
+    Q_PROPERTY(QVariantList episodes READ episodes NOTIFY queueChanged)
     // The server has thumbnails for the seek bar (trickplayFrame).
     Q_PROPERTY(bool hasTrickplay READ hasTrickplay NOTIFY trickplayChanged)
 
@@ -130,6 +134,7 @@ namespace jfd::ui {
     void setAudioDelay(double seconds);
     bool hasNext() const { return !m_nextId.isEmpty(); }
     bool hasPrevious() const { return !m_previousId.isEmpty(); }
+    QVariantList episodes() const { return inGroup() ? QVariantList() : m_episodes; }
     bool hasTrickplay() const { return m_trickplayInfo.has_value(); }
 
     // Plays an item alone. Waits for the video renderer when the page has
@@ -146,6 +151,8 @@ namespace jfd::ui {
     Q_INVOKABLE void skipSegment();
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
+    // Plays one of `episodes` from the start, alone.
+    Q_INVOKABLE void playEpisode(const QString& itemId);
     Q_INVOKABLE void stop();
     // The seek bar thumbnail at `seconds`: {source, x, y, width, height,
     // tileWidth, tileHeight} in tile pixels, where source is the tile image
@@ -231,6 +238,7 @@ namespace jfd::ui {
     QString m_queueItem;
     QString m_nextId;
     QString m_previousId;
+    QVariantList m_episodes;
     // Trickplay resolutions of the item (by media source id), and the one
     // the seek bar uses for the file playing now.
     QString m_trickplayItem;

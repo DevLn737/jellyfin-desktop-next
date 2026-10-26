@@ -390,6 +390,41 @@ TEST_CASE("At the end of an episode the next one plays, and Previous goes back")
   REQUIRE(waitFor([&] { return p.runtime->snapshot().item.value() == first.toStdString() && p.playing(); }, 60000));
 }
 
+TEST_CASE("The episodes list names the series' episodes, and choosing one plays it") {
+  Player p(QStringLiteral("jfd-player-episodes"), {});
+  ItemQuery query;
+  query.includeItemTypes = {QStringLiteral("Episode")};
+  query.sortBy = QStringLiteral("SortName");
+  auto page = run<ItemPage>([&](auto done) { p.client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  REQUIRE(page->items.size() == 2);
+  const QString first = page->items[0].id;
+  const QString second = page->items[1].id;
+  struct Restore {
+    Player& p;
+    QStringList ids;
+    ~Restore() {
+      for (const QString& id : ids) p.restore(id);
+    }
+  } restore{p, {first, second}};
+
+  p.model->play(first, 0);
+  REQUIRE(waitFor([&] { return p.playing(); }, 60000));
+  REQUIRE(waitFor([&] { return p.model->episodes().size() == 2; }, 10000));
+  QVariantList list = p.model->episodes();
+  CHECK(list[0].toMap().value(QStringLiteral("id")).toString() == first);
+  CHECK(list[0].toMap().value(QStringLiteral("current")).toBool());
+  CHECK_FALSE(list[1].toMap().value(QStringLiteral("current")).toBool());
+  CHECK(list[1].toMap().value(QStringLiteral("number")).toInt() > 0);
+
+  p.model->playEpisode(second);
+  REQUIRE(waitFor([&] { return p.runtime->snapshot().item.value() == second.toStdString() && p.playing(); }, 60000));
+  REQUIRE(waitFor([&] { return p.model->episodes().size() == 2 &&
+                               p.model->episodes()[1].toMap().value(QStringLiteral("current")).toBool(); },
+                  10000));
+  CHECK(p.model->position() < 10);
+}
+
 TEST_CASE("The seek bar has the server's trickplay thumbnails") {
   Player p(QStringLiteral("jfd-player-trickplay"), {});
   const Item episode = findItem(*p.client, QStringLiteral("Episode"));

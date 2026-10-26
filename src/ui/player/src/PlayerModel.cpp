@@ -315,9 +315,10 @@ namespace jfd::ui {
   void PlayerModel::loadEpisodes(const api::Item& item) {
     if (item.id == m_queueItem) return;
     m_queueItem = item.id;
-    const bool had = hasNext() || hasPrevious();
+    const bool had = hasNext() || hasPrevious() || !m_episodes.isEmpty();
     m_nextId.clear();
     m_previousId.clear();
+    m_episodes.clear();
     if (had) Q_EMIT queueChanged();
     if (item.type != QStringLiteral("Episode") || item.seriesId.isEmpty()) return;
     const QString itemId = item.id;
@@ -329,6 +330,14 @@ namespace jfd::ui {
         return;
       }
       const QList<api::Item>& episodes = page->items;
+      for (const api::Item& episode : episodes) {
+        m_episodes.append(QVariantMap{{QStringLiteral("id"), episode.id},
+                                      {QStringLiteral("name"), episode.name},
+                                      {QStringLiteral("season"), episode.parentIndexNumber.value_or(0)},
+                                      {QStringLiteral("number"), episode.indexNumber.value_or(0)},
+                                      {QStringLiteral("played"), episode.userData.played},
+                                      {QStringLiteral("current"), episode.id == itemId}});
+      }
       for (qsizetype i = 0; i < episodes.size(); ++i) {
         if (episodes[i].id != itemId) continue;
         if (i > 0) m_previousId = episodes[i - 1].id;
@@ -389,6 +398,11 @@ namespace jfd::ui {
     };
   }
 
+  void PlayerModel::playEpisode(const QString& itemId) {
+    if (itemId.isEmpty() || inGroup()) return;
+    play(itemId, 0);
+  }
+
   void PlayerModel::step(bool forward) {
     if (!m_current) return;
     const QString target = forward ? m_nextId : m_previousId;
@@ -443,9 +457,10 @@ namespace jfd::ui {
     m_reporter.snapshotChanged(snapshot);
     m_epoch.reset();
     m_current.reset();
-    const bool hadQueue = hasNext() || hasPrevious();
+    const bool hadQueue = hasNext() || hasPrevious() || !m_episodes.isEmpty();
     m_nextId.clear();
     m_previousId.clear();
+    m_episodes.clear();
     if (hadQueue) Q_EMIT queueChanged();
     // What stays true while someone else plays: the group, the personal rate.
     core::SessionSnapshot idle;
