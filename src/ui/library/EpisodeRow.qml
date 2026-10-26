@@ -8,8 +8,7 @@ import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
 // An episode in a season list: still image with progress, "1. Name",
-// run time and overview. Clicking opens the episode's page; the play
-// button starts it.
+// run time and overview. Clicking or the play button starts it.
 T.ItemDelegate {
     id: row
 
@@ -26,7 +25,7 @@ T.ItemDelegate {
 
     Keys.onReturnPressed: row.clicked()
     Keys.onEnterPressed: row.clicked()
-    onClicked: if (model.itemId) Navigator.navigate("item/" + model.itemId)
+    onClicked: playClicked()
 
     background: Rectangle {
         radius: Theme.radius
