@@ -3,6 +3,7 @@
 #include <jfd/api/ClientIdentity.h>
 #include <jfd/api/Models.h>
 #include <jfd/api/Playback.h>
+#include <jfd/api/Recommendations.h>
 #include <jfd/api/Result.h>
 
 #include <QByteArray>
@@ -177,6 +178,13 @@ namespace jfd::api {
     // GET Items/Latest for one library. Episodes are grouped into their
     // series, as in Jellyfin Web.
     void latestItems(const QString& parentId, int limit, QObject* context, Callback<ItemPage> done);
+    // GET Movies/Recommendations: categories of films the server picks from
+    // the user's history ("because you watched ..."). Empty without history.
+    void movieRecommendations(int categoryLimit, int itemLimit, QObject* context,
+                              Callback<QList<RecommendationGroup>> done);
+    // GET Items/Suggestions: a mixed list the server picks for the user.
+    // `types` limits it ("Movie", "Series").
+    void suggestions(int limit, const QStringList& types, QObject* context, Callback<ItemPage> done);
     void similarItems(const QString& itemId, int limit, QObject* context, Callback<ItemPage> done);
     // The ids of a collection's (BoxSet's) items, without images or user
     // data. The server lists a collection's items but not an item's

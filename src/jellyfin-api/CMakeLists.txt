@@ -5,12 +5,14 @@ add_library(jfd_jellyfin_api STATIC
   src/Models.cpp
   src/MusicApi.cpp
   src/Playback.cpp
+  src/Recommendations.cpp
   src/ServerDiscovery.cpp
   src/ServerTime.cpp
   src/ServerVersion.cpp
   src/SessionSocket.cpp
   src/SyncPlayApi.cpp
   include/jfd/api/ClientIdentity.h
+  include/jfd/api/Recommendations.h
   include/jfd/api/DeviceProfile.h
   include/jfd/api/JellyfinClient.h
   include/jfd/api/Models.h

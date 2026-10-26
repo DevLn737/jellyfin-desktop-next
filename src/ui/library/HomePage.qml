@@ -55,6 +55,20 @@ RoutePage {
                 wrapMode: Text.Wrap
             }
 
+            Item {
+                width: parent.width
+                height: customize.implicitHeight
+                ActionButton {
+                    id: customize
+                    objectName: "customizeHomeButton"
+                    anchors.right: parent.right
+                    iconSource: Icons.settings
+                    text: qsTr("Customize home")
+                    onClicked: Navigator.navigate("customizeHome")
+                    KeyNavigation.down: libraries
+                }
+            }
+
             CardRow {
                 id: libraries
                 objectName: "librariesRow"
@@ -77,11 +91,12 @@ RoutePage {
             id: row
             required title
             required property string kind
+            required property string sectionId
             required property var items
             required property string cardShape
             required property int index
 
-            objectName: "homeRow_" + kind
+            objectName: "homeRow_" + (kind === "recommend" || kind === "section" ? sectionId : kind)
             width: rows.width
             focus: ListView.isCurrentItem
             model: items

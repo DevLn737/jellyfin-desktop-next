@@ -69,6 +69,7 @@ namespace jfd::ui {
     navigator.registerPage(QStringLiteral("collection"), page("CollectionPage"));
     navigator.registerPage(QStringLiteral("item"), page("ItemPage"));
     navigator.registerPage(QStringLiteral("search"), page("SearchPage"));
+    navigator.registerPage(QStringLiteral("customizeHome"), page("CustomizeHomePage"));
 
     QObject::connect(&m_signIn, &library::SignIn::signedIn, &navigator, [this, &navigator] {
       m_collections.invalidate();
@@ -78,6 +79,7 @@ namespace jfd::ui {
     QObject::connect(&m_signIn, &library::SignIn::signedOut, &navigator, [this, &navigator] {
       m_socket.stop();
       m_collections.invalidate();
+      m_home.resetSession();
       navigator.reset(QStringLiteral("login"));
     });
     return true;
