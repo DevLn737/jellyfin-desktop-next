@@ -45,7 +45,9 @@ namespace jfd::library {
     api::ItemQuery query;
     query.searchTerm = term;
     query.includeItemTypes = {QStringLiteral("Movie"), QStringLiteral("Series"),
-                              QStringLiteral("Episode"), QStringLiteral("Video")};
+                              QStringLiteral("Episode"), QStringLiteral("Video"),
+                              QStringLiteral("MusicAlbum"), QStringLiteral("MusicArtist"),
+                              QStringLiteral("Playlist")};
     query.limit = m_options.limit;
     m_client.items(query, this, [this, serial](api::Result<api::ItemPage> result) {
       if (serial != m_serial) return;

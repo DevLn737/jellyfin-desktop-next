@@ -23,20 +23,32 @@ RoutePage {
 
         ColumnLayout {
             Layout.preferredWidth: 360
+            Layout.maximumWidth: 360
             Layout.fillHeight: true
             spacing: Theme.spacing
 
-            Rectangle {
+            // The cover is square and gives way to the controls below it:
+            // on a short window it shrinks instead of pushing them off.
+            Item {
+                objectName: "nowCoverBox"
                 Layout.fillWidth: true
-                Layout.preferredHeight: width
-                radius: Theme.radius
-                color: Theme.surfaceRaised
-                clip: true
-                Image {
-                    anchors.fill: parent
-                    asynchronous: true
-                    fillMode: Image.PreserveAspectCrop
-                    source: Library.image(Music.coverUrl(page.track.imageItemId || "", page.track.imageTag || "", 360))
+                Layout.fillHeight: true
+                Layout.minimumHeight: 48
+                Layout.maximumHeight: 360
+                Rectangle {
+                    objectName: "nowCover"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(parent.width, parent.height)
+                    height: width
+                    radius: Theme.radius
+                    color: Theme.surfaceRaised
+                    clip: true
+                    Image {
+                        anchors.fill: parent
+                        asynchronous: true
+                        fillMode: Image.PreserveAspectCrop
+                        source: Library.image(Music.coverUrl(page.track.imageItemId || "", page.track.imageTag || "", 360))
+                    }
                 }
             }
             Text {
@@ -164,7 +176,6 @@ RoutePage {
                 font.pixelSize: Theme.fontSizeSmall
                 wrapMode: Text.Wrap
             }
-            Item { Layout.fillHeight: true }
         }
 
         ColumnLayout {

@@ -40,6 +40,10 @@ TEST_CASE("Cards lead to a library or an item page") {
   CHECK(ui.routeFor(QStringLiteral("movie:603"), QStringLiteral("SeerrTitle")) ==
         QStringLiteral("seerr-title/movie:603"));
   CHECK(ui.routeFor(QStringLiteral("d"), QStringLiteral("Episode")) == QStringLiteral("item/d"));
+  // Music found by a search opens the music screens.
+  CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) == QStringLiteral("album/e"));
+  CHECK(ui.routeFor(QStringLiteral("f"), QStringLiteral("MusicArtist")) == QStringLiteral("artist/f"));
+  CHECK(ui.routeFor(QStringLiteral("g"), QStringLiteral("Playlist")) == QStringLiteral("playlist/g"));
 }
 
 TEST_CASE("Run times read as hours and minutes") {

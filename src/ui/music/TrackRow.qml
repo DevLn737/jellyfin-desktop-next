@@ -129,12 +129,9 @@ T.ItemDelegate {
 
     ActionMenu {
         id: menu
-        function popup() {
-            x = Math.max(0, row.width - width - Theme.spacing)
-            y = row.height
-            open()
-        }
-        parent: row
+        function popup() { open() }
+        anchorItem: more
+        alignRight: true
         entries: {
             const list = [qsTr("Play next"), qsTr("Add to queue")]
             if ((row.model.albumId || "").length > 0) list.push(qsTr("Go to album"))
