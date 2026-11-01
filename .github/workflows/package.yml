@@ -146,6 +146,7 @@ jobs:
         with:
           version: ${{ steps.pins.outputs.qt }}
           arch: ${{ steps.pins.outputs.qt-arch }}
+          modules: qtwebsockets
           cache: true
 
       # After Qt: install-qt-action sets PKG_CONFIG_PATH.

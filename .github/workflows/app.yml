@@ -39,6 +39,7 @@ jobs:
         with:
           version: ${{ steps.pins.outputs.qt }}
           arch: ${{ steps.pins.outputs.qt-arch }}
+          modules: qtwebsockets
           cache: true
 
       - name: Pinned libmpv (Linux)
@@ -172,6 +173,7 @@ jobs:
         with:
           version: ${{ steps.pins.outputs.qt }}
           arch: ${{ steps.pins.outputs.qt-arch }}
+          modules: qtwebsockets
           cache: true
 
       - name: Pinned libmpv
