@@ -22,7 +22,7 @@ TEST_CASE("Contrast follows WCAG") {
 }
 
 TEST_CASE("The built-in themes pass WCAG AA") {
-  for (const QVariantMap& palette : {darkPalette(), lightPalette()}) {
+  for (const QVariantMap& palette : {darkPalette(), lightPalette(), depthPalette()}) {
     for (const ContrastIssue& issue : contrastIssues(palette)) {
       MESSAGE(issue.what.toStdString(), " ", issue.ratio);
     }
@@ -43,7 +43,7 @@ TEST_CASE("Any accent gives readable text on it and a visible focus ring, in bot
     QVariantMap palette;
     bool dark;
   };
-  const QList<Base> bases = {{darkPalette(), true}, {lightPalette(), false}};
+  const QList<Base> bases = {{darkPalette(), true}, {lightPalette(), false}, {depthPalette(), true}};
   QList<QColor> accents;
   for (const AccentPreset& preset : accentPresets()) {
     accents.append(preset.color);
@@ -169,4 +169,23 @@ TEST_CASE("A theme with low contrast is accepted with a warning") {
       theme(R"("colors": {"background": "#808080", "surface": "#858585", "text": "#8a8a8a"})"), QStringLiteral("t"));
   REQUIRE(result.ok);
   CHECK(result.warnings.size() >= 2);
+}
+
+TEST_CASE("Depth is the glass palette with its own main button") {
+  const QVariantMap depth = depthPalette();
+  for (const QString& name : optionalColorNames()) {
+    CHECK_MESSAGE(depth.contains(name), name.toStdString());
+  }
+  // Dark text on the pale main button reads well.
+  CHECK(contrastRatio(QColor(depth.value(QStringLiteral("primaryText")).toString()),
+                      QColor(depth.value(QStringLiteral("primary")).toString())) >= 4.5);
+  // The glass and the border are translucent; the accent is the muted teal.
+  CHECK(QColor(depth.value(QStringLiteral("glassFill")).toString()).alpha() < 255);
+  CHECK(QColor(depth.value(QStringLiteral("border")).toString()).alpha() < 40);
+  CHECK(QColor(depth.value(QStringLiteral("accent")).toString()) == depthAccent());
+  // The other two built-in palettes are unchanged: they have no extras.
+  for (const QString& name : optionalColorNames()) {
+    CHECK(!darkPalette().contains(name));
+    CHECK(!lightPalette().contains(name));
+  }
 }

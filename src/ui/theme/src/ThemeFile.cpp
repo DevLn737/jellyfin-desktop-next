@@ -72,7 +72,9 @@ namespace jfd::ui {
       return failure(QCoreApplication::translate("Appearance", "\"colors\" must be an object."));
     }
     const QJsonObject given = colors.toObject();
-    for (const QString& colorName : colorNames()) {
+    QStringList allNames = colorNames();
+    allNames.append(optionalColorNames());
+    for (const QString& colorName : std::as_const(allNames)) {
       if (!given.contains(colorName)) {
         continue;
       }
@@ -129,8 +131,12 @@ namespace jfd::ui {
 
   QByteArray exportTheme(const ThemeDefinition& theme) {
     QJsonObject colors;
-    for (const QString& name : colorNames()) {
-      colors.insert(name, theme.colors.value(name).toString());
+    QStringList allNames = colorNames();
+    allNames.append(optionalColorNames());
+    for (const QString& name : std::as_const(allNames)) {
+      if (theme.colors.contains(name)) {
+        colors.insert(name, theme.colors.value(name).toString());
+      }
     }
     QJsonObject root;
     root.insert(QStringLiteral("format"), ThemeFormat);

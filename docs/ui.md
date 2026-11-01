@@ -43,6 +43,33 @@ on-screen display) uses `Overlay` instead of `Theme`: the same colour names,
 fixed dark, the same in every theme. The video stays dark whatever the page
 theme is.
 
+### The "Depth" look (default)
+
+`Palettes.depth` / `depthPalette()`: a blue-black page (`#0a0e16`), panels
+of translucent glass, hairline white edges (8 %), a muted teal accent
+(`#6fa8b3`) used only for progress, the active entry and focus, near-white
+text, and a pale main button with dark text. Manrope (SIL OFL 1.1, in
+`src/ui/theme/fonts` with its licence) is the typeface; the application
+loads it, and a system font is used if that fails. Radius 10.
+
+A palette may add optional names (`optionalColorNames()`): `glassFill`,
+`glassBorder`, `primary`, `primaryText`. `Theme` has a fallback for each
+(`glassFill` is the surface at 85 %, `primary` is the accent), so older
+palettes and theme files work unchanged. New `Theme` tokens: `panelFill`
+and `popupFill` (glass with effects, nearly solid with simplified effects),
+`radiusLarge`, `shadowColor` / `shadowRadius` / `shadowOffset` (one light
+shadow for popups), `minHitSize` (44, for TV mode) and `focusRingOffset`,
+`durationLong`. `Theme.sidebarWidth` is 216.
+
+Rules: glass only when `Theme.blurEnabled` and not `Theme.reducedEffects`;
+no blur is drawn over the live video (the player's controls read
+`Theme.colorsFor(item)`, so they use `Overlay`, which stays the dark
+palette, and a test checks this); at most one blur per screen, from a
+static snapshot. The panels draw no blur yet (Qt 6.4 is the minimum), only
+the translucent fill. Settings: Theme "Depth" (default), Dark, Light, Like
+the system (Depth when the system is dark); accent "Theme default" (the
+look's own accent) or a preset or custom colour.
+
 ### Themes
 
 Settings > Appearance: the theme (dark, light, like the system, or a theme
@@ -113,6 +140,10 @@ first next time. While it is open the player's keys do not reach the player.
 | `Toast` | `show(text, kind)` with kind "info" or "error"; use the shell's |
 | `LoadingIndicator` | `running` |
 | `FocusFrame` | the keyboard focus ring; `shown: control.visualFocus` |
+| `GlassPanel` | a translucent panel with a hairline edge (`popup: true` for menus); nearly solid with simplified effects |
+| `PopupMenu` | `anchorItem` (the button), `entries`, `currentIndex`, `disabledIndices`, `alignRight`, `open()`, `activated(index)`; 8 px under the button, above it if there is no room, always inside the window; the menus of the player and music move to it |
+| `SkeletonBox` | a grey placeholder that pulses (still with simplified effects), for content that is loading |
+| `StateMessage` | `kind` ("empty", "error", "offline"), `title`, `description` (`text` is the same), `retryVisible`, `retry()`; one look for empty, failed and offline screens |
 
 Every interactive control takes keyboard focus (Tab, arrows in rows and
 grids, Enter or Space to activate) and draws `FocusFrame` when focused by

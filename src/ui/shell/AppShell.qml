@@ -22,6 +22,10 @@ FocusScope {
     // it over the page with the names (closed again by choosing, Esc or a
     // click outside).
     property bool menuOpen: false
+    // The user's libraries and the account line for the sidebar (optional).
+    property alias libraries: sidebar.libraries
+    property alias accountName: sidebar.accountName
+    signal libraryChosen(string itemId, string type)
     // Off while something under the shell must show through (the video with
     // HDR10 output).
     property bool backgroundVisible: true
@@ -92,6 +96,7 @@ FocusScope {
         menuButton: Theme.compact
         onMenuToggled: shell.menuOpen = !shell.menuOpen
         onChosen: shell.menuOpen = false
+        onLibraryChosen: (itemId, type) => shell.libraryChosen(itemId, type)
         Behavior on x { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
         KeyNavigation.right: stack
     }

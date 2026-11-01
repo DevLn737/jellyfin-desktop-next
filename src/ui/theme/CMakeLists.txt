@@ -11,7 +11,14 @@ set_source_files_properties(Theme.qml Palettes.qml Overlay.qml PROPERTIES QT_QML
 qt_add_qml_module(jfd_ui_theme
   URI Jfd.Ui.Theme
   VERSION 1.0
-  QML_FILES Theme.qml Palettes.qml Overlay.qml)
+  QML_FILES Theme.qml Palettes.qml Overlay.qml
+  # Manrope (SIL OFL 1.1, see fonts/LICENSE-Manrope.txt): the "Depth" look's
+  # typeface, loaded by the application; a system font is used if it fails.
+  RESOURCES
+    fonts/Manrope-Regular.ttf
+    fonts/Manrope-Medium.ttf
+    fonts/Manrope-SemiBold.ttf
+    fonts/Manrope-Bold.ttf)
 target_link_libraries(jfd_ui_theme PUBLIC Qt6::Core Qt6::Gui PRIVATE Qt6::Quick)
 target_compile_definitions(jfd_ui_theme PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 jfd_add_translations(jfd_ui_theme)

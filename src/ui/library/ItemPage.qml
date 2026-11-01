@@ -34,16 +34,56 @@ RoutePage {
         visible: page.details && page.details.loading && !page.details.loaded
     }
 
-    Text {
+    StateMessage {
         objectName: "itemError"
         anchors.centerIn: parent
         width: Math.min(parent.width - 2 * Theme.pageMargin, 600)
-        visible: page.details && !page.details.loaded && text.length > 0
-        text: page.details ? page.details.errorText : ""
-        color: Theme.error
-        font.pixelSize: Theme.fontSizeBody
-        wrapMode: Text.Wrap
-        horizontalAlignment: Text.AlignHCenter
+        visible: page.details && !page.details.loaded && page.details.errorText.length > 0
+        kind: "error"
+        description: page.details ? page.details.errorText : ""
+        onRetry: if (page.details) page.details.reload()
+    }
+
+    // The backdrop is fixed to the top of the page (outside the Flickable, so
+    // the content scrolls over it). It fades into the page colour over a long
+    // distance, and a scrim over it grows with the scrolling, so text stays
+    // readable lower down. Drawn first, under the Flickable.
+    Item {
+        id: backdrop
+        objectName: "itemBackdrop"
+        z: -1
+        width: page.width
+        height: Math.min(page.height * 0.7, width * 9 / 16)
+        visible: page.details && page.details.loaded
+        readonly property color pageColor: Theme.background
+        // 0 at the top of the page, 1 once the content has scrolled a
+        // little more than the backdrop's half height.
+        readonly property real scrolled: Math.max(0, Math.min(1, flick.contentY / (height * 0.6)))
+        Image {
+            anchors.fill: parent
+            source: page.details ? Library.image(page.details.backdropUrl) : ""
+            sourceSize.width: width
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            opacity: status === Image.Ready ? 0.5 : 0
+            Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
+        }
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Qt.alpha(backdrop.pageColor, 0.0) }
+                GradientStop { position: 0.3; color: Qt.alpha(backdrop.pageColor, 0.15) }
+                GradientStop { position: 0.55; color: Qt.alpha(backdrop.pageColor, 0.5) }
+                GradientStop { position: 0.8; color: Qt.alpha(backdrop.pageColor, 0.85) }
+                GradientStop { position: 1.0; color: backdrop.pageColor }
+            }
+        }
+        Rectangle {
+            objectName: "itemBackdropScrim"
+            anchors.fill: parent
+            color: backdrop.pageColor
+            opacity: backdrop.scrolled * 0.75
+        }
     }
 
     Flickable {
@@ -53,34 +93,6 @@ RoutePage {
         contentHeight: content.implicitHeight + 2 * Theme.spacingHuge
         boundsBehavior: Flickable.StopAtBounds
         clip: true
-
-        // The backdrop sits at the top of the page and scrolls away with the
-        // content; it fades into the page background at its lower edge.
-        Item {
-            id: backdrop
-            z: -1
-            width: flick.width
-            height: Math.min(flick.height * 0.6, width * 9 / 16)
-            Image {
-                anchors.fill: parent
-                source: page.details ? Library.image(page.details.backdropUrl) : ""
-                sourceSize.width: width
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                opacity: status === Image.Ready ? 0.45 : 0
-                Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
-            }
-            Rectangle {
-                anchors.fill: parent
-                readonly property color clear: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0)
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: parent.clear }
-                    GradientStop { position: 0.5; color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0.35) }
-                    GradientStop { position: 0.8; color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0.8) }
-                    GradientStop { position: 1.0; color: Theme.background }
-                }
-            }
-        }
 
         ColumnLayout {
             id: content
