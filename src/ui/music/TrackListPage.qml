@@ -163,6 +163,8 @@ RoutePage {
                 guard: guard
                 showArtist: true
                 numbered: page.trackKind === "playlistTracks"
+                removable: page.trackKind === "playlistTracks"
+                onRemoveRequested: page.list.removeEntry(index)
             }
             LoadingIndicator {
                 anchors.centerIn: parent

@@ -196,6 +196,16 @@ MiniPlayer { }
   f.player->jumpTo(0);
   const bool shown = waitFor([&] { return bar->isVisible() && bar->height() > 0; });
   CHECK(shown);
+
+  // The volume slider is there on a wide window and moves the player's volume.
+  bar->setWidth(1280);
+  QQuickItem* volume = find(bar, "miniVolume");
+  REQUIRE(volume != nullptr);
+  CHECK(volume->isVisible());
+  f.player->setVolume(40);
+  CHECK(waitFor([&] { return qFuzzyCompare(volume->property("value").toDouble(), 40.0); }));
+  QMetaObject::invokeMethod(volume, "moved");
+  CHECK(f.player->volume() == 40);
 }
 
 TEST_CASE("Music is not offered in a SyncPlay group and a track during a movie asks first") {

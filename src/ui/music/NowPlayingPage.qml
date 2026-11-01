@@ -133,6 +133,29 @@ RoutePage {
                         : MusicSession.repeat === "queue" ? "track" : "none"
                 }
             }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+                Text {
+                    text: qsTr("Volume")
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeSmall
+                }
+                ValueSlider {
+                    objectName: "nowVolume"
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 100
+                    value: MusicSession.volume
+                    onMoved: MusicSession.volume = Math.round(value)
+                    Accessible.name: qsTr("Volume")
+                }
+                Text {
+                    text: MusicSession.volume + "%"
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeSmall
+                }
+            }
             Text {
                 Layout.fillWidth: true
                 visible: text.length > 0

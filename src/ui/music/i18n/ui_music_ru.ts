@@ -38,6 +38,10 @@
 <context>
     <name>MiniPlayer</name>
     <message>
+        <source>Volume</source>
+        <translation>Громкость</translation>
+    </message>
+    <message>
         <source>Previous</source>
         <translation>Назад</translation>
     </message>
@@ -204,6 +208,10 @@
     <message>
         <source>Repeat: track</source>
         <translation>Повтор: трек</translation>
+    </message>
+    <message>
+        <source>Volume</source>
+        <translation>Громкость</translation>
     </message>
     <message>
         <source>Queue</source>

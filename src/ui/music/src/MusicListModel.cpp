@@ -342,4 +342,17 @@ namespace jfd::ui {
     }
   }
 
+  void MusicListModel::removeEntry(int row) {
+    if (m_kind != QLatin1String("playlistTracks") || m_parentId.isEmpty()) return;
+    const api::Item* it = item(row);
+    if (!it || it->playlistItemId.isEmpty()) return;
+    m_api.removeFromPlaylist(m_parentId, {it->playlistItemId}, this, [this](api::Result<api::Empty> result) {
+      if (!result) {
+        setError(result.error().message);
+        return;
+      }
+      reload();
+    });
+  }
+
 } // namespace jfd::ui
