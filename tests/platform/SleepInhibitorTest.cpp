@@ -115,6 +115,29 @@ TEST_CASE("The portal keeps the system awake while playing and releases on pause
   CHECK(spinUntil([&] { return portal.request.closed == 2; }));
 }
 
+TEST_CASE("Music asks the portal for no more than keeping the system awake") {
+  PrivateBus bus;
+  if (!bus.isRunning()) {
+    MESSAGE("dbus-daemon is not installed; skipped");
+    return;
+  }
+  QDBusConnection service = bus.connect(QStringLiteral("portal"));
+  FakePortal portal(service);
+  REQUIRE(registerService(service, QStringLiteral("org.freedesktop.portal.Desktop"),
+                          QStringLiteral("/org/freedesktop/portal/desktop"), &portal));
+
+  auto inhibitor = createDBusSleepInhibitor(bus.connect(QStringLiteral("client")));
+  inhibitor->setInhibited(true, QStringLiteral("Playing music"), SleepInhibitor::Level::System);
+  REQUIRE(spinUntil([&] { return inhibitor->isInhibited(); }));
+  CHECK(portal.lastFlags == 4u);
+
+  // A video after the music replaces it with the full one.
+  inhibitor->setInhibited(true, QStringLiteral("Playing video"), SleepInhibitor::Level::Display);
+  REQUIRE(spinUntil([&] { return portal.inhibits == 2; }));
+  CHECK(portal.lastFlags == (4u | 8u));
+  CHECK(portal.request.closed == 1);
+}
+
 TEST_CASE("Without a portal the screen saver service is used") {
   PrivateBus bus;
   if (!bus.isRunning()) {

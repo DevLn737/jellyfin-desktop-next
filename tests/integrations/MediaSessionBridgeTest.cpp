@@ -50,11 +50,13 @@ namespace {
 
   class FakeInhibitor final : public jfd::platform::SleepInhibitor {
   public:
-    void setInhibited(bool inhibited, const QString& reason) override {
+    void setInhibited(bool inhibited, const QString& reason, Level level) override {
       calls.push_back(inhibited);
       lastReason = reason;
+      lastLevel = level;
     }
     std::vector<bool> calls;
+    Level lastLevel = Level::Display;
     QString lastReason;
   };
 
@@ -153,6 +155,7 @@ TEST_CASE("The bridge feeds controls and sleep inhibition and posts their comman
   CHECK(controls.states.back().subtitle == QStringLiteral("Show · S1 E2"));
   CHECK(inhibitor.calls == std::vector<bool>{false, true});
   CHECK(inhibitor.lastReason == QStringLiteral("Playing video"));
+  CHECK(inhibitor.lastLevel == jfd::platform::SleepInhibitor::Level::Display);
 
   // The same snapshot again changes nothing.
   const auto sent = controls.states.size();
@@ -173,4 +176,22 @@ TEST_CASE("The bridge feeds controls and sleep inhibition and posts their comman
   bridge.update(SessionSnapshot{});
   Q_EMIT controls.seekRequested(1'000);
   CHECK(posted.size() == 2);
+}
+
+TEST_CASE("Music keeps the system awake but lets the screen go dark") {
+  MediaSessionBridge bridge([](SessionInput) {});
+  FakeInhibitor inhibitor;
+  bridge.setSleepInhibitor(&inhibitor);
+  auto track = episode();
+  track.kind = PresenceInfo::Kind::Music;
+  bridge.setDetails(track);
+  bridge.update(playing());
+  CHECK(inhibitor.calls.back());
+  CHECK(inhibitor.lastLevel == jfd::platform::SleepInhibitor::Level::System);
+  CHECK(inhibitor.lastReason == QStringLiteral("Playing music"));
+
+  // A movie after it asks for the screen too.
+  bridge.setDetails(episode());
+  CHECK(inhibitor.lastLevel == jfd::platform::SleepInhibitor::Level::Display);
+  CHECK(inhibitor.lastReason == QStringLiteral("Playing video"));
 }

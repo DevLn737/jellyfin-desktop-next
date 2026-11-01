@@ -13,7 +13,7 @@ namespace jfd::platform {
     class NoSleepInhibitor final : public SleepInhibitor {
     public:
       using SleepInhibitor::SleepInhibitor;
-      void setInhibited(bool, const QString&) override {}
+      void setInhibited(bool, const QString&, Level) override {}
     };
   } // namespace
 
