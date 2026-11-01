@@ -70,6 +70,7 @@ FocusScope {
     }
 
     Flickable {
+        SmoothWheel {}
         id: scroller
         anchors.top: header.bottom
         anchors.topMargin: Theme.spacingSmall

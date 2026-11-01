@@ -23,6 +23,7 @@ RoutePage {
     }
 
     Flickable {
+        SmoothWheel {}
         anchors.fill: parent
         contentHeight: Math.max(height, column.implicitHeight + 2 * Theme.spacingHuge)
         boundsBehavior: Flickable.StopAtBounds

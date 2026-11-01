@@ -26,6 +26,7 @@ qt_add_qml_module(jfd_ui_controls
     PosterCard.qml
     SectionHeader.qml
     SkeletonBox.qml
+    SmoothWheel.qml
     StateMessage.qml
     Toast.qml
     ToggleSwitch.qml

@@ -149,6 +149,7 @@ FocusScope {
             }
 
             Flickable {
+                SmoothWheel {}
                 id: list
                 width: parent.width
                 height: Math.max(0, panel.height - input.implicitHeight - 2 * Theme.spacing - Theme.spacingSmall)

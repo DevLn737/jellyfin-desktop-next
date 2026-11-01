@@ -444,6 +444,7 @@ Flickable {
   width: 800; height: 500
   contentWidth: width; contentHeight: 1600
   boundsBehavior: Flickable.StopAtBounds
+  SmoothWheel {}
   CardRow {
     objectName: "row"
     y: 100
@@ -479,6 +480,55 @@ Flickable {
   CHECK(view->property("contentX").toDouble() == doctest::Approx(0.0));
   wheel(Qt::ShiftModifier);
   CHECK(view->property("contentX").toDouble() > 10);
+}
+
+TEST_CASE("The wheel scrolls a page smoothly and by a fixed step per notch") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Controls
+Flickable {
+  width: 800; height: 500
+  contentWidth: width; contentHeight: 5000
+  boundsBehavior: Flickable.StopAtBounds
+  SmoothWheel {}
+}
+)");
+  auto* page = qobject_cast<QQuickItem*>(object.get());
+  page->setParentItem(window.contentItem());
+  window.resize(800, 500);
+  window.show();
+  const auto pump = [](int ms) {
+    QElapsedTimer waited;
+    waited.start();
+    while (waited.elapsed() < ms) QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+  };
+  pump(200);
+  const QPointF over = page->mapToScene(QPointF(300, 200));
+  const auto wheel = [&](int notches) {
+    QWheelEvent event(over, window.mapToGlobal(over), QPoint(), QPoint(0, -120 * notches), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(&window, &event);
+  };
+  wheel(1);
+  pump(30);
+  const double early = page->property("contentY").toDouble();
+  pump(600);
+  const double one = page->property("contentY").toDouble();
+  // Eased: part of the way at first, the whole step in the end.
+  CHECK(early > 0);
+  CHECK(early < one);
+  CHECK(one >= 100);
+  // Notches in quick succession add up.
+  wheel(1);
+  wheel(1);
+  pump(600);
+  CHECK(page->property("contentY").toDouble() == doctest::Approx(one * 3).epsilon(0.02));
+  // And it stops at the top.
+  wheel(-100);
+  pump(600);
+  CHECK(page->property("contentY").toDouble() == doctest::Approx(0.0));
 }
 
 #include <QDir>
