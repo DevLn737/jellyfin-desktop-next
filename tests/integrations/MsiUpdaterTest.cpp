@@ -173,6 +173,8 @@ TEST_CASE("The update script waits, installs per user, and starts the program ei
   // The program is started after the failure marker is decided, not only on success.
   CHECK(script.indexOf(QStringLiteral("Start-Process -FilePath $Exe")) > script.indexOf(QStringLiteral(".failed")));
   CHECK_FALSE(script.contains(QStringLiteral("RunAs")));
+  // The package path reaches msiexec with backslashes (Qt hands over forward slashes).
+  CHECK(script.indexOf(QStringLiteral("GetFullPath($Msi)")) < script.indexOf(QStringLiteral("'msiexec.exe'")));
 
   const QStringList arguments = MsiUpdater::scriptArguments(QStringLiteral("C:/s/apply-update.ps1"), 4242,
                                                            QStringLiteral("C:/s/a b.msi"), QStringLiteral("C:/p/app.exe"),
@@ -180,9 +182,9 @@ TEST_CASE("The update script waits, installs per user, and starts the program ei
   CHECK(arguments.contains(QStringLiteral("Bypass")));
   const qsizetype file = arguments.indexOf(QStringLiteral("-File"));
   REQUIRE(file >= 0);
-  CHECK(arguments.at(file + 1) == QStringLiteral("C:/s/apply-update.ps1"));
+  CHECK(arguments.at(file + 1) == QDir::toNativeSeparators(QStringLiteral("C:/s/apply-update.ps1")));
   CHECK(arguments.at(arguments.indexOf(QStringLiteral("-ProcessId")) + 1) == QStringLiteral("4242"));
-  CHECK(arguments.at(arguments.indexOf(QStringLiteral("-Msi")) + 1) == QStringLiteral("C:/s/a b.msi"));
+  CHECK(arguments.at(arguments.indexOf(QStringLiteral("-Msi")) + 1) == QDir::toNativeSeparators(QStringLiteral("C:/s/a b.msi")));
 }
 
 TEST_CASE("Apply does nothing before a verified MSI is ready") {
