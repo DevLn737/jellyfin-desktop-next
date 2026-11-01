@@ -148,6 +148,7 @@ RoutePage {
         }
 
         ListView {
+            SmoothWheel {}
             id: tracks
             objectName: "musicTracks"
             Layout.fillWidth: true

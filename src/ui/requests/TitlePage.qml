@@ -44,6 +44,7 @@ RoutePage {
     }
 
     Flickable {
+        SmoothWheel {}
         id: scroller
         anchors.fill: parent
         anchors.leftMargin: Theme.pageMargin

@@ -214,19 +214,24 @@ RoutePage {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: Theme.controlHeight + 2 * Theme.spacing
+        // Tall and dark enough that the two-line clock stays readable over
+        // bright video.
+        height: Theme.controlHeight + 3 * Theme.spacing
         opacity: page.osdShown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
         gradient: Gradient {
-            GradientStop { position: 0; color: "#c0000000" }
+            GradientStop { position: 0; color: "#d0000000" }
+            GradientStop { position: 0.7; color: "#90000000" }
             GradientStop { position: 1; color: "transparent" }
         }
 
         Row {
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.top: parent.top
+            anchors.topMargin: Theme.spacing
+            height: Theme.controlHeight + Theme.spacing
             anchors.leftMargin: Theme.spacing
             anchors.rightMargin: Theme.spacing
             spacing: Theme.spacing
@@ -255,13 +260,18 @@ RoutePage {
                     text: Qt.formatTime(page.now, Locale.ShortFormat)
                     color: Overlay.text
                     font.pixelSize: Theme.fontSizeBody
+                    style: Text.Outline
+                    styleColor: "#80000000"
                 }
                 Text {
                     anchors.right: parent.right
                     visible: page.hasEnd
                     text: qsTr("Ends at %1").arg(Qt.formatTime(page.endsAt, Locale.ShortFormat))
-                    color: Overlay.textSecondary
+                    color: Overlay.text
+                    opacity: 0.85
                     font.pixelSize: Theme.fontSizeSmall
+                    style: Text.Outline
+                    styleColor: "#80000000"
                 }
             }
             // Only in a group: GroupSession exists once the group module
@@ -469,7 +479,10 @@ RoutePage {
                         onClicked: page.player.next()
                     }
                     Text {
+                        id: timeText
                         anchors.verticalCenter: parent.verticalCenter
+                        // Hidden when the right-hand buttons need the room.
+                        visible: rightControls.x - timeText.x >= implicitWidth + Theme.spacing
                         text: page.clock(timeline.value) + " / " + page.clock(page.player.duration)
                         color: Overlay.text
                         font.pixelSize: Theme.fontSizeBody
@@ -477,6 +490,7 @@ RoutePage {
                 }
 
                 Row {
+                    id: rightControls
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall

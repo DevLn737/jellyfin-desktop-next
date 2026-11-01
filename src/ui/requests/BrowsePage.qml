@@ -146,6 +146,7 @@ RoutePage {
 
         // The rows.
         Flickable {
+            SmoothWheel {}
             id: content
             objectName: "requestsRows"
             Layout.fillWidth: true

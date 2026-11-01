@@ -33,6 +33,7 @@ Rectangle {
     border.color: Overlay.border
 
     Flickable {
+        SmoothWheel {}
         id: flick
         anchors.fill: parent
         anchors.margins: Theme.spacing

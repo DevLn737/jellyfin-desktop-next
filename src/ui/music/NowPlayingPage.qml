@@ -201,6 +201,7 @@ RoutePage {
             }
 
             ListView {
+                SmoothWheel {}
                 id: queue
                 objectName: "nowQueue"
                 Layout.fillWidth: true

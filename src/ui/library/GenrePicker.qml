@@ -91,6 +91,7 @@ T.Button {
             }
 
             ListView {
+                SmoothWheel {}
                 id: list
                 objectName: "genreList"
                 width: parent.width
