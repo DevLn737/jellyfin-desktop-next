@@ -72,8 +72,8 @@ TEST_CASE("Home rows come in Jellyfin Web's order and empty rows are left out") 
   // A wide card for an episode uses its own still, sized for the card.
   const QUrl image = resume->data(resume->index(0), ItemListModel::ImageUrlRole).toUrl();
   CHECK(image.path() == QStringLiteral("/Items/e5/Images/Primary"));
-  CHECK(QUrlQuery(image).queryItemValue(QStringLiteral("fillWidth")) == QStringLiteral("200"));
-  CHECK(QUrlQuery(image).queryItemValue(QStringLiteral("fillHeight")) == QStringLiteral("113"));
+  CHECK(QUrlQuery(image).queryItemValue(QStringLiteral("fillWidth")) == QStringLiteral("540"));
+  CHECK(QUrlQuery(image).queryItemValue(QStringLiteral("fillHeight")) == QStringLiteral("304"));
 }
 
 TEST_CASE("A reload keeps rows on screen and drops what became empty") {

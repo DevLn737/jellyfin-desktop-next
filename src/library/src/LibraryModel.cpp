@@ -289,7 +289,7 @@ namespace jfd::library {
         setError(result.error().message);
       } else {
         const QSize pixels =
-            cardImageSize(CardShape::Poster, m_options.cardWidth, m_options.devicePixelRatio);
+            cardImageSize(CardShape::Poster, std::max(m_options.cardWidth, PosterCardWidth), m_options.devicePixelRatio);
         QList<ItemListModel::Entry> entries;
         entries.reserve(result->items.size());
         for (const api::Item& item : result->items)

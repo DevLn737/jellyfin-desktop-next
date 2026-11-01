@@ -120,7 +120,9 @@ namespace jfd::library {
 
   QList<ItemListModel::Entry> HomeModel::entries(const QList<api::Item>& items,
                                                  CardShape shape) const {
-    const QSize pixels = cardImageSize(shape, m_options.cardWidth, m_options.devicePixelRatio);
+    const QSize pixels = cardImageSize(shape, shape == CardShape::Thumb ? std::max(m_options.cardWidth, ThumbCardWidth)
+                                                                       : std::max(m_options.cardWidth, PosterCardWidth),
+                                       m_options.devicePixelRatio);
     QList<ItemListModel::Entry> out;
     out.reserve(items.size());
     for (const api::Item& item : items)
@@ -149,7 +151,7 @@ namespace jfd::library {
         return;
       }
       const QSize pixels =
-          cardImageSize(CardShape::Thumb, m_options.cardWidth, m_options.devicePixelRatio);
+          cardImageSize(CardShape::Thumb, std::max(m_options.cardWidth, ThumbCardWidth), m_options.devicePixelRatio);
       QList<ItemListModel::Entry> libraries;
       for (const api::Item& view : result->items)
         libraries.append({view, cardImageUrl(m_client, view, CardShape::Thumb, pixels)});

@@ -100,7 +100,7 @@ namespace jfd::library {
   }
 
   void RecommendationRows::publish(const QString& prefix, const QList<Row>& rows) {
-    const QSize pixels = cardImageSize(CardShape::Poster, m_options.cardWidth, m_options.devicePixelRatio);
+    const QSize pixels = cardImageSize(CardShape::Poster, std::max(m_options.cardWidth, PosterCardWidth), m_options.devicePixelRatio);
     QSet<QString> now;
     for (const Row& row : rows) {
       if (row.items.isEmpty()) continue;

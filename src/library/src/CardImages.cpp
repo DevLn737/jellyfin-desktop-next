@@ -1,5 +1,6 @@
 #include <jfd/library/CardImages.h>
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <initializer_list>
@@ -54,7 +55,7 @@ namespace jfd::library {
   } // namespace
 
   QSize cardImageSize(CardShape shape, int width, qreal devicePixelRatio) {
-    const int w = static_cast<int>(std::lround(width * devicePixelRatio));
+    const int w = static_cast<int>(std::lround(width * std::max(devicePixelRatio, 1.5)));
     switch (shape) {
     case CardShape::Poster:
       return {w, static_cast<int>(std::lround(w * 1.5))};
