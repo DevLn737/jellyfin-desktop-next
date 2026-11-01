@@ -22,6 +22,7 @@ qt_add_qml_module(jfd_ui_player
     PlayerIcons.qml
     PipWindow.qml
     PlayerPage.qml
+    SegmentsMenu.qml
     TrackMenu.qml
     TuneMenu.qml
   RESOURCES
@@ -35,6 +36,7 @@ qt_add_qml_module(jfd_ui_player
     icons/pip.svg
     icons/previous.svg
     icons/replay.svg
+    icons/segments.svg
     icons/subtitles.svg
     icons/tune.svg
     icons/volume.svg

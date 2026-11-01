@@ -70,6 +70,8 @@ namespace jfd::ui {
     Q_PROPERTY(int subtitleIndex READ subtitleIndex NOTIFY tracksChanged)
     // The skippable segment playing now ("Intro", "Outro", ...), or empty.
     Q_PROPERTY(QString segment READ segment NOTIFY segmentChanged)
+    // The file's media segments, in order: {type, start, end} in seconds.
+    Q_PROPERTY(QVariantList segments READ segments NOTIFY segmentsChanged)
     Q_PROPERTY(bool autoSkip READ autoSkip WRITE setAutoSkip NOTIFY autoSkipChanged)
     // Seconds; positive delays subtitles or audio. Local to this client.
     Q_PROPERTY(double subtitleDelay READ subtitleDelay WRITE setSubtitleDelay NOTIFY delaysChanged)
@@ -125,6 +127,7 @@ namespace jfd::ui {
       return m_tracks.table().selected(core::TrackKind::Subtitle).value_or(-1);
     }
     QString segment() const;
+    QVariantList segments() const;
     bool autoSkip() const { return m_skipper.autoSkip(); }
     void setAutoSkip(bool on);
     bool autoNext() const { return m_autoNext; }
@@ -153,6 +156,10 @@ namespace jfd::ui {
     // -1 turns subtitles off.
     Q_INVOKABLE void selectSubtitle(int streamIndex);
     Q_INVOKABLE void skipSegment();
+    // Seeks to the start of the next segment (direction > 0) or of the
+    // segment before the playing one (direction < 0); does nothing when
+    // there is none.
+    Q_INVOKABLE void jumpToSegment(int direction);
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
     // Plays one of `episodes` from the start, alone.
@@ -179,6 +186,7 @@ namespace jfd::ui {
     void positionChanged();
     void tracksChanged();
     void segmentChanged();
+    void segmentsChanged();
     void autoSkipChanged();
     void autoNextChanged();
     void volumeChanged();

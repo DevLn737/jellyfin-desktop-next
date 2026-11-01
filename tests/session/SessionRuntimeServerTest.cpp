@@ -16,6 +16,7 @@
 
 #include <QElapsedTimer>
 #include <QSignalSpy>
+#include <QTest>
 
 #include <memory>
 #include <optional>
@@ -176,6 +177,16 @@ TEST_CASE("Our client creates a group, plays its item and follows another member
 
   REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->leaveGroup(nullptr, done); }).ok());
   REQUIRE(waitFor([&] { return latest.group && latest.group->participants.size() == 1; }, 20000));
+
+  // Alone in the group, Pause pauses the video and the group, and Play goes on.
+  runtime.post(core::intent::Pause{});
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Paused &&
+                               latest.group->state == core::GroupState::Paused; }, 20000));
+  const auto pausedAt = latest.position.milliseconds();
+  QTest::qWait(1500);
+  CHECK(std::abs(latest.position.milliseconds() - pausedAt) < 100);
+  runtime.post(core::intent::Play{});
+  REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Playing; }, 20000));
 
   // Next from the media keys moves the group to the episode.
   runtime.post(core::intent::Next{});

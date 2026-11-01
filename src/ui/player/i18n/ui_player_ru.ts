@@ -126,6 +126,10 @@
         <translation>Выключить звук</translation>
     </message>
     <message>
+        <source>Segments</source>
+        <translation>Фрагменты</translation>
+    </message>
+    <message>
         <source>Episodes</source>
         <translation>Серии</translation>
     </message>
@@ -144,6 +148,41 @@
     <message>
         <source>Fullscreen</source>
         <translation>Во весь экран</translation>
+    </message>
+</context>
+<context>
+    <name>SegmentsMenu</name>
+    <message>
+        <source>Intro</source>
+        <translation>Заставка</translation>
+    </message>
+    <message>
+        <source>Credits</source>
+        <translation>Титры</translation>
+    </message>
+    <message>
+        <source>Recap</source>
+        <translation>Краткое содержание</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation>Анонс</translation>
+    </message>
+    <message>
+        <source>Commercial</source>
+        <translation>Реклама</translation>
+    </message>
+    <message>
+        <source>Segment</source>
+        <translation>Фрагмент</translation>
+    </message>
+    <message>
+        <source>Segments</source>
+        <translation>Фрагменты</translation>
+    </message>
+    <message>
+        <source>This video has no marked segments.</source>
+        <translation>В этом видео нет отмеченных фрагментов.</translation>
     </message>
 </context>
 <context>
@@ -186,6 +225,10 @@
     <message>
         <source>Speed</source>
         <translation>Скорость</translation>
+    </message>
+    <message>
+        <source>Speed (for everyone in the group)</source>
+        <translation>Скорость (для всех в группе)</translation>
     </message>
     <message>
         <source>Quality (the server converts this video)</source>

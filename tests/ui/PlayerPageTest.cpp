@@ -17,6 +17,7 @@
 #include <QSignalSpy>
 #include <QQmlEngine>
 #include <QQuickItem>
+#include <QRegularExpression>
 #include <QQuickWindow>
 #include <QtQml/qqmlextensionplugin.h>
 
@@ -226,6 +227,14 @@ TEST_CASE("The header shows the clock and when the file ends; the episodes butto
   const QList<QQuickItem*> lines = info->childItems();
   CHECK_FALSE(text(lines[0]).isEmpty());
   CHECK(text(lines[1]).startsWith(QStringLiteral("Ends at ")));
+  // Hours and minutes only: nothing that changes every second.
+  const QRegularExpression seconds(QStringLiteral("\\d\\d?[:.]\\d\\d[:.]\\d\\d"));
+  CHECK_FALSE(text(lines[0]).contains(seconds));
+  CHECK_FALSE(text(lines[1]).contains(seconds));
+  // No segments in this file: no segments button, and the menu keys do nothing.
+  QQuickItem* segmentsButton = find(f.page, "segmentsButton");
+  REQUIRE(segmentsButton != nullptr);
+  CHECK_FALSE(segmentsButton->isVisible());
   // No series list for this file: no button.
   QQuickItem* episodes = find(f.page, "episodes");
   REQUIRE(episodes != nullptr);
