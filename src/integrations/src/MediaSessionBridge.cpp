@@ -151,9 +151,16 @@ namespace jfd::integrations {
         if (controls) controls->setState(state);
     }
     const bool awake = keepsDisplayAwake(m_snapshot);
-    if (m_inhibitor && awake != m_lastAwake) {
+    // Music keeps the system from sleeping but lets the screen go dark.
+    const auto* details = currentDetails();
+    const bool music = details && details->kind == PresenceInfo::Kind::Music;
+    if (m_inhibitor && (awake != m_lastAwake || music != m_lastMusic)) {
       m_lastAwake = awake;
-      m_inhibitor->setInhibited(awake, QCoreApplication::translate("MediaSessionBridge", "Playing video"));
+      m_lastMusic = music;
+      m_inhibitor->setInhibited(awake,
+                                music ? QCoreApplication::translate("MediaSessionBridge", "Playing music")
+                                      : QCoreApplication::translate("MediaSessionBridge", "Playing video"),
+                                music ? platform::SleepInhibitor::Level::System : platform::SleepInhibitor::Level::Display);
     }
   }
 

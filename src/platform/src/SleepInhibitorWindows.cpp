@@ -14,16 +14,20 @@ namespace jfd::platform {
         if (isInhibited()) SetThreadExecutionState(ES_CONTINUOUS);
       }
 
-      void setInhibited(bool inhibited, const QString&) override {
-        if (inhibited == isInhibited()) return;
-        const EXECUTION_STATE state =
-            inhibited ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED : ES_CONTINUOUS;
+      void setInhibited(bool inhibited, const QString&, Level level) override {
+        if (inhibited == isInhibited() && (!inhibited || level == m_level)) return;
+        m_level = level;
+        const EXECUTION_STATE display = level == Level::Display ? ES_DISPLAY_REQUIRED : 0;
+        const EXECUTION_STATE state = inhibited ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED | display : ES_CONTINUOUS;
         if (SetThreadExecutionState(state) == 0) {
           qWarning("SetThreadExecutionState failed: %lu", GetLastError());
           return;
         }
         setActive(inhibited, Backend::WindowsExecutionState);
       }
+
+    private:
+      Level m_level = Level::Display;
     };
   } // namespace
 

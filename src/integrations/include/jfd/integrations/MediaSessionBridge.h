@@ -86,6 +86,7 @@ namespace jfd::integrations {
     std::optional<NowPlayingDetails> m_details;
     std::optional<platform::MediaControlsState> m_lastControls;
     std::optional<bool> m_lastAwake;
+    bool m_lastMusic = false;
   };
 
 } // namespace jfd::integrations
