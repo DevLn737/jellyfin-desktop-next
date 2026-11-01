@@ -50,6 +50,8 @@ namespace jfd::integrations {
       state.artUrl = details->artUrl;
       if (details->kind == PresenceInfo::Kind::Episode)
         state.subtitle = episodeLine(*details);
+      else if (details->kind == PresenceInfo::Kind::Music)
+        state.subtitle = details->artist;
       else if (details->year > 0)
         state.subtitle = QString::number(details->year);
     }
@@ -70,6 +72,8 @@ namespace jfd::integrations {
     if (details) {
       info.kind = details->kind;
       info.seriesName = details->seriesName;
+      info.artist = details->artist;
+      info.album = details->album;
       info.season = details->season;
       info.episode = details->episode;
       info.episodeEnd = details->episodeEnd;

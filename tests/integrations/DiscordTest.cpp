@@ -142,6 +142,23 @@ TEST_CASE("Episodes show the series, season and episode, and the group") {
   CHECK(state(buildActivity(info, 1800000000)) == QStringLiteral("Series"));
 }
 
+TEST_CASE("Music is listening: artist and album, no group line") {
+  PresenceInfo info;
+  info.kind = PresenceInfo::Kind::Music;
+  info.title = QStringLiteral("Song");
+  info.artist = QStringLiteral("Artist");
+  info.album = QStringLiteral("Record");
+  info.playing = true;
+  info.groupSize = 3;
+  QJsonObject activity = buildActivity(info, 1800000000);
+  CHECK(activity.value(QStringLiteral("type")).toInt() == 2);
+  CHECK(activity.value(QStringLiteral("details")).toString() == QStringLiteral("Song"));
+  CHECK(state(activity) == QStringLiteral("Artist · Record"));
+  info.playing = false;
+  info.positionMs = 65'000;
+  CHECK(state(buildActivity(info, 1800000000)) == QStringLiteral("Artist · Record · Paused · 1:05"));
+}
+
 TEST_CASE("Nothing is shown without a title; private posters and long titles are handled") {
   PresenceInfo info = movie();
   info.title.clear();

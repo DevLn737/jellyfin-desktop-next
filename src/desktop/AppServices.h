@@ -30,6 +30,14 @@ namespace jfd::media {
   class MpvPlayer;
 }
 
+namespace jfd::music {
+  class MusicPlayer;
+}
+
+namespace jfd::ui {
+  class MusicUi;
+}
+
 namespace jfd::session {
   class GroupModel;
   class SessionRuntime;
@@ -100,6 +108,10 @@ namespace jfd::desktop {
     // session. Declared after it so it goes first.
     std::unique_ptr<session::GroupModel> group;
 
+    // Music (installMusic): the queue and player on the session above, and
+    // the screens' lists. Declared after the session so they go first.
+    std::unique_ptr<music::MusicPlayer> music;
+    std::unique_ptr<ui::MusicUi> musicUi;
     // installSeerr: the Seerr connection and the credential storage its
     // session cookie is kept in (declared first so it goes last).
     std::unique_ptr<platform::CredentialStore> seerrCredentials;
@@ -159,6 +171,15 @@ namespace jfd::desktop {
   void installGroup(AppServices& services, QQmlEngine& engine);
   void uninstallGroup(AppServices& services);
 
+  // The music settings section (volume, normalization, keeping the queue).
+  bool registerMusicSettings(settings::SettingsRegistry& registry);
+  // The music screens' routes (music, album, artist, playlist, genre,
+  // nowplaying), the player and its saved queue. Needs installSession.
+  // uninstallMusic, before the session goes, drops them.
+  void installMusic(AppServices& services, QQmlEngine& engine);
+  // After the window loads: the mini-player in the shell's strip.
+  void installMiniPlayer(AppServices& services, QQmlEngine& engine);
+  void uninstallMusic(AppServices& services);
   // The Seerr settings section (address, sign in, check, sign out).
   bool registerSeerrSettings(settings::SettingsRegistry& registry);
   // Requests: the Seerr connection, its routes ("requests" in the sidebar

@@ -30,6 +30,8 @@ namespace jfd::integrations {
     core::ItemId item; // The details apply only while this item plays.
     PresenceInfo::Kind kind = PresenceInfo::Kind::Movie;
     QString seriesName;
+    QString artist; // Music.
+    QString album;
     std::optional<int> season;
     std::optional<int> episode;
     std::optional<int> episodeEnd;

@@ -10,6 +10,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   GroupInstall.cpp
   LegacyInstall.cpp LegacyInstall.h
   LibraryInstall.cpp
+  MusicInstall.cpp
   SeerrInstall.cpp
   SessionInstall.cpp
   ThemeInstall.cpp ThemeInstall.h
@@ -28,14 +29,14 @@ qt_add_qml_module(jellyfin-desktop
   VERSION 1.0
   NO_PLUGIN
   QML_FILES Main.qml
-  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Group Jfd.Ui.Player Jfd.Ui.Requests)
+  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Group Jfd.Ui.Player Jfd.Ui.Music Jfd.Ui.Requests)
 
 # Static QML modules: link each one's plugin (Q_IMPORT_QML_PLUGIN in
 # main.cpp) as well as the module itself.
 target_link_libraries(jellyfin-desktop PRIVATE
   Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network
   jfd::settings jfd::integrations jfd::platform jfd::session jfd::jellyfin_api
-  jfd::library jfd::seerr jfd::session_runtime jfd::media_backend jfd::diagnostics
+  jfd::library jfd::music jfd::seerr jfd::session_runtime jfd::media_backend jfd::diagnostics
   jfd_ui_theme jfd_ui_themeplugin
   jfd_ui_controls jfd_ui_controlsplugin
   jfd_ui_shell jfd_ui_shellplugin
@@ -43,6 +44,7 @@ target_link_libraries(jellyfin-desktop PRIVATE
   jfd_ui_library jfd_ui_libraryplugin
   jfd_ui_group jfd_ui_groupplugin
   jfd_ui_player jfd_ui_playerplugin
+  jfd_ui_music jfd_ui_musicplugin
   jfd_ui_requests jfd_ui_requestsplugin)
 jfd_add_translations(jellyfin-desktop)
 
