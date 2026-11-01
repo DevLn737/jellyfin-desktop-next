@@ -54,6 +54,16 @@ namespace jfd::ui {
     return names;
   }
 
+  const QStringList& optionalColorNames() {
+    static const QStringList names = {
+        QStringLiteral("glassFill"),
+        QStringLiteral("glassBorder"),
+        QStringLiteral("primary"),
+        QStringLiteral("primaryText"),
+    };
+    return names;
+  }
+
   namespace {
     QVariantMap rawDark() {
       return {
@@ -96,7 +106,39 @@ namespace jfd::ui {
         {QStringLiteral("progress"), QStringLiteral("#0078a8")},
       };
     }
+
+    // "Depth": a deep blue-black page, panels that are glass where the
+    // window allows it, a muted teal accent for progress, the active entry
+    // and focus only, and a pale button as the main action.
+    QVariantMap rawDepth() {
+      return {
+        {QStringLiteral("background"), QStringLiteral("#0a0e16")},
+        {QStringLiteral("surface"), QStringLiteral("#111826")},
+        {QStringLiteral("surfaceRaised"), QStringLiteral("#1a2232")},
+        {QStringLiteral("surfaceHover"), QStringLiteral("#232e42")},
+        {QStringLiteral("border"), QStringLiteral("#14ffffff")},
+        {QStringLiteral("accent"), QStringLiteral("#6fa8b3")},
+        {QStringLiteral("accentHover"), QStringLiteral("#8ab8c1")},
+        {QStringLiteral("accentText"), QStringLiteral("#000000")},
+        {QStringLiteral("text"), QStringLiteral("#e8ecf2")},
+        {QStringLiteral("textSecondary"), QStringLiteral("#aab3c1")},
+        {QStringLiteral("textDisabled"), QStringLiteral("#6f7a8c")},
+        {QStringLiteral("error"), QStringLiteral("#e5534b")},
+        {QStringLiteral("success"), QStringLiteral("#3fb950")},
+        {QStringLiteral("focusRing"), QStringLiteral("#6fa8b3")},
+        {QStringLiteral("scrim"), QStringLiteral("#b0060910")},
+        {QStringLiteral("progress"), QStringLiteral("#6fa8b3")},
+        {QStringLiteral("glassFill"), QStringLiteral("#80101622")},
+        {QStringLiteral("glassBorder"), QStringLiteral("#14ffffff")},
+        {QStringLiteral("primary"), QStringLiteral("#e8ecf2")},
+        {QStringLiteral("primaryText"), QStringLiteral("#0a0e16")},
+      };
+    }
   } // namespace
+
+  QVariantMap depthPalette() { return withAccent(rawDepth(), depthAccent(), true); }
+
+  QColor depthAccent() { return QColor(0x6f, 0xa8, 0xb3); }
 
   QVariantMap darkPalette() { return withAccent(rawDark(), accentPresets().first().color, true); }
 

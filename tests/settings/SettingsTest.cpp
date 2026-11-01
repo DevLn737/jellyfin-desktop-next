@@ -306,12 +306,12 @@ TEST_CASE("The appearance defaults and the theme choices") {
   auto files = std::make_shared<QList<Choice>>();
   REQUIRE(registerCommonSections(registry, [files] { return *files; }));
   Settings settings(registry, iniPath(dir));
-  CHECK(settings.value(keys::Theme).toString() == QLatin1String("dark"));
-  CHECK(settings.value(keys::Accent).toString() == QLatin1String("blue"));
-  CHECK(choicesOf(*registry.setting(keys::Theme)).size() == 3);
+  CHECK(settings.value(keys::Theme).toString() == QLatin1String("depth"));
+  CHECK(settings.value(keys::Accent).toString() == QLatin1String("theme"));
+  CHECK(choicesOf(*registry.setting(keys::Theme)).size() == 4);
   // A theme file that is not there yet cannot be chosen; once it is, it can.
   CHECK_FALSE(settings.setValue(keys::Theme, QStringLiteral("file:midnight")));
   files->append(Choice(QStringLiteral("file:midnight"), nullptr, QStringLiteral("Midnight")));
   CHECK(settings.setValue(keys::Theme, QStringLiteral("file:midnight")));
-  CHECK(choicesOf(*registry.setting(keys::Theme)).size() == 4);
+  CHECK(choicesOf(*registry.setting(keys::Theme)).size() == 5);
 }

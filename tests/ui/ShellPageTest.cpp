@@ -153,6 +153,7 @@ import Jfd.Ui.Theme
 QtObject {
   property var dark: Palettes.dark
   property var light: Palettes.light
+  property var depth: Palettes.depth
 }
 )");
   const auto same = [](const QVariantMap& made, const QVariant& fromQml) {
@@ -166,6 +167,7 @@ QtObject {
   };
   same(ui::darkPalette(), object->property("dark"));
   same(ui::lightPalette(), object->property("light"));
+  same(ui::depthPalette(), object->property("depth"));
 }
 
 TEST_CASE("Controls in a colour scope keep that palette when the theme changes") {
@@ -190,6 +192,46 @@ Item {
   QMetaObject::invokeMethod(object.get(), "useLight");
   CHECK(object->property("outside").value<QColor>() == QColor(QStringLiteral("#16181c")));
   CHECK(object->property("inside").value<QColor>() == QColor(QStringLiteral("#f2f2f2")));
+}
+
+TEST_CASE("The player's overlay stays dark in the Depth look, and glass is solid with simplified effects") {
+  QQmlEngine engine;
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Controls
+Item {
+  property color insideText: insideHeading.color
+  property color insideButton: insideButton.primaryFill
+  property color pageButton: pageButton.primaryFill
+  property color panel: Theme.panelFill
+  property color popup: Theme.popupFill
+  property color pageText: outsideHeading.color
+  function useDepth() { Theme.colors = Palettes.depth }
+  function simplify(on) { Theme.reducedEffects = on }
+  Heading { id: outsideHeading; text: "Page" }
+  ActionButton { id: pageButton; primary: true; text: "Play" }
+  Item {
+    readonly property var colorScope: Overlay.colors
+    Heading { id: insideHeading; text: "On the video" }
+    ActionButton { id: insideButton; primary: true; text: "Resume" }
+  }
+}
+)");
+  const auto call = [&](const char* name) { QMetaObject::invokeMethod(object.get(), name); };
+  call("useDepth");
+  const auto color = [&](const char* name) { return object->property(name).value<QColor>(); };
+  // The page is in the new look, the video's controls are not.
+  CHECK(color("pageText") == QColor(QStringLiteral("#e8ecf2")));
+  CHECK(color("insideText") == QColor(QStringLiteral("#f2f2f2")));
+  CHECK(color("pageButton") == QColor(QStringLiteral("#e8ecf2")));
+  CHECK(color("insideButton") == QColor(QStringLiteral("#00a4dc")));
+  // Glass is translucent with effects on, nearly solid with them simplified.
+  CHECK(color("panel").alpha() < 200);
+  QMetaObject::invokeMethod(object.get(), "simplify", Q_ARG(QVariant, true));
+  CHECK(color("panel").alpha() >= 240);
+  CHECK(color("popup").alpha() >= 240);
+  QMetaObject::invokeMethod(object.get(), "simplify", Q_ARG(QVariant, false));
 }
 
 
@@ -272,10 +314,10 @@ TEST_CASE("Layout at window sizes from 640x420 to 4K, in logical pixels") {
   };
   // 1366x768 at 150 % is 911x512; 1920x1080 at 200 % is 960x540; 3840x2160
   // at 100/150/200 % is 3840x2160, 2560x1440 and 1920x1080.
-  const Size sizes[] = {{640, 420, "compact", 64},    {899, 600, "compact", 64},   {900, 600, "normal", 220},
-                        {911, 512, "normal", 220},    {960, 540, "normal", 220},   {1024, 768, "normal", 220},
-                        {1280, 720, "normal", 220},   {1600, 900, "normal", 220},  {1920, 1080, "spacious", 220},
-                        {2560, 1440, "spacious", 220}, {3840, 2160, "spacious", 220}};
+  const Size sizes[] = {{640, 420, "compact", 64},    {899, 600, "compact", 64},   {900, 600, "normal", 216},
+                        {911, 512, "normal", 216},    {960, 540, "normal", 216},   {1024, 768, "normal", 216},
+                        {1280, 720, "normal", 216},   {1600, 900, "normal", 216},  {1920, 1080, "spacious", 216},
+                        {2560, 1440, "spacious", 216}, {3840, 2160, "spacious", 216}};
   QQuickItem* stack = find(shell, "pageStack");
   REQUIRE(stack != nullptr);
   for (const Size& size : sizes) {
@@ -343,8 +385,8 @@ TEST_CASE("The menu opens the names over the pages in a compact window") {
   QCoreApplication::processEvents();
   CHECK_FALSE(menu->isVisible());
   waited.restart();
-  while (sidebar->width() < 220 && waited.elapsed() < 2000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-  CHECK(sidebar->width() == doctest::Approx(220.0));
+  while (sidebar->width() < 216 && waited.elapsed() < 2000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  CHECK(sidebar->width() == doctest::Approx(216.0));
 }
 
 TEST_CASE("The plain wheel over a card row scrolls the page; Shift + wheel scrolls the row") {
@@ -432,6 +474,9 @@ Item {
         spacing: Theme.spacing
         ActionButton { text: "Play"; primary: true; iconSource: Icons.play }
         ActionButton { text: "Watch together"; iconSource: Icons.group }
+        GlassPanel { width: 220; height: 40; popup: true; Text { anchors.centerIn: parent; text: "Glass panel"; color: Theme.text } }
+        SkeletonBox { width: 160; height: 40; radius: Theme.radiusLarge }
+        StateMessage { width: 320; height: 220; kind: "error"; description: "Cannot reach the server." }
         IconButton { iconSource: Icons.search; toolTipText: "Search" }
         ToggleSwitch { checked: true }
       }
@@ -456,13 +501,15 @@ Item {
     const char* name;
     bool dark;
     const char* accent;
+    bool depth = false;
   };
-  const Look looks[] = {{"dark", true, "#00a4dc"}, {"light", false, "#00a4dc"}, {"light-purple", false, "#8e6be8"},
+  const Look looks[] = {{"depth", true, "#6fa8b3", true},
+                        {"dark", true, "#00a4dc"}, {"light", false, "#00a4dc"}, {"light-purple", false, "#8e6be8"},
                         {"dark-orange", true, "#f08c2e"}};
   const QSize sizes[] = {{640, 420}, {1024, 768}, {1280, 720}, {1920, 1080}};
   for (const Look& look : looks) {
-    const QVariantMap palette = ui::withAccent(look.dark ? ui::darkPalette() : ui::lightPalette(),
-                                               QColor(QString::fromLatin1(look.accent)), look.dark);
+    const QVariantMap palette = look.depth ? ui::depthPalette()
+        : ui::withAccent(look.dark ? ui::darkPalette() : ui::lightPalette(), QColor(QString::fromLatin1(look.accent)), look.dark);
     theme->setProperty("colors", palette);
     overlay->setProperty("colors", ui::withAccent(ui::darkPalette(), QColor(QString::fromLatin1(look.accent)), true));
     for (const QSize& size : sizes) {

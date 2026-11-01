@@ -25,6 +25,8 @@ namespace jfd::desktop {
 
     constexpr QLatin1String FilePrefix{"file:"};
     constexpr int DefaultRadius = 6;
+    constexpr int DepthRadius = 10;
+    constexpr QLatin1String DepthFont{"Manrope"};
 
     QString themeId(const QString& fileName) {
       return QFileInfo(fileName).completeBaseName();
@@ -141,6 +143,16 @@ namespace jfd::desktop {
         m_overlay(engine.singletonInstance<QObject*>("Jfd.Ui.Theme", "Overlay")),
         m_window(window) {
     Q_ASSERT(m_theme != nullptr && m_overlay != nullptr);
+    // Manrope, the typeface of the default look, ships in the program (SIL
+    // OFL 1.1). If it cannot be loaded the system font is used.
+    for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold"}) {
+      const QString path = QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Manrope-") + QLatin1String(weight) + QStringLiteral(".ttf");
+      if (QFontDatabase::addApplicationFont(path) >= 0) {
+        m_depthFontLoaded = true;
+      } else {
+        qCWarning(lcTheme) << "font" << path << "was not loaded";
+      }
+    }
     settings::Settings& settings = *services.settings;
     connect(&settings, &settings::Settings::valueChanged, this, [this](const QString& key) {
       if (key == settings::keys::Theme || key == settings::keys::Accent || key == settings::keys::AccentCustom) {
@@ -191,33 +203,46 @@ namespace jfd::desktop {
     QString choice = settings.value(settings::keys::Theme).toString();
     const ui::ThemeDefinition* file = nullptr;
     bool dark = true;
+    // "Depth" is the default look: it is used for its own choice, for any
+    // unknown choice and for a missing theme file, and "Like the system"
+    // gives it for a dark system.
+    bool depth = true;
     if (choice.startsWith(FilePrefix)) {
       file = m_catalog.find(choice.mid(FilePrefix.size()));
       if (file != nullptr) {
         dark = file->darkBase;
+        depth = false;
       } else {
-        qCWarning(lcTheme) << "theme file" << choice << "is missing; using the dark theme";
+        qCWarning(lcTheme) << "theme file" << choice << "is missing; using the default theme";
       }
+    } else if (choice == QLatin1String("dark")) {
+      depth = false;
     } else if (choice == QLatin1String("light")) {
       dark = false;
+      depth = false;
     } else if (choice == QLatin1String("system")) {
       // Unknown (a platform without a setting) is dark.
       dark = QGuiApplication::styleHints()->colorScheme() != Qt::ColorScheme::Light;
+      depth = dark;
     }
 
     // The accent from the settings; a theme file with an accent of its own
     // keeps it.
-    QColor accent = ui::accentPresets().first().color;
+    // "theme" (the default) is the accent of the look itself.
+    QColor accent = depth ? ui::depthAccent() : ui::accentPresets().first().color;
+    bool ownAccentChosen = false;
     const QString accentId = settings.value(settings::keys::Accent).toString();
     if (accentId == QLatin1String("custom")) {
       const QColor custom = ui::parseAccent(settings.value(settings::keys::AccentCustom).toString());
       if (custom.isValid()) {
         accent = custom;
+        ownAccentChosen = true;
       }
     } else {
       for (const ui::AccentPreset& preset : ui::accentPresets()) {
         if (preset.id == accentId) {
           accent = preset.color;
+          ownAccentChosen = true;
         }
       }
     }
@@ -231,6 +256,12 @@ namespace jfd::desktop {
         radius = file->radius;
       }
       font = file->fontFamily;
+    } else if (depth) {
+      palette = ownAccentChosen ? ui::withAccent(ui::depthPalette(), accent, true) : ui::depthPalette();
+      radius = DepthRadius;
+      if (m_depthFontLoaded) {
+        font = QLatin1String(DepthFont);
+      }
     } else {
       palette = ui::withAccent(dark ? ui::darkPalette() : ui::lightPalette(), accent, dark);
     }

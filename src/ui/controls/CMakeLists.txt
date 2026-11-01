@@ -14,6 +14,7 @@ qt_add_qml_module(jfd_ui_controls
     ChoiceBox.qml
     CardRow.qml
     FocusFrame.qml
+    GlassPanel.qml
     Heading.qml
     Icon.qml
     IconButton.qml
@@ -21,8 +22,11 @@ qt_add_qml_module(jfd_ui_controls
     InputField.qml
     ListItem.qml
     LoadingIndicator.qml
+    PopupMenu.qml
     PosterCard.qml
     SectionHeader.qml
+    SkeletonBox.qml
+    StateMessage.qml
     Toast.qml
     ToggleSwitch.qml
     ToolTipLabel.qml

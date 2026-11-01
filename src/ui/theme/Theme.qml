@@ -52,6 +52,23 @@ QtObject {
     readonly property color scrim: colors.scrim
     readonly property color progress: colors.progress
 
+    // Colours a palette may add (Palettes.depth has them); without them the
+    // fallbacks keep older palettes and theme files working.
+    // Glass: the fill of a floating or side panel and its edge.
+    readonly property color glassFill: colors.glassFill !== undefined ? colors.glassFill
+                                      : Qt.alpha(colors.surface, 0.85)
+    readonly property color glassBorder: colors.glassBorder !== undefined ? colors.glassBorder : colors.border
+    // The main action's button: filled with the accent unless the palette
+    // has a colour of its own for it.
+    readonly property color primary: colors.primary !== undefined ? colors.primary : colors.accent
+    readonly property color primaryText: colors.primaryText !== undefined ? colors.primaryText : colors.accentText
+    readonly property color primaryHover: colors.primary !== undefined ? Qt.darker(colors.primary, 1.1) : colors.accentHover
+    // What a panel is filled with: the glass when effects are on, a nearly
+    // solid surface when they are simplified (no blur is ever drawn then).
+    readonly property color panelFill: blurEnabled ? glassFill : Qt.alpha(colors.surface, 0.96)
+    // A menu or popup floats over content: kept readable, nearly solid.
+    readonly property color popupFill: Qt.alpha(colors.surfaceRaised, blurEnabled ? 0.94 : 0.98)
+
     // Type: sizes in device-independent pixels; the interface scale setting
     // scales everything through QT_SCALE_FACTOR.
     // A theme file may set a corner radius and an installed font family; the
@@ -76,6 +93,15 @@ QtObject {
     readonly property int radius: radiusOverride
     readonly property int radiusSmall: Math.max(1, Math.round(radiusOverride / 2))
     readonly property int focusRingWidth: 2
+    // Larger corners for panels and menus ("Depth" uses 10 px and 14 px).
+    readonly property int radiusLarge: Math.round(radiusOverride * 1.4)
+    // Elevation: popups get one light shadow; flat panels get none.
+    readonly property color shadowColor: "#66000000"
+    readonly property int shadowRadius: 16
+    readonly property int shadowOffset: 6
+    // TV mode: the smallest touch/remote target and the focus ring's gap.
+    readonly property int minHitSize: 44
+    readonly property int focusRingOffset: 2
 
     // Window size classes, by the window's width in logical pixels (the
     // application sets windowWidth): "compact" under 900 (the sidebar
@@ -93,7 +119,7 @@ QtObject {
     // Sizes
     readonly property int controlHeight: 38
     readonly property int iconSize: 22
-    readonly property int sidebarWidth: 220
+    readonly property int sidebarWidth: 216
     readonly property int sidebarCollapsedWidth: 64
     // Card widths; heights follow from the aspect ratios.
     // Poster-shaped cards are 110 to 220 px wide in every size class.
@@ -116,5 +142,7 @@ QtObject {
     readonly property int durationFast: reducedEffects ? 60 : 120
     readonly property int durationNormal: reducedEffects ? 100 : 200
     readonly property int durationSlow: reducedEffects ? 160 : 320
+    // Long fades (a backdrop into the page, skeleton shimmer).
+    readonly property int durationLong: reducedEffects ? 240 : 600
     readonly property int easing: Easing.OutCubic
 }
