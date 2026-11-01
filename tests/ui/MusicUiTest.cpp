@@ -208,6 +208,39 @@ MiniPlayer { }
   CHECK(f.player->volume() == 40);
 }
 
+TEST_CASE("Now Playing keeps its controls on screen on a short window and the track menu is the app's menu") {
+  Fixture f;
+  QQuickWindow window;
+  window.resize(1280, 800);
+  window.show();
+  music::Track track;
+  track.id = QStringLiteral("t1");
+  track.name = QStringLiteral("Queued Song");
+  f.player->append({track});
+  f.player->jumpTo(0);
+  auto page = f.create(R"(
+import QtQuick
+import Jfd.Ui.Music
+NowPlayingPage { width: 1280; height: 700 }
+)");
+  auto* item = qobject_cast<QQuickItem*>(page.get());
+  item->setParentItem(window.contentItem());
+  for (const char* name : {"nowSeek", "nowPlay", "nowVolume"}) {
+    QQuickItem* control = find(item, name);
+    REQUIRE(control != nullptr);
+    const QPointF bottom = control->mapToItem(item, QPointF(0, control->height()));
+    CHECK_MESSAGE(bottom.y() <= item->height(), name << " ends at " << bottom.y() << " of " << item->height());
+  }
+  // The cover stays square and not larger than its column.
+  QQuickItem* cover = find(item, "nowCover");
+  REQUIRE(cover != nullptr);
+  CHECK(cover->width() == doctest::Approx(cover->height()));
+  CHECK(cover->width() <= 360);
+  item->setHeight(520);
+  QQuickItem* volume = find(item, "nowVolume");
+  CHECK(volume->mapToItem(item, QPointF(0, volume->height())).y() <= item->height());
+}
+
 TEST_CASE("Music is not offered in a SyncPlay group and a track during a movie asks first") {
   Fixture f;
   auto guard = f.create(R"(

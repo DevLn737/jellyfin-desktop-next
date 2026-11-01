@@ -113,6 +113,10 @@ namespace jfd::ui {
 
   QString LibraryUi::routeFor(const QString& itemId, const QString& type) const {
     if (type == QLatin1String("BoxSet")) return QStringLiteral("collection/") + itemId;
+    // Music results of a search; their screens are in src/ui/music.
+    if (type == QLatin1String("MusicAlbum")) return QStringLiteral("album/") + itemId;
+    if (type == QLatin1String("MusicArtist")) return QStringLiteral("artist/") + itemId;
+    if (type == QLatin1String("Playlist")) return QStringLiteral("playlist/") + itemId;
     if (type == QLatin1String("CollectionFolder") || type == QLatin1String("UserView") ||
         type == QLatin1String("Folder")) {
       // Music libraries have screens of their own (src/ui/music).

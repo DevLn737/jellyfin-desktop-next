@@ -39,12 +39,8 @@ PosterCard {
 
     ActionMenu {
         id: menu
-        function popup() {
-            x = Math.min(card.width, 40)
-            y = Math.min(card.height, 40)
-            open()
-        }
-        parent: card
+        function popup() { open() }
+        anchorItem: card
         entries: card.model.type === "MusicAlbum"
             ? [qsTr("Play"), qsTr("Shuffle"), qsTr("Play next"), qsTr("Add to queue")]
             : [qsTr("Play"), qsTr("Shuffle")]
