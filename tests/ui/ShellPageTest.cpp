@@ -234,6 +234,50 @@ Item {
   QMetaObject::invokeMethod(object.get(), "simplify", Q_ARG(QVariant, false));
 }
 
+TEST_CASE("A popup menu opens with its entries, next to its button and inside the window") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  window.resize(640, 420);
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Controls
+Item {
+  width: 640; height: 420
+  property alias menu: menu
+  Rectangle { id: button; x: 600; y: 390; width: 30; height: 24 }
+  PopupMenu { id: menu; objectName: "menu"; anchorItem: button; entries: ["One", "Two", "Three"] }
+}
+)");
+  auto* root = qobject_cast<QQuickItem*>(object.get());
+  root->setParentItem(window.contentItem());
+  root->setPosition(QPointF(0, 0));
+  window.show();
+  auto* menu = root->findChild<QObject*>(QStringLiteral("menu"));
+  REQUIRE(menu != nullptr);
+  QMetaObject::invokeMethod(menu, "open");
+  QElapsedTimer settle;
+  settle.start();
+  while (settle.elapsed() < 300) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  auto* content = menu->property("contentItem").value<QQuickItem*>();
+  REQUIRE(content != nullptr);
+  int entries = 0;
+  for (QQuickItem* child : content->childItems()) {
+    if (child->objectName() == QLatin1String("popupEntry")) ++entries;
+  }
+  CHECK(entries == 3);
+  // The menu has the height of its entries (a templated popup has none of
+  // its own) and sits inside the overlay it opens in, 8 px from its edges.
+  auto* overlay = qobject_cast<QQuickItem*>(menu->property("parent").value<QObject*>());
+  REQUIRE(overlay != nullptr);
+  const double x = menu->property("x").toDouble(), y = menu->property("y").toDouble();
+  const double w = menu->property("width").toDouble(), h = menu->property("height").toDouble();
+  CHECK(h >= 3 * 38);
+  CHECK(x >= 8);
+  CHECK(y >= 8);
+  CHECK(x + w <= overlay->width() - 8 + 0.5);
+  CHECK(y + h <= overlay->height() - 8 + 0.5);
+}
+
 
 namespace {
   // Resident memory in bytes (Linux; elsewhere 0, and the growth check is skipped).

@@ -181,6 +181,11 @@ RoutePage {
                     page.signIn.signIn(user.text, password.text)
             }
 
+            // Focus goes to the password only when the name is already known
+            // (a saved server); it is decided once, never from the text, so
+            // typing a name keeps the cursor in the name field.
+            Component.onCompleted: (user.text.length > 0 ? password : user).forceActiveFocus()
+
             Column {
                 id: credentialColumn
                 width: parent.width
@@ -197,7 +202,6 @@ RoutePage {
                     id: user
                     objectName: "userName"
                     width: parent.width
-                    focus: text.length === 0
                     label: qsTr("User name")
                     text: page.signIn ? page.signIn.userName : ""
                     inputMethodHints: Qt.ImhNoAutoUppercase
@@ -207,7 +211,6 @@ RoutePage {
                     id: password
                     objectName: "password"
                     width: parent.width
-                    focus: user.text.length > 0
                     label: qsTr("Password")
                     password: true
                     onAccepted: form.submit()

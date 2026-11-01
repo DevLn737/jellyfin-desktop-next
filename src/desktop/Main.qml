@@ -57,7 +57,7 @@ Window {
             anchors.fill: parent
             backgroundVisible: !HdrOutput.videoShown
             libraries: Library.home ? Library.home.libraries : null
-            accountName: Library.signIn ? Library.signIn.serverName : ""
+            accountName: Library.signIn ? (Library.signIn.userName.length > 0 ? Library.signIn.userName : Library.signIn.serverName) : ""
             onLibraryChosen: (itemId, type) => Navigator.navigate(Library.routeFor(itemId, type))
             onPaletteRequested: palette.toggle()
         }

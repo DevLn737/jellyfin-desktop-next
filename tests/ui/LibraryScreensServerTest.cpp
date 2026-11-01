@@ -23,6 +23,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QTest>
 #include <QTemporaryDir>
 #include <QtQml/qqmlextensionplugin.h>
 
@@ -163,6 +164,11 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   screens.find("serverAddress")->setProperty("text", env("JFD_TEST_SERVER_URL"));
   Screens::click(screens.find("connectButton"));
   REQUIRE(waitFor([&] { return screens.find("userName") != nullptr; }, Timeout));
+  // Typing a whole name keeps the cursor in the name field (it once jumped
+  // to the password after the first character).
+  for (const char letter : {'a', 'l', 'i', 'c', 'e'}) QTest::keyClick(screens.window, letter);
+  CHECK(screens.find("userName")->property("text").toString() == QLatin1String("alice"));
+  CHECK(screens.find("password")->property("text").toString().isEmpty());
   screens.find("userName")->setProperty("text", env("JFD_TEST_USER"));
   screens.find("password")->setProperty("text", env("JFD_TEST_PASSWORD"));
   CHECK(screens.find("quickConnectButton")->property("visible").toBool());
