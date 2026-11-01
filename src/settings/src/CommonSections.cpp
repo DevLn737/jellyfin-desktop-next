@@ -93,11 +93,12 @@ namespace jfd::settings {
       SettingDescriptor theme;
       theme.key = key(keys::Theme);
       theme.type = SettingType::Choice;
-      theme.defaultValue = QStringLiteral("dark");
+      theme.defaultValue = QStringLiteral("depth");
       theme.label = QT_TRANSLATE_NOOP("CommonSettings", "Theme");
       theme.description = QT_TRANSLATE_NOOP("CommonSettings", "Changes at once, no restart needed. The video player is always dark.");
       theme.dynamicChoices = [themeFiles = std::move(themeFiles)] {
         QList<Choice> choices = {
+            {QStringLiteral("depth"), QT_TRANSLATE_NOOP("CommonSettings", "Depth")},
             {QStringLiteral("dark"), QT_TRANSLATE_NOOP("CommonSettings", "Dark")},
             {QStringLiteral("light"), QT_TRANSLATE_NOOP("CommonSettings", "Light")},
             {QStringLiteral("system"), QT_TRANSLATE_NOOP("CommonSettings", "Like the system")},
@@ -112,10 +113,11 @@ namespace jfd::settings {
       SettingDescriptor accent;
       accent.key = key(keys::Accent);
       accent.type = SettingType::Choice;
-      accent.defaultValue = QStringLiteral("blue");
+      accent.defaultValue = QStringLiteral("theme");
       accent.label = QT_TRANSLATE_NOOP("CommonSettings", "Accent colour");
       // The ids and names of the presets in jfd::ui::accentPresets().
       accent.choices = {
+          {QStringLiteral("theme"), QT_TRANSLATE_NOOP("CommonSettings", "Theme default")},
           {QStringLiteral("blue"), QT_TRANSLATE_NOOP("Appearance", "Blue")},
           {QStringLiteral("purple"), QT_TRANSLATE_NOOP("Appearance", "Purple")},
           {QStringLiteral("pink"), QT_TRANSLATE_NOOP("Appearance", "Pink")},

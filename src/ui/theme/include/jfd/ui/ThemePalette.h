@@ -14,7 +14,14 @@ namespace jfd::ui {
   // The names every palette has, in the order Theme.qml lists them.
   const QStringList& colorNames();
 
-  // The built-in palettes. `dark` matches Palettes.qml (a test checks).
+  // Names a palette may add (glass panels, the main button). Theme.qml has a
+  // fallback for each, so palettes and theme files without them stay valid.
+  const QStringList& optionalColorNames();
+
+  // The built-in palettes. They match Palettes.qml (a test checks).
+  // `depth` is the default look; its accent is `depthAccent()`.
+  QVariantMap depthPalette();
+  QColor depthAccent();
   QVariantMap darkPalette();
   QVariantMap lightPalette();
 

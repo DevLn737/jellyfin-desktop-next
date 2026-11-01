@@ -34,5 +34,9 @@
         <source>Menu</source>
         <translation>Меню</translation>
     </message>
+    <message>
+        <source>Libraries</source>
+        <translation>Библиотеки</translation>
+    </message>
 </context>
 </TS>

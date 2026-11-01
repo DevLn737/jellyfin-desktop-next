@@ -3,9 +3,34 @@ import QtQuick
 
 // Built-in colour palettes: maps from the names in Theme.qml to colours.
 // Theme.colors is one of these (or one made from the accent setting or a
-// theme file). The same values are made in C++ by darkPalette() and
-// lightPalette() (ThemePalette.cpp); a test keeps the two equal.
+// theme file). The same values are made in C++ by darkPalette(),
+// lightPalette() and depthPalette() (ThemePalette.cpp); a test keeps the two equal.
 QtObject {
+    // "Depth", the default look. Beside the shared names it has glass and
+    // main-button colours (Theme.qml has fallbacks for palettes without them).
+    readonly property var depth: ({
+        background: "#0a0e16",
+        surface: "#111826",
+        surfaceRaised: "#1a2232",
+        surfaceHover: "#232e42",
+        border: "#14ffffff",
+        accent: "#6fa8b3",
+        accentHover: "#8ab8c1",
+        accentText: "#000000",
+        text: "#e8ecf2",
+        textSecondary: "#aab3c1",
+        textDisabled: "#6f7a8c",
+        error: "#e5534b",
+        success: "#3fb950",
+        focusRing: "#6fa8b3",
+        scrim: "#b0060910",
+        progress: "#6fa8b3",
+        glassFill: "#80101622",
+        glassBorder: "#14ffffff",
+        primary: "#e8ecf2",
+        primaryText: "#0a0e16",
+    })
+
     readonly property var dark: ({
         background: "#101010",
         surface: "#1c1c1c",

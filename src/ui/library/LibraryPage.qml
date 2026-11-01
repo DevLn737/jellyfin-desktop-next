@@ -160,14 +160,14 @@ RoutePage {
             }
         }
 
-        Text {
+        StateMessage {
             objectName: "libraryError"
             Layout.fillWidth: true
-            visible: text.length > 0
-            text: page.library ? page.library.errorText : ""
-            color: Theme.error
-            font.pixelSize: Theme.fontSizeBody
-            wrapMode: Text.Wrap
+            Layout.preferredHeight: visible ? 200 : 0
+            visible: page.library && page.library.errorText.length > 0
+            kind: "error"
+            description: page.library ? page.library.errorText : ""
+            onRetry: if (page.library) page.library.reload()
         }
 
         CardGrid {
@@ -179,17 +179,28 @@ RoutePage {
             model: page.library
             delegate: ItemCard {}
 
-            LoadingIndicator {
-                anchors.centerIn: parent
+            // While the first page loads: grey cards where the grid will be.
+            Flow {
+                objectName: "librarySkeleton"
+                width: parent.width
+                spacing: Theme.spacing
                 visible: page.library && page.library.loading && grid.count === 0
+                Repeater {
+                    model: visible ? 12 : 0
+                    SkeletonBox {
+                        width: Theme.posterWidth
+                        height: Math.round(Theme.posterWidth / Theme.posterAspect)
+                        radius: Theme.radiusLarge
+                    }
+                }
             }
-            Text {
+            StateMessage {
+                objectName: "libraryEmpty"
                 anchors.centerIn: parent
                 visible: page.library && !page.library.loading && page.library.count === 0
                          && page.library.errorText.length === 0
-                text: qsTr("Nothing matches these filters.")
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeBody
+                kind: "empty"
+                title: qsTr("Nothing matches these filters.")
             }
         }
     }

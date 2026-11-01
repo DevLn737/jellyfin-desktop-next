@@ -84,6 +84,7 @@ namespace jfd::desktop {
     QQuickWindow& m_window;
     QVariantMap m_palette;
     bool m_darkBase = true;
+    bool m_depthFontLoaded = false;
   };
 
   // Resets the theme settings to their defaults; for --reset-theme, before

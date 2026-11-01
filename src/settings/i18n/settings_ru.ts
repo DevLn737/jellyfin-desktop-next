@@ -91,6 +91,10 @@
         <translation>Меняется сразу, перезапуск не нужен. Видеоплеер всегда тёмный.</translation>
     </message>
     <message>
+        <source>Depth</source>
+        <translation>Глубина</translation>
+    </message>
+    <message>
         <source>Dark</source>
         <translation>Тёмная</translation>
     </message>
@@ -105,6 +109,10 @@
     <message>
         <source>Accent colour</source>
         <translation>Цвет акцента</translation>
+    </message>
+    <message>
+        <source>Theme default</source>
+        <translation>По теме</translation>
     </message>
     <message>
         <source>Custom</source>

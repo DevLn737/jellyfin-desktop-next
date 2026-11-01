@@ -8,5 +8,9 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   icon in `controls/icons` has a dark twin in `icons-dark` (same drawing, dark
   fill) for light themes. Added with the home customizing screen: `up.svg`,
   `down.svg` (keyboard_arrow_up, keyboard_arrow_down).
+- **Manrope** typeface (`src/ui/theme/fonts`: Regular, Medium, SemiBold, Bold),
+  [SIL Open Font License 1.1](src/ui/theme/fonts/LICENSE-Manrope.txt),
+  copyright 2018 The Manrope Project Authors. Embedded unmodified; the licence
+  text ships with the font files.
 - **doctest** (`third_party/doctest`, tests only), MIT; **nlohmann/json** and
   **Monocypher** under their own licences in `third_party/`.

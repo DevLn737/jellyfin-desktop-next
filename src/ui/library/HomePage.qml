@@ -45,14 +45,14 @@ RoutePage {
             bottomPadding: Theme.spacingHuge
             spacing: Theme.spacingLarge
 
-            Text {
+            StateMessage {
                 objectName: "homeError"
                 width: parent.width
-                visible: text.length > 0
-                text: page.home ? page.home.errorText : ""
-                color: Theme.error
-                font.pixelSize: Theme.fontSizeBody
-                wrapMode: Text.Wrap
+                height: visible ? 200 : 0
+                visible: page.home && page.home.errorText.length > 0
+                kind: "error"
+                description: page.home ? page.home.errorText : ""
+                onRetry: if (page.home) page.home.reload()
             }
 
             Item {
@@ -81,9 +81,31 @@ RoutePage {
                 KeyNavigation.down: rows
             }
 
-            LoadingIndicator {
-                anchors.horizontalCenter: parent.horizontalCenter
+            // While the first rows load: grey cards where they will be.
+            Column {
+                objectName: "homeSkeleton"
+                width: parent.width
+                spacing: Theme.spacingLarge
                 visible: page.home && page.home.loading && page.home.count === 0
+                Repeater {
+                    model: visible ? 2 : 0
+                    Column {
+                        width: parent.width
+                        spacing: Theme.spacingSmall
+                        SkeletonBox { width: 180; height: 20 }
+                        Row {
+                            spacing: Theme.spacing
+                            Repeater {
+                                model: 6
+                                SkeletonBox {
+                                    width: Theme.thumbWidth
+                                    height: Math.round(Theme.thumbWidth / Theme.thumbAspect)
+                                    radius: Theme.radiusLarge
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -107,12 +129,12 @@ RoutePage {
         footer: Item { width: 1; height: Theme.spacingHuge }
     }
 
-    Text {
+    StateMessage {
+        objectName: "homeEmpty"
         anchors.centerIn: parent
         visible: page.home && !page.home.loading && page.home.count === 0
                  && page.home.libraries.count === 0 && page.home.errorText.length === 0
-        text: qsTr("Nothing here yet. Add media to a library on the server.")
-        color: Theme.textSecondary
-        font.pixelSize: Theme.fontSizeBody
+        kind: "empty"
+        description: qsTr("Nothing here yet. Add media to a library on the server.")
     }
 }

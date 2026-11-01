@@ -74,6 +74,10 @@
 <context>
     <name>MediaSessionBridge</name>
     <message>
+        <source>Playing music</source>
+        <translation>Воспроизведение музыки</translation>
+    </message>
+    <message>
         <source>Playing video</source>
         <translation>Воспроизведение видео</translation>
     </message>

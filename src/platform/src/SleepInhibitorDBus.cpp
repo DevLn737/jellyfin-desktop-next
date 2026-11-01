@@ -19,6 +19,7 @@ namespace jfd::platform {
     const QString ScreenSaverInterface = QStringLiteral("org.freedesktop.ScreenSaver");
     // org.freedesktop.portal.Inhibit flags: 4 suspend, 8 idle (screen blanking).
     constexpr uint InhibitSuspendAndIdle = 4 | 8;
+    constexpr uint InhibitSuspend = 4;
 
     // Requests are asynchronous; the wanted state can change while one is in
     // flight, so each reply is reconciled with what is wanted now.
@@ -33,16 +34,21 @@ namespace jfd::platform {
         releaseHeld();
       }
 
-      void setInhibited(bool inhibited, const QString& reason) override {
+      void setInhibited(bool inhibited, const QString& reason, Level level) override {
         m_wanted = inhibited;
         m_reason = reason;
+        m_level = level;
         reconcile();
       }
 
     private:
       void reconcile() {
         if (m_pending) return;
-        const bool held = !m_portalHandle.isEmpty() || m_screenSaverCookie != 0;
+        bool held = !m_portalHandle.isEmpty() || m_screenSaverCookie != 0;
+        if (held && m_wanted && m_level != m_heldLevel) {
+          releaseHeld();
+          held = false;
+        }
         if (m_wanted && !held)
           requestPortal();
         else if (!m_wanted && held)
@@ -52,15 +58,19 @@ namespace jfd::platform {
       void requestPortal() {
         QDBusMessage call =
             QDBusMessage::createMethodCall(PortalService, PortalPath, PortalInhibit, QStringLiteral("Inhibit"));
-        call << QString() << InhibitSuspendAndIdle
+        call << QString() << (m_level == Level::Display ? InhibitSuspendAndIdle : InhibitSuspend)
              << QVariantMap{{QStringLiteral("reason"), m_reason}};
         watch(m_bus.asyncCall(call), [this](QDBusPendingCallWatcher* watcher) {
           QDBusPendingReply<QDBusObjectPath> reply = *watcher;
           if (reply.isError()) {
-            requestScreenSaver();
+            // The screen saver service can only keep the screen on, which
+            // music does not ask for.
+            if (m_level == Level::Display) requestScreenSaver();
+            else m_wanted = false;
             return;
           }
           m_portalHandle = reply.value().path();
+          m_heldLevel = m_level;
           setActive(true, Backend::Portal);
           reconcile();
         });
@@ -82,6 +92,7 @@ namespace jfd::platform {
             return;
           }
           m_screenSaverCookie = reply.value();
+          m_heldLevel = Level::Display;
           setActive(true, Backend::ScreenSaver);
           reconcile();
         });
@@ -116,6 +127,8 @@ namespace jfd::platform {
 
       QDBusConnection m_bus;
       QString m_reason;
+      Level m_level = Level::Display;
+      Level m_heldLevel = Level::Display;
       QString m_portalHandle;
       uint m_screenSaverCookie = 0;
       bool m_wanted = false;
