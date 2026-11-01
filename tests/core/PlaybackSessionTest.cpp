@@ -61,14 +61,34 @@ TEST_CASE("Personal rate applies outside a group and returns after leaving") {
   h.post(intent::SetRate{*PlaybackRate::base(1.5)});
   CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1500);
 
+  // A file of its own is not the group's: it keeps the personal rate.
   h.join("p1", *PlaybackRate::base(1.25));
-  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1250);
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1500);
   CHECK(h.snapshot().personalRate.perMille() == 1500);
 
   h.post(group::Left{h.group});
   CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1500);
   CHECK(h.backend.last<command::SetRate>()->epoch == epoch);
   CHECK_FALSE(h.snapshot().group);
+}
+
+TEST_CASE("A file opened on its own inside a group is controlled locally and ignores the group's Stop") {
+  SessionHarness h;
+  h.join("p1");
+  h.open(h.media(), true);
+  h.outbox.sent.clear();
+  h.post(intent::Pause{});
+  CHECK(h.outbox.all<outgoing::RequestPause>().empty());
+  CHECK(h.backend.last<command::SetPaused>());
+  h.post(intent::SetRate{*PlaybackRate::base(1.5)});
+  CHECK(h.outbox.all<outgoing::RequestPlaybackRate>().empty());
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1500);
+  CHECK(h.snapshot().group->baseRate.perMille() == 1500);
+
+  // The server answers every request with the group's last command.
+  h.post(h.command(GroupCommandType::Stop, 0));
+  CHECK(h.snapshot().phase != PlaybackPhase::Idle);
+  CHECK(h.snapshot().media.isValid());
 }
 
 TEST_CASE("Joining asks the app for the group's item and reports Ready only after a real restart") {
