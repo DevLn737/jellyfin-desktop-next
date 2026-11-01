@@ -871,8 +871,11 @@ namespace jfd::sim {
         } else if (roll <= 70) {
           static constexpr std::int32_t rates[] = {1000, 1250, 1500, 750, 2000};
           const auto rate = *PlaybackRate::basePerMille(rates[world.rng.range(0, 4)]);
-          // Until the session hears that it joined, the rate is still personal.
-          if (!c.sessionGroup) c.personalRate = rate;
+          // Until the session hears that it joined, the rate is still
+          // personal; so it is for a file that is not the group's item.
+          const auto snapshot = c.session->snapshot();
+          const bool follows = snapshot.group && c.file && c.file->item == snapshot.group->playlistItem;
+          if (!c.sessionGroup || (c.file && !follows)) c.personalRate = rate;
           c.deliver(intent::SetRate{rate});
         } else if (roll <= 78) {
           world.after(world.jitter(20, 150), [&world, &c] { world.server.leave(&c, false); });
