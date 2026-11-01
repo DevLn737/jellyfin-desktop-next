@@ -124,6 +124,9 @@ namespace jfd::ui {
     Q_INVOKABLE void playAll(bool shuffle);
     // Adds the row to the end of the queue, or right after the current track.
     Q_INVOKABLE void enqueue(int row, bool next);
+    // Takes the row's track out of the playlist (the list's parentId) on the
+    // server, then reloads the list. Only for playlistTracks.
+    Q_INVOKABLE void removeEntry(int row);
 
   Q_SIGNALS:
     void queryChanged();

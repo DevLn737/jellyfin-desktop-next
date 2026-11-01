@@ -41,7 +41,7 @@ Item {
         id: info
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing
-        anchors.right: controls.left
+        anchors.right: volume.visible ? volume.left : controls.left
         anchors.rightMargin: Theme.spacing
         anchors.verticalCenter: parent.verticalCenter
         height: 56
@@ -83,6 +83,22 @@ Item {
         }
         TapHandler { onTapped: Navigator.navigate("nowplaying") }
         HoverHandler { cursorShape: Qt.PointingHandCursor }
+    }
+
+    ValueSlider {
+        id: volume
+        objectName: "miniVolume"
+        // Out of the way on a narrow window; Now Playing has it too.
+        visible: bar.width >= 760
+        anchors.right: controls.left
+        anchors.rightMargin: Theme.spacingLarge
+        anchors.verticalCenter: parent.verticalCenter
+        width: 110
+        from: 0
+        to: 100
+        value: MusicSession.volume
+        onMoved: MusicSession.volume = Math.round(value)
+        Accessible.name: qsTr("Volume")
     }
 
     Row {

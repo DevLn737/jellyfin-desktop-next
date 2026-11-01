@@ -233,6 +233,30 @@ the list `PlayerModel` already loads for Next and Previous); choosing one
 plays it from the start with `playEpisode`. Neither the button nor the key
 exists for a movie or in a SyncPlay group, where the queue is the server's.
 
+## Music screens
+
+`src/ui/music` (module `Jfd.Ui.Music`) is the face of the queue and player in
+`src/music`. Routes: `music` (the library page with Recent, Albums, Artists,
+Playlists, Genres and Songs), `album/<id>`, `artist/<id>`, `playlist/<id>`,
+`genre/<name>` and `nowplaying`. A library of type music opens `music` from the
+sidebar and the library page.
+
+- **Lists.** `MusicListModel` (`Music.createList(kind, owner)`) pages like the
+  library models: every row has its place from the first answer and pages load
+  as rows come into view, so 10,000 albums scroll at once. Kinds: albums,
+  artists, songs, playlists, genres, albumTracks, playlistTracks,
+  recentlyPlayed. `removeEntry(row)` takes a track out of a playlist.
+- **Player.** `MusicSession` is the one `MusicPlayer`; QML never talks to the
+  session. The mini-player is a strip in the shell's `miniPlayerSlot`
+  (`installMiniPlayer`): cover, title, controls, progress and, on a window of
+  760 px or more, the volume. The shell hides it in the video player.
+- **Guards.** `PlayGuard` asks before a track replaces a movie that is playing;
+  `GroupHint` replaces the buttons in a SyncPlay group (music is not available
+  there). Starting a video stops the music and keeps the queue.
+- **Strings and icons.** Strings are `qsTr` with a Russian file in
+  `src/ui/music/i18n`; icons are SVG files in `src/ui/music/icons` through
+  `MusicIcons`.
+
 ## Settings from QML
 
 `AppSettings.value("interface/language")`, `AppSettings.setValue(key,
