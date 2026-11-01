@@ -239,6 +239,44 @@ namespace jfd::ui {
     m_tracks.select(kind, streamIndex);
   }
 
+  QVariantList PlayerModel::segments() const {
+    QVariantList out;
+    for (const api::MediaSegment& segment : m_segments) {
+      if (segment.endTicks <= segment.startTicks) continue;
+      out.append(QVariantMap{{QStringLiteral("type"), segment.type},
+                             {QStringLiteral("start"), double(segment.startTicks) / TicksPerSecond},
+                             {QStringLiteral("end"), double(segment.endTicks) / TicksPerSecond}});
+    }
+    std::sort(out.begin(), out.end(), [](const QVariant& a, const QVariant& b) {
+      return a.toMap().value(QStringLiteral("start")).toDouble() < b.toMap().value(QStringLiteral("start")).toDouble();
+    });
+    return out;
+  }
+
+  void PlayerModel::jumpToSegment(int direction) {
+    if (!m_current || direction == 0) return;
+    const double now = position();
+    const QVariantList list = segments();
+    if (direction > 0) {
+      for (const QVariant& entry : list) {
+        const double start = entry.toMap().value(QStringLiteral("start")).toDouble();
+        if (start > now + 1.0) {
+          seek(start);
+          return;
+        }
+      }
+    } else {
+      // A few seconds into a segment, "previous" goes to its own start.
+      for (qsizetype i = list.size() - 1; i >= 0; --i) {
+        const double start = list.at(i).toMap().value(QStringLiteral("start")).toDouble();
+        if (start < now - 3.0) {
+          seek(start);
+          return;
+        }
+      }
+    }
+  }
+
   void PlayerModel::skipSegment() {
     if (m_current) m_skipper.skip();
   }
@@ -334,6 +372,7 @@ namespace jfd::ui {
     if (m_segmentsItem != request.itemId) {
       m_segmentsItem = request.itemId;
       m_segments.clear();
+      Q_EMIT segmentsChanged();
       const QString itemId = request.itemId;
       m_client.mediaSegments(itemId, this, [this, itemId](api::Result<QList<api::MediaSegment>> result) {
         if (itemId != m_segmentsItem) return;
@@ -342,6 +381,7 @@ namespace jfd::ui {
           return;
         }
         m_segments = *result;
+        Q_EMIT segmentsChanged();
         if (m_epoch && m_current && m_current->request.itemId == itemId)
           m_skipper.begin(*m_epoch, m_segments);
       });

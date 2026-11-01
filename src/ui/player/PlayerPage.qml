@@ -42,6 +42,13 @@ RoutePage {
         return h > 0 ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s)
     }
 
+    // Hours and minutes in the system's style, never seconds: the clock and
+    // the end time would otherwise change every second.
+    function shortTime(date) {
+        const format = Qt.locale().timeFormat(Locale.ShortFormat).replace(/[:.\s]*s{1,2}/g, "")
+        return Qt.formatTime(date, format)
+    }
+
     // The time now, for the clock and for when the file ends.
     property date now: new Date()
     readonly property bool hasEnd: player.active && player.duration > 0
@@ -252,16 +259,20 @@ RoutePage {
                 visible: width > 0 && page.width >= 560
                 Text {
                     anchors.right: parent.right
-                    text: Qt.formatTime(page.now, Locale.ShortFormat)
+                    text: page.shortTime(page.now)
                     color: Overlay.text
                     font.pixelSize: Theme.fontSizeBody
+                    style: Text.Outline
+                    styleColor: "#a0000000"
                 }
                 Text {
                     anchors.right: parent.right
                     visible: page.hasEnd
-                    text: qsTr("Ends at %1").arg(Qt.formatTime(page.endsAt, Locale.ShortFormat))
-                    color: Overlay.textSecondary
+                    text: qsTr("Ends at %1").arg(page.shortTime(page.endsAt))
+                    color: Overlay.text
                     font.pixelSize: Theme.fontSizeSmall
+                    style: Text.Outline
+                    styleColor: "#a0000000"
                 }
             }
             // Only in a group: GroupSession exists once the group module
@@ -280,7 +291,8 @@ RoutePage {
         anchors.right: parent.right
         anchors.bottom: bottomBar.top
         anchors.margins: Theme.spacingLarge
-        visible: page.player.segment.length > 0
+        // Not under an open menu, which sits in the same corner.
+        visible: page.player.segment.length > 0 && page.openMenu.length === 0
         primary: true
         text: page.player.segment === "Intro" ? qsTr("Skip intro")
             : page.player.segment === "Outro" ? qsTr("Skip credits")
@@ -295,10 +307,12 @@ RoutePage {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: Theme.spacing
-        anchors.bottomMargin: 2 * Theme.spacing + Theme.controlHeight + Theme.spacingSmall
+        // Above the whole bar, seek line included.
+        anchors.bottomMargin: bottomBar.height + Theme.spacingSmall
         active: page.openMenu.length > 0
         sourceComponent: page.openMenu === "tune" ? tuneMenu
-            : page.openMenu === "episodes" ? episodesMenu : trackMenu
+            : page.openMenu === "episodes" ? episodesMenu
+            : page.openMenu === "segments" ? segmentsMenu : trackMenu
     }
     Component {
         id: trackMenu
@@ -326,8 +340,21 @@ RoutePage {
         }
     }
     Component {
+        id: segmentsMenu
+        SegmentsMenu {
+            segments: page.player.segments
+            position: page.player.position
+            onChosen: (start) => {
+                page.player.seek(start)
+                page.openMenu = ""
+            }
+        }
+    }
+    Component {
         id: tuneMenu
-        TuneMenu {}
+        TuneMenu {
+            speedAvailable: !page.player.inGroup || GroupSession.rateSupported
+        }
     }
 
     // Bottom bar.
@@ -431,6 +458,25 @@ RoutePage {
                 HoverHandler {
                     id: timelineHover
                 }
+
+                // Where the intro, credits and the like are: a bright band
+                // on the line, over the track and under the handle.
+                Repeater {
+                    model: page.player.duration > 0 ? page.player.segments : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        objectName: "segmentMark"
+                        z: -0.5
+                        x: timeline.leftPadding + modelData.start / page.player.duration * timeline.availableWidth
+                        width: Math.max(3, (modelData.end - modelData.start) / page.player.duration * timeline.availableWidth)
+                        y: timeline.topPadding + timeline.availableHeight / 2 - height / 2
+                        height: 8
+                        radius: 2
+                        color: modelData.type === "Intro" || modelData.type === "Recap" || modelData.type === "Preview"
+                            ? Theme.accent : Overlay.text
+                        opacity: 0.75
+                    }
+                }
             }
 
             Item {
@@ -470,6 +516,8 @@ RoutePage {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
+                        // Out of the way of the buttons on a narrow window.
+                        visible: page.width >= 640
                         text: page.clock(timeline.value) + " / " + page.clock(page.player.duration)
                         color: Overlay.text
                         font.pixelSize: Theme.fontSizeBody
@@ -503,6 +551,22 @@ RoutePage {
                             page.player.volume = Math.round(value)
                             page.poke()
                         }
+                    }
+                    ActionButton {
+                        objectName: "speedButton"
+                        // The speed at a glance; in a group it is everyone's.
+                        visible: page.width >= 720 && (!page.player.inGroup || GroupSession.rateSupported)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: page.player.baseRate + "×"
+                        primary: Math.abs(page.player.baseRate - 1) > 0.001
+                        onClicked: page.toggleMenu("tune")
+                    }
+                    IconButton {
+                        objectName: "segmentsButton"
+                        visible: page.player.segments.length > 0
+                        iconSource: PlayerIcons.segments
+                        toolTipText: qsTr("Segments")
+                        onClicked: page.toggleMenu("segments")
                     }
                     IconButton {
                         objectName: "episodes"
@@ -577,6 +641,10 @@ RoutePage {
             page.toggleFullscreen(); break
         case Qt.Key_S:
             page.player.skipSegment(); break
+        case Qt.Key_BracketRight:
+            page.player.jumpToSegment(1); break
+        case Qt.Key_BracketLeft:
+            page.player.jumpToSegment(-1); break
         case Qt.Key_N:
             page.player.next(); break
         case Qt.Key_E:

@@ -3,10 +3,13 @@ import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Player
 
-// Speed (alone; a group's speed is on the group page), quality, subtitle
-// and audio delay, and automatic skipping of intros and credits.
+// Speed (in a group it asks the group, so everyone follows), quality,
+// subtitle and audio delay, and automatic skipping of intros and credits.
 Rectangle {
     id: menu
+
+    // Alone always; in a group only when the server can change its speed.
+    property bool speedAvailable: true
 
     width: 340
     height: column.implicitHeight + 2 * Theme.spacing
@@ -50,10 +53,10 @@ Rectangle {
         Column {
             width: parent.width
             spacing: Theme.spacingTiny
-            visible: !PlayerSession.inGroup
+            visible: menu.speedAvailable
 
             Text {
-                text: qsTr("Speed")
+                text: PlayerSession.inGroup ? qsTr("Speed (for everyone in the group)") : qsTr("Speed")
                 color: Overlay.text
                 font.pixelSize: Theme.fontSizeBody
             }

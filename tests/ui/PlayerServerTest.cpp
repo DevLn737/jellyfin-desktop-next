@@ -4,6 +4,7 @@
 #include <jfd/api/DeviceProfile.h>
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
+#include <jfd/api/SyncPlayApi.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/PlayerModel.h>
 
@@ -17,6 +18,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QSignalSpy>
+#include <QTest>
 #include <QUrlQuery>
 
 #include <cmath>
@@ -595,6 +597,22 @@ TEST_CASE("The intro shows a Skip button that jumps past it; credits skip on the
   REQUIRE(waitFor([&] { return p.model->segment() == QStringLiteral("Intro"); }, 20000));
   CHECK(p.model->position() >= 1.5);
   CHECK(p.model->position() < 12);
+  // The list of segments, in order, for the seek bar and the segments menu.
+  REQUIRE(waitFor([&] { return p.model->segments().size() == 2; }, 10000));
+  const QVariantMap intro = p.model->segments().at(0).toMap();
+  const QVariantMap credits = p.model->segments().at(1).toMap();
+  CHECK(intro.value(QStringLiteral("type")).toString() == QStringLiteral("Intro"));
+  CHECK(intro.value(QStringLiteral("start")).toDouble() == doctest::Approx(2.0));
+  CHECK(intro.value(QStringLiteral("end")).toDouble() == doctest::Approx(12.0));
+  CHECK(credits.value(QStringLiteral("type")).toString() == QStringLiteral("Outro"));
+  // Jump to the next segment's start, and back to the one before.
+  const double before = p.model->position();
+  p.model->jumpToSegment(1);
+  const bool jumped = waitFor([&] { return p.model->position() >= 49.5 && p.model->position() < 58 && !p.model->loading(); }, 20000);
+  INFO("from " << before << " to " << p.model->position() << " duration " << p.model->duration());
+  REQUIRE(jumped);
+  p.model->jumpToSegment(-1);
+  REQUIRE(waitFor([&] { return std::abs(p.model->position() - 2) < 2.0 && !p.model->loading(); }, 20000));
   p.model->skipSegment();
   REQUIRE(waitFor([&] { return p.model->position() >= 11.9 && !p.model->loading(); }, 20000));
   CHECK(p.model->position() < 15);
@@ -715,4 +733,33 @@ TEST_CASE("A video started during music replaces it") {
   REQUIRE(waitFor([&] { return p.playing(); }, 60000));
   CHECK(p.runtime->snapshot().item.value() == movie.id.toStdString());
   CHECK(p.model->active());
+}
+
+TEST_CASE("Alone in a group, the player's pause pauses the video and Play goes on") {
+  Player p(QStringLiteral("jfd-player-group-alone"), {});
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+  SyncPlayApi syncPlay(*p.client);
+
+  p.runtime->createGroup(QStringLiteral("jfd-player-group-alone"));
+  REQUIRE(waitFor([&] { return p.model->inGroup(); }, 20000));
+  REQUIRE(run<Empty>([&](auto done) { syncPlay.setNewQueue({movie.id}, 0, 0, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return p.model->active() && !p.model->loading(); }, 60000));
+
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.playing() && p.model->position() > 2; }, 30000));
+
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.model->paused(); }, 10000));
+  const double pausedAt = p.model->position();
+  QTest::qWait(2000);
+  CHECK(std::abs(p.model->position() - pausedAt) < 0.2);
+  CHECK(p.model->paused());
+
+  p.model->togglePause();
+  REQUIRE(waitFor([&] { return p.playing() && p.model->position() > pausedAt + 1; }, 20000));
 }
