@@ -100,6 +100,25 @@ built.
   as Windows; graphics drivers, VA-API, PipeWire/PulseAudio and GnuTLS come
   from the system. Make it executable and run it. Flatpak comes later.
 
+**Updates.** Both builds check for a newer release (Settings, Integrations)
+and update themselves. The client downloads the release file and its
+`.minisig`, checks the minisign signature against the key built into the
+client, and offers "Restart and update" in the toast once nothing plays and
+you are not in a SyncPlay group; if the download or the check fails, the toast
+links to the release page instead.
+
+- **Linux:** the AppImage is replaced in place (the folder must be writable).
+  The old file is kept until the new version confirms its start; if it exits
+  or hangs within 60 seconds, the old file is put back and started, and it
+  reports that the new version did not start.
+- **Windows:** `jellyfin-desktop-next-<version>-x64.msi` is installed over the
+  running copy with `msiexec` (a major upgrade of the same product; per user,
+  no administrator rights) by a PowerShell script that waits for the app to
+  exit and starts it again. If the installer fails, Windows Installer restores
+  the old version, which is started and reports that the new version did not
+  install (the installer log is `update-install.log` in the app's
+  `update` data folder). Only a copy installed by the MSI updates itself.
+
 ## License
 
 GPL-2.0-or-later. Parts of this client are derived from

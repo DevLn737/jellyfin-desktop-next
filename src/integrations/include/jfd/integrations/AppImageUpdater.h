@@ -1,19 +1,16 @@
 #pragma once
 
 #include <jfd/integrations/ReleaseSignature.h>
+#include <jfd/integrations/SignedDownload.h>
 #include <jfd/integrations/UpdateChecker.h>
 
 #include <QObject>
-#include <QPointer>
 #include <QString>
 #include <QUrl>
 
-#include <functional>
 #include <optional>
 
-class QFile;
 class QNetworkAccessManager;
-class QNetworkReply;
 
 // Installs a newer AppImage in place of the running one, and puts the old one
 // back when the new one does not start.
@@ -39,7 +36,6 @@ namespace jfd::integrations {
     // AppImage. stateDirectory: where the pending-update marker lives.
     AppImageUpdater(QNetworkAccessManager* network, QString appImage, QString stateDirectory,
                     std::optional<MinisignPublicKey> key, QObject* parent = nullptr);
-    ~AppImageUpdater() override;
 
     // An AppImage with a release key built in, in a folder it can write to.
     bool supported() const;
@@ -76,8 +72,6 @@ namespace jfd::integrations {
 
   private:
     QString markerPath() const;
-    void download(const QUrl& url, const QString& path, qint64 size, std::function<void()> done);
-    void fail(const QString& reason);
 
     QNetworkAccessManager* m_network;
     QString m_appImage;
@@ -85,8 +79,7 @@ namespace jfd::integrations {
     std::optional<MinisignPublicKey> m_key;
     QString m_readyVersion;
     QString m_preparing;
-    QPointer<QNetworkReply> m_reply;
-    QFile* m_file = nullptr;
+    SignedDownload m_download;
   };
 
 } // namespace jfd::integrations
