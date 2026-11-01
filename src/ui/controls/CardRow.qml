@@ -2,7 +2,8 @@ import QtQuick
 import Jfd.Ui.Theme
 
 // A titled horizontal row of cards ("Continue watching", "Latest movies").
-// Scrolls with the mouse wheel, drag, and Left/Right when focused. The
+// Scrolls with Shift + wheel, drag, and Left/Right when focused; the plain
+// wheel scrolls the page. The
 // delegate is usually a PosterCard bound to the model's roles.
 FocusScope {
     id: row
@@ -45,15 +46,14 @@ FocusScope {
         preferredHighlightEnd: width - Theme.spacingHuge
         cacheBuffer: 2 * Theme.thumbWidth
 
-        // A vertical wheel scrolls the row sideways.
+        // A plain vertical wheel belongs to the page (it passes through the
+        // row); Shift + wheel scrolls the row sideways. A sideways wheel or
+        // touchpad swipe is the list's own.
         WheelHandler {
             orientation: Qt.Vertical
+            acceptedModifiers: Qt.ShiftModifier
             target: null
-            onWheel: (event) => {
-                if (event.modifiers & Qt.ShiftModifier || Math.abs(event.angleDelta.x) > 0)
-                    return
-                list.flick(event.angleDelta.y * 8, 0)
-            }
+            onWheel: (event) => list.flick(event.angleDelta.y * 8, 0)
         }
     }
 }

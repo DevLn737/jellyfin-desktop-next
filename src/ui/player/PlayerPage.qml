@@ -290,11 +290,12 @@ RoutePage {
         onClicked: page.player.skipSegment()
     }
 
-    // Menus open above the bottom bar, on the right.
+    // Menus open just above the row of buttons, on the right.
     Loader {
         anchors.right: parent.right
-        anchors.bottom: bottomBar.top
-        anchors.margins: Theme.spacing
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: Theme.spacing
+        anchors.bottomMargin: 2 * Theme.spacing + Theme.controlHeight + Theme.spacingSmall
         active: page.openMenu.length > 0
         sourceComponent: page.openMenu === "tune" ? tuneMenu
             : page.openMenu === "episodes" ? episodesMenu : trackMenu
