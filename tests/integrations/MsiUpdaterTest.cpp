@@ -182,9 +182,9 @@ TEST_CASE("The update script waits, installs per user, and starts the program ei
   CHECK(arguments.contains(QStringLiteral("Bypass")));
   const qsizetype file = arguments.indexOf(QStringLiteral("-File"));
   REQUIRE(file >= 0);
-  CHECK(arguments.at(file + 1) == QStringLiteral("C:/s/apply-update.ps1"));
+  CHECK(arguments.at(file + 1) == QDir::toNativeSeparators(QStringLiteral("C:/s/apply-update.ps1")));
   CHECK(arguments.at(arguments.indexOf(QStringLiteral("-ProcessId")) + 1) == QStringLiteral("4242"));
-  CHECK(arguments.at(arguments.indexOf(QStringLiteral("-Msi")) + 1) == QStringLiteral("C:/s/a b.msi"));
+  CHECK(arguments.at(arguments.indexOf(QStringLiteral("-Msi")) + 1) == QDir::toNativeSeparators(QStringLiteral("C:/s/a b.msi")));
 }
 
 TEST_CASE("Apply does nothing before a verified MSI is ready") {
