@@ -134,7 +134,7 @@ under the interface layer. A second window would get its own swap chain.
 Proposed first version: entering PiP while HDR output is active tone-maps
 (SDR video item in the small window; HDR is for the big window), or the
 button is hidden while `HdrOutput.active`. To decide with a test on an HDR
-monitor, which is on Ruslan's deferred measurement list.
+monitor, which is on the deferred real-hardware measurement list.
 
 ## Test plan
 
