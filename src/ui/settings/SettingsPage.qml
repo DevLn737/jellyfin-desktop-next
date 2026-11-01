@@ -19,6 +19,7 @@ RoutePage {
     }
 
     ListView {
+        SmoothWheel {}
         id: list
         objectName: "settingsList"
         anchors.top: heading.bottom

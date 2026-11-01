@@ -17,6 +17,7 @@ FocusScope {
     activeFocusOnTab: true
 
     GridView {
+        SmoothWheel {}
         id: grid
         anchors.fill: parent
         focus: true

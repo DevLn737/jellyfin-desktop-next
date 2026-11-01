@@ -21,6 +21,7 @@ RoutePage {
     Basic.StackView.onActivated: if (home && home.count > 0) home.reload()
 
     ListView {
+        SmoothWheel {}
         id: rows
         objectName: "homeRows"
         anchors.fill: parent

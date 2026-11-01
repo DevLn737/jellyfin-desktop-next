@@ -144,6 +144,7 @@ RoutePage {
             }
 
             ListView {
+                SmoothWheel {}
                 id: songs
                 objectName: "musicSongs"
                 anchors.fill: parent

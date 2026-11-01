@@ -24,6 +24,7 @@ RoutePage {
     }
 
     ListView {
+        SmoothWheel {}
         id: list
         objectName: "homeSectionList"
         anchors.top: heading.bottom

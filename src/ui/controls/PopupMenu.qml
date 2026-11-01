@@ -41,9 +41,19 @@ T.Popup {
     padding: Theme.spacingTiny
     margins: Theme.spacingSmall
     width: 240
+    // A templated Popup has no height of its own: the entries' plus padding.
+    implicitHeight: contentHeight + topPadding + bottomPadding
     modal: false
     focus: true
     closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
+
+    // The overlay (the window) can be resized or only get its size once the
+    // menu is open: follow it.
+    Connections {
+        target: menu.parent
+        function onWidthChanged() { if (menu.visible) menu.reposition() }
+        function onHeightChanged() { if (menu.visible) menu.reposition() }
+    }
 
     onAboutToShow: reposition()
     onHeightChanged: if (visible) reposition()
@@ -76,26 +86,25 @@ T.Popup {
         }
     }
 
-    contentItem: ListView {
+    // A column, not a list: menus are short, and the height is known as
+    // soon as the entries are.
+    contentItem: Column {
         id: list
-        implicitHeight: contentHeight
-        model: menu.entries
-        clip: true
-        interactive: contentHeight > height
-        boundsBehavior: Flickable.StopAtBounds
-        currentIndex: menu.currentIndex
-        keyNavigationEnabled: true
-        delegate: ListItem {
-            id: entry
-            required property string modelData
-            required property int index
-            width: list.width
-            text: modelData
-            trailingText: index === menu.currentIndex ? "✓" : ""
-            enabled: menu.disabledIndices.indexOf(index) < 0
-            onClicked: {
-                menu.close()
-                menu.activated(index)
+        Repeater {
+            model: menu.entries
+            delegate: ListItem {
+                id: entry
+                objectName: "popupEntry"
+                required property string modelData
+                required property int index
+                width: list.width
+                text: modelData
+                trailingText: index === menu.currentIndex ? "✓" : ""
+                enabled: menu.disabledIndices.indexOf(index) < 0
+                onClicked: {
+                    menu.close()
+                    menu.activated(index)
+                }
             }
         }
     }

@@ -337,3 +337,11 @@ hint says to use the window menu's Always on top, and the title is fixed
   overviews.
 - In the player, the audio, subtitle and settings menus open just above the
   button row. A tooltip that would not fit below its button shows above it.
+
+### Wheel scrolling
+
+`SmoothWheel {}` declared inside a `Flickable`, `ListView` or `GridView`
+makes the plain vertical wheel scroll it with an eased animation and a fixed
+step of 130 px per notch (quick notches add up); touchpads, which send exact
+pixel deltas, move it one to one. Shift + wheel and sideways swipes stay with
+the view. Every page's main scrolling view has one; add it to a new page's.

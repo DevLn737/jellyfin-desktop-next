@@ -87,6 +87,7 @@ RoutePage {
     }
 
     Flickable {
+        SmoothWheel {}
         id: flick
         anchors.fill: parent
         visible: page.details && page.details.loaded

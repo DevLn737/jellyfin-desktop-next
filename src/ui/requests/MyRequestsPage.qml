@@ -49,6 +49,7 @@ RoutePage {
         }
 
         ListView {
+            SmoothWheel {}
             id: list
             objectName: "myRequestsList"
             Layout.fillWidth: true
