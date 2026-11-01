@@ -1,4 +1,5 @@
 #include "AppServices.h"
+#include <jfd/session/GroupModel.h>
 
 #include <jfd/playback/PlayerOptions.h>
 #include <jfd/session/SessionRuntime.h>
@@ -533,7 +534,14 @@ namespace jfd::desktop {
     ui::Navigator& navigator = *services.navigator;
     navigator.registerPage(QStringLiteral("player"), QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Player/PlayerPage.qml")));
     if (services.libraryUi != nullptr) {
-      services.libraryUi->setPlayHandler([&model, &navigator](const QString& itemId, qint64 startTicks) {
+      services.libraryUi->setPlayHandler([&model, &navigator, &services](const QString& itemId, qint64 startTicks) {
+        // In a group, Play starts the item for the group, as Web does: a
+        // file opened beside it would not follow the group's commands.
+        if (services.group != nullptr && services.group->inGroup()) {
+          services.group->watchTogether(itemId, QString(), startTicks);
+          navigator.navigate(QStringLiteral("group"));
+          return;
+        }
         model.play(itemId, startTicks);
         navigator.navigate(QStringLiteral("player"));
       });

@@ -160,7 +160,7 @@ namespace jfd::core {
   }
 
   void PlaybackSession::on(const intent::Play&) {
-    if (m_group) {
+    if (groupDrives()) {
       send(outgoing::RequestUnpause{m_group->epoch});
       return;
     }
@@ -168,7 +168,7 @@ namespace jfd::core {
   }
 
   void PlaybackSession::on(const intent::Pause&) {
-    if (m_group) {
+    if (groupDrives()) {
       send(outgoing::RequestPause{m_group->epoch});
       return;
     }
@@ -176,7 +176,7 @@ namespace jfd::core {
   }
 
   void PlaybackSession::on(const intent::Seek& seek) {
-    if (m_group) {
+    if (groupDrives()) {
       send(outgoing::RequestSeek{m_group->epoch, seek.position});
       return;
     }
@@ -184,7 +184,7 @@ namespace jfd::core {
   }
 
   void PlaybackSession::on(const intent::SetRate& rate) {
-    if (m_group) {
+    if (groupDrives()) {
       // The group rate is a base rate; the server validates the same range.
       if (const auto base = PlaybackRate::basePerMille(rate.rate.perMille()))
         send(outgoing::RequestPlaybackRate{m_group->epoch, *base});
@@ -196,7 +196,7 @@ namespace jfd::core {
   }
 
   void PlaybackSession::on(const intent::Stop&) {
-    if (m_group) {
+    if (groupDrives()) {
       send(outgoing::RequestStop{m_group->epoch});
       return;
     }
@@ -441,7 +441,9 @@ namespace jfd::core {
     if (!mediaFollowsGroup() || !m_media->started) {
       // Still loading this occurrence: the server waits for our Ready and
       // repeats the command once everyone is ready.
-      if (command.type == GroupCommandType::Stop && m_media) stopMedia(PlaybackPhase::Idle);
+      // Not another file the user opened on their own while in the group.
+      if (command.type == GroupCommandType::Stop && m_media && mediaFollowsGroup())
+        stopMedia(PlaybackPhase::Idle);
       return;
     }
 
@@ -500,6 +502,13 @@ namespace jfd::core {
 
   bool PlaybackSession::mediaFollowsGroupItem(const PlaylistItemId& item) const {
     return m_group && !item.isEmpty() && item == m_group->playlistItem;
+  }
+
+  bool PlaybackSession::groupDrives() const {
+    // A file opened on one's own while in a group (nothing queued there, or
+    // music) is played and controlled locally; the group's commands, its
+    // speed and its pauses are not for it.
+    return m_group && (!m_media || mediaFollowsGroup());
   }
 
   bool PlaybackSession::mediaFollowsGroup() const {
@@ -562,7 +571,7 @@ namespace jfd::core {
   }
 
   PlaybackRate PlaybackSession::effectiveRate() const {
-    if (!m_group) return m_personalRate;
+    if (!groupDrives()) return m_personalRate;
     return m_group->correctionRate.value_or(m_group->baseRate);
   }
 
@@ -814,7 +823,8 @@ namespace jfd::core {
       g.name = m_group->name;
       g.participants = m_group->participants;
       g.state = m_group->state;
-      g.baseRate = m_group->baseRate;
+      // The speed the player shows: the group's, or the own file's.
+      g.baseRate = groupDrives() ? m_group->baseRate : m_personalRate;
       g.connected = m_group->connected;
       g.playlistItem = m_group->playlistItem;
       g.driftMilliseconds = m_group->driftMilliseconds;

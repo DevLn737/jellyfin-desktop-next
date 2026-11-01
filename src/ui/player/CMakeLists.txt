@@ -23,6 +23,7 @@ qt_add_qml_module(jfd_ui_player
     PipWindow.qml
     PlayerPage.qml
     SegmentsMenu.qml
+    SpeedButton.qml
     TrackMenu.qml
     TuneMenu.qml
   RESOURCES

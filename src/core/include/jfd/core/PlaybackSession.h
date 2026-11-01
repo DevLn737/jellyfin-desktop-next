@@ -159,6 +159,7 @@ namespace jfd::core {
     void readyConfirmed(ReadyPurpose purpose);
     void issueExternalTracks();
     void stepQueue(bool forward);
+    bool groupDrives() const;
     bool mediaFollowsGroup() const;
     bool mediaFollowsGroupItem(const PlaylistItemId& item) const;
 
