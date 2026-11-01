@@ -46,6 +46,9 @@ namespace jfd::integrations {
     // needed (an install for one user has no files in use by the system).
     return QStringLiteral(R"PS(param([int]$ProcessId, [string]$Msi, [string]$Exe, [string]$Log, [string]$Marker)
 $ErrorActionPreference = 'Stop'
+# msiexec does not open a package named with forward slashes.
+$Msi = [System.IO.Path]::GetFullPath($Msi)
+$Log = [System.IO.Path]::GetFullPath($Log)
 Remove-Item -LiteralPath "$Marker.failed" -Force -ErrorAction SilentlyContinue
 try { Wait-Process -Id $ProcessId -Timeout 120 } catch { }
 $code = 1
@@ -64,12 +67,12 @@ try { Start-Process -FilePath $Exe -WorkingDirectory (Split-Path -Parent $Exe) }
     return {QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
             QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"),
             QStringLiteral("-WindowStyle"), QStringLiteral("Hidden"),
-            QStringLiteral("-File"), scriptPath,
+            QStringLiteral("-File"), QDir::toNativeSeparators(scriptPath),
             QStringLiteral("-ProcessId"), QString::number(pid),
-            QStringLiteral("-Msi"), msi,
-            QStringLiteral("-Exe"), executable,
-            QStringLiteral("-Log"), log,
-            QStringLiteral("-Marker"), marker};
+            QStringLiteral("-Msi"), QDir::toNativeSeparators(msi),
+            QStringLiteral("-Exe"), QDir::toNativeSeparators(executable),
+            QStringLiteral("-Log"), QDir::toNativeSeparators(log),
+            QStringLiteral("-Marker"), QDir::toNativeSeparators(marker)};
   }
 
   MsiUpdater::MsiUpdater(QNetworkAccessManager* network, QString executable, QString installFolder,
