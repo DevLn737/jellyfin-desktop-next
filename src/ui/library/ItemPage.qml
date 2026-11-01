@@ -29,29 +29,6 @@ RoutePage {
         return h > 0 ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s)
     }
 
-    // The backdrop fades into the page under the content.
-    Image {
-        id: backdrop
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: Math.min(parent.height * 0.6, width * 9 / 16)
-        source: page.details ? Library.image(page.details.backdropUrl) : ""
-        sourceSize.width: width
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        opacity: status === Image.Ready ? 0.35 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
-
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.4; color: "transparent" }
-                GradientStop { position: 1.0; color: Theme.background }
-            }
-        }
-    }
-
     LoadingIndicator {
         anchors.centerIn: parent
         visible: page.details && page.details.loading && !page.details.loaded
@@ -76,6 +53,34 @@ RoutePage {
         contentHeight: content.implicitHeight + 2 * Theme.spacingHuge
         boundsBehavior: Flickable.StopAtBounds
         clip: true
+
+        // The backdrop sits at the top of the page and scrolls away with the
+        // content; it fades into the page background at its lower edge.
+        Item {
+            id: backdrop
+            z: -1
+            width: flick.width
+            height: Math.min(flick.height * 0.6, width * 9 / 16)
+            Image {
+                anchors.fill: parent
+                source: page.details ? Library.image(page.details.backdropUrl) : ""
+                sourceSize.width: width
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                opacity: status === Image.Ready ? 0.45 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
+            }
+            Rectangle {
+                anchors.fill: parent
+                readonly property color clear: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0)
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: parent.clear }
+                    GradientStop { position: 0.5; color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0.35) }
+                    GradientStop { position: 0.8; color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0.8) }
+                    GradientStop { position: 1.0; color: Theme.background }
+                }
+            }
+        }
 
         ColumnLayout {
             id: content

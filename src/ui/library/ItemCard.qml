@@ -8,7 +8,7 @@ import Jfd.Ui.Library
 
 // A card for one row of an item list (home rows, a library grid, search,
 // similar items). Clicking opens the item's page, or the library for a
-// library or collection. An episode shows its series as the title and
+// library or collection; an episode plays. An episode shows its series as the title and
 // "S1:E2 · Name" below, as Jellyfin Web does.
 PosterCard {
     id: card
@@ -30,7 +30,13 @@ PosterCard {
     unplayedCount: model.unplayedCount || 0
 
     onClicked: {
-        if (itemId.length > 0)
+        if (itemId.length === 0)
+            return
+        // An episode has no page of its own: it plays (resuming where it
+        // stopped). Its series page lists the others.
+        if (model.type === "Episode")
+            Library.play(itemId, model.playbackPositionTicks || 0)
+        else
             Navigator.navigate(Library.routeFor(itemId, model.type))
     }
 }

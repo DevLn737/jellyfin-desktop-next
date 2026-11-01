@@ -209,35 +209,22 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   CHECK_FALSE(screens.find("playTarget")->property("text").toString().isEmpty());
   screens.screenshot(QStringLiteral("series"));
 
-  // The second episode's page.
+  // Watch together hands the series' next episode over.
+  Screens::click(screens.find("watchTogetherButton"));
+  REQUIRE(screens.together.size() == 1);
+  CHECK_FALSE(screens.togetherName.isEmpty());
+
+  // An episode has no page: clicking its row plays it.
   QQuickItem* episodeRow = nullptr;
   QMetaObject::invokeMethod(screens.find("episodes"), "itemAt",
                             Q_RETURN_ARG(QQuickItem*, episodeRow), Q_ARG(int, 1));
   REQUIRE(episodeRow != nullptr);
   Screens::click(episodeRow);
-  REQUIRE(waitFor(
-      [&] {
-        return screens.navigator->currentName() == QLatin1String("item") &&
-               screens.navigator->currentRoute() != QStringLiteral("item/") + seriesId;
-      },
-      Timeout));
-  const QString episodeRoute = screens.navigator->currentRoute();
-  REQUIRE(screens.waitShowing(episodeRoute));
-  REQUIRE(waitFor([&] { return !screens.find("itemName")->property("text").toString().isEmpty(); },
-                  Timeout));
-  REQUIRE(
-      waitFor([&] { return screens.find("playButton")->property("visible").toBool(); }, Timeout));
-  screens.screenshot(QStringLiteral("episode"));
-
-  // Play and Watch together hand the episode and its position over.
-  Screens::click(screens.find("playButton"));
   REQUIRE(screens.played.size() == 1);
-  CHECK(QStringLiteral("item/") + screens.played[0].first == episodeRoute);
+  CHECK_FALSE(screens.played[0].first.isEmpty());
+  CHECK(screens.played[0].first != seriesId);
   CHECK(screens.played[0].second == 0);
-  Screens::click(screens.find("watchTogetherButton"));
-  REQUIRE(screens.together.size() == 1);
-  CHECK(QStringLiteral("item/") + screens.together[0].first == episodeRoute);
-  CHECK_FALSE(screens.togetherName.isEmpty());
+  CHECK(screens.navigator->currentRoute() == QStringLiteral("item/") + seriesId);
 
   // Card images came through the image provider and count against the
   // video memory budget.

@@ -12,6 +12,7 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QWheelEvent>
 #include <QtQml/qqmlextensionplugin.h>
 
 #include <memory>
@@ -344,6 +345,54 @@ TEST_CASE("The menu opens the names over the pages in a compact window") {
   waited.restart();
   while (sidebar->width() < 220 && waited.elapsed() < 2000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
   CHECK(sidebar->width() == doctest::Approx(220.0));
+}
+
+TEST_CASE("The plain wheel over a card row scrolls the page; Shift + wheel scrolls the row") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Controls
+Flickable {
+  objectName: "page"
+  width: 800; height: 500
+  contentWidth: width; contentHeight: 1600
+  boundsBehavior: Flickable.StopAtBounds
+  CardRow {
+    objectName: "row"
+    y: 100
+    width: parent.width
+    model: 30
+    delegate: Rectangle { width: 120; height: 160; color: "red" }
+  }
+}
+)");
+  auto* page = qobject_cast<QQuickItem*>(object.get());
+  page->setParentItem(window.contentItem());
+  window.resize(800, 500);
+  window.show();
+  auto* row = page->findChild<QQuickItem*>(QStringLiteral("row"));
+  REQUIRE(row != nullptr);
+  auto* view = row->property("view").value<QQuickItem*>();
+  REQUIRE(view != nullptr);
+  QElapsedTimer settle;
+  settle.start();
+  while (settle.elapsed() < 300) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+
+  const QPointF over = page->mapToScene(QPointF(300, 200));
+  const auto wheel = [&](Qt::KeyboardModifiers modifiers) {
+    QWheelEvent event(over, window.mapToGlobal(over), QPoint(), QPoint(0, -120), Qt::NoButton, modifiers,
+                      Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(&window, &event);
+    QElapsedTimer waited;
+    waited.start();
+    while (waited.elapsed() < 400) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  };
+  wheel(Qt::NoModifier);
+  CHECK(page->property("contentY").toDouble() > 10);
+  CHECK(view->property("contentX").toDouble() == doctest::Approx(0.0));
+  wheel(Qt::ShiftModifier);
+  CHECK(view->property("contentX").toDouble() > 10);
 }
 
 #include <QDir>
