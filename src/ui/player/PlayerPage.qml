@@ -560,13 +560,14 @@ RoutePage {
                             page.poke()
                         }
                     }
-                    ActionButton {
+                    SpeedButton {
                         objectName: "speedButton"
                         // The speed at a glance; in a group it is everyone's.
                         visible: page.width >= 720 && (!page.player.inGroup || GroupSession.rateSupported)
                         anchors.verticalCenter: parent.verticalCenter
                         text: page.player.baseRate + "×"
-                        primary: Math.abs(page.player.baseRate - 1) > 0.001
+                        changed: Math.abs(page.player.baseRate - 1) > 0.001
+                        toolTipText: qsTr("Speed")
                         onClicked: page.toggleMenu("tune")
                     }
                     IconButton {

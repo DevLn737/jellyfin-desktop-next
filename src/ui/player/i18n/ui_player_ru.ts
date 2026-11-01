@@ -126,6 +126,10 @@
         <translation>Выключить звук</translation>
     </message>
     <message>
+        <source>Speed</source>
+        <translation>Скорость</translation>
+    </message>
+    <message>
         <source>Segments</source>
         <translation>Фрагменты</translation>
     </message>
