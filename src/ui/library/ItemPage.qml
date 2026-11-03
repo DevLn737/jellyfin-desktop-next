@@ -125,11 +125,21 @@ RoutePage {
                     color: Theme.surfaceRaised
                     clip: true
                     Image {
+                        id: posterImage
                         anchors.fill: parent
                         source: page.details ? Library.image(page.details.posterUrl) : ""
                         sourceSize.width: 480
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
+                    }
+                    // Without a poster: the title's initial, as on the cards.
+                    Text {
+                        objectName: "posterInitial"
+                        anchors.centerIn: parent
+                        visible: posterImage.status !== Image.Ready
+                        text: page.title.length > 0 ? page.title.charAt(0).toUpperCase() : ""
+                        color: Theme.textDisabled
+                        font.pixelSize: Theme.fontSizeHeadline * 2
                     }
                 }
 

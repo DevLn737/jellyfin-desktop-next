@@ -33,6 +33,15 @@ FocusScope {
         return Number(number).toLocaleString(Qt.locale(), "f", decimals) + (row.unit.length > 0 ? " " + row.unit : "")
     }
 
+    // "1,5" in Russian, "1.5" anywhere: NaN (refused) only when neither reads.
+    function parseNumber(text) {
+        try {
+            return Number.fromLocaleString(Qt.locale(), text.trim())
+        } catch (error) {
+            return Number(text.trim())
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         radius: Theme.radius
@@ -178,7 +187,7 @@ FocusScope {
             Accessible.name: row.label
             inputMethodHints: row.type === "string" ? Qt.ImhNone : Qt.ImhFormattedNumbersOnly
             onAccepted: {
-                const value = row.type === "string" ? text : Number(text)
+                const value = row.type === "string" ? text : row.parseNumber(text)
                 errorText = AppSettings.setValue(row.key, value) ? "" : qsTr("This value is not allowed.")
             }
             onActiveFocusChanged: if (!activeFocus) accepted()
