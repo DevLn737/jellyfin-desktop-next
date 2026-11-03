@@ -101,6 +101,9 @@ TEST_CASE("MPRIS shows what plays and sends commands back") {
   CHECK_FALSE(property(client, Player, QStringLiteral("CanGoPrevious")).toBool());
   const QVariantMap meta = metadata(client);
   CHECK(meta.value(QStringLiteral("xesam:title")).toString() == QStringLiteral("Серия 2"));
+  // A video: the series line under the title, and no album.
+  CHECK(meta.value(QStringLiteral("xesam:artist")).toStringList() == QStringList{QStringLiteral("Сериал · S01E02")});
+  CHECK_FALSE(meta.contains(QStringLiteral("xesam:album")));
   CHECK(meta.value(QStringLiteral("mpris:length")).toLongLong() == 1'440'000'000LL);
   CHECK(meta.value(QStringLiteral("mpris:artUrl")).toString().startsWith(QStringLiteral("https://media.example.org/")));
   const qlonglong position = property(client, Player, QStringLiteral("Position")).toLongLong();
@@ -160,6 +163,35 @@ TEST_CASE("MPRIS shows what plays and sends commands back") {
   const QDBusMessage gone = call(client, QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("Get"),
                                  {Player, QStringLiteral("PlaybackStatus")});
   CHECK(gone.type() == QDBusMessage::ErrorMessage);
+}
+
+TEST_CASE("MPRIS shows a track's artist and album, not the artist twice") {
+  PrivateBus bus;
+  if (!bus.isRunning()) {
+    MESSAGE("dbus-daemon is not installed; skipped");
+    return;
+  }
+  auto controls = createMprisMediaControls(bus.connect(QStringLiteral("app")), QStringLiteral("jellyfin_test"),
+                                           QStringLiteral("Jellyfin Desktop Next"),
+                                           QStringLiteral("io.github.devln737.JellyfinDesktopNext"));
+  REQUIRE(controls->isAvailable());
+  QDBusConnection client = bus.connect(QStringLiteral("client"));
+  MediaControlsState track = playing();
+  track.kind = MediaControlsState::Kind::Music;
+  track.title = QStringLiteral("Track");
+  track.subtitle = QStringLiteral("Artist");
+  track.artist = QStringLiteral("Artist");
+  track.album = QStringLiteral("Album");
+  controls->setState(track);
+  const QVariantMap meta = metadata(client);
+  CHECK(meta.value(QStringLiteral("xesam:title")).toString() == QStringLiteral("Track"));
+  CHECK(meta.value(QStringLiteral("xesam:artist")).toStringList() == QStringList{QStringLiteral("Artist")});
+  CHECK(meta.value(QStringLiteral("xesam:album")).toString() == QStringLiteral("Album"));
+
+  // Without an album the field is left out.
+  track.album.clear();
+  controls->setState(track);
+  CHECK_FALSE(metadata(client).contains(QStringLiteral("xesam:album")));
 }
 
 #include "MprisTest.moc"
