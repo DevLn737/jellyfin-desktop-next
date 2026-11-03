@@ -57,6 +57,12 @@ namespace jfd::ui {
     return item;
   }
 
+  MusicLyrics* MusicUi::createLyrics(QObject* owner) {
+    auto* lyrics = new MusicLyrics(*m_config.client, owner);
+    QQmlEngine::setObjectOwnership(lyrics, QQmlEngine::CppOwnership);
+    return lyrics;
+  }
+
   QUrl MusicUi::coverUrl(const QString& itemId, const QString& tag, int width) const {
     if (!m_config.client || itemId.isEmpty() || tag.isEmpty()) return {};
     const QSize pixels = library::cardImageSize(library::CardShape::Square, width, m_config.devicePixelRatio);

@@ -241,6 +241,22 @@
         <source>Clear</source>
         <translation>Очистить</translation>
     </message>
+    <message>
+        <source>Lyrics</source>
+        <translation>Текст песни</translation>
+    </message>
+    <message>
+        <source>Show queue</source>
+        <translation>Показать очередь</translation>
+    </message>
+    <message>
+        <source>Show lyrics</source>
+        <translation>Показать текст</translation>
+    </message>
+    <message>
+        <source>No lyrics</source>
+        <translation>Текста песни нет</translation>
+    </message>
 </context>
 <context>
     <name>PlayGuard</name>
