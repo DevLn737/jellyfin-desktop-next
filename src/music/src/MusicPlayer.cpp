@@ -559,7 +559,9 @@ namespace jfd::music {
   void MusicPlayer::changed() { m_saveTimer.start(); }
 
   QByteArray MusicPlayer::saveState() const {
-    const double seconds = m_epoch ? m_snapshot.position.seconds() : static_cast<double>(m_resumeTicks) / TicksPerSecond;
+    // A stopped file keeps its epoch with an idle snapshot; its position is
+    // then the one stop() kept for resume.
+    const double seconds = active() ? m_snapshot.position.seconds() : static_cast<double>(m_resumeTicks) / TicksPerSecond;
     const QJsonObject state{{QStringLiteral("version"), 1},
                             {QStringLiteral("owner"), ownerOf(m_client)},
                             {QStringLiteral("position"), seconds},
