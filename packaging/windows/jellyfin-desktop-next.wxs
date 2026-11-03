@@ -5,7 +5,9 @@
   shortcuts. Uninstalling removes the program folder, shortcuts and the
   installer's registry key; the profile (settings, cache) is removed only with
   REMOVEPROFILE=1. Built by packaging/windows/build-msi.ps1, which passes
-  Version, ExeName and the Deployment bind path (the windeployqt folder).
+  Version (the MSI version, see packaging/release-version.sh), DisplayVersion
+  (the release, 0.0.1-beta.9), ExeName and the Deployment bind path (the
+  windeployqt folder).
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <?define ProductName = "Jellyfin Desktop Next" ?>
@@ -15,7 +17,7 @@
 
   <Package Name="$(var.ProductName)" Manufacturer="Jellyfin Desktop Next" Language="1033"
            Version="$(var.Version)" UpgradeCode="$(var.UpgradeCode)" Scope="perUser" InstallerVersion="500">
-    <SummaryInformation Description="$(var.ProductName) $(var.Version)" />
+    <SummaryInformation Description="$(var.ProductName) $(var.DisplayVersion)" />
     <!-- CI builds of one version replace each other too. -->
     <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
@@ -32,6 +34,8 @@
     <Icon Id="AppIcon" SourceFile="$(var.IconFile)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- Apps & features shows the MSI version (0.0.1309); this names the release (0.0.1-beta.9). -->
+    <Property Id="ARPCOMMENTS" Value="Version $(var.DisplayVersion)" />
     <Property Id="ADDDESKTOPSHORTCUT" Value="1" Secure="yes" />
     <Property Id="REMOVEPROFILE" Secure="yes" />
 

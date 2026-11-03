@@ -28,6 +28,13 @@ add_test(NAME qml_literals_check
 add_test(NAME licenses_check
   COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/licenses/IconLicenses.cmake")
 
+# The MSI versions packaging/release-version.sh derives from release tags.
+find_program(JFD_BASH bash)
+if(UNIX AND JFD_BASH)
+  add_test(NAME release_version_check
+    COMMAND "${JFD_BASH}" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/release-version-test.sh" "${PROJECT_SOURCE_DIR}")
+endif()
+
 add_executable(jfd_diagnostics_tests
   core/main.cpp
   diagnostics/FrameStatsTest.cpp

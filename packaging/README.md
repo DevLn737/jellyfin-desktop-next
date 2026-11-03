@@ -20,6 +20,28 @@ Built by `.github/workflows/package.yml`; every version used is pinned in
    installed app's smoke test with only Windows on `PATH`, reinstalls the same
    version, uninstalls, and checks that nothing is left (and that the profile is
    kept, or removed with `REMOVEPROFILE=1`).
+5. [windows/test-msi-update.ps1](windows/test-msi-update.ps1) runs the
+   client's own update script ([apply-update.ps1](../src/integrations/apply-update.ps1),
+   built into `MsiUpdater`) against real packages: an older MSI of the same
+   build is installed, the script waits for a process, upgrades it to the new
+   MSI and starts the installed program again; a broken package must leave the
+   `.failed` marker and the installed version, and the older MSI over the newer
+   one must be refused as a downgrade.
+
+**MSI versions.** Windows Installer orders packages by the first three fields of
+`ProductVersion` only, so a pre-release cannot be a fourth field. The third
+field is `patch * 1000 + rank`: 0 for a build without a release tag, `N` for
+`-alpha.N`, `300 + N` for `-beta.N`, `600 + N` for `-rc.N` (N up to 299), 999 for
+the release. `v0.0.1-beta.9` installs as 0.0.1309, `v0.0.1` as 0.0.1999. A newer
+beta upgrades an older one, an older one is refused with the downgrade message,
+and Apps & features shows the release's own version in its comments
+(`ARPCOMMENTS`). [release-version.sh](release-version.sh) computes it (its `msi`
+output) and refuses other pre-release names; `release_version_check` tests it.
+Betas up to beta.8 were all built as 0.0.1 and are upgraded by any later one.
+
+A release is published only after the AppImage passed its smoke test on every
+distribution (`sign` needs `appimage-smoke`) and the commit's CI, App and
+Session runs on main succeeded (the `release` job checks them).
 
 The product name, folder and `UpgradeCode` in the `.wxs` identify installs:
 never change the `UpgradeCode`. The profile folders removed by `REMOVEPROFILE=1`
