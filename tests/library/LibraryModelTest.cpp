@@ -4,6 +4,7 @@
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LibraryUpdates.h>
 
+#include <QElapsedTimer>
 #include <QSignalSpy>
 
 using namespace jfd;
@@ -79,6 +80,91 @@ TEST_CASE("The grid has every row from the first page and loads pages as rows ar
 
   REQUIRE(waitFor([&] { return library.availableGenres().size() == 2; }));
   CHECK(library.availableYears().size() == 2);
+}
+
+TEST_CASE("A page that failed is asked for again only after a backoff or a reload") {
+  Movies movies;
+  int failing = 0;
+  LibraryFixture f([&](const HttpRequest& r) {
+    if (r.path == QLatin1String("/Items") &&
+        r.query.queryItemValue(QStringLiteral("startIndex")) == QStringLiteral("200") && failing > 0) {
+      --failing;
+      return HttpResponse{500, {}, {}, 0};
+    }
+    return movies(r);
+  });
+  LibraryModel::Options options;
+  options.retryAfterMs = 400;
+  LibraryModel library(f.client, options);
+  library.setCollectionType(QStringLiteral("movies"));
+  library.setLibraryId(QStringLiteral("lib1"));
+  REQUIRE(waitFor([&] { return library.count() == 250; }));
+  const auto pageRequests = [&] {
+    int n = 0;
+    for (const HttpRequest& r : f.server.requests())
+      if (r.path == QLatin1String("/Items") &&
+          r.query.queryItemValue(QStringLiteral("startIndex")) == QStringLiteral("200"))
+        ++n;
+    return n;
+  };
+
+  failing = 100;
+  library.data(library.index(240), ItemListModel::NameRole);
+  REQUIRE(waitFor([&] { return pageRequests() == 1 && !library.loading(); }));
+  CHECK_FALSE(library.errorText().isEmpty());
+  // Delegates scrolling over the failed rows ask again and again: nothing
+  // goes to the server until the backoff is over.
+  for (int i = 0; i < 20; ++i) {
+    library.data(library.index(200 + i), ItemListModel::NameRole);
+    library.ensureLoaded(200 + i);
+    waitFor([] { return false; }, 5);
+  }
+  CHECK(pageRequests() == 1);
+  // After it, the next delegate asks once more.
+  waitFor([] { return false; }, 450);
+  library.data(library.index(240), ItemListModel::NameRole);
+  REQUIRE(waitFor([&] { return pageRequests() == 2 && !library.loading(); }));
+
+  // A reload asks at once, and the page loads.
+  failing = 0;
+  library.reload();
+  REQUIRE(waitFor([&] { return library.count() == 250 && !library.loading(); }));
+  library.data(library.index(240), ItemListModel::NameRole);
+  REQUIRE(waitFor([&] { return library.item(240) != nullptr; }));
+  CHECK(nameAt(library, 240) == QStringLiteral("Movie 240"));
+}
+
+TEST_CASE("Only the pages near the one shown stay in memory") {
+  Movies movies;
+  movies.total = 1000;
+  LibraryFixture f([&movies](const HttpRequest& r) { return movies(r); });
+  LibraryModel::Options options;
+  options.pageSize = 50;
+  options.maxPages = 3;
+  LibraryModel library(f.client, options);
+  library.setCollectionType(QStringLiteral("movies"));
+  library.setLibraryId(QStringLiteral("lib1"));
+  REQUIRE(waitFor([&] { return library.count() == 1000; }));
+  QSignalSpy changed(&library, &LibraryModel::dataChanged);
+  // Scroll down a page at a time.
+  for (int page = 1; page < 8; ++page) {
+    library.ensureLoaded(page * 50);
+    REQUIRE(waitFor([&] { return library.item(page * 50) != nullptr; }));
+    CHECK(library.loadedPages() <= 3);
+  }
+  // The last pages are kept, the first ones were dropped and say so.
+  CHECK(library.item(7 * 50) != nullptr);
+  CHECK(library.item(6 * 50) != nullptr);
+  CHECK(library.item(0) == nullptr);
+  CHECK(library.item(100) == nullptr);
+  CHECK_FALSE(library.data(library.index(0), LibraryModel::LoadedRole).toBool());
+  bool firstDropped = false;
+  for (const QList<QVariant>& args : changed)
+    if (args.at(0).value<QModelIndex>().row() == 0) firstDropped = true;
+  CHECK(firstDropped);
+  // Scrolling back loads it again.
+  REQUIRE(waitFor([&] { return library.item(0) != nullptr; }));
+  CHECK(nameAt(library, 0) == QStringLiteral("Movie 0"));
 }
 
 TEST_CASE("Sort and filters go to the server and start the grid over") {
@@ -289,4 +375,60 @@ TEST_CASE("The collection index finds the collections holding an item") {
   CHECK_FALSE(index.ready());
   CHECK(ask(QStringLiteral("m9")) == QStringList{QStringLiteral("Beta")});
   CHECK(collectionListings == 2);
+
+  // Another item's update (metadata, images) keeps the index...
+  updates.handleMessage(QStringLiteral("LibraryChanged"),
+                        QJsonDocument::fromJson(R"({"ItemsUpdated": ["m1"]})").object());
+  CHECK(index.ready());
+  CHECK(ask(QStringLiteral("m9")) == QStringList{QStringLiteral("Beta")});
+  CHECK(collectionListings == 2);
+  // ...an added item, which may be a new collection, does not.
+  updates.handleMessage(QStringLiteral("LibraryChanged"),
+                        QJsonDocument::fromJson(R"({"ItemsAdded": ["b3"]})").object());
+  CHECK_FALSE(index.ready());
+  CHECK(ask(QStringLiteral("m9")) == QStringList{QStringLiteral("Beta")});
+  CHECK(collectionListings == 3);
+}
+
+TEST_CASE("The collection index lists at most a few collections at once") {
+  constexpr int Collections = 12;
+  constexpr int DelayMs = 60;
+  QList<qint64> arrivals;
+  QElapsedTimer clock;
+  clock.start();
+  LibraryFixture f([&](const HttpRequest& r) {
+    if (r.path != QLatin1String("/Items")) return HttpResponse{404, {}, {}, 0};
+    const QString parent = r.query.queryItemValue(QStringLiteral("parentId"));
+    if (parent.isEmpty()) {
+      QByteArray items;
+      for (int i = 0; i < Collections; ++i)
+        items += (i == 0 ? "" : ",") + QByteArray(R"({"Id": "b)") + QByteArray::number(i) +
+                 R"(", "Name": "C)" + QByteArray::number(i) + R"(", "Type": "BoxSet"})";
+      return ok(page(items));
+    }
+    arrivals.append(clock.elapsed());
+    return ok(page(R"({"Id": "m)" + parent.mid(1).toUtf8() + "\"}"), DelayMs);
+  });
+  library::CollectionIndex index(f.client);
+  QList<api::Item> found;
+  bool answered = false;
+  index.collectionsOf(QStringLiteral("m7"), &f.client, [&](const QList<api::Item>& collections) {
+    found = collections;
+    answered = true;
+  });
+  REQUIRE(waitFor([&] { return answered; }, 10000));
+  REQUIRE(found.size() == 1);
+  CHECK(found.front().id == QStringLiteral("b7"));
+  REQUIRE(arrivals.size() == Collections);
+  // A request is in flight on the server from its arrival until its answer
+  // DelayMs later; the next one is sent only once an answer came back.
+  int most = 0;
+  for (int i = 0; i < arrivals.size(); ++i) {
+    int inFlight = 0;
+    for (int j = 0; j <= i; ++j)
+      if (arrivals[j] + DelayMs > arrivals[i]) ++inFlight;
+    most = std::max(most, inFlight);
+  }
+  CHECK(most <= library::CollectionIndex::MaxParallel);
+  CHECK(most >= 2);
 }

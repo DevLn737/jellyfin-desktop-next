@@ -8,6 +8,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iterator>
 
 namespace jfd::library {
@@ -15,6 +16,29 @@ namespace jfd::library {
   LibraryModel::LibraryModel(api::JellyfinClient& client, Options options, QObject* parent)
       : QAbstractListModel(parent), m_client(client), m_options(options) {
     if (m_options.pageSize < 1) m_options.pageSize = 1;
+    if (m_options.maxPages < 2) m_options.maxPages = 2;
+    m_clock.start();
+  }
+
+  bool LibraryModel::mayLoad(int page) const {
+    if (m_inFlight.contains(page)) return false;
+    const auto failed = m_failed.constFind(page);
+    return failed == m_failed.constEnd() || m_clock.elapsed() >= failed->retryAt;
+  }
+
+  void LibraryModel::dropFarPages(int keep) {
+    while (m_pages.size() > m_options.maxPages) {
+      auto farthest = m_pages.end();
+      for (auto it = m_pages.begin(); it != m_pages.end(); ++it)
+        if (it.key() != keep &&
+            (farthest == m_pages.end() || std::abs(it.key() - keep) > std::abs(farthest.key() - keep)))
+          farthest = it;
+      if (farthest == m_pages.end()) return;
+      const int first = farthest.key() * m_options.pageSize;
+      const int last = std::min(m_total, first + static_cast<int>(farthest->size())) - 1;
+      m_pages.erase(farthest);
+      if (last >= first) Q_EMIT dataChanged(index(first), index(last));
+    }
   }
 
   QStringList LibraryModel::itemTypesFor(const QString& collectionType) {
@@ -48,7 +72,9 @@ namespace jfd::library {
     const int at = row % m_options.pageSize;
     if (page == m_pages.constEnd() || at >= page->size()) {
       // Load it from the event loop: models must not change inside data().
-      if (!m_inFlight.contains(pageIndex)) {
+      // A page that failed waits for its backoff instead of being asked
+      // for by every delegate that shows it.
+      if (mayLoad(pageIndex)) {
         auto* self = const_cast<LibraryModel*>(this);
         QTimer::singleShot(0, self, [self, row]() { self->ensureLoaded(row); });
       }
@@ -235,6 +261,7 @@ namespace jfd::library {
     beginResetModel();
     m_pages.clear();
     m_inFlight.clear();
+    m_failed.clear();
     m_total = 0;
     endResetModel();
     Q_EMIT countChanged();
@@ -259,7 +286,7 @@ namespace jfd::library {
   }
 
   void LibraryModel::loadPage(int page) {
-    if (m_inFlight.contains(page) || m_libraryId.isEmpty()) return;
+    if (!mayLoad(page) || m_libraryId.isEmpty()) return;
     const bool wasLoading = loading();
     m_inFlight.insert(page);
     if (!wasLoading) Q_EMIT loadingChanged();
@@ -287,8 +314,13 @@ namespace jfd::library {
       if (generation != m_generation) return;
       m_inFlight.remove(page);
       if (!result) {
+        Failure& failure = m_failed[page];
+        failure.count = std::min(failure.count + 1, 16);
+        const qint64 backoff = std::min<qint64>(60'000, qint64(m_options.retryAfterMs) << (failure.count - 1));
+        failure.retryAt = m_clock.elapsed() + backoff;
         setError(library::errorText(result.error()));
       } else {
+        m_failed.remove(page);
         const QSize pixels =
             cardImageSize(CardShape::Poster, std::max(m_options.cardWidth, PosterCardWidth), m_options.devicePixelRatio);
         QList<ItemListModel::Entry> entries;
@@ -297,6 +329,7 @@ namespace jfd::library {
           entries.append({item, cardImageUrl(m_client, item, CardShape::Poster, pixels)});
         m_pages.insert(page, std::move(entries));
         setTotal(result->totalRecordCount);
+        dropFarPages(page);
         const int first = page * m_options.pageSize;
         const int last = std::min(m_total, first + m_options.pageSize) - 1;
         if (last >= first) Q_EMIT dataChanged(index(first), index(last));

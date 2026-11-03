@@ -4,6 +4,7 @@
 #include <jfd/library/ItemListModel.h>
 
 #include <QAbstractListModel>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QJsonObject>
 #include <QList>
@@ -58,6 +59,13 @@ namespace jfd::library {
       int pageSize = 100;
       int cardWidth = 200;
       qreal devicePixelRatio = 1.0;
+      // Pages kept in memory; past it the page farthest from the one just
+      // loaded is dropped (and loaded again when it comes into view), so a
+      // long scroll through a large library does not keep every item.
+      int maxPages = 12;
+      // A page whose request failed is asked for again only after this,
+      // doubled on each failure up to a minute, or on reload().
+      int retryAfterMs = 2000;
     };
 
     LibraryModel(api::JellyfinClient& client, Options options, QObject* parent = nullptr);
@@ -133,6 +141,9 @@ namespace jfd::library {
   private:
     void scheduleReload();
     void loadPage(int page);
+    // A failed page waits for its backoff.
+    bool mayLoad(int page) const;
+    void dropFarPages(int keep);
     void setError(const QString& text);
     void setTotal(int total);
     QStringList itemTypes() const;
@@ -155,6 +166,12 @@ namespace jfd::library {
     int m_total = 0;
     QHash<int, QList<ItemListModel::Entry>> m_pages;
     QSet<int> m_inFlight;
+    struct Failure {
+      qint64 retryAt = 0;
+      int count = 0;
+    };
+    QHash<int, Failure> m_failed;
+    QElapsedTimer m_clock;
     api::ItemFilters m_filters;
     QString m_errorText;
   };
