@@ -1,6 +1,8 @@
 import QtQuick
 import Jfd.Ui.Theme
+import Jfd.Ui.Controls
 import Jfd.Ui.Shell
+import Jfd.Ui.Settings
 import Jfd.Ui.Player
 import Jfd.Ui.Library
 
@@ -60,11 +62,33 @@ Window {
             accountName: Library.signIn ? (Library.signIn.userName.length > 0 ? Library.signIn.userName : Library.signIn.serverName) : ""
             onLibraryChosen: (itemId, type) => Navigator.navigate(Library.routeFor(itemId, type))
             onPaletteRequested: palette.toggle()
+            // The same action as Sign out on the settings page.
+            onSignOutRequested: AppSettings.trigger("account/signOut")
         }
 
         CommandPalette {
             id: palette
             anchors.fill: parent
+        }
+
+        // A track from the search would stop the video that plays: ask first.
+        Connections {
+            target: Library
+            function onTrackConfirmationNeeded(trackId, albumId) {
+                stopVideo.trackId = trackId
+                stopVideo.albumId = albumId
+                stopVideo.open()
+            }
+        }
+        AppDialog {
+            id: stopVideo
+            objectName: "stopVideoForTrack"
+            property string trackId
+            property string albumId
+            title: qsTr("Stop the video?")
+            text: qsTr("Playing music stops the video that is playing now.")
+            acceptText: qsTr("Play music")
+            onAccepted: Library.playTrack(trackId, albumId, true)
         }
     }
 }

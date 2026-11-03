@@ -5,9 +5,11 @@
 qt_add_library(jfd_ui_music STATIC
   src/MusicItem.cpp
   src/MusicListModel.cpp
+  src/MusicLyrics.cpp
   src/MusicUi.cpp
   include/jfd/ui/MusicItem.h
   include/jfd/ui/MusicListModel.h
+  include/jfd/ui/MusicLyrics.h
   include/jfd/ui/MusicUi.h)
 target_include_directories(jfd_ui_music PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(jfd_ui_music PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/jfd/ui)

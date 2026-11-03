@@ -40,6 +40,11 @@ namespace jfd::ui {
     Q_EMIT handlersChanged();
   }
 
+  void LibraryUi::setTrackHandler(TrackHandler handler) {
+    m_track = std::move(handler);
+    Q_EMIT handlersChanged();
+  }
+
   library::LibraryModel* LibraryUi::newModel(QObject* owner) const {
     library::LibraryModel::Options options;
     options.devicePixelRatio = m_services.devicePixelRatio;
@@ -55,6 +60,7 @@ namespace jfd::ui {
     // The palette shows a few results and answers quickly.
     options.delayMs = 200;
     options.limit = 12;
+    options.peopleLimit = 4;
     options.cardWidth = 80;
     options.devicePixelRatio = m_services.devicePixelRatio;
     auto* model = new library::SearchModel(*m_services.client, options, owner);
@@ -94,6 +100,17 @@ namespace jfd::ui {
     return model;
   }
 
+  library::LibraryModel* LibraryUi::createPerson(const QString& personId, QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::LibraryModel* model = newModel(owner);
+    model->setCollectionType(library::LibraryModel::PersonItems);
+    // Newest first, as on a filmography.
+    model->setSortBy(QStringLiteral("PremiereDate"));
+    model->setDescending(true);
+    model->setLibraryId(personId);
+    return model;
+  }
+
   library::ItemDetails* LibraryUi::createDetails(const QString& itemId, QObject* owner) {
     if (m_services.client == nullptr) return nullptr;
     library::ItemDetails::Options options;
@@ -124,6 +141,7 @@ namespace jfd::ui {
     if (type == QLatin1String("MusicAlbum")) return QStringLiteral("album/") + itemId;
     if (type == QLatin1String("MusicArtist")) return QStringLiteral("artist/") + itemId;
     if (type == QLatin1String("Playlist")) return QStringLiteral("playlist/") + itemId;
+    if (type == QLatin1String("Person")) return QStringLiteral("person/") + itemId;
     if (type == QLatin1String("CollectionFolder") || type == QLatin1String("UserView") ||
         type == QLatin1String("Folder")) {
       // Music libraries have screens of their own (src/ui/music).
@@ -179,6 +197,21 @@ namespace jfd::ui {
       return;
     }
     m_watchTogether(itemId, name, startPositionTicks);
+  }
+
+  void LibraryUi::playTrack(const QString& trackId, const QString& albumId, bool confirmed) {
+    if (trackId.isEmpty()) return;
+    if (!m_track.play) {
+      qCInfo(lcLibraryUi) << "Play track" << trackId << "with no music player installed";
+      Q_EMIT message(tr("Music is not available in this build yet."), false);
+      return;
+    }
+    if (!confirmed && m_track.stopsVideo && m_track.stopsVideo()) {
+      Q_EMIT trackConfirmationNeeded(trackId, albumId);
+      return;
+    }
+    if (!m_track.play(trackId, albumId))
+      Q_EMIT message(tr("Leave the group to play music."), false);
   }
 
 } // namespace jfd::ui

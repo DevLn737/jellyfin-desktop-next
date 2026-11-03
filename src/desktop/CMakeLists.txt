@@ -29,7 +29,7 @@ qt_add_qml_module(jellyfin-desktop
   VERSION 1.0
   NO_PLUGIN
   QML_FILES Main.qml
-  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Group Jfd.Ui.Player Jfd.Ui.Music Jfd.Ui.Requests)
+  DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell Jfd.Ui.Settings Jfd.Ui.Library Jfd.Ui.Group Jfd.Ui.Player Jfd.Ui.Music Jfd.Ui.Requests)
 
 # Static QML modules: link each one's plugin (Q_IMPORT_QML_PLUGIN in
 # main.cpp) as well as the module itself.

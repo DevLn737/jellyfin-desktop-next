@@ -3,6 +3,7 @@
 #include <jfd/music/MusicPlayer.h>
 #include <jfd/ui/MusicItem.h>
 #include <jfd/ui/MusicListModel.h>
+#include <jfd/ui/MusicLyrics.h>
 
 #include <QJSEngine>
 #include <QObject>
@@ -50,6 +51,8 @@ namespace jfd::ui {
     Q_INVOKABLE jfd::ui::MusicListModel* createList(const QString& kind, QObject* owner);
     // The item of an album, artist or playlist page.
     Q_INVOKABLE jfd::ui::MusicItem* createItem(const QString& itemId, QObject* owner);
+    // The lyrics of a track (the page sets which); the page owns them.
+    Q_INVOKABLE jfd::ui::MusicLyrics* createLyrics(QObject* owner);
     // A cover (a track's album, an item's Primary image) at `width` logical
     // pixels; empty without a tag.
     Q_INVOKABLE QUrl coverUrl(const QString& itemId, const QString& tag, int width) const;

@@ -33,7 +33,7 @@ namespace jfd::music {
   MusicPlayer::MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent)
       : QObject(parent), m_runtime(runtime), m_client(client), m_api(client),
         m_sink(playback::clientReportSink(client)), m_reporter(*m_sink) {
-    m_model.reset(&m_queue);
+    m_model.setQueue(&m_queue);
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(SaveDelayMs);
     connect(&m_saveTimer, &QTimer::timeout, this, [this] {
@@ -121,8 +121,7 @@ namespace jfd::music {
 
   void MusicPlayer::setShuffle(bool on) {
     if (on == m_queue.shuffle()) return;
-    m_queue.setShuffle(on);
-    m_model.reset(&m_queue);
+    m_model.setShuffle(on);
     Q_EMIT modeChanged();
     Q_EMIT currentChanged();
     queueEdited(true);
@@ -132,31 +131,27 @@ namespace jfd::music {
 
   void MusicPlayer::play(QList<Track> tracks, int start) {
     if (tracks.isEmpty() || !available()) return;
-    m_queue.replace(std::move(tracks), start);
-    m_model.reset(&m_queue);
+    m_model.replace(std::move(tracks), start);
     Q_EMIT queueChanged();
     open(m_queue.current());
   }
 
   void MusicPlayer::append(QList<Track> tracks) {
     if (tracks.isEmpty()) return;
-    m_queue.append(std::move(tracks));
-    m_model.reset(&m_queue);
+    m_model.append(std::move(tracks));
     queueEdited(true);
   }
 
   void MusicPlayer::playNext(QList<Track> tracks) {
     if (tracks.isEmpty()) return;
-    m_queue.playNext(std::move(tracks));
-    m_model.reset(&m_queue);
+    m_model.playNext(std::move(tracks));
     queueEdited(true);
   }
 
   void MusicPlayer::removeAt(int index) {
     const bool wasCurrent = index == m_queue.current();
     const bool wasOpen = wasCurrent && m_epoch.has_value();
-    if (m_queue.remove(index) == MusicQueue::Removed::Current && wasCurrent) {
-      m_model.reset(&m_queue);
+    if (m_model.remove(index) == MusicQueue::Removed::Current && wasCurrent) {
       Q_EMIT currentChanged();
       queueEdited(true);
       if (wasOpen) {
@@ -165,22 +160,19 @@ namespace jfd::music {
       }
       return;
     }
-    m_model.reset(&m_queue);
     Q_EMIT currentChanged();
     queueEdited(true);
   }
 
   void MusicPlayer::move(int from, int to) {
-    m_queue.move(from, to);
-    m_model.reset(&m_queue);
+    m_model.move(from, to);
     Q_EMIT currentChanged();
     queueEdited(true);
   }
 
   void MusicPlayer::clear() {
     stop();
-    m_queue.clear();
-    m_model.reset(&m_queue);
+    m_model.clear();
     Q_EMIT currentChanged();
     queueEdited(true);
   }
@@ -494,7 +486,7 @@ namespace jfd::music {
       if (start < 0 && i >= startIndex) start = static_cast<int>(tracks.size());
       tracks.append(Track::fromItem(items[i]));
     }
-    m_queue.setShuffle(shuffle);
+    m_model.setShuffle(shuffle);
     Q_EMIT modeChanged();
     play(std::move(tracks), std::max(start, 0));
   }
@@ -505,6 +497,41 @@ namespace jfd::music {
                    api.albumTracks(albumId, context, std::move(done));
                  },
                  startIndex, shuffle);
+  }
+
+  void MusicPlayer::playTrack(const QString& trackId, const QString& albumId) {
+    if (!available() || trackId.isEmpty()) return;
+    const auto alone = [this, trackId] {
+      api::ItemQuery query;
+      query.ids = {trackId};
+      query.limit = 1;
+      m_client.items(query, this, [this](api::Result<api::ItemPage> page) {
+        if (!page) {
+          m_error = page.error().message;
+          Q_EMIT failed(m_error);
+          return;
+        }
+        playItems(page->items, 0, false);
+      });
+    };
+    if (albumId.isEmpty()) {
+      alone();
+      return;
+    }
+    m_api.albumTracks(albumId, this, [this, trackId, alone](api::Result<api::ItemPage> page) {
+      if (!page) {
+        m_error = page.error().message;
+        Q_EMIT failed(m_error);
+        return;
+      }
+      for (int i = 0; i < page->items.size(); ++i) {
+        if (page->items[i].id == trackId) {
+          playItems(page->items, i, false);
+          return;
+        }
+      }
+      alone();
+    });
   }
 
   void MusicPlayer::playPlaylist(const QString& playlistId, int startIndex, bool shuffle) {
@@ -575,9 +602,8 @@ namespace jfd::music {
     if (o.value(QLatin1String("owner")).toString() != ownerOf(m_client)) return;
     auto queue = MusicQueue::fromJson(o.value(QLatin1String("queue")).toObject());
     if (!queue) return;
-    m_queue = std::move(*queue);
+    m_model.assign(std::move(*queue));
     m_resumeTicks = static_cast<std::int64_t>(o.value(QLatin1String("position")).toDouble() * TicksPerSecond);
-    m_model.reset(&m_queue);
     Q_EMIT queueChanged();
     Q_EMIT currentChanged();
     Q_EMIT modeChanged();

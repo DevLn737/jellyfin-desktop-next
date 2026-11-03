@@ -8,11 +8,30 @@ import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
 // What plays now: the big cover, title, a seek bar, the controls and the
-// queue, where a click jumps to a track and the menu takes one out.
+// queue, where a click jumps to a track and the menu takes one out. The
+// Lyrics button shows the track's lyrics in place of the queue: synced
+// ones follow the track (the line sung now stands out and stays in view,
+// a click on a line seeks there), plain ones are shown as they are.
 RoutePage {
     id: page
 
     readonly property var track: MusicSession.currentTrack
+    property bool showLyrics: false
+    readonly property var lyrics: Music.createLyrics(page)
+
+    // Asked for once shown; kept for the track while the queue is shown.
+    Binding {
+        target: page.lyrics
+        property: "trackId"
+        value: page.track.id || ""
+        when: page.showLyrics
+        restoreMode: Binding.RestoreNone
+    }
+    Binding {
+        target: page.lyrics
+        property: "position"
+        value: MusicSession.position
+    }
 
     title: qsTr("Now playing")
 
@@ -197,10 +216,16 @@ RoutePage {
                 Layout.fillWidth: true
                 SectionHeader {
                     Layout.fillWidth: true
-                    text: qsTr("Queue")
+                    text: page.showLyrics ? qsTr("Lyrics") : qsTr("Queue")
+                }
+                ActionButton {
+                    objectName: "nowLyricsToggle"
+                    text: page.showLyrics ? qsTr("Show queue") : qsTr("Show lyrics")
+                    onClicked: page.showLyrics = !page.showLyrics
                 }
                 ActionButton {
                     objectName: "nowClear"
+                    visible: !page.showLyrics
                     text: qsTr("Clear")
                     enabled: MusicSession.queueSize > 0
                     onClicked: {
@@ -216,6 +241,7 @@ RoutePage {
                 objectName: "nowQueue"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                visible: !page.showLyrics
                 clip: true
                 focus: true
                 keyNavigationEnabled: true
@@ -239,6 +265,78 @@ RoutePage {
                         onTapped: MusicSession.removeAt(entry.index)
                     }
                     Keys.onDeletePressed: MusicSession.removeAt(entry.index)
+                }
+            }
+
+            Item {
+                objectName: "nowLyrics"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: page.showLyrics
+
+                ListView {
+                    SmoothWheel {}
+                    id: lyricsList
+                    objectName: "nowLyricsList"
+                    anchors.fill: parent
+                    clip: true
+                    visible: page.lyrics.count > 0
+                    boundsBehavior: Flickable.StopAtBounds
+                    spacing: Theme.spacingSmall
+                    model: page.lyrics
+                    // The line sung now stays near the middle; a scroll by
+                    // hand moves away until the next line starts.
+                    currentIndex: page.lyrics.currentLine
+                    highlight: Item {}
+                    highlightRangeMode: page.lyrics.synced ? ListView.ApplyRange : ListView.NoHighlightRange
+                    preferredHighlightBegin: height * 0.35
+                    preferredHighlightEnd: height * 0.55
+                    highlightMoveDuration: Theme.durationSlow
+                    delegate: Item {
+                        id: line
+                        required property int index
+                        required property string text
+                        required property double start
+                        required property bool isCurrent
+                        width: ListView.view.width
+                        height: lineText.implicitHeight
+                        Text {
+                            id: lineText
+                            width: parent.width
+                            text: line.text
+                            wrapMode: Text.Wrap
+                            color: line.isCurrent || !page.lyrics.synced ? Theme.text : Theme.textSecondary
+                            font.pixelSize: page.lyrics.synced ? Theme.fontSizeLarge : Theme.fontSizeBody
+                            font.weight: line.isCurrent ? Theme.fontWeightBold : Font.Normal
+                            lineHeight: 1.2
+                        }
+                        TapHandler {
+                            enabled: line.start >= 0
+                            onTapped: MusicSession.seek(line.start)
+                        }
+                    }
+                }
+
+                LoadingIndicator {
+                    anchors.centerIn: parent
+                    visible: page.lyrics.loading
+                }
+                StateMessage {
+                    objectName: "nowNoLyrics"
+                    anchors.centerIn: parent
+                    width: parent.width
+                    visible: page.lyrics.empty || (page.track.id || "").length === 0
+                    kind: "empty"
+                    title: qsTr("No lyrics")
+                }
+                StateMessage {
+                    objectName: "nowLyricsError"
+                    anchors.centerIn: parent
+                    width: parent.width
+                    visible: page.lyrics.errorText.length > 0
+                    kind: Library.online ? "error" : "offline"
+                    description: page.lyrics.errorText
+                    onRetry: page.lyrics.reload()
                 }
             }
         }

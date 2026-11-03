@@ -49,6 +49,7 @@ namespace jfd::library {
     if (collectionType == QLatin1String("boxsets")) return {QStringLiteral("BoxSet")};
     // Whatever the collection holds.
     if (collectionType == CollectionItems) return {};
+    if (collectionType == PersonItems) return {QStringLiteral("Movie"), QStringLiteral("Series")};
     return {QStringLiteral("Movie"), QStringLiteral("Series"), QStringLiteral("Video")};
   }
 
@@ -270,6 +271,8 @@ namespace jfd::library {
     if (m_libraryId.isEmpty()) return;
 
     loadPage(0);
+    // A person's titles have no filters of their own to offer.
+    if (m_collectionType == PersonItems) return;
     const quint64 generation = m_generation;
     m_client.itemFilters(m_libraryId, itemTypes(), this,
                          [this, generation](api::Result<api::ItemFilters> result) {
@@ -292,7 +295,10 @@ namespace jfd::library {
     if (!wasLoading) Q_EMIT loadingChanged();
 
     api::ItemQuery query;
-    query.parentId = m_libraryId;
+    if (m_collectionType == PersonItems)
+      query.personIds = {m_libraryId};
+    else
+      query.parentId = m_libraryId;
     query.includeItemTypes = itemTypes();
     // A collection's items are its own children; a library's are anywhere
     // below it.

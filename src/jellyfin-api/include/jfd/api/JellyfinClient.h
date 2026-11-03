@@ -56,6 +56,8 @@ namespace jfd::api {
     // Music: tracks and albums of these (album) artists.
     QStringList albumArtistIds;
     QStringList artistIds;
+    // Items these people (actors, directors, ...) appear in.
+    QStringList personIds;
   };
 
   // Image types the server keeps per item: "Primary", "Backdrop", "Thumb",
@@ -186,6 +188,9 @@ namespace jfd::api {
     // `types` limits it ("Movie", "Series").
     void suggestions(int limit, const QStringList& types, QObject* context, Callback<ItemPage> done);
     void similarItems(const QString& itemId, int limit, QObject* context, Callback<ItemPage> done);
+    // GET Persons: actors, directors and other people whose name matches
+    // `searchTerm`, as items of type Person.
+    void persons(const QString& searchTerm, int limit, QObject* context, Callback<ItemPage> done);
     // The ids of a collection's (BoxSet's) items, without images or user
     // data. The server lists a collection's items but not an item's
     // collections, so this is how the collections holding an item are found.

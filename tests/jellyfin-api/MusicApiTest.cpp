@@ -159,3 +159,49 @@ TEST_CASE("Playlists are created, added to and trimmed") {
   CHECK(s.last().method == "DELETE");
   CHECK(s.param("entryIds") == QStringLiteral("e1,e2"));
 }
+
+TEST_CASE("Lyrics: synced lines with starts, plain text, or none") {
+  Signed s([](const HttpRequest& r) {
+    if (r.path == QLatin1String("/jf/Audio/synced/Lyrics"))
+      return jfd::test::json(R"({"Metadata": {"Artist": "Alpha Artist", "IsSynced": true},
+        "Lyrics": [{"Text": "First", "Start": 10000000}, {"Text": "", "Start": 35000000},
+                   {"Text": "Third", "Start": 40000000}]})");
+    if (r.path == QLatin1String("/jf/Audio/plain/Lyrics"))
+      return jfd::test::json(R"({"Metadata": {}, "Lyrics": [{"Text": "One line"}, {"Text": "Another"}]})");
+    return jfd::test::json(R"({"title": "Not Found", "status": 404})", 404);
+  });
+
+  auto synced = run<Lyrics>([&](auto done) { s.music.lyrics(QStringLiteral("synced"), nullptr, done); });
+  REQUIRE(synced.ok());
+  CHECK(s.last().method == "GET");
+  CHECK(s.last().headers.value("authorization").contains("Token=\"token1\""));
+  REQUIRE(synced->lines.size() == 3);
+  CHECK(synced->synced);
+  CHECK(synced->lines[0].text == QStringLiteral("First"));
+  CHECK(synced->lines[2].startTicks == 40000000);
+  // The line playing: none before the first, then each until the next.
+  CHECK(synced->lineAt(0) == -1);
+  CHECK(synced->lineAt(10000000) == 0);
+  CHECK(synced->lineAt(34999999) == 0);
+  CHECK(synced->lineAt(36000000) == 1);
+  CHECK(synced->lineAt(999000000) == 2);
+
+  auto plain = run<Lyrics>([&](auto done) { s.music.lyrics(QStringLiteral("plain"), nullptr, done); });
+  REQUIRE(plain.ok());
+  CHECK_FALSE(plain->synced);
+  REQUIRE(plain->lines.size() == 2);
+  CHECK_FALSE(plain->lines[0].startTicks.has_value());
+  CHECK(plain->lineAt(50000000) == -1);
+
+  // A track without lyrics: empty, not an error.
+  auto none = run<Lyrics>([&](auto done) { s.music.lyrics(QStringLiteral("none"), nullptr, done); });
+  REQUIRE(none.ok());
+  CHECK(none->isEmpty());
+  CHECK_FALSE(none->synced);
+
+  // Lines that all have starts are synced when the server leaves the flag out.
+  const Lyrics bare =
+      Lyrics::fromJson(QJsonDocument::fromJson(R"({"Lyrics": [{"Text": "a", "Start": 0}]})").object());
+  CHECK(bare.synced);
+  CHECK(bare.lineAt(0) == 0);
+}

@@ -38,5 +38,13 @@
         <source>Libraries</source>
         <translation>Библиотеки</translation>
     </message>
+    <message>
+        <source>Sign out</source>
+        <translation>Выйти</translation>
+    </message>
+    <message>
+        <source>Sign out of this server? Playback stops and the password is asked for again.</source>
+        <translation>Выйти с этого сервера? Воспроизведение остановится, и пароль нужно будет ввести снова.</translation>
+    </message>
 </context>
 </TS>

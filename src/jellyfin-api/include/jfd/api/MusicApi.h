@@ -2,8 +2,12 @@
 
 #include <jfd/api/JellyfinClient.h>
 
+#include <QJsonObject>
+#include <QList>
 #include <QString>
 #include <QStringList>
+
+#include <optional>
 
 // The music library: artists, albums, tracks, genres and playlists. A thin
 // layer over JellyfinClient; every call answers items in the same Item type,
@@ -25,6 +29,26 @@ namespace jfd::api {
     // Albums and tracks of these album artists (or artists).
     QStringList albumArtistIds;
     QStringList artistIds;
+  };
+
+  // A track's lyrics (GET Audio/{id}/Lyrics). Synced lyrics (from an LRC
+  // file) give each line its start in the track; plain ones have none.
+  struct LyricLine {
+    QString text;
+    std::optional<qint64> startTicks;
+  };
+
+  struct Lyrics {
+    QList<LyricLine> lines;
+    // The lines have starts, so the line playing can be shown.
+    bool synced = false;
+
+    bool isEmpty() const { return lines.isEmpty(); }
+    // The line playing at `ticks`: the last one starting at or before it;
+    // -1 before the first line and for plain lyrics.
+    int lineAt(qint64 ticks) const;
+    // The body of GET Audio/{id}/Lyrics.
+    static Lyrics fromJson(const QJsonObject& body);
   };
 
   class MusicApi {
@@ -51,6 +75,10 @@ namespace jfd::api {
     void recentlyPlayed(const QString& parentId, int limit, QObject* context, Callback<ItemPage> done);
     // GET Albums/{id}/Similar.
     void similarAlbums(const QString& albumId, int limit, QObject* context, Callback<ItemPage> done);
+
+    // GET Audio/{id}/Lyrics. A track without lyrics (404) answers empty
+    // lyrics, not an error.
+    void lyrics(const QString& trackId, QObject* context, Callback<Lyrics> done);
 
     // POST Playlists: a new music playlist holding `trackIds`. Answers its id.
     void createPlaylist(const QString& name, const QStringList& trackIds, QObject* context,

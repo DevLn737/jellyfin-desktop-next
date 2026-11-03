@@ -42,6 +42,7 @@ namespace jfd::ui {
     Q_PROPERTY(jfd::library::SearchModel* search READ search NOTIFY attached)
     Q_PROPERTY(bool canPlay READ canPlay NOTIFY handlersChanged)
     Q_PROPERTY(bool canWatchTogether READ canWatchTogether NOTIFY handlersChanged)
+    Q_PROPERTY(bool canPlayTracks READ canPlayTracks NOTIFY handlersChanged)
     // The server's live connection (the session socket) is up. A screen
     // whose request failed while it is down says "No connection", and
     // reloads on reconnected().
@@ -64,18 +65,27 @@ namespace jfd::ui {
     using PlayHandler = std::function<void(const QString& itemId, qint64 startPositionTicks)>;
     using WatchTogetherHandler =
         std::function<void(const QString& itemId, const QString& name, qint64 startPositionTicks)>;
+    // A track found by search plays in the music player, its album as the
+    // queue. `play` answers false when music cannot play now (in a group);
+    // `stopsVideo` says that starting it would stop the video playing.
+    struct TrackHandler {
+      std::function<bool(const QString& trackId, const QString& albumId)> play;
+      std::function<bool()> stopsVideo;
+    };
 
     explicit LibraryUi(QObject* parent = nullptr);
 
     void attach(const Services& services);
     void setPlayHandler(PlayHandler handler);
     void setWatchTogetherHandler(WatchTogetherHandler handler);
+    void setTrackHandler(TrackHandler handler);
 
     library::SignIn* signIn() const { return m_services.signIn; }
     library::HomeModel* home() const { return m_services.home; }
     library::SearchModel* search() const { return m_services.search; }
     bool canPlay() const { return bool(m_play); }
     bool canWatchTogether() const { return bool(m_watchTogether); }
+    bool canPlayTracks() const { return bool(m_track.play); }
     bool online() const { return m_online; }
     // Called by LibraryScreens as the session socket comes and goes; a
     // change from offline to online emits reconnected().
@@ -88,6 +98,9 @@ namespace jfd::ui {
     // A grid of one collection's items, owned by `owner`. Null before attach.
     Q_INVOKABLE jfd::library::LibraryModel* createCollection(const QString& collectionId,
                                                              QObject* owner);
+    // The films and series a person appears in, owned by `owner`. Null
+    // before attach.
+    Q_INVOKABLE jfd::library::LibraryModel* createPerson(const QString& personId, QObject* owner);
     // An item page's model, owned by `owner`. Null before attach.
     Q_INVOKABLE jfd::library::ItemDetails* createDetails(const QString& itemId, QObject* owner);
     // A search of its own (the command palette's), owned by `owner`; the
@@ -96,7 +109,9 @@ namespace jfd::ui {
     // The image provider's source for a server image URL.
     Q_INVOKABLE QString image(const QUrl& url) const;
     // Where a card leads: "library/<id>" for a library, "collection/<id>"
-    // for a collection, "item/<id>" for anything else.
+    // for a collection, "person/<id>" for a person, the music pages for
+    // albums, artists and playlists, "item/<id>" for anything else. A
+    // track has no page: it plays (playTrack).
     Q_INVOKABLE QString routeFor(const QString& itemId, const QString& type) const;
     // A library's title from the home page's list, for the grid's heading.
     Q_INVOKABLE QString libraryName(const QString& libraryId) const;
@@ -106,6 +121,10 @@ namespace jfd::ui {
     Q_INVOKABLE void play(const QString& itemId, qint64 startPositionTicks);
     Q_INVOKABLE void watchTogether(const QString& itemId, const QString& name,
                                    qint64 startPositionTicks);
+    // Plays a track in its album. With a video playing it first asks
+    // (trackConfirmationNeeded); `confirmed` is the answer.
+    Q_INVOKABLE void playTrack(const QString& trackId, const QString& albumId,
+                               bool confirmed = false);
 
   Q_SIGNALS:
     void attached();
@@ -116,6 +135,9 @@ namespace jfd::ui {
     // The connection came back after it was lost: screens showing an
     // error load again.
     void reconnected();
+    // Playing this track would stop the video; the window asks, and calls
+    // playTrack again with `confirmed` on yes.
+    void trackConfirmationNeeded(const QString& trackId, const QString& albumId);
 
   private:
     QString collectionTypeOf(const QString& libraryId) const;
@@ -127,6 +149,7 @@ namespace jfd::ui {
     Services m_services;
     PlayHandler m_play;
     WatchTogetherHandler m_watchTogether;
+    TrackHandler m_track;
     bool m_online = true;
   };
 

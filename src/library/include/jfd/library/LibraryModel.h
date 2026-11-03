@@ -53,7 +53,7 @@ namespace jfd::library {
     enum class PlayedFilter { All, Played, Unplayed };
     Q_ENUM(PlayedFilter)
 
-    enum Role { LoadedRole = ItemListModel::CommunityRatingRole + 1 };
+    enum Role { LoadedRole = ItemListModel::AlbumIdRole + 1 };
 
     struct Options {
       int pageSize = 100;
@@ -79,7 +79,8 @@ namespace jfd::library {
     QString libraryId() const { return m_libraryId; }
     void setLibraryId(const QString& id);
     // The library's CollectionType; decides which item types are listed.
-    // CollectionItems lists the items of one collection (a BoxSet) instead.
+    // CollectionItems lists the items of one collection (a BoxSet) instead,
+    // PersonItems the films and series a person (the id) appears in.
     QString collectionType() const { return m_collectionType; }
     void setCollectionType(const QString& type);
     QString sortBy() const { return m_sortBy; }
@@ -121,6 +122,7 @@ namespace jfd::library {
     // shows, and so on.
     static QStringList itemTypesFor(const QString& collectionType);
     static inline const QString CollectionItems = QStringLiteral("jfd-collection");
+    static inline const QString PersonItems = QStringLiteral("jfd-person");
 
     void follow(LibraryUpdates& updates);
 

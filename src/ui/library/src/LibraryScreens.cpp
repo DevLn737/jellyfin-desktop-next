@@ -84,6 +84,7 @@ namespace jfd::ui {
     navigator.registerPage(QStringLiteral("home"), page("HomePage"));
     navigator.registerPage(QStringLiteral("library"), page("LibraryPage"));
     navigator.registerPage(QStringLiteral("collection"), page("CollectionPage"));
+    navigator.registerPage(QStringLiteral("person"), page("PersonPage"));
     navigator.registerPage(QStringLiteral("item"), page("ItemPage"));
     navigator.registerPage(QStringLiteral("search"), page("SearchPage"));
     navigator.registerPage(QStringLiteral("customizeHome"), page("CustomizeHomePage"));

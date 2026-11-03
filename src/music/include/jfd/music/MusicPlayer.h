@@ -117,6 +117,9 @@ namespace jfd::music {
     Q_INVOKABLE void playPlaylist(const QString& playlistId, int startIndex = 0, bool shuffle = false);
     Q_INVOKABLE void playArtist(const QString& artistId, bool shuffle = true);
     Q_INVOKABLE void queueAlbum(const QString& albumId, bool next);
+    // Plays one track with its album as the queue, from that track; a track
+    // without an album (or not found in it) plays alone.
+    Q_INVOKABLE void playTrack(const QString& trackId, const QString& albumId);
 
     // Plays the queue's track at `index`.
     Q_INVOKABLE void jumpTo(int index);

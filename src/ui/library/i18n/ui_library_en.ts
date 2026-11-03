@@ -22,6 +22,16 @@
     </message>
 </context>
 <context>
+    <name>PersonPage</name>
+    <message numerus="yes">
+        <source>%n title(s)</source>
+        <translation>
+            <numerusform>%n title</numerusform>
+            <numerusform>%n titles</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>jfd::ui::LibraryUi</name>
     <message numerus="yes">
         <source>%n min</source>

@@ -501,6 +501,8 @@ namespace jfd::api {
       query.addQueryItem(QStringLiteral("albumArtistIds"), q.albumArtistIds.join(QLatin1Char(',')));
     if (!q.artistIds.isEmpty())
       query.addQueryItem(QStringLiteral("artistIds"), q.artistIds.join(QLatin1Char(',')));
+    if (!q.personIds.isEmpty())
+      query.addQueryItem(QStringLiteral("personIds"), q.personIds.join(QLatin1Char(',')));
     query.addQueryItem(QStringLiteral("recursive"), boolText(q.recursive));
     query.addQueryItem(QStringLiteral("startIndex"), QString::number(q.startIndex));
     query.addQueryItem(QStringLiteral("limit"), QString::number(q.limit));
@@ -665,6 +667,16 @@ namespace jfd::api {
     query.addQueryItem(Fields, ItemFields);
     sendJson(Method::Get, QStringLiteral("Items/%1/Similar").arg(itemId), query, std::nullopt,
              context, parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
+  void JellyfinClient::persons(const QString& searchTerm, int limit, QObject* context,
+                               Callback<ItemPage> done) {
+    QUrlQuery query = userQuery();
+    if (!searchTerm.isEmpty()) query.addQueryItem(QStringLiteral("searchTerm"), searchTerm);
+    query.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+    query.addQueryItem(Fields, QStringLiteral("PrimaryImageAspectRatio"));
+    sendJson(Method::Get, QStringLiteral("Persons"), query, std::nullopt, context,
+             parsed<ItemPage>(std::move(done), json::itemPage));
   }
 
   void JellyfinClient::collectionItemIds(const QString& collectionId, QObject* context,

@@ -23,6 +23,37 @@ namespace jfd::api {
     }
   } // namespace
 
+  int Lyrics::lineAt(qint64 ticks) const {
+    if (!synced) return -1;
+    int at = -1;
+    for (int i = 0; i < lines.size(); ++i) {
+      const std::optional<qint64>& start = lines[i].startTicks;
+      if (!start) continue;
+      if (*start > ticks) break;
+      at = i;
+    }
+    return at;
+  }
+
+  Lyrics Lyrics::fromJson(const QJsonObject& body) {
+    Lyrics lyrics;
+    bool allStarts = true;
+    for (const QJsonValue& value : body.value(QLatin1String("Lyrics")).toArray()) {
+      const QJsonObject line = value.toObject();
+      LyricLine out;
+      out.text = line.value(QLatin1String("Text")).toString();
+      const QJsonValue start = line.value(QLatin1String("Start"));
+      if (start.isDouble()) out.startTicks = static_cast<qint64>(start.toDouble());
+      else allStarts = false;
+      lyrics.lines.append(std::move(out));
+    }
+    const QJsonValue isSynced =
+        body.value(QLatin1String("Metadata")).toObject().value(QLatin1String("IsSynced"));
+    // Without the flag, lines that all have a start are synced.
+    lyrics.synced = !lyrics.lines.isEmpty() && (isSynced.isBool() ? isSynced.toBool() : allStarts);
+    return lyrics;
+  }
+
   QString MusicApi::sortName(MusicSort sort) {
     switch (sort) {
     case MusicSort::Name: return QStringLiteral("SortName");
@@ -150,6 +181,17 @@ namespace jfd::api {
     query.addQueryItem(QStringLiteral("fields"), MusicFields);
     m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("Albums/%1/Similar").arg(albumId), query,
                       std::nullopt, context, parsed<ItemPage>(std::move(done), json::itemPage));
+  }
+
+  void MusicApi::lyrics(const QString& trackId, QObject* context, Callback<Lyrics> done) {
+    m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("Audio/%1/Lyrics").arg(trackId), {}, std::nullopt,
+                      context, [done = std::move(done)](Result<QJsonObject> result) {
+                        if (!result) {
+                          if (result.error().isNotFound()) return done(Lyrics{});
+                          return done(result.error());
+                        }
+                        done(Lyrics::fromJson(result.value()));
+                      });
   }
 
   void MusicApi::createPlaylist(const QString& name, const QStringList& trackIds, QObject* context,

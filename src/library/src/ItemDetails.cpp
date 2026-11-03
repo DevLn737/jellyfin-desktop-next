@@ -14,7 +14,7 @@ namespace jfd::library {
     }
 
     bool isPlayable(const api::Item& item) {
-      return !item.isFolder && !is(item, "Series") && !is(item, "Season");
+      return !item.isFolder && !is(item, "Series") && !is(item, "Season") && !is(item, "Person");
     }
   } // namespace
 
@@ -179,7 +179,7 @@ namespace jfd::library {
                             });
     }
 
-    if (m_collectionIndex != nullptr && !is(item, "BoxSet")) {
+    if (m_collectionIndex != nullptr && !is(item, "BoxSet") && !is(item, "Person")) {
       begin();
       m_collectionIndex->collectionsOf(item.id, this,
                                        [this, generation](const QList<api::Item>& collections) {

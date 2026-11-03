@@ -26,6 +26,8 @@ FocusScope {
     property alias libraries: sidebar.libraries
     property alias accountName: sidebar.accountName
     signal libraryChosen(string itemId, string type)
+    // The account menu's Sign out, confirmed.
+    signal signOutRequested()
     // Off while something under the shell must show through (the video with
     // HDR10 output).
     property bool backgroundVisible: true
@@ -97,6 +99,7 @@ FocusScope {
         onMenuToggled: shell.menuOpen = !shell.menuOpen
         onChosen: shell.menuOpen = false
         onLibraryChosen: (itemId, type) => shell.libraryChosen(itemId, type)
+        onSignOutRequested: shell.signOutRequested()
         Behavior on x { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
         KeyNavigation.right: stack
     }

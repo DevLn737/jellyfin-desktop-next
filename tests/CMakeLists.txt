@@ -293,7 +293,7 @@ if(JFD_BUILD_APP)
     # The music screens on a virtual backend and a fake server: 10,000
     # albums and 50,000 tracks by pages, the mini-player, groups and the
     # question before music replaces a movie.
-    add_executable(jfd_ui_music_tests support/QtGuiTestMain.cpp ui/MusicUiTest.cpp)
+    add_executable(jfd_ui_music_tests support/QtGuiTestMain.cpp ui/MusicUiTest.cpp ui/MusicLyricsTest.cpp)
     target_include_directories(jfd_ui_music_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_music_tests PRIVATE
       jfd_ui_music jfd_ui_musicplugin jfd_ui_library jfd_ui_libraryplugin

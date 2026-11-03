@@ -254,14 +254,16 @@ RoutePage {
         anchors.right: parent.right
         anchors.top: parent.top
         // Tall and dark enough that the two-line clock stays readable over
-        // bright video.
+        // bright video. "Ends at" sits about 40 to 55 px down, which is where
+        // a letterboxed film's picture starts (16:9 in 1280x800): the shade
+        // stays dark down to it and fades out only below.
         height: Theme.controlHeight + 3 * Theme.spacing
         opacity: page.osdShown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
         gradient: Gradient {
             GradientStop { position: 0; color: "#d0000000" }
-            GradientStop { position: 0.7; color: "#90000000" }
+            GradientStop { position: 0.75; color: "#b0000000" }
             GradientStop { position: 1; color: "transparent" }
         }
 
@@ -303,7 +305,7 @@ RoutePage {
                     color: Overlay.text
                     font.pixelSize: Theme.fontSizeBody
                     style: Text.Outline
-                    styleColor: "#80000000"
+                    styleColor: "#c0000000"
                 }
                 Text {
                     anchors.right: parent.right
@@ -313,7 +315,7 @@ RoutePage {
                     opacity: 0.85
                     font.pixelSize: Theme.fontSizeSmall
                     style: Text.Outline
-                    styleColor: "#80000000"
+                    styleColor: "#c0000000"
                 }
             }
             // Only in a group: GroupSession exists once the group module

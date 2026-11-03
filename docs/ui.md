@@ -283,7 +283,14 @@ sidebar and the library page.
   760 px or more, the volume. The shell hides it in the video player.
 - **Guards.** `PlayGuard` asks before a track replaces a movie that is playing;
   `GroupHint` replaces the buttons in a SyncPlay group (music is not available
-  there). Starting a video stops the music and keeps the queue.
+  there). Starting a video stops the music and keeps the queue. A track
+  found by the global search plays through `Library.playTrack` (its album
+  as the queue); the window asks first while a video plays.
+- **Lyrics.** "Now playing" shows the track's lyrics in place of the queue
+  (`MusicLyrics`, `Music.createLyrics(owner)`, from `GET Audio/{id}/Lyrics`).
+  Synced lines follow the position: the line sung now is bold and kept near
+  the middle, a click on a line seeks to it. Plain lyrics are shown as text;
+  a track without any says "No lyrics".
 - **Strings and icons.** Strings are `qsTr` with a Russian file in
   `src/ui/music/i18n`; icons are SVG files in `src/ui/music/icons` through
   `MusicIcons`.

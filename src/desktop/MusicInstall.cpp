@@ -7,6 +7,7 @@
 #include <jfd/settings/Settings.h>
 #include <jfd/settings/SettingsRegistry.h>
 #include <jfd/ui/CommandRegistry.h>
+#include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/MusicUi.h>
 #include <jfd/ui/Navigator.h>
 
@@ -169,6 +170,18 @@ namespace jfd::desktop {
     services.musicUi = std::make_unique<ui::MusicUi>(config);
     ui::Music::setInstance(services.musicUi.get());
     ui::MusicSession::setInstance(&player);
+
+    // Tracks found by the global search play here, in their album.
+    if (services.libraryUi != nullptr) {
+      ui::LibraryUi::TrackHandler tracks;
+      tracks.play = [&player](const QString& trackId, const QString& albumId) {
+        if (!player.available()) return false;
+        player.playTrack(trackId, albumId);
+        return true;
+      };
+      tracks.stopsVideo = [&player] { return player.videoActive(); };
+      services.libraryUi->setTrackHandler(std::move(tracks));
+    }
 
     ui::Navigator& navigator = *services.navigator;
     ui::RouteSpec::SidebarEntry entry;
