@@ -11,7 +11,12 @@ namespace jfd::integrations {
       : QObject(parent), m_network(network) {}
 
   SignedDownload::~SignedDownload() {
-    if (m_reply) m_reply->abort();
+    // Not reported: whoever waits for the download is going away too.
+    if (m_reply) {
+      m_reply->disconnect(this);
+      m_reply->abort();
+      m_reply->deleteLater();
+    }
     delete m_file;
   }
 
@@ -38,18 +43,34 @@ namespace jfd::integrations {
     }
     QNetworkRequest request(url);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    // Restarted by every bit of data that arrives (see the header).
+    request.setTransferTimeout(static_cast<int>(m_transferTimeout.count()));
+    m_writeFailed = false;
     QNetworkReply* reply = m_network->get(request);
     m_reply = reply;
     connect(reply, &QNetworkReply::readyRead, this, [this, reply] {
-      if (m_file->write(reply->readAll()) < 0) reply->abort();
+      if (m_file->write(reply->readAll()) < 0) {
+        m_writeFailed = true;
+        reply->abort();
+      }
     });
     connect(reply, &QNetworkReply::finished, this, [this, reply, size, done = std::move(done)] {
       reply->deleteLater();
-      m_file->write(reply->readAll());
+      if (m_file->write(reply->readAll()) < 0) m_writeFailed = true;
       const qint64 written = m_file->size();
       const bool flushed = m_file->flush();
       m_file->close();
-      if (reply->error() != QNetworkReply::NoError) {
+      const QNetworkReply::NetworkError error = reply->error();
+      if (m_writeFailed) {
+        fail(QStringLiteral("cannot write %1").arg(m_file->fileName()));
+      } else if (error == QNetworkReply::OperationCanceledError || error == QNetworkReply::TimeoutError) {
+        // Nothing else aborts a reply here (a failed write is handled above),
+        // so a cancelled one ran into the transfer timeout.
+        fail(QStringLiteral("download stalled: no data for %1 ms (%2 of %3 bytes)")
+                 .arg(m_transferTimeout.count())
+                 .arg(written)
+                 .arg(size));
+      } else if (error != QNetworkReply::NoError) {
         fail(QStringLiteral("download failed: %1").arg(reply->errorString()));
       } else if (!flushed || (size > 0 && written != size)) {
         fail(QStringLiteral("download incomplete: %1 of %2 bytes").arg(written).arg(size));

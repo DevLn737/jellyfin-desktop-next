@@ -59,8 +59,10 @@ namespace {
 
   Outcome prepare(MsiUpdater& updater, const Release& next) {
     Outcome outcome;
-    QObject::connect(&updater, &MsiUpdater::ready, [&](const QString& v) { outcome.ready = v; });
-    QObject::connect(&updater, &MsiUpdater::failed, [&](const QString& reason) { outcome.failure = reason; });
+    // Connected for this call only: outcome is gone once it returns.
+    QObject context;
+    QObject::connect(&updater, &MsiUpdater::ready, &context, [&](const QString& v) { outcome.ready = v; });
+    QObject::connect(&updater, &MsiUpdater::failed, &context, [&](const QString& reason) { outcome.failure = reason; });
     updater.prepare(next);
     REQUIRE(waitFor([&] { return outcome.done(); }));
     return outcome;

@@ -59,8 +59,11 @@ namespace {
 
   Outcome prepare(AppImageUpdater& updater, const Release& next) {
     Outcome outcome;
-    QObject::connect(&updater, &AppImageUpdater::ready, [&](const QString& v) { outcome.ready = v; });
-    QObject::connect(&updater, &AppImageUpdater::failed, [&](const QString& reason) { outcome.failure = reason; });
+    // Connected for this call only: outcome is gone once it returns.
+    QObject context;
+    QObject::connect(&updater, &AppImageUpdater::ready, &context, [&](const QString& v) { outcome.ready = v; });
+    QObject::connect(&updater, &AppImageUpdater::failed, &context,
+                     [&](const QString& reason) { outcome.failure = reason; });
     updater.prepare(next);
     REQUIRE(waitFor([&] { return outcome.done(); }));
     return outcome;
