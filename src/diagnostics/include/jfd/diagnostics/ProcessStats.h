@@ -18,6 +18,17 @@ struct ProcessSample
   std::uint64_t privateBytes = 0;
 };
 
+// What privateBytes measures here, for the report: they differ between
+// Windows (commit charge, paged out or not) and Linux (resident only).
+constexpr const char* privateBytesKind()
+{
+#ifdef _WIN32
+  return "committed";
+#else
+  return "resident";
+#endif
+}
+
 // Samples the current process. Empty if the platform query fails.
 std::optional<ProcessSample> sampleCurrentProcess();
 

@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QList>
 #include <QLoggingCategory>
 
 #include <cstdio>
@@ -16,6 +17,12 @@ namespace jfd::desktop {
     std::mutex logMutex;
     QFile* logFile = nullptr;
     QtMessageHandler previousHandler = nullptr;
+    bool installed = false;
+    // Lines logged before the log file starts (bufferEarlyLog()), written
+    // to it first.
+    bool buffering = false;
+    QList<QByteArray> earlyLines;
+    constexpr qsizetype MaxEarlyLines = 500;
 
     const char* levelName(QtMsgType type) {
       switch (type) {
@@ -48,6 +55,8 @@ namespace jfd::desktop {
         if (logFile != nullptr) {
           logFile->write(line);
           logFile->flush();
+        } else if (buffering && type != QtDebugMsg && earlyLines.size() < MaxEarlyLines) {
+          earlyLines.append(line);
         }
       }
       if (previousHandler != nullptr) {
@@ -55,6 +64,17 @@ namespace jfd::desktop {
       }
     }
   } // namespace
+
+  void bufferEarlyLog() {
+    {
+      std::lock_guard lock(logMutex);
+      buffering = true;
+    }
+    if (!installed) {
+      previousHandler = qInstallMessageHandler(writeLine);
+      installed = true;
+    }
+  }
 
   void startLogFile(const QString& directory) {
     QDir().mkpath(directory);
@@ -70,14 +90,26 @@ namespace jfd::desktop {
     }
     {
       std::lock_guard lock(logMutex);
+      for (const QByteArray& line : earlyLines) file->write(line);
+      file->flush();
+      earlyLines.clear();
+      buffering = false;
       logFile = file;
     }
-    previousHandler = qInstallMessageHandler(writeLine);
+    if (!installed) {
+      previousHandler = qInstallMessageHandler(writeLine);
+      installed = true;
+    }
   }
 
   void stopLogFile() {
-    qInstallMessageHandler(previousHandler);
+    if (installed) {
+      qInstallMessageHandler(previousHandler);
+      installed = false;
+    }
     std::lock_guard lock(logMutex);
+    buffering = false;
+    earlyLines.clear();
     delete logFile;
     logFile = nullptr;
   }

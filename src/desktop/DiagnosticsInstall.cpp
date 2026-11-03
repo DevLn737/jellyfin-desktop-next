@@ -66,9 +66,10 @@ namespace jfd::desktop {
                                const std::optional<diagnostics::ProcessSample>& to) {
       QString line = at.toString(QStringLiteral("HH:mm:ss"));
       if (to) {
-        line += QStringLiteral("  memory %1 MB (private %2 MB)")
+        line += QStringLiteral("  memory %1 MB (private %2 MB %3)")
                     .arg(double(to->residentBytes) / 1048576.0, 0, 'f', 0)
-                    .arg(double(to->privateBytes) / 1048576.0, 0, 'f', 0);
+                    .arg(double(to->privateBytes) / 1048576.0, 0, 'f', 0)
+                    .arg(QLatin1String(diagnostics::privateBytesKind()));
         if (from) {
           line += QStringLiteral(", cpu %1% of one core").arg(diagnostics::cpuPercent(*from, *to), 0, 'f', 1);
         }

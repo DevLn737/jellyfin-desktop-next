@@ -119,6 +119,9 @@ int main(int argc, char* argv[]) {
   }
 
   desktop::AppServices services;
+  // The 2.x import below logs what it took over; that belongs in the log
+  // file and the diagnostic report, which start later.
+  desktop::bufferEarlyLog();
   desktop::LegacyImport legacy = desktop::findLegacyImport(options.smoke);
   if (settingsFile.isEmpty()) {
     settingsFile = settings::Settings::defaultFilePath();
