@@ -29,10 +29,6 @@ namespace jfd::ui {
       if (name == QLatin1String("played")) return api::MusicSort::LastPlayed;
       return api::MusicSort::Name;
     }
-
-    QString text(const char* source, int count) {
-      return QCoreApplication::translate("MusicList", source, nullptr, count);
-    }
   } // namespace
 
   MusicListModel::MusicListModel(api::JellyfinClient& client, music::MusicPlayer& player, Options options,
@@ -92,10 +88,13 @@ namespace jfd::ui {
       }
       return line;
     }
+    // Spelled out, so lupdate sees the plural forms.
     if (item.type == QLatin1String("MusicArtist"))
-      return item.albumCount ? text("%n album(s)", *item.albumCount) : QString();
+      return item.albumCount ? QCoreApplication::translate("MusicList", "%n album(s)", nullptr, *item.albumCount)
+                             : QString();
     if (item.type == QLatin1String("Playlist"))
-      return item.childCount ? text("%n track(s)", *item.childCount) : QString();
+      return item.childCount ? QCoreApplication::translate("MusicList", "%n track(s)", nullptr, *item.childCount)
+                             : QString();
     if (item.type == QLatin1String("Audio"))
       return item.artists.isEmpty() ? item.albumArtist : item.artists.join(QStringLiteral(", "));
     return {};

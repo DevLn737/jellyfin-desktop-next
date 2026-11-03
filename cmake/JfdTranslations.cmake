@@ -27,7 +27,12 @@ endif()
 
 set_property(GLOBAL PROPERTY JFD_TRANSLATION_ENTRIES "")
 
+# English plurals: the source text "%n item(s)" is not English for people.
+# A module with qsTr("...%n...", "", n) strings passes PLURALS and keeps
+# i18n/<name>_en.ts with only those strings (lupdate -pluralonly), giving
+# "1 item" and "5 items"; the application loads *_en.qm for English.
 function(jfd_add_translations target)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "PLURALS" "" "")
   if(NOT TARGET Qt6::lrelease)
     message(STATUS "Qt Linguist tools not found: ${target} is built without translations")
     return()
@@ -35,7 +40,11 @@ function(jfd_add_translations target)
   file(RELATIVE_PATH rel "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
   string(REPLACE "/" "_" name "${rel}")
   set(ts_files "")
-  foreach(language IN LISTS JFD_LANGUAGES)
+  set(languages ${JFD_LANGUAGES})
+  if(arg_PLURALS)
+    list(APPEND languages en)
+  endif()
+  foreach(language IN LISTS languages)
     set(ts "${CMAKE_CURRENT_SOURCE_DIR}/i18n/${name}_${language}.ts")
     if(NOT EXISTS "${ts}")
       # A new module starts with an empty file; update_translations fills it.
@@ -43,7 +52,11 @@ function(jfd_add_translations target)
       message(STATUS "Created ${ts}")
     endif()
     list(APPEND ts_files "${ts}")
-    set_property(GLOBAL APPEND PROPERTY JFD_TRANSLATION_ENTRIES "${CMAKE_CURRENT_SOURCE_DIR}|${ts}")
+    set(entry "${CMAKE_CURRENT_SOURCE_DIR}|${ts}")
+    if(language STREQUAL "en")
+      string(APPEND entry "|pluralonly")
+    endif()
+    set_property(GLOBAL APPEND PROPERTY JFD_TRANSLATION_ENTRIES "${entry}")
   endforeach()
 
   # lrelease is called directly: qt_add_lrelease changed its signature in Qt

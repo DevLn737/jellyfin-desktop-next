@@ -46,7 +46,29 @@ target_link_libraries(jellyfin-desktop PRIVATE
   jfd_ui_player jfd_ui_playerplugin
   jfd_ui_music jfd_ui_musicplugin
   jfd_ui_requests jfd_ui_requestsplugin)
-jfd_add_translations(jellyfin-desktop)
+jfd_add_translations(jellyfin-desktop PLURALS)
+
+# Qt's own strings (network errors, standard buttons) in the interface
+# language: Qt's .qm files are embedded next to ours as :/i18n/qtbase_ru.qm
+# and so on, and load with them. A Qt without its translations builds
+# without (the strings stay English).
+if(TARGET Qt6::lrelease AND DEFINED QT6_INSTALL_PREFIX AND DEFINED QT6_INSTALL_TRANSLATIONS)
+  set(jfd_qt_qm_dir "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}")
+  set(jfd_qt_qm_files "")
+  foreach(language IN LISTS JFD_LANGUAGES)
+    foreach(module IN ITEMS qtbase qtdeclarative)
+      if(EXISTS "${jfd_qt_qm_dir}/${module}_${language}.qm")
+        list(APPEND jfd_qt_qm_files "${jfd_qt_qm_dir}/${module}_${language}.qm")
+      endif()
+    endforeach()
+  endforeach()
+  if(jfd_qt_qm_files)
+    qt_add_resources(jellyfin-desktop jellyfin-desktop_qt_i18n PREFIX "/i18n" BASE "${jfd_qt_qm_dir}"
+      FILES ${jfd_qt_qm_files})
+  else()
+    message(STATUS "Qt's translations not found in ${jfd_qt_qm_dir}: Qt's own strings stay English")
+  endif()
+endif()
 
 if(JFD_BUILD_TESTS)
   # Opens the window, checks the login page, visits every route and back,

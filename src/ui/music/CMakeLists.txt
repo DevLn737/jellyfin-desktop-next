@@ -47,4 +47,4 @@ target_link_libraries(jfd_ui_music
   PRIVATE jfd_ui_theme jfd_ui_controls)
 target_compile_definitions(jfd_ui_music PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 target_compile_options(jfd_ui_music PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
-jfd_add_translations(jfd_ui_music)
+jfd_add_translations(jfd_ui_music PLURALS)
