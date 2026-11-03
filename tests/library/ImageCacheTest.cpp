@@ -138,19 +138,19 @@ TEST_CASE("The disk cache survives a restart and stays under its limit") {
   const int fileSize = static_cast<int>(png(800, 1200).size());
   ImageCache::Limits limits;
   limits.diskBytes = fileSize * 3 + 10;
-  // Downloads run newest first; the file written last is the one trimming
-  // keeps for sure.
-  int last = -1;
+  // One download at a time, so the file written last is known: it is the
+  // one trimming keeps for sure. (Decoding runs on a worker pool, so with
+  // parallel downloads the order of the answers says nothing about the
+  // order of the writes.)
+  const int last = 5;
   {
     ImageCache cache(f.client, dir.path(), limits);
-    int done = 0;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i <= last; ++i) {
+      bool done = false;
       cache.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(i)), QSize(20, 30),
-                    nullptr, [&done, &last, i](const QImage&) {
-                      ++done;
-                      last = i;
-                    });
-    REQUIRE(waitFor([&] { return done == 6; }, 10000));
+                    nullptr, [&done](const QImage&) { done = true; });
+      REQUIRE(waitFor([&] { return done; }, 10000));
+    }
     CHECK(cache.diskBytes() <= limits.diskBytes);
   }
   const auto requests = f.server.requests().size();
