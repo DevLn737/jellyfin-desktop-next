@@ -28,8 +28,10 @@ class MpvPlayer;
 //   in mpv's on_preloaded hook and reported as SourceOpened with
 //   demuxer-start-time. start() sets the file's start position and releases
 //   the hook, so the first frame mpv decodes is the requested one.
-// - Files are matched to epochs in loadfile order through MPV_EVENT_START_FILE
-//   and the playlist entry id that later events carry.
+// - Files are matched to epochs by playlist entry id: the loadfile reply
+//   names the entry, MPV_EVENT_START_FILE and later events carry it. A load
+//   replaced before mpv started it gets no START_FILE and is dropped then.
+//   (A libmpv whose reply has no entry id falls back to loadfile order.)
 // - preload() appends the next file to mpv's playlist (prefetched ahead of
 //   time) and tells the session about the switch with Advanced when the
 //   current file ends by itself; the file is not held at the start.
@@ -74,6 +76,9 @@ private:
   void flush();
   core::backend::Sample sample() const;
   bool isCurrent(core::MediaEpoch epoch) const;
+  static std::optional<std::int64_t> loadedEntryId(const mpv_event& event);
+  // The epoch of the file that starts as this playlist entry, if ours.
+  std::optional<core::MediaEpoch> startingEpoch(std::int64_t playlistEntryId);
   void releaseHook();
   // Forgets the queued file: it leaves mpv's playlist and the pending starts.
   void dropPreload();
@@ -87,6 +92,11 @@ private:
 
   // Loads sent to mpv whose START_FILE has not arrived yet, in order.
   std::deque<core::MediaEpoch> m_starting;
+  // Playlist entries of loads mpv has accepted, from the loadfile replies.
+  std::map<std::int64_t, core::MediaEpoch> m_loaded;
+  // Whether this libmpv names the entry in its loadfile reply.
+  bool m_entryIdsKnown = false;
+  // Playlist entries of started files.
   std::map<std::int64_t, core::MediaEpoch> m_entries;
   // The file mpv is playing or holding, if any.
   std::optional<core::MediaEpoch> m_current;

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -59,7 +60,7 @@ MpvMediaBackend::MpvMediaBackend(MpvPlayer& player, const core::Clock& clock, Po
 {
   if (!m_mpv)
     return;
-  mpv_hook_add(m_mpv, PreloadedHook, "on_preloaded", 0);
+  m_player.addHook("on_preloaded", PreloadedHook);
   mpv_observe_property(m_mpv, TimePos, "time-pos", MPV_FORMAT_NONE);
   mpv_observe_property(m_mpv, Pause, "pause", MPV_FORMAT_NONE);
   mpv_observe_property(m_mpv, Seeking, "seeking", MPV_FORMAT_NONE);
@@ -124,7 +125,7 @@ void MpvMediaBackend::load(core::MediaEpoch epoch, const core::BackendLoad& requ
   int pause = request.startPaused ? 1 : 0;
   mpv_set_property(m_mpv, "pause", MPV_FORMAT_FLAG, &pause);
   m_starting.push_back(epoch);
-  command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "replace"});
+  command({Reply::Load, epoch, {}, {}, request.url}, {"loadfile", request.url.c_str(), "replace"});
 }
 
 void MpvMediaBackend::preload(core::MediaEpoch epoch, const core::BackendLoad& request)
@@ -142,9 +143,9 @@ void MpvMediaBackend::preload(core::MediaEpoch epoch, const core::BackendLoad& r
   // mpv 0.38 (client API 2.3) added the index between the flags and the
   // options; older ones take the options right after the flags.
   if (mpv_client_api_version() >= MPV_MAKE_VERSION(2, 3))
-    command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "append", "-1", options});
+    command({Reply::Load, epoch, {}, {}, request.url}, {"loadfile", request.url.c_str(), "append", "-1", options});
   else
-    command({Reply::Load, epoch, {}, {}, {}}, {"loadfile", request.url.c_str(), "append", options});
+    command({Reply::Load, epoch, {}, {}, request.url}, {"loadfile", request.url.c_str(), "append", options});
 }
 
 void MpvMediaBackend::dropPreload()
@@ -155,8 +156,11 @@ void MpvMediaBackend::dropPreload()
     return;
   std::erase(m_starting, *m_preload);
   m_preload.reset();
-  // Everything but the current file.
-  mpv_command_string(m_mpv, "playlist-clear");
+  // Everything but the current file. Queued behind the loadfile that
+  // appended the dropped file: a synchronous command runs at once and could
+  // clear the playlist before that file is in it.
+  const char* clear[] {"playlist-clear", nullptr};
+  mpv_command_async(m_mpv, 0, clear);
 }
 
 void MpvMediaBackend::start(core::MediaEpoch epoch, std::optional<core::BackendSeconds> position)
@@ -288,6 +292,13 @@ void MpvMediaBackend::handleReply(std::uint64_t token, const mpv_event& event)
       std::erase(m_starting, pending.epoch);
       m_post(core::backend::Ended {pending.epoch, core::backend::EndReason::Error, error});
     }
+    else if (const auto entry = loadedEntryId(event))
+    {
+      // The reply comes before the file's START_FILE, which names the same
+      // playlist entry: that, not the order of loads, says which file starts.
+      m_entryIdsKnown = true;
+      m_loaded[*entry] = pending.epoch;
+    }
     break;
   case Reply::Seek:
     if (failed)
@@ -329,8 +340,20 @@ void MpvMediaBackend::handle(const mpv_event& event)
       m_current.reset();
       break;
     }
-    m_current = m_starting.front();
-    m_starting.pop_front();
+    const auto starting = startingEpoch(start->playlist_entry_id);
+    if (!starting)
+    {
+      // Not one of ours (another client loaded it).
+      m_current.reset();
+      break;
+    }
+    m_current = *starting;
+    // Loads before this one were replaced before they started: they never
+    // get a START_FILE of their own.
+    const auto at = std::find(m_starting.begin(), m_starting.end(), *m_current);
+    if (at != m_starting.end())
+      m_starting.erase(m_starting.begin(), at + 1);
+    std::erase_if(m_loaded, [this](const auto& entry) { return entry.second < *m_current; });
     m_entries[start->playlist_entry_id] = *m_current;
     if (m_preload && *m_preload == *m_current)
     {
@@ -500,6 +523,34 @@ void MpvMediaBackend::handle(const mpv_event& event)
   default:
     break;
   }
+}
+
+std::optional<std::int64_t> MpvMediaBackend::loadedEntryId(const mpv_event& event)
+{
+  if (!event.data)
+    return std::nullopt;
+  const mpv_node& result = static_cast<const mpv_event_command*>(event.data)->result;
+  if (result.format != MPV_FORMAT_NODE_MAP)
+    return std::nullopt;
+  for (int i = 0; i < result.u.list->num; ++i)
+    if (std::string_view(result.u.list->keys[i]) == "playlist_entry_id"
+        && result.u.list->values[i].format == MPV_FORMAT_INT64)
+      return result.u.list->values[i].u.int64;
+  return std::nullopt;
+}
+
+std::optional<core::MediaEpoch> MpvMediaBackend::startingEpoch(std::int64_t playlistEntryId)
+{
+  if (const auto loaded = m_loaded.find(playlistEntryId); loaded != m_loaded.end())
+  {
+    const core::MediaEpoch epoch = loaded->second;
+    m_loaded.erase(loaded);
+    return epoch;
+  }
+  // A libmpv whose loadfile reply has no entry id: the loads in order.
+  if (!m_entryIdsKnown && !m_starting.empty())
+    return m_starting.front();
+  return std::nullopt;
 }
 
 void MpvMediaBackend::flush()

@@ -10,6 +10,7 @@
 #include <QString>
 #include <QVariant>
 
+#include <cstdint>
 #include <functional>
 
 namespace jfd::media {
@@ -81,6 +82,12 @@ public:
   // registered with a nonzero reply_userdata.
   using EventListener = std::function<void(const mpv_event&)>;
   void setEventListener(EventListener listener) { m_listener = std::move(listener); }
+  // Registers an mpv hook for the listener, once per core: libmpv cannot
+  // remove a hook, so a second adapter on this player reuses the first
+  // registration instead of holding every file twice. The listener must
+  // continue each hook event; without a listener the player continues it,
+  // so a file is never held by a hook nobody handles.
+  void addHook(const char* name, std::uint64_t userdata, int priority = 0);
 
 Q_SIGNALS:
   void pausedChanged();
@@ -105,6 +112,7 @@ private:
 
   MpvHandle m_mpv;
   EventListener m_listener;
+  QList<QPair<QByteArray, std::uint64_t>> m_hooks;
   bool m_paused = false;
   double m_position = 0;
   double m_duration = 0;
