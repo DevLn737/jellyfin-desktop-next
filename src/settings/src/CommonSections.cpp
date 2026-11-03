@@ -22,12 +22,16 @@ namespace jfd::settings {
       signOut.key = key(keys::SignOut);
       signOut.type = SettingType::Action;
       signOut.label = QT_TRANSLATE_NOOP("CommonSettings", "Sign out");
+      signOut.confirmation = QT_TRANSLATE_NOOP(
+          "CommonSettings", "Sign out of this server? Playback stops and the password is asked for again.");
       section.settings.append(signOut);
 
       SettingDescriptor changeServer;
       changeServer.key = key(keys::ChangeServer);
       changeServer.type = SettingType::Action;
       changeServer.label = QT_TRANSLATE_NOOP("CommonSettings", "Change server");
+      changeServer.confirmation = QT_TRANSLATE_NOOP(
+          "CommonSettings", "Sign out and choose another server? Playback stops.");
       section.settings.append(changeServer);
       return section;
     }

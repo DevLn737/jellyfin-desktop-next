@@ -34,6 +34,8 @@ namespace jfd::ui {
       UnitRole,
       RequiresRestartRole,
       IsDefaultRole,
+      // Actions: the question asked before triggering; empty for none.
+      ConfirmationRole,
     };
 
     explicit SettingsModel(settings::Settings& settings, QObject* parent = nullptr);

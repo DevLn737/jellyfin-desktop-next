@@ -73,6 +73,10 @@ namespace jfd::settings {
     bool hidden = false;
     // The change applies after a restart; the screen says so.
     bool requiresRestart = false;
+    // Action only: the question the screen asks before triggering it (for
+    // example before signing out); translated in the section's context
+    // like the label. None: the action runs at once.
+    const char* confirmation = nullptr;
   };
 
   // Rewrites a section's stored values from one schema version to the next.

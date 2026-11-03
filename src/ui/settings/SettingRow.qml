@@ -19,6 +19,8 @@ FocusScope {
     required property real step
     required property string unit
     required property bool requiresRestart
+    // Actions: asked before triggering (sign out); empty runs at once.
+    required property string confirmation
 
     readonly property bool ranged: maximum > minimum
 
@@ -122,7 +124,20 @@ FocusScope {
             objectName: "editor"
             focus: true
             text: row.label
-            onClicked: AppSettings.trigger(row.key)
+            onClicked: {
+                if (row.confirmation.length > 0) confirm.open()
+                else AppSettings.trigger(row.key)
+            }
+
+            AppDialog {
+                id: confirm
+                objectName: "confirmAction"
+                title: row.label
+                text: row.confirmation
+                acceptText: row.label
+                destructive: true
+                onAccepted: AppSettings.trigger(row.key)
+            }
         }
     }
 
