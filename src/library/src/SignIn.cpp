@@ -165,8 +165,11 @@ namespace jfd::library {
     }
     const quint64 attempt = ++m_attempt;
     setError({});
+    // The form comes back with this name if the password is wrong
+    // (userName is notified with the step).
+    m_userName = userName.trimmed();
     setStep(Step::SigningIn);
-    m_client.signIn(userName.trimmed(), password, this,
+    m_client.signIn(m_userName, password, this,
                     [this, attempt](api::Result<api::AuthenticationResult> result) {
                       if (attempt != m_attempt) return;
                       if (!result) {

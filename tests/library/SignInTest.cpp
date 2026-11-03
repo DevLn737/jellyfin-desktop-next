@@ -83,6 +83,13 @@ TEST_CASE("Password sign-in checks the server, then stores the token and the ser
            !s.signIn.errorText().isEmpty();
   }));
   CHECK(s.signIn.errorText() == QStringLiteral("Wrong user name or password."));
+  // The form comes back with the name that was typed.
+  CHECK(s.signIn.userName() == QStringLiteral("alice"));
+
+  // An empty name says so and stays on the form.
+  s.signIn.signIn(QStringLiteral("  "), QStringLiteral("secret"));
+  CHECK(s.signIn.step() == SignIn::Step::Credentials);
+  CHECK(s.signIn.errorText() == QStringLiteral("Enter a user name."));
 
   s.signIn.signIn(QStringLiteral(" alice "), QStringLiteral("secret"));
   REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::SignedIn; }));

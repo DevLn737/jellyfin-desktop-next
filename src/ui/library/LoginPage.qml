@@ -34,7 +34,10 @@ RoutePage {
             objectName: "loginColumn"
             width: Math.min(parent.width - 2 * Theme.spacingHuge, 420)
             x: (parent.width - width) / 2
-            y: Math.max(Theme.spacingHuge, (page.height - implicitHeight) / 3)
+            // The error line does not count: the form stays where it was
+            // when a message appears above it.
+            y: Math.max(Theme.spacingHuge, (page.height - implicitHeight
+                                            + (loginError.visible ? loginError.height + spacing : 0)) / 3)
             spacing: Theme.spacingLarge
 
             Text {
@@ -52,6 +55,7 @@ RoutePage {
             }
 
             Text {
+                id: loginError
                 objectName: "loginError"
                 width: parent.width
                 visible: text.length > 0
@@ -177,9 +181,9 @@ RoutePage {
             id: form
             implicitHeight: credentialColumn.implicitHeight
 
+            // Always sent: an empty name gets "Enter a user name." back.
             function submit() {
-                if (user.text.length > 0)
-                    page.signIn.signIn(user.text, password.text)
+                page.signIn.signIn(user.text, password.text)
             }
 
             // Focus goes to the password only when the name is already known
@@ -222,7 +226,6 @@ RoutePage {
                         objectName: "signInButton"
                         primary: true
                         text: qsTr("Sign in")
-                        enabled: user.text.length > 0
                         onClicked: form.submit()
                     }
                     ActionButton {
