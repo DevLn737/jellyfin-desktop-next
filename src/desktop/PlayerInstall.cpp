@@ -1,6 +1,7 @@
 #include "AppServices.h"
 #include <jfd/session/GroupModel.h>
 
+#include <jfd/library/SignIn.h>
 #include <jfd/playback/PlayerOptions.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/HdrOutput.h>
@@ -542,6 +543,11 @@ namespace jfd::desktop {
                      });
     QObject::connect(&model, &ui::PlayerModel::autoSkipChanged, &settings,
                      [&model, &settings] { settings.setValue(AutoSkipKey, model.autoSkip()); });
+
+    // A video playing on (the picture-in-picture window outlives the page)
+    // would go on as the next user.
+    if (services.signIn != nullptr)
+      QObject::connect(services.signIn, &library::SignIn::signedOut, &model, [&model] { model.stop(); });
 
     ui::Navigator& navigator = *services.navigator;
     navigator.registerPage(QStringLiteral("player"), QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Player/PlayerPage.qml")));
