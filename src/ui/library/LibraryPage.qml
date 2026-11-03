@@ -20,6 +20,12 @@ RoutePage {
 
     Component.onCompleted: library = Library.createLibrary(routeArgument, page)
 
+    // Back from a lost connection: what failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() { if (page.library && page.library.errorText.length > 0) page.library.reload() }
+    }
+
     title: Library.libraryName(routeArgument) || (library ? library.name : "") || qsTr("Library")
 
     ColumnLayout {
@@ -39,6 +45,9 @@ RoutePage {
             }
             Text {
                 objectName: "libraryCount"
+                // Not "0 items" beside an error, nor while the first page loads.
+                visible: page.library !== null && page.library.errorText.length === 0
+                         && !(page.library.loading && page.library.count === 0)
                 text: page.library ? qsTr("%n item(s)", "", page.library.count) : ""
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSmall
@@ -165,7 +174,7 @@ RoutePage {
             Layout.fillWidth: true
             Layout.preferredHeight: visible ? 200 : 0
             visible: page.library && page.library.errorText.length > 0
-            kind: "error"
+            kind: Library.online ? "error" : "offline"
             description: page.library ? page.library.errorText : ""
             onRetry: if (page.library) page.library.reload()
         }

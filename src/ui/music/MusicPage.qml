@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
+import Jfd.Ui.Library
 
 // The music library: recently played, albums, artists, playlists, genres
 // and songs. Every tab is one list that loads its pages as they come into
@@ -38,6 +39,12 @@ RoutePage {
 
     PlayGuard { id: guard }
 
+    // Back from a lost connection: a list that failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() { if (page.list.errorText.length > 0) page.list.reload() }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.leftMargin: Theme.spacingHuge
@@ -54,6 +61,7 @@ RoutePage {
             }
             Text {
                 objectName: "musicCount"
+                visible: page.list.errorText.length === 0 && !(page.list.loading && page.list.count === 0)
                 text: qsTr("%n item(s)", "", page.list.count)
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSmall
@@ -115,14 +123,14 @@ RoutePage {
             GroupHint { Layout.fillWidth: true }
         }
 
-        Text {
+        StateMessage {
             objectName: "musicError"
             Layout.fillWidth: true
-            visible: text.length > 0
-            text: page.list.errorText
-            color: Theme.error
-            font.pixelSize: Theme.fontSizeBody
-            wrapMode: Text.Wrap
+            Layout.preferredHeight: visible ? implicitHeight : 0
+            visible: page.list.errorText.length > 0
+            kind: Library.online ? "error" : "offline"
+            description: page.list.errorText
+            onRetry: page.list.reload()
         }
 
         Item {

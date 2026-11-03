@@ -84,6 +84,10 @@
 <context>
     <name>MusicList</name>
     <message>
+        <source>This list cannot be shown.</source>
+        <translation>Этот список не может быть показан.</translation>
+    </message>
+    <message>
         <source>%1 min</source>
         <translation>%1 мин</translation>
     </message>

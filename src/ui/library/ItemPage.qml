@@ -20,6 +20,14 @@ RoutePage {
 
     Component.onCompleted: details = Library.createDetails(routeArgument, page)
 
+    // Back from a lost connection: a page that failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() {
+            if (page.details && !page.details.loaded && page.details.errorText.length > 0) page.details.reload()
+        }
+    }
+
     function clock(ticks) {
         const total = Math.floor(ticks / 10000000)
         const h = Math.floor(total / 3600)
@@ -39,7 +47,7 @@ RoutePage {
         anchors.centerIn: parent
         width: Math.min(parent.width - 2 * Theme.pageMargin, 600)
         visible: page.details && !page.details.loaded && page.details.errorText.length > 0
-        kind: "error"
+        kind: Library.online ? "error" : "offline"
         description: page.details ? page.details.errorText : ""
         onRetry: if (page.details) page.details.reload()
     }

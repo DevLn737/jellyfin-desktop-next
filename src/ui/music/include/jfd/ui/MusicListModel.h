@@ -169,6 +169,9 @@ namespace jfd::ui {
     };
     QHash<int, QList<Entry>> m_pages;
     QSet<int> m_inFlight;
+    // Pages whose request failed: asked again only on reload() (Try again,
+    // the connection coming back), not each time a row comes into view.
+    QSet<int> m_failed;
     QString m_errorText;
   };
 

@@ -6,13 +6,17 @@
 #include <jfd/music/MusicPlayer.h>
 
 #include <QCoreApplication>
+#include <QLoggingCategory>
 #include <QTimer>
+#include <QUrl>
 
 #include <algorithm>
 
 namespace jfd::ui {
 
   namespace {
+    Q_LOGGING_CATEGORY(lcMusicList, "jfd.ui.music")
+
     // Lists the server answers in one piece get one page this big.
     constexpr int WholePage = 10'000;
     constexpr int RecentlyPlayedCount = 50;
@@ -105,7 +109,7 @@ namespace jfd::ui {
     const int at = row % pageSize();
     if (page == m_pages.constEnd() || at >= page->size()) {
       // Load it from the event loop: models must not change inside data().
-      if (!m_inFlight.contains(pageIndex)) {
+      if (!m_inFlight.contains(pageIndex) && !m_failed.contains(pageIndex)) {
         auto* self = const_cast<MusicListModel*>(this);
         QTimer::singleShot(0, self, [self, row]() { self->ensureLoaded(row); });
       }
@@ -205,6 +209,7 @@ namespace jfd::ui {
   void MusicListModel::reload() {
     ++m_generation;
     m_inFlight.clear();
+    m_failed.clear();
     beginResetModel();
     m_pages.clear();
     m_total = 0;
@@ -221,7 +226,7 @@ namespace jfd::ui {
   void MusicListModel::ensureLoaded(int row) {
     if (row < 0 || row >= m_total) return;
     const int page = row / pageSize();
-    if (!m_pages.contains(page) && !m_inFlight.contains(page)) loadPage(page);
+    if (!m_pages.contains(page) && !m_inFlight.contains(page) && !m_failed.contains(page)) loadPage(page);
   }
 
   void MusicListModel::loadPage(int page) {
@@ -233,6 +238,7 @@ namespace jfd::ui {
       if (generation != m_generation) return;
       m_inFlight.remove(page);
       if (!result) {
+        m_failed.insert(page);
         setError(library::errorText(result.error()));
         Q_EMIT loadingChanged();
         return;
@@ -262,7 +268,10 @@ namespace jfd::ui {
     else if (m_kind == QLatin1String("recentlyPlayed")) m_api.recentlyPlayed(m_parentId, RecentlyPlayedCount, this, done);
     else {
       m_inFlight.remove(page);
-      setError(QStringLiteral("Unknown music list: ") + m_kind);
+      m_failed.insert(page);
+      // A page's mistake, not the user's: the log names it.
+      qCWarning(lcMusicList) << "unknown music list" << m_kind;
+      setError(QCoreApplication::translate("MusicList", "This list cannot be shown."));
       Q_EMIT loadingChanged();
     }
   }
@@ -295,7 +304,11 @@ namespace jfd::ui {
     if (it->type == QLatin1String("MusicAlbum")) return QStringLiteral("album/") + it->id;
     if (it->type == QLatin1String("MusicArtist")) return QStringLiteral("artist/") + it->id;
     if (it->type == QLatin1String("Playlist")) return QStringLiteral("playlist/") + it->id;
-    if (it->type == QLatin1String("MusicGenre")) return QStringLiteral("genre/") + it->name;
+    if (it->type == QLatin1String("MusicGenre")) {
+      // A route argument has no slash ("Hip-Hop/Rap"): GenrePage decodes it.
+      if (it->name.isEmpty()) return {};
+      return QStringLiteral("genre/") + QString::fromLatin1(QUrl::toPercentEncoding(it->name));
+    }
     return {};
   }
 

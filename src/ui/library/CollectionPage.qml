@@ -23,6 +23,15 @@ RoutePage {
 
     title: details && details.loaded ? details.name : qsTr("Collection")
 
+    // Back from a lost connection: what failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() {
+            if (page.items && page.items.errorText.length > 0) page.items.reload()
+            if (page.details && page.details.errorText.length > 0) page.details.reload()
+        }
+    }
+
     Image {
         anchors.top: parent.top
         anchors.left: parent.left
@@ -62,6 +71,8 @@ RoutePage {
             }
             Text {
                 objectName: "collectionCount"
+                visible: page.items !== null && page.items.errorText.length === 0
+                         && !(page.items.loading && page.items.count === 0)
                 text: page.items ? qsTr("%n item(s)", "", page.items.count) : ""
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSmall

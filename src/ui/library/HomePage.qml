@@ -20,6 +20,12 @@ RoutePage {
     Component.onCompleted: if (home) home.reload()
     Basic.StackView.onActivated: if (home && home.count > 0) home.reload()
 
+    // Back from a lost connection: what failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() { if (page.home && page.home.errorText.length > 0) page.home.reload() }
+    }
+
     ListView {
         SmoothWheel {}
         id: rows
@@ -51,7 +57,7 @@ RoutePage {
                 width: parent.width
                 height: visible ? 200 : 0
                 visible: page.home && page.home.errorText.length > 0
-                kind: "error"
+                kind: Library.online ? "error" : "offline"
                 description: page.home ? page.home.errorText : ""
                 onRetry: if (page.home) page.home.reload()
             }

@@ -42,6 +42,10 @@ namespace jfd::ui {
     Q_PROPERTY(jfd::library::SearchModel* search READ search NOTIFY attached)
     Q_PROPERTY(bool canPlay READ canPlay NOTIFY handlersChanged)
     Q_PROPERTY(bool canWatchTogether READ canWatchTogether NOTIFY handlersChanged)
+    // The server's live connection (the session socket) is up. A screen
+    // whose request failed while it is down says "No connection", and
+    // reloads on reconnected().
+    Q_PROPERTY(bool online READ online NOTIFY onlineChanged)
 
   public:
     struct Services {
@@ -72,6 +76,10 @@ namespace jfd::ui {
     library::SearchModel* search() const { return m_services.search; }
     bool canPlay() const { return bool(m_play); }
     bool canWatchTogether() const { return bool(m_watchTogether); }
+    bool online() const { return m_online; }
+    // Called by LibraryScreens as the session socket comes and goes; a
+    // change from offline to online emits reconnected().
+    void setOnline(bool online);
 
     // A grid for one library, owned by `owner` (the page), with the sort
     // and filters it had last time; changes to them are kept. Null before
@@ -104,6 +112,10 @@ namespace jfd::ui {
     void handlersChanged();
     // For the shell's toast.
     void message(const QString& text, bool error);
+    void onlineChanged();
+    // The connection came back after it was lost: screens showing an
+    // error load again.
+    void reconnected();
 
   private:
     QString collectionTypeOf(const QString& libraryId) const;
@@ -115,6 +127,7 @@ namespace jfd::ui {
     Services m_services;
     PlayHandler m_play;
     WatchTogetherHandler m_watchTogether;
+    bool m_online = true;
   };
 
 } // namespace jfd::ui

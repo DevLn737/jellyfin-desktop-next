@@ -96,7 +96,11 @@ Item {
         width: 110
         from: 0
         to: 100
-        value: MusicSession.volume
+        // The player's volume, except under the user's hand.
+        Binding on value {
+            when: !volume.pressed
+            value: MusicSession.volume
+        }
         onMoved: MusicSession.volume = Math.round(value)
         Accessible.name: qsTr("Volume")
     }
