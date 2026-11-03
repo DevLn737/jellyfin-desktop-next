@@ -69,6 +69,13 @@ namespace jfd::testing {
     std::map<std::uint64_t, std::pair<TimerId, LocalInstant>> m_armed;
   };
 
+  // GCC 13 at -O3 reports moves of the BackendCommand variant below as
+  // "maybe uninitialized" (a known false positive in std::variant storage);
+  // every alternative is fully built by the RecordingBackend overrides.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
   namespace command {
     struct Load {
       MediaEpoch epoch;
@@ -161,6 +168,10 @@ namespace jfd::testing {
   protected:
     virtual void record(BackendCommand command) { commands.push_back(std::move(command)); }
   };
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
   class RecordingOutbox final : public SyncPlayOutbox {
   public:
