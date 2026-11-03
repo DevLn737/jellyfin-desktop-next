@@ -105,11 +105,18 @@ namespace jfd::core {
     struct QueueStepRequested {
       bool forward = true;
     };
+    // A group request failed for good (group::RequestFailed for the current
+    // membership, or a create or join).
+    struct GroupRequestFailed {
+      group::Request request = group::Request::Ready;
+      int httpStatus = 0;
+    };
   } // namespace notice
 
   using SessionNotice =
       std::variant<notice::GroupItemRequested, notice::GroupRateRejected,
-                   notice::StreamReopenNeeded, notice::ReadyTimedOut, notice::QueueStepRequested>;
+                   notice::StreamReopenNeeded, notice::ReadyTimedOut, notice::QueueStepRequested,
+                   notice::GroupRequestFailed>;
 
   class SessionObserver {
   public:

@@ -82,6 +82,9 @@ namespace jfd::core {
               return joined.epoch.isValid() && joined.epoch > m_latestGroupEpoch;
             },
             [&](const group::ClockSynced&) { return true; },
+            [&](const group::ClockLost&) { return true; },
+            // The epoch says which membership failed; on() checks it.
+            [&](const group::RequestFailed&) { return true; },
             [&](const TimerFired& fired) {
               const auto armed = m_armed.find(fired.id.serial);
               if (armed == m_armed.end() || armed->second != fired.id) return false;
@@ -425,7 +428,51 @@ namespace jfd::core {
         notice::GroupRateRejected{rejected.httpStatus, rejected.unsupportedParticipants});
   }
 
-  void PlaybackSession::on(const group::ClockSynced& synced) { m_offset = synced.offset; }
+  void PlaybackSession::on(const group::ClockSynced& synced) {
+    const bool changed = !m_clockSynced || synced.offset != m_offset;
+    m_offset = synced.offset;
+    m_clockSynced = true;
+    if (!m_group || !changed) return;
+    // What waited for server time, or was armed by the old offset.
+    if (m_group->deferredReady) {
+      const bool ready = *m_group->deferredReady;
+      m_group->deferredReady.reset();
+      reportReady(ready);
+    }
+    if (m_group->commandDeferred) {
+      m_group->commandDeferred = false;
+      scheduleCommand(true);
+    } else if (m_group->commandTimer) {
+      cancel(m_group->commandTimer);
+      scheduleCommand(false);
+    }
+  }
+
+  void PlaybackSession::on(const group::ClockLost&) {
+    m_clockSynced = false;
+    if (!m_group) return;
+    // An armed command would fire by a clock that may be wrong by however
+    // long the computer slept: wait for the new offset.
+    if (m_group->commandTimer) {
+      cancel(m_group->commandTimer);
+      m_group->commandDeferred = true;
+    }
+  }
+
+  void PlaybackSession::on(const group::RequestFailed& failed) {
+    switch (failed.request) {
+    case group::Request::Create:
+    case group::Request::Join:
+      break;
+    case group::Request::Rejoin:
+    case group::Request::Leave:
+    case group::Request::Ready:
+    case group::Request::Buffering:
+      if (!m_group || m_group->epoch != failed.epoch) return;
+      break;
+    }
+    m_ports.observer.notify(notice::GroupRequestFailed{failed.request, failed.httpStatus});
+  }
 
   void PlaybackSession::on(const group::Command& command) {
     Group& group = *m_group;
@@ -447,9 +494,21 @@ namespace jfd::core {
       return;
     }
 
+    if (!m_clockSynced && command.type != GroupCommandType::Stop) {
+      // When is server time; without an offset it cannot be placed.
+      group.commandDeferred = true;
+      return;
+    }
+    scheduleCommand(true);
+  }
+
+  void PlaybackSession::scheduleCommand(bool fresh) {
+    Group& group = *m_group;
+    if (!group.lastCommand || !mediaFollowsGroup() || !m_media->started) return;
+    const group::Command& command = *group.lastCommand;
     const LocalInstant due = m_offset.toLocal(command.when);
     if (due > now()) {
-      if (command.type == GroupCommandType::Unpause && m_media->position &&
+      if (fresh && command.type == GroupCommandType::Unpause && m_media->position &&
           (*m_media->position - command.position).abs() > m_settings.reconciler.skipMinimum)
         seekTo(command.position, ReadyPurpose::Sync);
       group.commandTimer = arm(TimerPurpose::GroupCommand, due);
@@ -602,6 +661,12 @@ namespace jfd::core {
 
   void PlaybackSession::reportReady(bool ready) {
     if (!m_group || !m_media || !m_media->position) return;
+    if (!m_clockSynced) {
+      // When is server time: report once the offset is known.
+      m_group->deferredReady = ready;
+      return;
+    }
+    m_group->deferredReady.reset();
     const LocalInstant current = now();
     const ServerInstant when = m_offset.toServer(current);
     const bool playing = !m_media->paused && !m_media->buffering;
@@ -645,6 +710,7 @@ namespace jfd::core {
 
   void PlaybackSession::clearScheduledCommand() {
     if (!m_group) return;
+    m_group->commandDeferred = false;
     cancel(m_group->commandTimer);
     cancel(m_group->cooldownTimer);
     m_group->syncEnabled = false;
@@ -693,7 +759,8 @@ namespace jfd::core {
   }
 
   void PlaybackSession::applyDuplicate(const group::Command& command) {
-    // Already scheduled: nothing to do.
+    // Already scheduled, or waiting for the clock: nothing to do.
+    if (!m_clockSynced || m_group->commandDeferred) return;
     if (m_offset.toLocal(command.when) > now()) return;
     if (!mediaFollowsGroup() || !m_media->started) return;
     const bool offTarget =
@@ -734,7 +801,7 @@ namespace jfd::core {
         group.lastCommand->playlistItem != media.request.playlistItem)
       return;
     if (media.buffering || media.paused || media.seeking || !media.position ||
-        media.purpose != ReadyPurpose::None)
+        media.purpose != ReadyPurpose::None || !m_clockSynced)
       return;
 
     const GroupTimeline timeline{group.lastCommand->position, group.lastCommand->when,

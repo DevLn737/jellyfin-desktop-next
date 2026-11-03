@@ -107,6 +107,23 @@ namespace jfd::core {
       WallTicks roundTrip{0};
     };
 
+    // The offset is unknown again (a new connection, possibly after the
+    // computer slept and the steady clock stood still): until the next
+    // ClockSynced the session neither schedules group commands nor reports
+    // Ready or Buffering, since both need server time.
+    struct ClockLost {};
+
+    enum class Request { Create, Join, Rejoin, Leave, Ready, Buffering };
+
+    // A group request the server refused or did not answer (status 0). For
+    // Create and Join the epoch is empty; for the others it is the
+    // membership the request was for.
+    struct RequestFailed {
+      GroupEpoch epoch;
+      Request request = Request::Ready;
+      int httpStatus = 0;
+    };
+
   } // namespace group
 
   namespace outgoing {

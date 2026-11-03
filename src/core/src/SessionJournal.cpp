@@ -103,6 +103,18 @@ namespace jfd::core {
       return "?";
     }
 
+    const char* name(group::Request request) {
+      switch (request) {
+      case group::Request::Create: return "create";
+      case group::Request::Join: return "join";
+      case group::Request::Rejoin: return "rejoin";
+      case group::Request::Leave: return "leave";
+      case group::Request::Ready: return "ready";
+      case group::Request::Buffering: return "buffering";
+      }
+      return "?";
+    }
+
     std::string flags(const backend::Sample& sample) {
       std::string text = seconds(sample.position);
       if (sample.paused) text += " paused";
@@ -216,6 +228,11 @@ namespace jfd::core {
                   std::chrono::duration_cast<std::chrono::milliseconds>(synced.roundTrip);
               return "ClockSynced round trip " + std::to_string(roundTrip.count()) + "ms offset " +
                      std::to_string(offset.count()) + "ms";
+            },
+            [](const group::ClockLost&) { return std::string("ClockLost"); },
+            [](const group::RequestFailed& failed) {
+              return std::string("GroupRequestFailed ") + name(failed.request) + " " +
+                     epoch("group", failed.epoch) + " HTTP " + std::to_string(failed.httpStatus);
             },
             [](const TimerFired& fired) {
               return std::string("TimerFired ") + name(fired.id.purpose) + " #" +

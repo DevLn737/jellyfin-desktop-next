@@ -20,9 +20,12 @@ namespace jfd::testing {
     EpochCounter<GroupEpochTag> groupEpochs;
     GroupEpoch group;
 
-    explicit SessionHarness(SessionSettings settings = {}) {
+    explicit SessionHarness(SessionSettings settings = {}, bool synced = true) {
       session = std::make_unique<PlaybackSession>(
           SessionPorts{backend, clock, timers, outbox, observer}, settings);
+      // The fakes share one clock with the server (a zero offset), measured
+      // before anything happens; tests of the unsynced clock pass false.
+      if (synced) post(group::ClockSynced{ClockOffset{}, WallTicks(0)});
     }
 
     static MediaTicks ms(std::int64_t value) { return *MediaTicks::fromMilliseconds(value); }
