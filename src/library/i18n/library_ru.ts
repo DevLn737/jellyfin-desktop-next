@@ -2,6 +2,45 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>ErrorText</name>
+    <message>
+        <source>The server cannot be reached. Check the network connection.</source>
+        <translation>Сервер недоступен. Проверьте подключение к сети.</translation>
+    </message>
+    <message>
+        <source>The server did not answer in time.</source>
+        <translation>Сервер не ответил вовремя.</translation>
+    </message>
+    <message>
+        <source>The server sent an answer the app does not understand.</source>
+        <translation>Сервер прислал ответ, который приложение не понимает.</translation>
+    </message>
+    <message>
+        <source>The server does not support this.</source>
+        <translation>Сервер это не поддерживает.</translation>
+    </message>
+    <message>
+        <source>The session has ended. Sign in again.</source>
+        <translation>Сеанс завершён. Войдите снова.</translation>
+    </message>
+    <message>
+        <source>The server does not allow this.</source>
+        <translation>Сервер не разрешает это действие.</translation>
+    </message>
+    <message>
+        <source>The server could not find this.</source>
+        <translation>Сервер не нашёл запрошенное.</translation>
+    </message>
+    <message>
+        <source>The server ran into a problem (%1).</source>
+        <translation>На сервере произошла ошибка (%1).</translation>
+    </message>
+    <message>
+        <source>The server refused the request (%1).</source>
+        <translation>Сервер отклонил запрос (%1).</translation>
+    </message>
+</context>
+<context>
     <name>jfd::library</name>
     <message>
         <source>Recommended for you</source>

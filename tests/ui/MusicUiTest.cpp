@@ -151,6 +151,52 @@ TEST_CASE("A library of 10,000 albums and 50,000 tracks loads its pages as they 
   REQUIRE(waitFor([&] { return songs.loadedPages() == 2; }));
 }
 
+TEST_CASE("A genre with a slash in its name has a route, and a failed page waits for a reload") {
+  Fixture f;
+  int failed = 0;
+  f.server.setHandler([&failed](const test::HttpRequest& request) {
+    if (request.path.endsWith(QLatin1String("/MusicGenres"))) {
+      return test::json(R"({"Items": [{"Id": "g1", "Name": "Hip-Hop/Rap", "Type": "MusicGenre"},
+                                      {"Id": "g2", "Name": "", "Type": "MusicGenre"}], "TotalRecordCount": 2})");
+    }
+    if (request.query.queryItemValue(QStringLiteral("startIndex")).toInt() > 0) {
+      ++failed;
+      return test::json("{}", 500);
+    }
+    return items(request);
+  });
+
+  // Route arguments cannot hold a slash: the name is percent-encoded.
+  ui::MusicListModel genres(f.client, *f.player);
+  genres.setKind(QStringLiteral("genres"));
+  REQUIRE(waitFor([&] { return genres.count() == 2; }));
+  CHECK(genres.routeFor(0) == QStringLiteral("genre/Hip-Hop%2FRap"));
+  CHECK(genres.routeFor(1).isEmpty());
+
+  ui::MusicListModel albums(f.client, *f.player);
+  albums.setKind(QStringLiteral("albums"));
+  REQUIRE(waitFor([&] { return albums.count() == Albums; }));
+  const QModelIndex last = albums.index(Albums - 1);
+  albums.data(last, ui::MusicListModel::NameRole);
+  REQUIRE(waitFor([&] { return !albums.errorText().isEmpty(); }));
+  // A translated sentence, not the transport's text.
+  CHECK(albums.errorText() == QStringLiteral("The server ran into a problem (500)."));
+  // Rows of the failed page coming into view again do not ask again.
+  for (int i = 0; i < 5; ++i) {
+    albums.data(last, ui::MusicListModel::NameRole);
+    QCoreApplication::processEvents();
+  }
+  // Long enough for a repeated request to reach the fake server.
+  CHECK_FALSE(waitFor([&] { return failed > 1; }, 300));
+  CHECK(failed == 1);
+
+  // Try again does.
+  albums.reload();
+  REQUIRE(waitFor([&] { return albums.count() == Albums && albums.errorText().isEmpty(); }));
+  albums.data(last, ui::MusicListModel::NameRole);
+  CHECK(waitFor([&] { return failed == 2; }));
+}
+
 TEST_CASE("The music page lists the library by tab and the mini-player follows the queue") {
   Fixture f;
   QQuickWindow window;

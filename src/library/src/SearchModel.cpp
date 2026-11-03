@@ -1,6 +1,7 @@
 #include <jfd/library/SearchModel.h>
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/library/ErrorText.h>
 #include <jfd/library/CardImages.h>
 #include <jfd/library/LibraryUpdates.h>
 
@@ -55,7 +56,7 @@ namespace jfd::library {
       if (!result) {
         // The text can be sent again after a failure.
         m_sent.clear();
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         return;
       }
       const QSize pixels =

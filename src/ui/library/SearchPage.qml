@@ -30,7 +30,9 @@ RoutePage {
             Layout.fillWidth: true
             Layout.maximumWidth: 640
             focus: true
-            placeholderText: qsTr("Films, series, episodes, people")
+            // Exactly what SearchModel asks the server for: tracks are
+            // searched on the Music page (Songs).
+            placeholderText: qsTr("Films, series, episodes, albums, artists, playlists")
             text: page.search ? page.search.text : ""
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextChanged: if (page.search && page.search.text !== text) page.search.text = text

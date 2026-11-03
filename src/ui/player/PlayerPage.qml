@@ -33,6 +33,16 @@ RoutePage {
     title: player.title
     focus: true
 
+    // The bar's buttons and the timeline take focus from Tab, never from a
+    // click, so the player's keys (Space, arrows) keep working after a
+    // click on them.
+    component OsdButton: IconButton {
+        focusPolicy: Qt.TabFocus
+    }
+
+    // A closed menu gives the keys back to the page.
+    onOpenMenuChanged: if (openMenu.length === 0) page.forceActiveFocus()
+
     function clock(seconds) {
         const total = Math.max(0, Math.floor(seconds))
         const h = Math.floor(total / 3600)
@@ -52,10 +62,17 @@ RoutePage {
     // The time now, for the clock and for when the file ends.
     property date now: new Date()
     readonly property bool hasEnd: player.active && player.duration > 0
-    // Remaining media time at the playback speed.
+    // Remaining media time at the chosen speed (a group's base speed, not
+    // the short corrections that keep it in step).
     readonly property date endsAt: new Date(now.getTime()
-        + Math.max(0, player.duration - player.position) / Math.max(0.1, player.rate) * 1000)
-    readonly property bool hasEpisodes: !player.inGroup && player.episodes.length > 1
+        + Math.max(0, player.duration - player.position) / Math.max(0.1, player.baseRate) * 1000)
+    // In a group the chosen episode goes to the group's queue.
+    readonly property bool hasEpisodes: player.episodes.length > 1
+
+    function playEpisode(itemId) {
+        if (player.inGroup) GroupSession.watchTogether(itemId, "", 0)
+        else player.playEpisode(itemId)
+    }
 
     function poke() {
         osdVisible = true
@@ -80,7 +97,7 @@ RoutePage {
     }
 
     function delayText(seconds) {
-        return (seconds > 0 ? "+" : "") + seconds.toFixed(1) + " " + qsTr("s")
+        return (seconds > 0 ? "+" : "") + Number(seconds).toLocaleString(Qt.locale(), "f", 1) + " " + qsTr("s")
     }
 
     function changeVolume(step) {
@@ -164,16 +181,31 @@ RoutePage {
     }
 
     MouseArea {
+        objectName: "videoArea"
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: page.osdShown ? Qt.ArrowCursor : Qt.BlankCursor
         onPositionChanged: page.poke()
         onClicked: {
+            page.forceActiveFocus()
+            // A click while the display is hidden only brings it back: it
+            // was probably meant for a button that had faded out.
             if (page.openMenu.length > 0) page.openMenu = ""
-            else page.player.togglePause()
+            else if (page.osdShown) clickTimer.restart()
             page.poke()
         }
-        onDoubleClicked: page.toggleFullscreen()
+        // The first click of a double-click must not pause: the single
+        // click waits until a double-click can no longer come.
+        onDoubleClicked: {
+            clickTimer.stop()
+            page.toggleFullscreen()
+        }
+        Timer {
+            id: clickTimer
+            objectName: "clickTimer"
+            interval: Qt.styleHints.mouseDoubleClickInterval
+            onTriggered: page.player.togglePause()
+        }
     }
 
     Rectangle {
@@ -243,14 +275,16 @@ RoutePage {
             anchors.rightMargin: Theme.spacing
             spacing: Theme.spacing
 
-            IconButton {
+            OsdButton {
                 iconSource: Icons.back
                 toolTipText: qsTr("Back")
                 onClicked: page.leave()
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(0, parent.width - Theme.controlHeight - groupOsd.width - timeInfo.width - 4 * Theme.spacing)
+                // The clock's room only while it shows.
+                width: Math.max(0, parent.width - Theme.controlHeight - groupOsd.width
+                                   - (timeInfo.visible ? timeInfo.width + Theme.spacing : 0) - 3 * Theme.spacing)
                 text: page.player.title
                 color: Overlay.text
                 font.pixelSize: Theme.fontSizeLarge
@@ -261,7 +295,8 @@ RoutePage {
                 id: timeInfo
                 objectName: "timeInfo"
                 anchors.verticalCenter: parent.verticalCenter
-                visible: width > 0 && page.width >= 560
+                // The clock can be turned off in the settings.
+                visible: page.player.showClock && page.width >= 560
                 Text {
                     anchors.right: parent.right
                     text: page.shortTime(page.now)
@@ -339,8 +374,10 @@ RoutePage {
         id: episodesMenu
         EpisodesPanel {
             episodes: page.player.episodes
+            // Between the bars, however short the window is.
+            maximumHeight: page.height - bottomBar.height - topBar.height - 2 * Theme.spacingSmall
             onChosen: (itemId) => {
-                page.player.playEpisode(itemId)
+                page.playEpisode(itemId)
                 page.openMenu = ""
             }
         }
@@ -453,12 +490,18 @@ RoutePage {
                 from: 0
                 to: Math.max(page.player.duration, 1)
                 stepSize: 10
+                focusPolicy: Qt.TabFocus
                 // Follows playback except while dragged.
                 Binding on value {
                     when: !timeline.pressed
                     value: page.player.position
                 }
-                onMoved: page.poke()
+                // A drag seeks once, on release; a key step (Tab focus) at
+                // once.
+                onMoved: {
+                    page.poke()
+                    if (!pressed) page.player.seek(value)
+                }
                 onPressedChanged: if (!pressed) page.player.seek(value)
 
                 HoverHandler {
@@ -494,25 +537,25 @@ RoutePage {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall
 
-                    IconButton {
+                    OsdButton {
                         objectName: "playPause"
                         iconSource: page.player.paused ? Icons.play : PlayerIcons.pause
                         toolTipText: page.player.paused ? qsTr("Play") : qsTr("Pause")
                         onClicked: page.player.togglePause()
                     }
-                    IconButton {
+                    OsdButton {
                         visible: page.width >= 720
                         iconSource: PlayerIcons.replay
                         toolTipText: qsTr("Back 10 seconds")
                         onClicked: page.player.seekBy(-10)
                     }
-                    IconButton {
+                    OsdButton {
                         visible: page.width >= 720
                         iconSource: PlayerIcons.forward
                         toolTipText: qsTr("Forward 10 seconds")
                         onClicked: page.player.seekBy(10)
                     }
-                    IconButton {
+                    OsdButton {
                         objectName: "next"
                         // A group's queue is the server's; alone, the series'.
                         visible: page.player.inGroup || page.player.hasNext
@@ -537,7 +580,7 @@ RoutePage {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall
 
-                    IconButton {
+                    OsdButton {
                         objectName: "mute"
                         iconSource: page.player.muted || page.player.volume === 0 ? PlayerIcons.volumeOff
                                                                                   : PlayerIcons.volume
@@ -546,6 +589,7 @@ RoutePage {
                     }
                     ValueSlider {
                         objectName: "volume"
+                        focusPolicy: Qt.TabFocus
                         anchors.verticalCenter: parent.verticalCenter
                         // The mute button stays when the window is narrow.
                         visible: page.width >= 800
@@ -562,6 +606,7 @@ RoutePage {
                     }
                     SpeedButton {
                         objectName: "speedButton"
+                        focusPolicy: Qt.TabFocus
                         // The speed at a glance; in a group it is everyone's.
                         visible: page.width >= 720 && (!page.player.inGroup || GroupSession.rateSupported)
                         anchors.verticalCenter: parent.verticalCenter
@@ -570,43 +615,43 @@ RoutePage {
                         toolTipText: qsTr("Speed")
                         onClicked: page.toggleMenu("tune")
                     }
-                    IconButton {
+                    OsdButton {
                         objectName: "segmentsButton"
                         visible: page.player.segments.length > 0
                         iconSource: PlayerIcons.segments
                         toolTipText: qsTr("Segments")
                         onClicked: page.toggleMenu("segments")
                     }
-                    IconButton {
+                    OsdButton {
                         objectName: "episodes"
                         visible: page.hasEpisodes
                         iconSource: PlayerIcons.episodes
                         toolTipText: qsTr("Episodes")
                         onClicked: page.toggleMenu("episodes")
                     }
-                    IconButton {
+                    OsdButton {
                         iconSource: PlayerIcons.audio
                         toolTipText: qsTr("Audio")
                         onClicked: page.toggleMenu("audio")
                     }
-                    IconButton {
+                    OsdButton {
                         iconSource: PlayerIcons.subtitles
                         toolTipText: qsTr("Subtitles")
                         onClicked: page.toggleMenu("subtitles")
                     }
-                    IconButton {
+                    OsdButton {
                         iconSource: PlayerIcons.tune
                         toolTipText: qsTr("Playback settings")
                         onClicked: page.toggleMenu("tune")
                     }
-                    IconButton {
+                    OsdButton {
                         objectName: "pip"
                         visible: page.pipAvailable
                         iconSource: PlayerIcons.pip
                         toolTipText: qsTr("Picture in picture")
                         onClicked: page.enterPip()
                     }
-                    IconButton {
+                    OsdButton {
                         iconSource: page.fullscreen ? PlayerIcons.fullscreenExit : PlayerIcons.fullscreen
                         toolTipText: page.fullscreen ? qsTr("Exit fullscreen") : qsTr("Fullscreen")
                         onClicked: page.toggleFullscreen()

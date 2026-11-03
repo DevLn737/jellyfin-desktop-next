@@ -118,6 +118,8 @@ T.ItemDelegate {
             anchors.verticalCenter: parent.verticalCenter
             iconSource: MusicIcons.more
             toolTipText: qsTr("More")
+            // Not over the menu it opened.
+            toolTipSuppressed: menu.visible
             onClicked: menu.popup()
         }
     }

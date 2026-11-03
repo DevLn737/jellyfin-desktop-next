@@ -12,8 +12,11 @@
 #include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/PlayerSession.h>
 
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QQmlComponent>
+#include <QStyleHints>
+#include <QTest>
 #include <QSignalSpy>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -214,6 +217,55 @@ TEST_CASE("Keys seek, change the volume and the delays, and the speed applies al
 
   f.player->setRate(1.5);
   REQUIRE(waitFor([&] { return f.player->baseRate() == doctest::Approx(1.5); }, 2000));
+}
+
+TEST_CASE("Clicks on the bar leave the keys to the page; a double-click or a click on a hidden bar does not pause") {
+  Fixture f;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  f.page->forceActiveFocus();
+  const auto press = [&](int key) {
+    QKeyEvent pressEvent(QEvent::KeyPress, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&f.window, &pressEvent);
+    QKeyEvent releaseEvent(QEvent::KeyRelease, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&f.window, &releaseEvent);
+  };
+  const int doubleClick = QGuiApplication::styleHints()->mouseDoubleClickInterval();
+
+  // A click on the mute button mutes, and Space is still play/pause, not
+  // that button again.
+  QQuickItem* mute = find(f.page, "mute");
+  REQUIRE(mute != nullptr);
+  const QPoint onMute = mute->mapToScene(QPointF(mute->width() / 2, mute->height() / 2)).toPoint();
+  QTest::mouseMove(&f.window, onMute);
+  REQUIRE(waitFor([&] { return mute->isVisible() && mute->opacity() > 0.99; }, 2000));
+  QTest::mouseClick(&f.window, Qt::LeftButton, Qt::NoModifier, onMute);
+  CHECK(f.player->muted());
+  press(Qt::Key_Space);
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+  CHECK(f.player->muted());
+  press(Qt::Key_Space);
+  REQUIRE(waitFor([&] { return !f.player->paused(); }, 2000));
+
+  // A double-click on the video toggles fullscreen and nothing else.
+  const QPoint middle(640, 300);
+  QTest::mouseDClick(&f.window, Qt::LeftButton, Qt::NoModifier, middle);
+  CHECK_FALSE(waitFor([&] { return f.player->paused(); }, doubleClick + 300));
+  const bool fullscreen = f.window.visibility() == QWindow::FullScreen;
+  if (fullscreen) f.window.showNormal();
+
+  // With the bar faded out, a click brings it back without pausing (the
+  // pointer is already there: no move shows the bar first).
+  QTest::mouseMove(&f.window, middle);
+  f.page->setProperty("osdVisible", false);
+  QTest::mouseClick(&f.window, Qt::LeftButton, Qt::NoModifier, middle);
+  CHECK(f.page->property("osdVisible").toBool());
+  CHECK_FALSE(waitFor([&] { return f.player->paused(); }, doubleClick + 300));
+
+  // With the bar shown, a single click pauses once the double-click time
+  // has passed.
+  QTest::mouseClick(&f.window, Qt::LeftButton, Qt::NoModifier, middle);
+  CHECK(waitFor([&] { return f.player->paused(); }, doubleClick + 2000));
 }
 
 TEST_CASE("The header shows the clock and when the file ends; the episodes button waits for a list") {

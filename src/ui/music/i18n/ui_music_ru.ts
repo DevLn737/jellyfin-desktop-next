@@ -84,6 +84,26 @@
 <context>
     <name>MusicList</name>
     <message>
+        <source>This list cannot be shown.</source>
+        <translation>Этот список не может быть показан.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n album(s)</source>
+        <translation>
+            <numerusform>%n альбом</numerusform>
+            <numerusform>%n альбома</numerusform>
+            <numerusform>%n альбомов</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n track(s)</source>
+        <translation>
+            <numerusform>%n трек</numerusform>
+            <numerusform>%n трека</numerusform>
+            <numerusform>%n треков</numerusform>
+        </translation>
+    </message>
+    <message>
         <source>%1 min</source>
         <translation>%1 мин</translation>
     </message>

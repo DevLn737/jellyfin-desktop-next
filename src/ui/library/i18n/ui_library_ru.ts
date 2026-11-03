@@ -311,8 +311,8 @@
         <translation>Поиск</translation>
     </message>
     <message>
-        <source>Films, series, episodes, people</source>
-        <translation>Фильмы, сериалы, серии, люди</translation>
+        <source>Films, series, episodes, albums, artists, playlists</source>
+        <translation>Фильмы, сериалы, серии, альбомы, исполнители, плейлисты</translation>
     </message>
     <message>
         <source>Nothing found.</source>

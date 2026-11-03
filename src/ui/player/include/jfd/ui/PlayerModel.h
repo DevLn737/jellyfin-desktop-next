@@ -81,9 +81,12 @@ namespace jfd::ui {
     Q_PROPERTY(bool hasNext READ hasNext NOTIFY queueChanged)
     Q_PROPERTY(bool hasPrevious READ hasPrevious NOTIFY queueChanged)
     Q_PROPERTY(bool autoNext READ autoNext WRITE setAutoNext NOTIFY autoNextChanged)
+    // The clock and the end time in the page's header (a setting).
+    Q_PROPERTY(bool showClock READ showClock WRITE setShowClock NOTIFY showClockChanged)
     // The series' episodes in order, for the episodes panel: maps with id,
     // name, season, number, played and current. Empty for anything but an
-    // episode, and in a group (the group's queue is the server's).
+    // episode. In a group the page sends the chosen one to the group's
+    // queue (GroupSession.watchTogether) instead of playEpisode.
     Q_PROPERTY(QVariantList episodes READ episodes NOTIFY queueChanged)
     // The video is in the small picture-in-picture window; the player page
     // is not shown and must not stop the playback.
@@ -134,13 +137,15 @@ namespace jfd::ui {
     // Preferred languages and subtitle mode, for files opened from now on.
     void setTrackDefaults(playback::TrackDefaults defaults) { m_trackPreference.setDefaults(std::move(defaults)); }
     void setAutoNext(bool on);
+    bool showClock() const { return m_showClock; }
+    void setShowClock(bool on);
     double subtitleDelay() const { return m_subtitleDelay; }
     void setSubtitleDelay(double seconds);
     double audioDelay() const { return m_audioDelay; }
     void setAudioDelay(double seconds);
     bool hasNext() const { return !m_nextId.isEmpty(); }
     bool hasPrevious() const { return !m_previousId.isEmpty(); }
-    QVariantList episodes() const { return inGroup() ? QVariantList() : m_episodes; }
+    QVariantList episodes() const { return m_episodes; }
     bool pip() const { return m_pip; }
     bool hasTrickplay() const { return m_trickplayInfo.has_value(); }
 
@@ -189,6 +194,7 @@ namespace jfd::ui {
     void segmentsChanged();
     void autoSkipChanged();
     void autoNextChanged();
+    void showClockChanged();
     void volumeChanged();
     void maxBitrateChanged();
     void delaysChanged();
@@ -239,6 +245,7 @@ namespace jfd::ui {
     // The viewer's last audio and subtitle pick, for the next file.
     playback::TrackPreference m_trackPreference;
     bool m_autoNext = true;
+    bool m_showClock = true;
     void applyDeviceProfile();
 
     api::DeviceProfileOptions m_profileOptions;

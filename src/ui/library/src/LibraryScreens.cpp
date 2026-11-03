@@ -63,6 +63,15 @@ namespace jfd::ui {
     services.devicePixelRatio = m_devicePixelRatio;
     m_ui->attach(services);
 
+    // Lost while the socket tries again; back once it is up again. The
+    // screens reload on the way back.
+    QObject::connect(&m_socket, &api::SessionSocket::stateChanged, m_ui,
+                     [ui = m_ui](api::SessionSocket::State state) {
+                       using State = api::SessionSocket::State;
+                       if (state == State::Reconnecting) ui->setOnline(false);
+                       else if (state == State::Ready) ui->setOnline(true);
+                     });
+
     navigator.registerPage(QStringLiteral("login"), page("LoginPage"));
     navigator.registerPage(QStringLiteral("home"), page("HomePage"));
     navigator.registerPage(QStringLiteral("library"), page("LibraryPage"));

@@ -3,48 +3,71 @@ import QtQuick.Window
 import Jfd.Ui.Theme
 
 // A small label shown below its parent after a short hover, or above it when
-// there is no room below in the window (the player's bottom bar).
-Rectangle {
+// there is no room below in the window (the player's bottom bar). The label
+// itself is drawn on the window's content item, kept inside the window, so
+// lists that clip and later siblings cannot cut or cover it.
+Item {
     id: tip
-    // Colours of the nearest colour scope (the video player has its own).
+    // Colours of the nearest colour scope (the video player has its own),
+    // read where the tip is declared.
     readonly property var colors: Theme.colorsFor(tip)
 
     property alias text: label.text
     property bool shown: false
+    readonly property Item target: parent
+    readonly property Item overlay: Window.window ? Window.window.contentItem : null
+    readonly property real margin: Theme.spacingTiny
 
-    // Decided when it is about to show.
-    property bool above: false
-    onShownChanged: {
-        if (!shown || !parent || !Window.window) return
-        above = parent.mapToItem(null, 0, parent.height).y + Theme.spacingTiny + height > Window.window.height
+    width: 0
+    height: 0
+
+    function place() {
+        const overlay = bubble.parent
+        if (!overlay || !tip.target) return
+        const origin = tip.target.mapToItem(overlay, 0, 0)
+        const below = origin.y + tip.target.height + tip.margin
+        bubble.above = below + bubble.height > overlay.height
+        bubble.y = bubble.above ? origin.y - bubble.height - tip.margin : below
+        const centred = origin.x + (tip.target.width - bubble.width) / 2
+        bubble.x = Math.max(tip.margin, Math.min(overlay.width - bubble.width - tip.margin, centred))
     }
 
-    y: above ? -height - Theme.spacingTiny : parent.height + Theme.spacingTiny
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: label.implicitWidth + 2 * Theme.spacingSmall
-    height: label.implicitHeight + Theme.spacingTiny * 2
-    radius: Theme.radiusSmall
-    color: colors.surfaceRaised
-    border.color: colors.border
-    z: 200
-    opacity: 0
-    visible: opacity > 0
+    onShownChanged: if (shown) place()
 
-    states: State {
-        when: tip.shown
-        PropertyChanges { tip.opacity: 1 }
-    }
-    transitions: Transition {
-        SequentialAnimation {
-            PauseAnimation { duration: tip.shown ? 500 : 0 }
-            NumberAnimation { property: "opacity"; duration: Theme.durationFast }
+    Rectangle {
+        id: bubble
+        objectName: "toolTip"
+        // Below or above its parent, decided on showing.
+        property bool above: false
+
+        parent: tip.overlay ? tip.overlay : tip
+        width: label.implicitWidth + 2 * Theme.spacingSmall
+        height: label.implicitHeight + Theme.spacingTiny * 2
+        onWidthChanged: if (tip.shown) tip.place()
+        radius: Theme.radiusSmall
+        color: tip.colors.surfaceRaised
+        border.color: tip.colors.border
+        z: 10000
+        opacity: 0
+        // Gone with its button, when the button hides (an overlay fading out).
+        visible: opacity > 0 && tip.visible && tip.text.length > 0
+
+        states: State {
+            when: tip.shown
+            PropertyChanges { bubble.opacity: 1 }
         }
-    }
+        transitions: Transition {
+            SequentialAnimation {
+                PauseAnimation { duration: tip.shown ? 500 : 0 }
+                NumberAnimation { property: "opacity"; duration: Theme.durationFast }
+            }
+        }
 
-    Text {
-        id: label
-        anchors.centerIn: parent
-        color: colors.text
-        font.pixelSize: Theme.fontSizeSmall
+        Text {
+            id: label
+            anchors.centerIn: parent
+            color: tip.colors.text
+            font.pixelSize: Theme.fontSizeSmall
+        }
     }
 }

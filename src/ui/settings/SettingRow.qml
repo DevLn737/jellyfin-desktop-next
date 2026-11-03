@@ -19,6 +19,8 @@ FocusScope {
     required property real step
     required property string unit
     required property bool requiresRestart
+    // Actions: asked before triggering (sign out); empty runs at once.
+    required property string confirmation
 
     readonly property bool ranged: maximum > minimum
 
@@ -29,6 +31,15 @@ FocusScope {
     function formatNumber(number) {
         const decimals = row.type === "int" ? 0 : (row.step < 0.1 ? 2 : 1)
         return Number(number).toLocaleString(Qt.locale(), "f", decimals) + (row.unit.length > 0 ? " " + row.unit : "")
+    }
+
+    // "1,5" in Russian, "1.5" anywhere: NaN (refused) only when neither reads.
+    function parseNumber(text) {
+        try {
+            return Number.fromLocaleString(Qt.locale(), text.trim())
+        } catch (error) {
+            return Number(text.trim())
+        }
     }
 
     Rectangle {
@@ -122,7 +133,20 @@ FocusScope {
             objectName: "editor"
             focus: true
             text: row.label
-            onClicked: AppSettings.trigger(row.key)
+            onClicked: {
+                if (row.confirmation.length > 0) confirm.open()
+                else AppSettings.trigger(row.key)
+            }
+
+            AppDialog {
+                id: confirm
+                objectName: "confirmAction"
+                title: row.label
+                text: row.confirmation
+                acceptText: row.label
+                destructive: true
+                onAccepted: AppSettings.trigger(row.key)
+            }
         }
     }
 
@@ -163,7 +187,7 @@ FocusScope {
             Accessible.name: row.label
             inputMethodHints: row.type === "string" ? Qt.ImhNone : Qt.ImhFormattedNumbersOnly
             onAccepted: {
-                const value = row.type === "string" ? text : Number(text)
+                const value = row.type === "string" ? text : row.parseNumber(text)
                 errorText = AppSettings.setValue(row.key, value) ? "" : qsTr("This value is not allowed.")
             }
             onActiveFocusChanged: if (!activeFocus) accepted()

@@ -39,6 +39,14 @@
 <context>
     <name>CommonSettings</name>
     <message>
+        <source>Sign out of this server? Playback stops and the password is asked for again.</source>
+        <translation>Выйти с этого сервера? Воспроизведение остановится, и пароль нужно будет ввести снова.</translation>
+    </message>
+    <message>
+        <source>Sign out and choose another server? Playback stops.</source>
+        <translation>Выйти и выбрать другой сервер? Воспроизведение остановится.</translation>
+    </message>
+    <message>
         <source>Account</source>
         <translation>Учётная запись</translation>
     </message>

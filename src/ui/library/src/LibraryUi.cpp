@@ -23,6 +23,13 @@ namespace jfd::ui {
     Q_EMIT attached();
   }
 
+  void LibraryUi::setOnline(bool online) {
+    if (online == m_online) return;
+    m_online = online;
+    Q_EMIT onlineChanged();
+    if (online) Q_EMIT reconnected();
+  }
+
   void LibraryUi::setPlayHandler(PlayHandler handler) {
     m_play = std::move(handler);
     Q_EMIT handlersChanged();

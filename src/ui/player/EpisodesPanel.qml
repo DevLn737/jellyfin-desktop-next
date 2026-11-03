@@ -26,8 +26,12 @@ Rectangle {
         return 0
     }
 
+    // The room the page has for it (between the player's bars).
+    property real maximumHeight: 420
+
     width: 340
-    height: Math.min(column.implicitHeight + 2 * Theme.spacing, 420)
+    height: Math.max(Theme.controlHeight * 2,
+                     Math.min(column.implicitHeight + 2 * Theme.spacing, 420, maximumHeight))
     radius: Theme.radius
     color: Overlay.surface
     border.color: Overlay.border
@@ -40,9 +44,14 @@ Rectangle {
         contentHeight: column.implicitHeight
         clip: true
 
-        // Opens scrolled to the episode that plays.
-        Component.onCompleted: contentY = Math.max(0, Math.min(
-            contentHeight - height, panel.currentRow() * (Theme.controlHeight + Theme.spacingTiny)))
+        // Opens scrolled to the episode that plays, in the middle; the
+        // heading and the real row heights count.
+        function scrollToCurrent() {
+            const row = rows.itemAt(panel.currentRow())
+            if (!row) return
+            contentY = Math.max(0, Math.min(contentHeight - height, row.y - (height - row.height) / 2))
+        }
+        Component.onCompleted: Qt.callLater(scrollToCurrent)
 
         Column {
             id: column
@@ -55,11 +64,14 @@ Rectangle {
             }
 
             Repeater {
+                id: rows
                 model: panel.episodes
                 delegate: ListItem {
                     required property var modelData
                     width: column.width
                     text: panel.label(modelData)
+                    // Every row keeps the check's room: the texts line up.
+                    reserveIcon: true
                     iconSource: modelData.current ? Icons.check : ""
                     enabled: !modelData.current
                     opacity: modelData.played && !modelData.current ? 0.6 : 1

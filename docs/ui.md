@@ -336,7 +336,13 @@ hint says to use the window menu's Always on top, and the title is fixed
   it stopped. The series page lists the episodes with their stills and
   overviews.
 - In the player, the audio, subtitle and settings menus open just above the
-  button row. A tooltip that would not fit below its button shows above it.
+  button row. A tooltip that would not fit below its button shows above it;
+  tooltips are drawn on the window's content item and kept inside the
+  window, so clipping lists cannot cut them.
+- The player's bar buttons and timeline take focus only from Tab: after a
+  click, Space and the arrows are still the player's keys. A single click on
+  the video waits for the double-click time (a double-click only toggles
+  fullscreen); a click while the bar is hidden only shows it.
 
 ### Wheel scrolling
 

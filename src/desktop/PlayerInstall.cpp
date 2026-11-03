@@ -1,6 +1,7 @@
 #include "AppServices.h"
 #include <jfd/session/GroupModel.h>
 
+#include <jfd/library/SignIn.h>
 #include <jfd/playback/PlayerOptions.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/HdrOutput.h>
@@ -25,6 +26,7 @@ namespace jfd::desktop {
     const QString HdrKey = QStringLiteral("playback/hdr10");
     const QString VolumeKey = QStringLiteral("playback/defaultVolume");
     const QString AutoNextKey = QStringLiteral("playback/autoNextEpisode");
+    const QString ShowClockKey = QStringLiteral("playback/showClock");
     const QString HwdecKey = QStringLiteral("playback/hardwareDecoding");
     const QString AudioLanguageKey = QStringLiteral("audio/language");
     const QString SubtitleLanguageKey = QStringLiteral("subtitles/language");
@@ -411,6 +413,15 @@ namespace jfd::desktop {
         "PlayerSettings", "When an episode ends. In a group the group's queue decides.");
     section.settings.append(autoNext);
 
+    settings::SettingDescriptor showClock;
+    showClock.key = QStringLiteral("showClock");
+    showClock.type = settings::SettingType::Bool;
+    showClock.defaultValue = true;
+    showClock.label = QT_TRANSLATE_NOOP("PlayerSettings", "Show the clock in the player");
+    showClock.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "The time now and when the video ends, at the top of the player.");
+    section.settings.append(showClock);
+
     settings::SettingDescriptor volume;
     volume.key = QStringLiteral("defaultVolume");
     volume.type = settings::SettingType::Int;
@@ -503,6 +514,7 @@ namespace jfd::desktop {
     settings::Settings& settings = *services.settings;
     model.setAutoSkip(settings.value(AutoSkipKey).toBool());
     model.setAutoNext(settings.value(AutoNextKey).toBool());
+    model.setShowClock(settings.value(ShowClockKey).toBool());
     model.setVolume(settings.value(VolumeKey).toInt());
     media::MpvPlayer* player = services.player.get();
     if (player != nullptr) {
@@ -523,6 +535,7 @@ namespace jfd::desktop {
                        else if (key == AudioLanguageKey || key == SubtitleLanguageKey || key == SubtitleModeKey)
                          model.setTrackDefaults(trackDefaults(settings));
                        else if (key == AutoNextKey) model.setAutoNext(value.toBool());
+                       else if (key == ShowClockKey) model.setShowClock(value.toBool());
                        else if (player == nullptr) return;
                        else if (key == HwdecKey) player->setStringProperty("hwdec", value.toString().toUtf8());
                        else if (key.startsWith(AudioSection)) applyAudio(*player, settings);
@@ -530,6 +543,11 @@ namespace jfd::desktop {
                      });
     QObject::connect(&model, &ui::PlayerModel::autoSkipChanged, &settings,
                      [&model, &settings] { settings.setValue(AutoSkipKey, model.autoSkip()); });
+
+    // A video playing on (the picture-in-picture window outlives the page)
+    // would go on as the next user.
+    if (services.signIn != nullptr)
+      QObject::connect(services.signIn, &library::SignIn::signedOut, &model, [&model] { model.stop(); });
 
     ui::Navigator& navigator = *services.navigator;
     navigator.registerPage(QStringLiteral("player"), QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Player/PlayerPage.qml")));

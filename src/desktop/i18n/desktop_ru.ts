@@ -355,6 +355,14 @@
 <context>
     <name>PlayerSettings</name>
     <message>
+        <source>Show the clock in the player</source>
+        <translation>Показывать часы в плеере</translation>
+    </message>
+    <message>
+        <source>The time now and when the video ends, at the top of the player.</source>
+        <translation>Текущее время и время окончания видео вверху плеера.</translation>
+    </message>
+    <message>
         <source>Playback</source>
         <translation>Воспроизведение</translation>
     </message>

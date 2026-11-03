@@ -94,9 +94,14 @@ RoutePage {
                     from: 0
                     to: Math.max(1, MusicSession.duration)
                     enabled: MusicSession.active
-                    // The thumb follows the player except while it is dragged.
-                    value: MusicSession.position
-                    onMoved: MusicSession.seek(value)
+                    // The thumb follows the player except while it is
+                    // dragged; a drag seeks once, on release, a key at once.
+                    Binding on value {
+                        when: !seek.pressed
+                        value: MusicSession.position
+                    }
+                    onMoved: if (!pressed) MusicSession.seek(value)
+                    onPressedChanged: if (!pressed) MusicSession.seek(value)
                     Accessible.name: qsTr("Position")
                 }
                 Text {
@@ -154,11 +159,16 @@ RoutePage {
                     font.pixelSize: Theme.fontSizeSmall
                 }
                 ValueSlider {
+                    id: nowVolume
                     objectName: "nowVolume"
                     Layout.fillWidth: true
                     from: 0
                     to: 100
-                    value: MusicSession.volume
+                    // The player's volume, except under the user's hand.
+                    Binding on value {
+                        when: !nowVolume.pressed
+                        value: MusicSession.volume
+                    }
                     onMoved: MusicSession.volume = Math.round(value)
                     Accessible.name: qsTr("Volume")
                 }

@@ -6,17 +6,26 @@ import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
 
-// A genre: route "genre/<name>". Its albums.
+// A genre: route "genre/<name>", the name percent-encoded (a name like
+// "Hip-Hop/Rap" has a slash, which a route argument cannot). Its albums.
 RoutePage {
     id: page
 
+    readonly property string genreName: {
+        try {
+            return decodeURIComponent(routeArgument)
+        } catch (error) {
+            return routeArgument
+        }
+    }
+
     readonly property var list: {
         const model = Music.createList("albums", page)
-        model.genre = routeArgument
+        model.genre = page.genreName
         return model
     }
 
-    title: routeArgument
+    title: genreName
 
     PlayGuard { id: guard }
 

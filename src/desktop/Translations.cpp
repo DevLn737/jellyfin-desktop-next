@@ -31,10 +31,10 @@ namespace jfd::desktop {
     return QStringLiteral("en");
   }
 
+  // English has files too: only the plural forms ("1 item", "5 items"), as
+  // the sources say "%n item(s)". Russian has every string, and Qt's own
+  // (qtbase_ru.qm, embedded by src/desktop/CMakeLists.txt).
   int installTranslations(QCoreApplication& app, const QString& language) {
-    if (language == QLatin1String("en")) {
-      return 0;
-    }
     const QString suffix = QLatin1Char('_') + language + QStringLiteral(".qm");
     const QStringList files = QDir(QStringLiteral(":/i18n")).entryList({QLatin1Char('*') + suffix}, QDir::Files);
     int loaded = 0;

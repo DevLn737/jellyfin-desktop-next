@@ -20,6 +20,14 @@ RoutePage {
 
     Component.onCompleted: details = Library.createDetails(routeArgument, page)
 
+    // Back from a lost connection: a page that failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() {
+            if (page.details && !page.details.loaded && page.details.errorText.length > 0) page.details.reload()
+        }
+    }
+
     function clock(ticks) {
         const total = Math.floor(ticks / 10000000)
         const h = Math.floor(total / 3600)
@@ -39,7 +47,7 @@ RoutePage {
         anchors.centerIn: parent
         width: Math.min(parent.width - 2 * Theme.pageMargin, 600)
         visible: page.details && !page.details.loaded && page.details.errorText.length > 0
-        kind: "error"
+        kind: Library.online ? "error" : "offline"
         description: page.details ? page.details.errorText : ""
         onRetry: if (page.details) page.details.reload()
     }
@@ -117,11 +125,21 @@ RoutePage {
                     color: Theme.surfaceRaised
                     clip: true
                     Image {
+                        id: posterImage
                         anchors.fill: parent
                         source: page.details ? Library.image(page.details.posterUrl) : ""
                         sourceSize.width: 480
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
+                    }
+                    // Without a poster: the title's initial, as on the cards.
+                    Text {
+                        objectName: "posterInitial"
+                        anchors.centerIn: parent
+                        visible: posterImage.status !== Image.Ready
+                        text: page.title.length > 0 ? page.title.charAt(0).toUpperCase() : ""
+                        color: Theme.textDisabled
+                        font.pixelSize: Theme.fontSizeHeadline * 2
                     }
                 }
 

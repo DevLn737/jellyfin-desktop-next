@@ -109,6 +109,8 @@ namespace jfd::ui {
       return setting.requiresRestart;
     case IsDefaultRole:
       return m_settings.isDefault(row.key);
+    case ConfirmationRole:
+      return translated(context, setting.confirmation);
     default:
       return {};
     }
@@ -130,6 +132,7 @@ namespace jfd::ui {
         {UnitRole, "unit"},
         {RequiresRestartRole, "requiresRestart"},
         {IsDefaultRole, "isDefault"},
+        {ConfirmationRole, "confirmation"},
     };
   }
 

@@ -1,6 +1,7 @@
 #include <jfd/library/ItemDetails.h>
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/library/ErrorText.h>
 #include <jfd/library/CardImages.h>
 #include <jfd/library/CollectionIndex.h>
 #include <jfd/library/LibraryUpdates.h>
@@ -143,7 +144,7 @@ namespace jfd::library {
     m_client.itemDetails(m_itemId, this, [this, generation](api::Result<api::Item> result) {
       if (generation != m_generation) return;
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         done();
         return;
       }
@@ -196,7 +197,7 @@ namespace jfd::library {
     m_client.seasons(seriesId, this, [this, generation](api::Result<api::ItemPage> result) {
       if (generation != m_generation) return;
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         done();
         return;
       }
@@ -258,7 +259,7 @@ namespace jfd::library {
                           m_episodes.setEntries(entries(result->items, true));
                           chooseSeasonTarget();
                         } else {
-                          setError(result.error().message);
+                          setError(library::errorText(result.error()));
                         }
                         done();
                       });
@@ -315,7 +316,7 @@ namespace jfd::library {
     const bool wanted = !m_item->userData.isFavorite;
     m_client.setFavorite(id, wanted, this, [this](api::Result<api::UserItemData> result) {
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         return;
       }
       if (m_updates)
@@ -333,7 +334,7 @@ namespace jfd::library {
     data.playbackPositionTicks = 0;
     auto finish = [this, data](api::Result<api::Empty> result) {
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         return;
       }
       if (m_updates)

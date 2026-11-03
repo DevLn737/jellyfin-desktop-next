@@ -1,6 +1,7 @@
 #include <jfd/library/LibraryModel.h>
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/library/ErrorText.h>
 #include <jfd/library/LibraryUpdates.h>
 
 #include <QJsonArray>
@@ -286,7 +287,7 @@ namespace jfd::library {
       if (generation != m_generation) return;
       m_inFlight.remove(page);
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
       } else {
         const QSize pixels =
             cardImageSize(CardShape::Poster, std::max(m_options.cardWidth, PosterCardWidth), m_options.devicePixelRatio);

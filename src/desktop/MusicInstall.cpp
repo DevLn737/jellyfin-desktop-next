@@ -21,6 +21,8 @@
 #include <QScreen>
 #include <QUrl>
 
+#include <memory>
+
 namespace jfd::desktop {
 
   namespace {
@@ -123,16 +125,27 @@ namespace jfd::desktop {
 
     // The saved queue belongs to a server and user: it comes back once the
     // client is signed in as them.
-    const auto restore = [&player, &settings] {
+    // Between a sign-out and the next sign-in nothing is saved: the cleared
+    // queue must not replace the one saved for the user who left.
+    auto saving = std::make_shared<bool>(true);
+    const auto restore = [&player, &settings, saving] {
+      *saving = true;
       if (player.queueSize() == 0 && settings.value(ContinueKey).toBool())
         player.restoreState(settings.value(QueueKey).toString().toUtf8());
     };
-    player.setPersistence([&settings](const QByteArray& state) {
+    player.setPersistence([&settings, saving](const QByteArray& state) {
+      if (!*saving) return;
       if (settings.value(ContinueKey).toBool()) settings.setValue(QueueKey, QString::fromUtf8(state));
       else settings.setValue(QueueKey, QString());
     });
     if (services.signIn != nullptr) {
       QObject::connect(services.signIn, &library::SignIn::signedIn, &player, restore);
+      // The queue is the user's: it stops and goes with them, so the next
+      // user neither hears it nor reports it as theirs.
+      QObject::connect(services.signIn, &library::SignIn::signedOut, &player, [&player, saving] {
+        *saving = false;
+        player.clear();
+      });
       if (services.signIn->step() == library::SignIn::Step::SignedIn) restore();
     }
 

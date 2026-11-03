@@ -12,9 +12,18 @@ foreach(entry IN LISTS JFD_TRANSLATION_ENTRIES)
   string(REPLACE "|" ";" parts "${entry}")
   list(GET parts 0 source_dir)
   list(GET parts 1 ts)
+  # English files hold only the plural forms (cmake/JfdTranslations.cmake).
+  set(only "")
+  list(LENGTH parts part_count)
+  if(part_count GREATER 2)
+    list(GET parts 2 flag)
+    if(flag STREQUAL "pluralonly")
+      set(only -pluralonly)
+    endif()
+  endif()
   if(MODE STREQUAL "update")
     execute_process(
-      COMMAND "${LUPDATE}" -silent -locations none -no-obsolete "${source_dir}" -ts "${ts}"
+      COMMAND "${LUPDATE}" -silent -locations none -no-obsolete ${only} "${source_dir}" -ts "${ts}"
       RESULT_VARIABLE result)
     if(NOT result EQUAL 0)
       message(FATAL_ERROR "lupdate failed for ${ts}")
@@ -28,7 +37,7 @@ foreach(entry IN LISTS JFD_TRANSLATION_ENTRIES)
   file(MAKE_DIRECTORY "${WORK_DIR}")
   file(COPY_FILE "${ts}" "${copy}")
   execute_process(
-    COMMAND "${LUPDATE}" -silent -locations none "${source_dir}" -ts "${copy}"
+    COMMAND "${LUPDATE}" -silent -locations none ${only} "${source_dir}" -ts "${copy}"
     RESULT_VARIABLE result)
   if(NOT result EQUAL 0)
     message(FATAL_ERROR "lupdate failed for ${ts}")

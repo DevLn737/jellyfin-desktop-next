@@ -22,6 +22,17 @@ RoutePage {
 
     title: item.name || qsTr("Music")
 
+    function retry() {
+        if (item.errorText.length > 0) item.reload()
+        if (list.errorText.length > 0) list.reload()
+    }
+
+    // Back from a lost connection: what failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() { page.retry() }
+    }
+
     PlayGuard { id: guard }
 
     ColumnLayout {
@@ -137,14 +148,14 @@ RoutePage {
             }
         }
 
-        Text {
+        StateMessage {
             objectName: "musicError"
             Layout.fillWidth: true
-            visible: text.length > 0
-            text: page.item.errorText || page.list.errorText
-            color: Theme.error
-            font.pixelSize: Theme.fontSizeBody
-            wrapMode: Text.Wrap
+            Layout.preferredHeight: visible ? implicitHeight : 0
+            visible: description.length > 0
+            kind: Library.online ? "error" : "offline"
+            description: page.item.errorText || page.list.errorText
+            onRetry: page.retry()
         }
 
         ListView {

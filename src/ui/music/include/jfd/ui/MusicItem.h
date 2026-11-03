@@ -52,6 +52,8 @@ namespace jfd::ui {
     int trackCount() const;
 
     Q_INVOKABLE void toggleFavorite();
+    // Asks for the item again (after an error).
+    Q_INVOKABLE void reload();
 
   Q_SIGNALS:
     void itemChanged();
