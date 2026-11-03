@@ -507,6 +507,41 @@ namespace jfd::music {
                  startIndex, shuffle);
   }
 
+  void MusicPlayer::playTrack(const QString& trackId, const QString& albumId) {
+    if (!available() || trackId.isEmpty()) return;
+    const auto alone = [this, trackId] {
+      api::ItemQuery query;
+      query.ids = {trackId};
+      query.limit = 1;
+      m_client.items(query, this, [this](api::Result<api::ItemPage> page) {
+        if (!page) {
+          m_error = page.error().message;
+          Q_EMIT failed(m_error);
+          return;
+        }
+        playItems(page->items, 0, false);
+      });
+    };
+    if (albumId.isEmpty()) {
+      alone();
+      return;
+    }
+    m_api.albumTracks(albumId, this, [this, trackId, alone](api::Result<api::ItemPage> page) {
+      if (!page) {
+        m_error = page.error().message;
+        Q_EMIT failed(m_error);
+        return;
+      }
+      for (int i = 0; i < page->items.size(); ++i) {
+        if (page->items[i].id == trackId) {
+          playItems(page->items, i, false);
+          return;
+        }
+      }
+      alone();
+    });
+  }
+
   void MusicPlayer::playPlaylist(const QString& playlistId, int startIndex, bool shuffle) {
     fetchAndPlay(playlistId,
                  [playlistId](api::MusicApi& api, QObject* context, api::Callback<api::ItemPage> done) {

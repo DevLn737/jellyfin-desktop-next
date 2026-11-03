@@ -86,7 +86,11 @@ namespace jfd::library {
     }
     // An episode's poster is its series'.
     if (episode) return first({series, own});
-    return first({own, series});
+    // A track without a cover of its own shows its album's.
+    auto album = [&] {
+      return image(client, item.albumId, Primary, item.albumPrimaryImageTag, pixels);
+    };
+    return first({own, series, album});
   }
 
   QUrl backdropUrl(const api::JellyfinClient& client, const api::Item& item, QSize pixels) {

@@ -8,7 +8,7 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | Header | What it gives |
 | --- | --- |
 | `JellyfinClient.h` | One server and user: sign-in (password, Quick Connect), server version check, session capabilities, items, `PlaybackInfo`, playback reports, watched state, raw requests |
-| `JellyfinClient.h` (library) | Libraries (`UserViews`), "Continue watching" (`UserItems/Resume`), "Next up" (`Shows/NextUp`), latest per library (`Items/Latest`), filtered and sorted pages, filter values (`Items/Filters`), similar items, favorites, image URLs, item details with trickplay, media segments, trickplay tile URLs and authorized fetches |
+| `JellyfinClient.h` (library) | Libraries (`UserViews`), "Continue watching" (`UserItems/Resume`), "Next up" (`Shows/NextUp`), latest per library (`Items/Latest`), filtered and sorted pages, filter values (`Items/Filters`), similar items, people (`Persons`), favorites, image URLs, item details with trickplay, media segments, trickplay tile URLs and authorized fetches |
 | `ServerDiscovery.h` | Servers on the local network (UDP broadcast to port 7359) |
 | `SessionSocket.h` | The `/socket` connection: keep-alives, reconnect with backoff, capabilities re-reported on every connect, raw `SyncPlayCommand` and `SyncPlayGroupUpdate` |
 | `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, and `GetUtcTime` samples |
@@ -19,9 +19,9 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model (the measurement prototype's) |
 | `library/SignIn.h`, `ServerStore.h` | The login flow: servers on the network and saved ones, version check, password and Quick Connect, token in the credential store, restore at start-up, sign-out, expired sessions |
 | `library/HomeModel.h` | Home rows: Continue watching, Next up, latest per video library; reloads keep rows on screen |
-| `library/LibraryModel.h` | A library as a grid with every row from the first page and pages loaded as rows are shown; sort and filters |
+| `library/LibraryModel.h` | A library (or a collection, or a person's films and series by `personIds`) as a grid with every row from the first page and pages loaded as rows are shown; sort and filters |
 | `library/ItemDetails.h` | A movie, series, season or episode page: seasons, episodes, similar, what Play starts, favorite and watched toggles; emits `playRequested` for the session's launcher |
-| `library/SearchModel.h` | Search as you type, stale answers dropped |
+| `library/SearchModel.h` | Search as you type (titles, music with tracks, and people from `Persons`), stale answers dropped |
 | `library/ImageCache.h` | Images decoded at card size; memory limit (128 MiB), disk cache in the profile, newest requests first, cancellation |
 | `library/LibraryUpdates.h` | `UserDataChanged` and `LibraryChanged` from the socket, and local changes, to every model |
 

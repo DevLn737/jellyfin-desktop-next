@@ -23,6 +23,8 @@ namespace jfd::library {
       m_delay.stop();
       ++m_serial;
       m_sent.clear();
+      m_items.reset();
+      m_people.reset();
       m_results.setEntries({});
       setLoading(false);
       setError({});
@@ -43,29 +45,57 @@ namespace jfd::library {
     const quint64 serial = ++m_serial;
     setLoading(true);
     setError({});
+    m_items.reset();
+    m_people.reset();
     api::ItemQuery query;
     query.searchTerm = term;
     query.includeItemTypes = {QStringLiteral("Movie"), QStringLiteral("Series"),
                               QStringLiteral("Episode"), QStringLiteral("Video"),
                               QStringLiteral("MusicAlbum"), QStringLiteral("MusicArtist"),
-                              QStringLiteral("Playlist")};
+                              QStringLiteral("Playlist"), QStringLiteral("Audio")};
     query.limit = m_options.limit;
     m_client.items(query, this, [this, serial](api::Result<api::ItemPage> result) {
       if (serial != m_serial) return;
-      setLoading(false);
-      if (!result) {
-        // The text can be sent again after a failure.
-        m_sent.clear();
-        setError(library::errorText(result.error()));
-        return;
-      }
-      const QSize pixels =
-          cardImageSize(CardShape::Poster, m_options.cardWidth, m_options.devicePixelRatio);
-      QList<ItemListModel::Entry> entries;
-      for (const api::Item& item : result->items)
-        entries.append({item, cardImageUrl(m_client, item, CardShape::Poster, pixels)});
-      m_results.setEntries(std::move(entries));
+      m_items = std::move(result);
+      finish();
     });
+    if (m_options.peopleLimit <= 0) {
+      m_people = QList<api::Item>();
+      return;
+    }
+    m_client.persons(term, m_options.peopleLimit, this,
+                     [this, serial](api::Result<api::ItemPage> result) {
+                       if (serial != m_serial) return;
+                       // A server without the people search still finds the rest.
+                       m_people = result ? result->items : QList<api::Item>();
+                       finish();
+                     });
+  }
+
+  void SearchModel::finish() {
+    if (!m_items || !m_people) return;
+    setLoading(false);
+    const api::Result<api::ItemPage> items = std::move(*m_items);
+    QList<api::Item> people = std::move(*m_people);
+    m_items.reset();
+    m_people.reset();
+    if (!items) {
+      // The text can be sent again after a failure.
+      m_sent.clear();
+      setError(library::errorText(items.error()));
+      return;
+    }
+    const QSize pixels =
+        cardImageSize(CardShape::Poster, m_options.cardWidth, m_options.devicePixelRatio);
+    QList<ItemListModel::Entry> entries;
+    for (const api::Item& item : items->items)
+      entries.append({item, cardImageUrl(m_client, item, CardShape::Poster, pixels)});
+    for (api::Item& person : people) {
+      // The card picks the person page by type.
+      if (person.type.isEmpty()) person.type = QStringLiteral("Person");
+      entries.append({person, cardImageUrl(m_client, person, CardShape::Poster, pixels)});
+    }
+    m_results.setEntries(std::move(entries));
   }
 
   void SearchModel::setLoading(bool loading) {

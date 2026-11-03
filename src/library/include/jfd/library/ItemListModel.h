@@ -25,7 +25,7 @@ namespace jfd::library {
       IdRole = Qt::UserRole + 1,
       NameRole,
       TypeRole,
-      // "S1:E2", the production year, or empty.
+      // "S1:E2", a track's artists, the production year, or empty.
       SubtitleRole,
       ImageUrlRole,
       RunTimeTicksRole,
@@ -41,6 +41,8 @@ namespace jfd::library {
       OverviewRole,
       YearRole,
       CommunityRatingRole,
+      // A track's album, so it can play in its album.
+      AlbumIdRole,
     };
     Q_ENUM(Role)
 

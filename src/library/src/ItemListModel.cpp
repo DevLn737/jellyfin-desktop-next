@@ -11,6 +11,11 @@ namespace jfd::library {
           return QStringLiteral("S%1:E%2").arg(*item.parentIndexNumber).arg(*item.indexNumber);
         return QStringLiteral("E%1").arg(*item.indexNumber);
       }
+      if (item.type == QLatin1String("Audio")) {
+        if (!item.artists.isEmpty()) return item.artists.join(QStringLiteral(", "));
+        if (!item.albumArtist.isEmpty()) return item.albumArtist;
+        return item.album;
+      }
       if (item.productionYear) return QString::number(*item.productionYear);
       return {};
     }
@@ -83,6 +88,8 @@ namespace jfd::library {
       return item.productionYear ? QVariant(*item.productionYear) : QVariant();
     case CommunityRatingRole:
       return item.communityRating ? QVariant(*item.communityRating) : QVariant();
+    case AlbumIdRole:
+      return item.albumId;
     default:
       return {};
     }
@@ -108,7 +115,8 @@ namespace jfd::library {
             {SeriesNameRole, "seriesName"},
             {OverviewRole, "overview"},
             {YearRole, "year"},
-            {CommunityRatingRole, "communityRating"}};
+            {CommunityRatingRole, "communityRating"},
+            {AlbumIdRole, "albumId"}};
   }
 
   const ItemListModel::Entry* ItemListModel::entry(int row) const {

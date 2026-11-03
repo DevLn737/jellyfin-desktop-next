@@ -1,10 +1,13 @@
 #pragma once
 
+#include <jfd/api/Result.h>
 #include <jfd/library/ItemListModel.h>
 
 #include <QObject>
 #include <QString>
 #include <QTimer>
+
+#include <optional>
 
 namespace jfd::api {
   class JellyfinClient;
@@ -16,6 +19,11 @@ namespace jfd::library {
 
   // Search as you type: the query goes out once typing pauses, and only the
   // answer to the latest text is shown, however the answers arrive.
+  //
+  // Titles (films, series, episodes, videos), music (albums, artists,
+  // playlists, tracks) and people (actors, directors) are searched; people
+  // come from a request of their own and are listed after the rest. A
+  // failed people request leaves them out without an error.
   class SearchModel : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
@@ -27,6 +35,7 @@ namespace jfd::library {
     struct Options {
       int delayMs = 300;
       int limit = 60;
+      int peopleLimit = 12;
       int cardWidth = 200;
       qreal devicePixelRatio = 1.0;
     };
@@ -54,6 +63,8 @@ namespace jfd::library {
   private:
     void setLoading(bool loading);
     void setError(const QString& text);
+    // Shows the results once both requests answered.
+    void finish();
 
     api::JellyfinClient& m_client;
     Options m_options;
@@ -62,6 +73,9 @@ namespace jfd::library {
     ItemListModel m_results;
     QTimer m_delay;
     quint64 m_serial = 0;
+    // The answers to the latest request so far.
+    std::optional<api::Result<api::ItemPage>> m_items;
+    std::optional<QList<api::Item>> m_people;
     bool m_loading = false;
     QString m_errorText;
   };

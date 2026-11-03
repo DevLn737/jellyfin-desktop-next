@@ -44,6 +44,8 @@ TEST_CASE("Cards lead to a library or an item page") {
   CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) == QStringLiteral("album/e"));
   CHECK(ui.routeFor(QStringLiteral("f"), QStringLiteral("MusicArtist")) == QStringLiteral("artist/f"));
   CHECK(ui.routeFor(QStringLiteral("g"), QStringLiteral("Playlist")) == QStringLiteral("playlist/g"));
+  // A person lists their films and series.
+  CHECK(ui.routeFor(QStringLiteral("h"), QStringLiteral("Person")) == QStringLiteral("person/h"));
 }
 
 TEST_CASE("Run times read as hours and minutes") {
@@ -83,4 +85,45 @@ TEST_CASE("Without services the screens get no models") {
   CHECK(ui.createLibrary(QStringLiteral("x"), nullptr) == nullptr);
   CHECK(ui.createDetails(QStringLiteral("x"), nullptr) == nullptr);
   CHECK(ui.libraryName(QStringLiteral("x")).isEmpty());
+}
+
+TEST_CASE("A track goes to the music player, asking first while a video plays") {
+  LibraryUi ui;
+  QSignalSpy messages(&ui, &LibraryUi::message);
+  QSignalSpy confirm(&ui, &LibraryUi::trackConfirmationNeeded);
+  CHECK_FALSE(ui.canPlayTracks());
+  ui.playTrack(QStringLiteral("t"), QStringLiteral("a"));
+  CHECK(messages.count() == 1);
+
+  QStringList played;
+  bool video = false;
+  bool available = true;
+  LibraryUi::TrackHandler handler;
+  handler.play = [&](const QString& track, const QString& album) {
+    if (!available) return false;
+    played << track + QLatin1Char('@') + album;
+    return true;
+  };
+  handler.stopsVideo = [&] { return video; };
+  ui.setTrackHandler(std::move(handler));
+  CHECK(ui.canPlayTracks());
+
+  ui.playTrack(QStringLiteral("t"), QStringLiteral("a"));
+  CHECK(played == QStringList{QStringLiteral("t@a")});
+
+  video = true;
+  ui.playTrack(QStringLiteral("u"), QStringLiteral("b"));
+  REQUIRE(confirm.count() == 1);
+  CHECK(confirm[0][0].toString() == QStringLiteral("u"));
+  CHECK(confirm[0][1].toString() == QStringLiteral("b"));
+  CHECK(played.size() == 1);
+  ui.playTrack(QStringLiteral("u"), QStringLiteral("b"), true);
+  CHECK(played.last() == QStringLiteral("u@b"));
+
+  // In a group music cannot play: the toast says why.
+  video = false;
+  available = false;
+  ui.playTrack(QStringLiteral("v"), QString());
+  CHECK(played.size() == 2);
+  CHECK(messages.count() == 2);
 }

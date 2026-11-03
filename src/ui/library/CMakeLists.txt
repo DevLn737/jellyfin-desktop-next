@@ -27,6 +27,7 @@ qt_add_qml_module(jfd_ui_library
     ItemPage.qml
     LibraryPage.qml
     LoginPage.qml
+    PersonPage.qml
     SearchPage.qml
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell)
 target_link_libraries(jfd_ui_library

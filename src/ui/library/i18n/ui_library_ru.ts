@@ -305,18 +305,45 @@
     </message>
 </context>
 <context>
+    <name>PersonPage</name>
+    <message>
+        <source>Person</source>
+        <translation>Человек</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n title(s)</source>
+        <translation>
+            <numerusform>%n фильм или сериал</numerusform>
+            <numerusform>%n фильма или сериала</numerusform>
+            <numerusform>%n фильмов или сериалов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>♥ Favorite</source>
+        <translation>♥ В избранном</translation>
+    </message>
+    <message>
+        <source>♡ Add to favorites</source>
+        <translation>♡ В избранное</translation>
+    </message>
+    <message>
+        <source>No films or series with this person.</source>
+        <translation>Фильмов и сериалов с этим человеком нет.</translation>
+    </message>
+</context>
+<context>
     <name>SearchPage</name>
     <message>
         <source>Search</source>
         <translation>Поиск</translation>
     </message>
     <message>
-        <source>Films, series, episodes, albums, artists, playlists</source>
-        <translation>Фильмы, сериалы, серии, альбомы, исполнители, плейлисты</translation>
-    </message>
-    <message>
         <source>Nothing found.</source>
         <translation>Ничего не найдено.</translation>
+    </message>
+    <message>
+        <source>Films, series, episodes, music, people</source>
+        <translation>Фильмы, сериалы, серии, музыка, люди</translation>
     </message>
 </context>
 <context>
@@ -348,6 +375,14 @@
     <message>
         <source>Watching together is not available in this build yet.</source>
         <translation>Совместный просмотр в этой сборке пока недоступен.</translation>
+    </message>
+    <message>
+        <source>Music is not available in this build yet.</source>
+        <translation>Музыка в этой сборке пока недоступна.</translation>
+    </message>
+    <message>
+        <source>Leave the group to play music.</source>
+        <translation>Выйдите из группы, чтобы слушать музыку.</translation>
     </message>
 </context>
 </TS>

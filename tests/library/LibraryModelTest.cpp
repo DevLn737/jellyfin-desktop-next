@@ -330,6 +330,26 @@ TEST_CASE("A movie library can list its collections; a collection lists its own 
   CHECK(q.queryItemValue(QStringLiteral("recursive")) == QStringLiteral("false"));
 }
 
+TEST_CASE("A person lists the films and series they appear in") {
+  Movies movies;
+  movies.total = 3;
+  LibraryFixture f([&movies](const HttpRequest& r) { return movies(r); });
+  LibraryModel person(f.client);
+  person.setCollectionType(LibraryModel::PersonItems);
+  person.setSortBy(QStringLiteral("PremiereDate"));
+  person.setDescending(true);
+  person.setLibraryId(QStringLiteral("p1"));
+  REQUIRE(waitFor([&] { return person.count() == 3 && !person.loading(); }));
+  const QUrlQuery q = lastQuery(f, QStringLiteral("/Items"));
+  CHECK(q.queryItemValue(QStringLiteral("personIds")) == QStringLiteral("p1"));
+  CHECK_FALSE(q.hasQueryItem(QStringLiteral("parentId")));
+  CHECK(q.queryItemValue(QStringLiteral("includeItemTypes")) == QStringLiteral("Movie,Series"));
+  CHECK(q.queryItemValue(QStringLiteral("recursive")) == QStringLiteral("true"));
+  CHECK(q.queryItemValue(QStringLiteral("sortOrder")) == QStringLiteral("Descending"));
+  // A person is not a library: there are no filters to ask for.
+  CHECK(f.count(QStringLiteral("/Items/Filters")) == 0);
+}
+
 TEST_CASE("The collection index finds the collections holding an item") {
   int collectionListings = 0;
   QStringList b2Items{QStringLiteral("m2")};

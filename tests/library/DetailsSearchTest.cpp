@@ -147,6 +147,7 @@ TEST_CASE("Favorite and watched toggles reach every model through the updates") 
 
 TEST_CASE("Search waits for typing to pause and shows only the latest answer") {
   LibraryFixture f([](const HttpRequest& r) {
+    if (r.path == QLatin1String("/Persons")) return ok(page(""));
     const QString term = r.query.queryItemValue(QStringLiteral("searchTerm"));
     if (term == QLatin1String("slow"))
       return ok(page(R"({"Id": "old", "Name": "Old", "Type": "Movie"})"), 400);
@@ -160,7 +161,9 @@ TEST_CASE("Search waits for typing to pause and shows only the latest answer") {
   search.setText(QStringLiteral("fr"));
   search.setText(QStringLiteral("fri"));
   REQUIRE(waitFor([&] { return search.results()->count() == 1; }));
-  CHECK(f.server.requests().size() == 1);
+  // One search for titles and music, one for people.
+  CHECK(f.count(QStringLiteral("/Items")) == 1);
+  CHECK(f.count(QStringLiteral("/Persons")) == 1);
   CHECK(search.results()->entry(0)->item.name == QStringLiteral("fri"));
 
   // A slow answer for an earlier text never replaces a newer one.
@@ -179,6 +182,61 @@ TEST_CASE("Search waits for typing to pause and shows only the latest answer") {
   // Clearing is immediate.
   search.setText(QString());
   CHECK(search.results()->count() == 0);
+}
+
+TEST_CASE("Search finds tracks and people; people come last") {
+  bool peopleFail = false;
+  LibraryFixture f([&peopleFail](const HttpRequest& r) {
+    if (r.path == QLatin1String("/Persons")) {
+      if (peopleFail) return HttpResponse{500, "{}"};
+      // The people answer comes first; the list still keeps them last.
+      return ok(page(R"({"Id": "p1", "Name": "Some Actor", "Type": "Person",
+                         "ImageTags": {"Primary": "pp"}})"));
+    }
+    return ok(page(R"({"Id": "t1", "Name": "Track", "Type": "Audio", "MediaType": "Audio",
+                       "AlbumId": "al1", "Album": "Album", "AlbumPrimaryImageTag": "at",
+                       "Artists": ["Band", "Guest"]},
+                      {"Id": "m1", "Name": "Movie", "Type": "Movie"})"),
+              150);
+  });
+  SearchModel::Options options;
+  options.delayMs = 10;
+  options.peopleLimit = 7;
+  SearchModel search(f.client, options);
+  search.setText(QStringLiteral("k"));
+  REQUIRE(waitFor([&] { return search.results()->count() == 3 && !search.loading(); }));
+  const ItemListModel& results = *search.results();
+  CHECK(results.entry(0)->item.type == QStringLiteral("Audio"));
+  CHECK(results.entry(2)->item.type == QStringLiteral("Person"));
+  const QModelIndex track = results.index(0);
+  CHECK(results.data(track, ItemListModel::AlbumIdRole).toString() == QStringLiteral("al1"));
+  CHECK(results.data(track, ItemListModel::SubtitleRole).toString() == QStringLiteral("Band, Guest"));
+  // A track without a cover of its own shows its album's.
+  CHECK(results.entry(0)->imageUrl.path() == QStringLiteral("/Items/al1/Images/Primary"));
+
+  const HttpRequest* items = nullptr;
+  const HttpRequest* people = nullptr;
+  for (const HttpRequest& r : f.server.requests()) {
+    if (r.path == QLatin1String("/Items")) items = &r;
+    if (r.path == QLatin1String("/Persons")) people = &r;
+  }
+  REQUIRE(items != nullptr);
+  REQUIRE(people != nullptr);
+  CHECK(items->query.queryItemValue(QStringLiteral("includeItemTypes"))
+            .split(QLatin1Char(','))
+            .contains(QStringLiteral("Audio")));
+  CHECK(people->query.queryItemValue(QStringLiteral("searchTerm")) == QStringLiteral("k"));
+  CHECK(people->query.queryItemValue(QStringLiteral("limit")) == QStringLiteral("7"));
+  CHECK(people->query.queryItemValue(QStringLiteral("userId")) == QStringLiteral("user1"));
+
+  // Without the people search the rest is still found, with no error.
+  peopleFail = true;
+  search.setText(QStringLiteral("ke"));
+  REQUIRE(waitFor([&] {
+    return search.results()->count() == 2 && !search.loading() &&
+           f.count(QStringLiteral("/Persons")) == 2;
+  }));
+  CHECK(search.errorText().isEmpty());
 }
 
 TEST_CASE("Socket messages become user data and library changes") {

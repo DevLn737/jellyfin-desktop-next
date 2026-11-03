@@ -79,9 +79,13 @@ FocusScope {
         const item = mediaRepeater.itemAt(index - commandList.length)
         if (!item)
             return
-        const route = Library.routeFor(item.itemId, item.itemType)
         close()
-        Navigator.navigate(route)
+        // A track has no page: it plays in its album.
+        if (item.itemType === "Audio") {
+            Library.playTrack(item.itemId, item.albumId)
+            return
+        }
+        Navigator.navigate(Library.routeFor(item.itemId, item.itemType))
     }
 
     visible: opened
@@ -215,6 +219,7 @@ FocusScope {
                             required property int index
                             readonly property string itemId: model.itemId || ""
                             readonly property string itemType: model.type || ""
+                            readonly property string albumId: model.albumId || ""
                             readonly property int position: palette.commandList.length + index
                             width: content.width
                             text: model.name || ""

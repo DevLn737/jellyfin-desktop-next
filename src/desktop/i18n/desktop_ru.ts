@@ -315,6 +315,21 @@
     </message>
 </context>
 <context>
+    <name>Main</name>
+    <message>
+        <source>Stop the video?</source>
+        <translation>Остановить видео?</translation>
+    </message>
+    <message>
+        <source>Playing music stops the video that is playing now.</source>
+        <translation>Музыка остановит видео, которое сейчас идёт.</translation>
+    </message>
+    <message>
+        <source>Play music</source>
+        <translation>Включить музыку</translation>
+    </message>
+</context>
+<context>
     <name>MusicNav</name>
     <message>
         <source>Music</source>
