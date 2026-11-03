@@ -10,6 +10,8 @@ T.Button {
 
     property url iconSource
     property string toolTipText
+    // Hides the tooltip, for example while the menu the button opened shows.
+    property bool toolTipSuppressed: false
 
     implicitWidth: Theme.controlHeight
     implicitHeight: Theme.controlHeight
@@ -37,6 +39,6 @@ T.Button {
 
     ToolTipLabel {
         text: control.toolTipText
-        shown: control.hovered && control.toolTipText.length > 0
+        shown: control.hovered && !control.down && !control.toolTipSuppressed && control.toolTipText.length > 0
     }
 }
