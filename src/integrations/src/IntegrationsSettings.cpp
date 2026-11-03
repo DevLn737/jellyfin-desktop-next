@@ -27,13 +27,26 @@ namespace jfd::integrations {
         "The Discord app on this computer shows the title, and \"Watching together\" in a group.");
     section.settings.append(discord);
 
+    settings::SettingDescriptor poster;
+    poster.key = key(keys::DiscordPoster);
+    poster.type = settings::SettingType::Bool;
+    poster.defaultValue = false;
+    poster.label = QT_TRANSLATE_NOOP("IntegrationsSettings", "Show the poster in Discord");
+    poster.description = QT_TRANSLATE_NOOP(
+        "IntegrationsSettings",
+        "Discord loads the poster from your server, so people who see your status can see the "
+        "server's address. Only for servers with a public https address.");
+    section.settings.append(poster);
+
     settings::SettingDescriptor updates;
     updates.key = key(keys::CheckForUpdates);
     updates.type = settings::SettingType::Bool;
     updates.defaultValue = true;
-    updates.label = QT_TRANSLATE_NOOP("IntegrationsSettings", "Check for a new version at startup");
-    updates.description = QT_TRANSLATE_NOOP("IntegrationsSettings",
-                                            "Only shows a link to the download page; nothing is installed.");
+    updates.label = QT_TRANSLATE_NOOP("IntegrationsSettings", "Check for updates at startup");
+    updates.description = QT_TRANSLATE_NOOP(
+        "IntegrationsSettings",
+        "A new version is downloaded and its signature checked; it is installed only when you choose "
+        "\"Restart and update\". Builds that cannot update themselves show a link to the download page.");
     section.settings.append(updates);
 
     settings::SettingDescriptor channel;

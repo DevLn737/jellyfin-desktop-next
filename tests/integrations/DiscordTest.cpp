@@ -325,3 +325,36 @@ TEST_CASE("Presence keeps the timer through pauses and rebases on seeks and new 
   presence.update(std::nullopt);
   CHECK(next().isNull());
 }
+
+TEST_CASE("The poster, which shows the server's address, is on the card only when opted in") {
+  const QString prefix = uniquePrefix();
+  QLocalServer server;
+  REQUIRE(server.listen(prefix + QLatin1Char('0')));
+  DiscordPresence presence({prefix + QLatin1Char('0')});
+  presence.configure(true, AppId);
+  REQUIRE(waitFor([&] { return server.hasPendingConnections(); }));
+  std::unique_ptr<QLocalSocket> peer(server.nextPendingConnection());
+  CHECK_FALSE(readJson(peer.get()).isEmpty());
+  ready(peer.get());
+  auto next = [&] {
+    const QJsonObject request = readJson(peer.get());
+    acknowledge(peer.get(), request);
+    return request.value(QStringLiteral("args")).toObject().value(QStringLiteral("activity")).toObject();
+  };
+  auto image = [](const QJsonObject& activity) {
+    return activity.value(QStringLiteral("assets")).toObject().value(QStringLiteral("large_image")).toString();
+  };
+  CHECK(next().isEmpty());
+
+  const PresenceInfo info = movie();
+  REQUIRE(info.poster.isValid());
+  presence.update(info);
+  const QString hidden = image(next());
+  CHECK_FALSE(hidden.contains(Server.host()));
+  CHECK_FALSE(hidden.isEmpty());
+
+  presence.setShowPoster(true);
+  CHECK(image(next()) == info.poster.toString(QUrl::FullyEncoded));
+  presence.setShowPoster(false);
+  CHECK(image(next()) == hidden);
+}

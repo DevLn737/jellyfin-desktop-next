@@ -163,10 +163,13 @@ namespace jfd::desktop {
     integrations.bridge->setPresence(&integrations.presence);
 
     settings::Settings& settings = *services.settings;
+    integrations.presence.setShowPoster(settings.value(integrations::keys::DiscordPoster).toBool());
     integrations.presence.configure(settings.value(integrations::keys::Discord).toBool());
     QObject::connect(&settings, &settings::Settings::valueChanged, &integrations.presence,
                      [&integrations](const QString& key, const QVariant& value) {
                        if (key == integrations::keys::Discord) integrations.presence.configure(value.toBool());
+                       if (key == integrations::keys::DiscordPoster)
+                         integrations.presence.setShowPoster(value.toBool());
                      });
   }
 

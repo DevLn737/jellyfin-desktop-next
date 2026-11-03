@@ -26,6 +26,10 @@ namespace jfd::integrations {
     explicit DiscordPresence(QStringList endpoints = {}, QObject* parent = nullptr);
 
     void configure(bool enabled, const QString& applicationId = defaultApplicationId());
+    // The poster is fetched by Discord from the server, so everyone who sees
+    // the card can see the server's address: off unless the user opts in
+    // (keys::DiscordPoster). Off, the card shows the app's icon.
+    void setShowPoster(bool show);
     // nullopt: nothing plays; the card is removed.
     void update(const std::optional<PresenceInfo>& info);
 
@@ -40,6 +44,7 @@ namespace jfd::integrations {
     std::optional<PresenceInfo> m_info;
     QElapsedTimer m_positionClock;
     qint64 m_start = 0;
+    bool m_showPoster = false;
     std::function<qint64()> m_now = [] { return QDateTime::currentSecsSinceEpoch(); };
   };
 

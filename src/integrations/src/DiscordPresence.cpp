@@ -32,6 +32,12 @@ namespace jfd::integrations {
     publish();
   }
 
+  void DiscordPresence::setShowPoster(bool show) {
+    if (show == m_showPoster) return;
+    m_showPoster = show;
+    publish();
+  }
+
   void DiscordPresence::update(const std::optional<PresenceInfo>& info) {
     if (!info) {
       m_info.reset();
@@ -57,6 +63,7 @@ namespace jfd::integrations {
     }
     PresenceInfo now = *m_info;
     if (now.playing && m_positionClock.isValid()) now.positionMs += m_positionClock.elapsed();
+    if (!m_showPoster) now.poster = QUrl();
     const qint64 seconds = m_now();
     m_start = presenceStart(m_start, now.positionMs, now.playing, seconds);
     m_ipc.setActivity(buildActivity(now, m_start));

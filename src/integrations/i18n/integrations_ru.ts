@@ -47,16 +47,24 @@
         <translation>Показывать в Discord, что я смотрю</translation>
     </message>
     <message>
+        <source>Show the poster in Discord</source>
+        <translation>Показывать постер в Discord</translation>
+    </message>
+    <message>
+        <source>Discord loads the poster from your server, so people who see your status can see the server&apos;s address. Only for servers with a public https address.</source>
+        <translation>Discord загружает постер с вашего сервера, поэтому те, кто видит ваш статус, увидят и адрес сервера. Только для серверов с публичным адресом https.</translation>
+    </message>
+    <message>
         <source>The Discord app on this computer shows the title, and &quot;Watching together&quot; in a group.</source>
         <translation>Приложение Discord на этом компьютере покажет название, а в группе — «Смотрим вместе».</translation>
     </message>
     <message>
-        <source>Check for a new version at startup</source>
-        <translation>Проверять новую версию при запуске</translation>
+        <source>Check for updates at startup</source>
+        <translation>Проверять обновления при запуске</translation>
     </message>
     <message>
-        <source>Only shows a link to the download page; nothing is installed.</source>
-        <translation>Только показывает ссылку на страницу загрузки, ничего не устанавливает.</translation>
+        <source>A new version is downloaded and its signature checked; it is installed only when you choose &quot;Restart and update&quot;. Builds that cannot update themselves show a link to the download page.</source>
+        <translation>Новая версия скачивается и проверяется по подписи; устанавливается она, только когда вы выберете «Перезапустить и обновить». Сборки, которые не умеют обновляться сами, показывают ссылку на страницу загрузки.</translation>
     </message>
     <message>
         <source>Update channel</source>
