@@ -76,6 +76,10 @@ namespace jfd::seerr {
     // Probes first and sends the password only to a Seerr that uses Jellyfin.
     void signIn(const QString& userName, const QString& password, QObject* context,
                 Callback<User> done);
+    // The sign-in alone, for a caller that has just probed this server and
+    // seen it is a Seerr on Jellyfin.
+    void signInProbed(const QString& userName, const QString& password, QObject* context,
+                      Callback<User> done);
     void currentUser(QObject* context, Callback<User> done);
     void signOut(QObject* context, Callback<api::Empty> done);
 

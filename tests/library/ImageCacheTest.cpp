@@ -4,8 +4,11 @@
 
 #include <QBuffer>
 #include <QDir>
+#include <QFile>
 #include <QImage>
 #include <QTemporaryDir>
+
+#include <memory>
 
 using namespace jfd;
 using jfd::library::ImageCache;
@@ -135,30 +138,91 @@ TEST_CASE("The disk cache survives a restart and stays under its limit") {
   const int fileSize = static_cast<int>(png(800, 1200).size());
   ImageCache::Limits limits;
   limits.diskBytes = fileSize * 3 + 10;
-  // Downloads run newest first; the file written last is the one trimming
-  // keeps for sure.
-  int last = -1;
+  // One download at a time, so the file written last is known: it is the
+  // one trimming keeps for sure. (Decoding runs on a worker pool, so with
+  // parallel downloads the order of the answers says nothing about the
+  // order of the writes.)
+  const int last = 5;
   {
     ImageCache cache(f.client, dir.path(), limits);
-    int done = 0;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i <= last; ++i) {
+      bool done = false;
       cache.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(i)), QSize(20, 30),
-                    nullptr, [&done, &last, i](const QImage&) {
-                      ++done;
-                      last = i;
-                    });
-    REQUIRE(waitFor([&] { return done == 6; }, 10000));
+                    nullptr, [&done](const QImage&) { done = true; });
+      REQUIRE(waitFor([&] { return done; }, 10000));
+    }
     CHECK(cache.diskBytes() <= limits.diskBytes);
   }
   const auto requests = f.server.requests().size();
   ImageCache again(f.client, dir.path(), limits);
   CHECK(again.diskBytes() > 0);
   QImage image;
+  bool delivered = false;
   again.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(last)), QSize(20, 30),
-                nullptr, [&](const QImage& i) { image = i; });
-  // Read from disk, synchronously.
+                nullptr, [&](const QImage& i) {
+                  image = i;
+                  delivered = true;
+                });
+  // Read and decoded on the worker pool, not on the GUI thread: a moment
+  // later, and without the network.
+  CHECK_FALSE(delivered);
+  REQUIRE(waitFor([&] { return delivered; }, 5000));
   CHECK_FALSE(image.isNull());
+  CHECK(image.width() <= 20);
   CHECK(f.server.requests().size() == requests);
+  // Then from memory, before request() returns.
+  QImage again2;
+  again.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(last)), QSize(20, 30),
+                nullptr, [&](const QImage& i) { again2 = i; });
+  CHECK_FALSE(again2.isNull());
+}
+
+TEST_CASE("A corrupt file in the disk cache is fetched from the server again") {
+  Images images;
+  LibraryFixture f([&images](const HttpRequest& r) { return images(r); });
+  QTemporaryDir dir;
+  const QUrl url = at(f, QStringLiteral("/Items/9/Images/Primary"));
+  {
+    ImageCache cache(f.client, dir.path());
+    bool done = false;
+    cache.request(url, QSize(20, 30), nullptr, [&](const QImage&) { done = true; });
+    REQUIRE(waitFor([&] { return done; }));
+  }
+  const QStringList files = QDir(dir.path()).entryList(QDir::Files);
+  REQUIRE(files.size() == 1);
+  {
+    QFile file(QDir(dir.path()).filePath(files.front()));
+    REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    file.write("not an image");
+  }
+  const auto requests = f.server.requests().size();
+  ImageCache cache(f.client, dir.path());
+  QImage image;
+  bool done = false;
+  cache.request(url, QSize(20, 30), nullptr, [&](const QImage& i) {
+    image = i;
+    done = true;
+  });
+  REQUIRE(waitFor([&] { return done; }));
+  CHECK_FALSE(image.isNull());
+  CHECK(f.server.requests().size() == requests + 1);
+}
+
+TEST_CASE("The gate posts to the cache's thread only while the cache lives") {
+  Images images;
+  LibraryFixture f([&images](const HttpRequest& r) { return images(r); });
+  auto cache = std::make_unique<ImageCache>(f.client, QString());
+  const auto gate = cache->gate();
+  int ran = 0;
+  REQUIRE(gate->post([&](ImageCache&) { ++ran; }));
+  REQUIRE(waitFor([&] { return ran == 1; }));
+  // Posted, then the cache goes before the event loop runs it.
+  REQUIRE(gate->post([&](ImageCache&) { ++ran; }));
+  cache.reset();
+  waitFor([] { return false; }, 50);
+  CHECK(ran == 1);
+  CHECK_FALSE(gate->post([&](ImageCache&) { ++ran; }));
+  CHECK(ran == 1);
 }
 
 TEST_CASE("The token goes only to the client's own server; keys leave credentials out") {

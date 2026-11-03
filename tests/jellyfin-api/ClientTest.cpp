@@ -7,6 +7,7 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 
 #include <memory>
@@ -138,6 +139,53 @@ TEST_CASE("A callback whose context is gone is never called") {
   waitFor([&] { return server.requests().size() == 1; });
   waitFor([] { return false; }, 400);
   CHECK_FALSE(called);
+}
+
+TEST_CASE("A read whose context is gone is stopped and frees its connection") {
+  FakeServer server([](const HttpRequest& r) {
+    const int delay = r.path == QLatin1String("/Users/slow") ? 3000 : 0;
+    return HttpResponse{200, R"({"Id": "user1"})", "application/json", delay};
+  });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("token1"), QStringLiteral("user1"));
+  // Six slow reads take every connection to the host.
+  auto page = std::make_unique<QObject>();
+  for (int i = 0; i < 6; ++i)
+    client.rawRequest(JellyfinClient::Method::Get, QStringLiteral("Users/slow"), {}, page.get(),
+                      [](int, QByteArray) {});
+  REQUIRE(waitFor([&] { return server.requests().size() == 6; }));
+  // The page is left: its reads stop, and the next request does not wait
+  // for them.
+  page.reset();
+  QElapsedTimer timer;
+  timer.start();
+  auto result = run<UserInfo>([&](auto done) { client.currentUser(nullptr, done); });
+  CHECK(*result);
+  CHECK(timer.elapsed() < 2000);
+}
+
+TEST_CASE("A new sign-in clears the old session and says so") {
+  FakeServer server([](const HttpRequest&) { return HttpResponse{401, {}, {}, 0}; });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("old"), QStringLiteral("user1"));
+  QSignalSpy changed(&client, &JellyfinClient::sessionChanged);
+  auto result = run<AuthenticationResult>(
+      [&](auto done) { client.signIn(QStringLiteral("bob"), QStringLiteral("x"), nullptr, done); });
+  REQUIRE_FALSE(*result);
+  CHECK_FALSE(client.isSignedIn());
+  CHECK(client.userId().isEmpty());
+  CHECK(changed.count() >= 1);
+
+  // Quick Connect too.
+  client.setSession(QStringLiteral("old"), QStringLiteral("user1"));
+  changed.clear();
+  auto quick = run<AuthenticationResult>(
+      [&](auto done) { client.quickConnectSignIn(QStringLiteral("secret"), nullptr, done); });
+  REQUIRE_FALSE(*quick);
+  CHECK(client.userId().isEmpty());
+  CHECK(changed.count() >= 1);
 }
 
 TEST_CASE("Unreachable servers and timeouts are told apart") {

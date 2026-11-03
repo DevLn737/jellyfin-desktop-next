@@ -23,6 +23,18 @@ add_test(NAME jfd_core_tests COMMAND jfd_core_tests)
 add_test(NAME qml_literals_check
   COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/i18n/QmlLiterals.cmake")
 
+# Every file in an icons*/ folder has its line in LICENSES.md, and every
+# line there names a file that exists.
+add_test(NAME licenses_check
+  COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/licenses/IconLicenses.cmake")
+
+# The MSI versions packaging/release-version.sh derives from release tags.
+find_program(JFD_BASH bash)
+if(UNIX AND JFD_BASH)
+  add_test(NAME release_version_check
+    COMMAND "${JFD_BASH}" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/release-version-test.sh" "${PROJECT_SOURCE_DIR}")
+endif()
+
 add_executable(jfd_diagnostics_tests
   core/main.cpp
   diagnostics/FrameStatsTest.cpp
@@ -113,13 +125,13 @@ if(TARGET jfd_jellyfin_api)
   jfd_add_qt_test(jfd_playback_tests playback/TrackTableTest.cpp playback/PlaybackReporterTest.cpp
     playback/StreamPlanTest.cpp playback/TrackControllerTest.cpp
     playback/SegmentSkipperTest.cpp playback/TrackPreferenceTest.cpp playback/PlayerOptionsTest.cpp)
-  target_link_libraries(jfd_playback_tests PRIVATE jfd::playback)
+  target_link_libraries(jfd_playback_tests PRIVATE jfd::playback jfd_test_support)
 
   if(TARGET jfd_integrations)
     jfd_add_qt_test(jfd_integrations_tests integrations/DiscordTest.cpp integrations/UpdateCheckerTest.cpp
       integrations/MediaSessionBridgeTest.cpp integrations/IntegrationsSettingsTest.cpp
       integrations/ReleaseSignatureTest.cpp integrations/AppImageUpdaterTest.cpp
-      integrations/MsiUpdaterTest.cpp)
+      integrations/MsiUpdaterTest.cpp integrations/SignedDownloadTest.cpp)
     target_link_libraries(jfd_integrations_tests PRIVATE jfd::integrations Qt6::WebSockets)
   endif()
 
@@ -156,7 +168,7 @@ if(TARGET jfd_jellyfin_api)
   endif()
 
   if(TARGET jfd_session_runtime)
-    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp)
+    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
@@ -189,6 +201,12 @@ if(JFD_BUILD_APP)
   target_link_libraries(jfd_media_backend_tests PRIVATE jfd::media_backend doctest)
   add_test(NAME jfd_media_backend_tests COMMAND jfd_media_backend_tests)
   set_tests_properties(jfd_media_backend_tests PROPERTIES TIMEOUT 120)
+
+  # The video items' render-thread decisions, without a GPU.
+  add_executable(jfd_render_setup_tests support/QtGuiTestMain.cpp media/RenderSetupTest.cpp)
+  target_link_libraries(jfd_render_setup_tests PRIVATE jfd::media_backend doctest)
+  add_test(NAME jfd_render_setup_tests COMMAND jfd_render_setup_tests)
+  set_tests_properties(jfd_render_setup_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
 
   if(JFD_SERVER_TESTS AND TARGET jfd_session_runtime)
     # The same on headless mpv, playing the server's stream.

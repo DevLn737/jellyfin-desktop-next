@@ -189,9 +189,9 @@ namespace jfd::desktop {
   void installSeerr(AppServices& services, QQmlEngine& engine);
   void uninstallSeerr(AppServices& services);
 
-  // Leaves a SyncPlay group before quitting; calls done when the server
-  // answered or after a short timeout, so quitting never hangs on the
-  // network.
+  // Before quitting: reports the playing file (and music track) stopped and
+  // leaves a SyncPlay group; calls done when the server answered all of
+  // them or after a short timeout, so quitting never hangs on the network.
   void prepareExit(AppServices& services, std::function<void()> done);
 
 } // namespace jfd::desktop

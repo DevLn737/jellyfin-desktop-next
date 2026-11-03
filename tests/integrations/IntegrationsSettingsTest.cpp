@@ -19,6 +19,8 @@ TEST_CASE("Discord is off and the update check on until the user changes them") 
   QTemporaryDir dir;
   jfd::settings::Settings settings(registry, dir.filePath(QStringLiteral("settings.ini")));
   CHECK(settings.value(keys::Discord) == QVariant(false));
+  // The poster shares the server's address with Discord: opt-in.
+  CHECK(settings.value(keys::DiscordPoster) == QVariant(false));
   CHECK(settings.value(keys::CheckForUpdates) == QVariant(true));
   CHECK(settings.setValue(keys::Discord, true));
   CHECK(settings.value(keys::Discord) == QVariant(true));

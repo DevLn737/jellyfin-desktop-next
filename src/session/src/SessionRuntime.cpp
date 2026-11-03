@@ -26,7 +26,11 @@ namespace jfd::session {
     const Post post = [queue = m_queue](core::SessionInput input) { queue->post(std::move(input)); };
     m_timers = new QtTimers(m_clock, [post](core::TimerFired fired) { post(fired); }, this);
     m_transport = new ApiTransport(client, this);
-    m_group = std::make_unique<syncplay::GroupClient>(*m_transport, m_clock, post);
+    const auto schedule = [this](core::WallTicks delay, std::function<void()> task) {
+      QTimer::singleShot(std::chrono::duration_cast<std::chrono::milliseconds>(delay), this,
+                         std::move(task));
+    };
+    m_group = std::make_unique<syncplay::GroupClient>(*m_transport, m_clock, post, schedule);
     m_backend = makeBackend(m_clock, post);
     m_session = std::make_unique<core::PlaybackSession>(
         core::SessionPorts{*m_backend, m_clock, *m_timers, *m_group, m_hub}, settings.session);
@@ -34,6 +38,13 @@ namespace jfd::session {
     m_hub.snapshotChanged(m_session->snapshot());
     m_launcher = new PlaybackLauncher(client, std::move(settings.deviceProfile), post, this);
     m_notices = m_hub.subscribe({}, [this](const core::SessionNotice& notice) { onNotice(notice); });
+    // The group waits for our Ready on its item: one we cannot open would
+    // keep everyone waiting, so we leave (GroupModel says why).
+    connect(m_launcher, &PlaybackLauncher::openFailed, this, [this](const PlaybackLauncher::Request& request) {
+      const auto& group = m_session->snapshot().group;
+      if (request.playlistItem.isEmpty() || !group || group->playlistItem != request.playlistItem) return;
+      m_group->leaveGroup();
+    });
 
     // The socket hands over the Data objects; the group client parses whole
     // session messages, as they arrive on the wire.

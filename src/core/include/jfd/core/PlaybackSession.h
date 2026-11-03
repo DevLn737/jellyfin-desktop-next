@@ -113,6 +113,11 @@ namespace jfd::core {
       std::optional<TimerId> correctionTimer;
       bool reportedBuffering = false;
       std::optional<std::int64_t> driftMilliseconds;
+      // A command that came while the clock offset was unknown: scheduled
+      // once ClockSynced arrives.
+      bool commandDeferred = false;
+      // A Ready (true) or Buffering (false) held back for the same reason.
+      std::optional<bool> deferredReady;
     };
 
     bool accept(const SessionInput& input);
@@ -147,6 +152,8 @@ namespace jfd::core {
     void on(const group::QueueChanged&);
     void on(const group::RateChangeRejected&);
     void on(const group::ClockSynced&);
+    void on(const group::ClockLost&);
+    void on(const group::RequestFailed&);
     void on(const TimerFired&);
 
     // Media helpers.
@@ -168,6 +175,9 @@ namespace jfd::core {
     void clearScheduledCommand();
     void clearCorrection();
     void cancelGroupTimers();
+    // Runs the last command now or arms its timer by server time.
+    // `fresh`: just received (an Unpause far away seeks ahead of time).
+    void scheduleCommand(bool fresh);
     void executeCommand(const group::Command& command, bool late);
     void applyDuplicate(const group::Command& command);
     void reportReady(bool ready);
@@ -201,6 +211,9 @@ namespace jfd::core {
     std::optional<Media> m_media;
     std::optional<Group> m_group;
     ClockOffset m_offset;
+    // Whether m_offset was measured since the last ClockLost. A session
+    // starts without one: server time is unknown until the first ClockSynced.
+    bool m_clockSynced = false;
     PlaybackRate m_personalRate = PlaybackRate::normal();
     PlaybackPhase m_endPhase = PlaybackPhase::Idle;
     std::string m_error;

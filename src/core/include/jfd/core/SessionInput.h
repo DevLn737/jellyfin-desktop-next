@@ -179,6 +179,7 @@ namespace jfd::core {
                    group::QueueChanged, group::RateChangeRejected, group::ClockSynced,
                    TimerFired, intent::Next, intent::Previous, intent::SelectTrack,
                    intent::AddExternalTrack, group::ParticipantsChanged,
-                   intent::SetSyncCorrection, intent::PreloadNext, backend::Advanced>;
+                   intent::SetSyncCorrection, intent::PreloadNext, backend::Advanced,
+                   group::ClockLost, group::RequestFailed>;
 
 } // namespace jfd::core

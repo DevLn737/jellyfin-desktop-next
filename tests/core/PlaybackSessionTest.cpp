@@ -507,3 +507,68 @@ TEST_CASE("Opening, stopping or ending drops the preload; a stale Advanced chang
   h.post(backend::Advanced{third, newest});
   CHECK(h.snapshot().media == newest);
 }
+
+TEST_CASE("Before the first clock sync, group commands and Ready wait for server time") {
+  SessionHarness h({}, false);
+  h.join("p1");
+  h.open(h.media("p1"), true);
+  // The file is ready, but When cannot be stated without an offset.
+  CHECK(h.outbox.all<outgoing::Ready>().empty());
+
+  h.post(h.command(GroupCommandType::Unpause, 0, 500ms));
+  CHECK_FALSE(h.timers.isArmed(TimerPurpose::GroupCommand));
+  CHECK_FALSE(h.backend.last<command::SetPaused>());
+
+  // The server clock is 2 s ahead of ours: the unpause was due 1.5 s ago.
+  h.post(group::ClockSynced{ClockOffset{std::chrono::seconds(2)}, WallTicks(0)});
+  REQUIRE(h.outbox.all<outgoing::Ready>().size() == 1);
+  REQUIRE(h.backend.last<command::SetPaused>());
+  CHECK_FALSE(h.backend.last<command::SetPaused>()->paused);
+}
+
+TEST_CASE("A command armed before the clock was lost is re-armed by the new offset") {
+  SessionHarness h;
+  h.join("p1");
+  h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0, 10s));
+  REQUIRE(h.timers.isArmed(TimerPurpose::GroupCommand));
+
+  // A reconnect (after sleep): the old offset may be off by hours.
+  h.post(group::ClockLost{});
+  CHECK_FALSE(h.timers.isArmed(TimerPurpose::GroupCommand));
+  h.advance(5s);
+  CHECK_FALSE(h.backend.last<command::SetPaused>());
+
+  // The new offset puts the command's instant 1 s from now.
+  h.post(group::ClockSynced{ClockOffset{std::chrono::seconds(4)}, WallTicks(0)});
+  REQUIRE(h.timers.isArmed(TimerPurpose::GroupCommand));
+  h.advance(999ms);
+  CHECK_FALSE(h.backend.last<command::SetPaused>());
+  h.advance(1ms);
+  REQUIRE(h.backend.last<command::SetPaused>());
+  CHECK_FALSE(h.backend.last<command::SetPaused>()->paused);
+}
+
+TEST_CASE("A changed offset re-arms a scheduled command") {
+  SessionHarness h;
+  h.join("p1");
+  h.open(h.media("p1"), true);
+  h.post(h.command(GroupCommandType::Unpause, 0, 10s));
+  // Server time turns out 9 s further ahead: the command is 1 s away.
+  h.post(group::ClockSynced{ClockOffset{std::chrono::seconds(9)}, WallTicks(0)});
+  h.advance(1s);
+  REQUIRE(h.backend.last<command::SetPaused>());
+  CHECK_FALSE(h.backend.last<command::SetPaused>()->paused);
+}
+
+TEST_CASE("A failed group request of the current membership is a notice; a stale one is not") {
+  SessionHarness h;
+  h.join("p1");
+  h.post(group::RequestFailed{h.group, group::Request::Ready, 500});
+  REQUIRE(h.observer.all<notice::GroupRequestFailed>().size() == 1);
+  CHECK(h.observer.all<notice::GroupRequestFailed>()[0].httpStatus == 500);
+  h.post(group::RequestFailed{GroupEpoch{}, group::Request::Ready, 500});
+  CHECK(h.observer.all<notice::GroupRequestFailed>().size() == 1);
+  h.post(group::RequestFailed{GroupEpoch{}, group::Request::Create, 403});
+  CHECK(h.observer.all<notice::GroupRequestFailed>().size() == 2);
+}

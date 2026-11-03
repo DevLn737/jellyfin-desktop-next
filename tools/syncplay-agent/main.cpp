@@ -449,6 +449,12 @@ namespace {
                      },
                      // Reported by the runtime's queueStepRequested signal.
                      [](const notice::QueueStepRequested&) {},
+                     [](const notice::GroupRequestFailed& failed) {
+                       emit({{"t", "notice"},
+                             {"kind", "groupRequestFailed"},
+                             {"request", static_cast<int>(failed.request)},
+                             {"status", failed.httpStatus}});
+                     },
                  },
                  notice);
     }

@@ -50,8 +50,12 @@ namespace jfd::integrations {
       state.artUrl = details->artUrl;
       if (details->kind == PresenceInfo::Kind::Episode)
         state.subtitle = episodeLine(*details);
-      else if (details->kind == PresenceInfo::Kind::Music)
+      else if (details->kind == PresenceInfo::Kind::Music) {
+        state.kind = platform::MediaControlsState::Kind::Music;
         state.subtitle = details->artist;
+        state.artist = details->artist;
+        state.album = details->album;
+      }
       else if (details->year > 0)
         state.subtitle = QString::number(details->year);
     }

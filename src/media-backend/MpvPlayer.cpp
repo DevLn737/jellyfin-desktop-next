@@ -286,12 +286,29 @@ void MpvPlayer::drainEvents()
       qWarning().noquote() << "mpv" << message->prefix << QString::fromUtf8(message->text).trimmed();
       break;
     }
+    case MPV_EVENT_HOOK:
+      // Nobody listens for the hook any more (the adapter is gone): let
+      // the file go on.
+      if (!m_listener)
+        mpv_hook_continue(m_mpv.get(), static_cast<const mpv_event_hook*>(event->data)->id);
+      break;
     default:
       break;
     }
     if (m_listener)
       m_listener(*event);
   }
+}
+
+void MpvPlayer::addHook(const char* name, std::uint64_t userdata, int priority)
+{
+  if (!m_mpv)
+    return;
+  const QPair<QByteArray, std::uint64_t> hook {QByteArray(name), userdata};
+  if (m_hooks.contains(hook))
+    return;
+  m_hooks.append(hook);
+  mpv_hook_add(m_mpv.get(), userdata, name, priority);
 }
 
 void MpvPlayer::handleProperty(const mpv_event_property& property)

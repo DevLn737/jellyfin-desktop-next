@@ -1,5 +1,8 @@
 #include "MpvPlayer.h"
 #include "MpvVideoItem.h"
+#ifdef JFD_HAVE_D3D11_VIDEO
+#include "MpvD3D11VideoItem.h"
+#endif
 
 #include <QElapsedTimer>
 #include <QGuiApplication>
@@ -10,11 +13,11 @@
 #include <QSGRendererInterface>
 
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <memory>
 
 using jfd::media::MpvPlayer;
-using jfd::media::MpvVideoItem;
 
 namespace {
 
@@ -42,11 +45,14 @@ bool waitFor(const std::function<bool()>& condition, int timeoutMs)
 
 // The video moves between two windows the way picture in picture does it:
 // the item in one window goes away and a new one is made in the other, on the
-// same mpv core, while the file keeps playing.
+// same mpv core, while the file keeps playing. Item is MpvVideoItem (OpenGL)
+// or MpvD3D11VideoItem; on Direct3D 11 the new context often has to be asked
+// for again while the old window still holds the core's only one.
+template <class Item>
 struct Slot
 {
   std::unique_ptr<QQuickWindow> window = std::make_unique<QQuickWindow>();
-  QPointer<MpvVideoItem> video;
+  QPointer<Item> video;
   bool ready = false;
   QString error;
 
@@ -62,11 +68,11 @@ struct Slot
   {
     ready = false;
     error.clear();
-    auto* item = new MpvVideoItem(window->contentItem());
+    auto* item = new Item(window->contentItem());
     item->setSize(window->size());
     item->setPlayer(player);
-    QObject::connect(item, &MpvVideoItem::renderContextReady, window.get(), [this] { ready = true; }, Qt::QueuedConnection);
-    QObject::connect(item, &MpvVideoItem::renderError, window.get(), [this](const QString& e) { error = e; }, Qt::QueuedConnection);
+    QObject::connect(item, &Item::renderContextReady, window.get(), [this] { ready = true; }, Qt::QueuedConnection);
+    QObject::connect(item, &Item::renderError, window.get(), [this](const QString& e) { error = e; }, Qt::QueuedConnection);
     video = item;
   }
 
@@ -86,11 +92,9 @@ struct Slot
 
 }
 
-int main(int argc, char* argv[])
+template <class Item>
+int run(QGuiApplication& app)
 {
-  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-  QGuiApplication app(argc, argv);
-
   MpvPlayer::Options options;
   options.hwdec = QStringLiteral("no");
   options.audioOutput = QStringLiteral("null");
@@ -102,7 +106,7 @@ int main(int argc, char* argv[])
   if (!player->isValid())
     return 1;
 
-  Slot big(0), small(400);
+  Slot<Item> big(0), small(400);
   big.attach(player.get());
   check(waitFor([&] { return big.ready || !big.error.isEmpty(); }, 20000) && big.error.isEmpty(), "render context in the first window");
 
@@ -118,8 +122,8 @@ int main(int argc, char* argv[])
   QObject::connect(player.get(), &MpvPlayer::firstFrame, &app, [](double) { std::printf("     first frame again\n"); });
   for (int round = 1; round <= 3; ++round)
   {
-    Slot& from = round % 2 ? big : small;
-    Slot& to = round % 2 ? small : big;
+    Slot<Item>& from = round % 2 ? big : small;
+    Slot<Item>& to = round % 2 ? small : big;
     const double before = player->position();
     player->setStringProperty("vid", "no");
     waitFor([] { return false; }, 100);
@@ -139,4 +143,25 @@ int main(int argc, char* argv[])
     check(player->position() != before, "playback goes on across the move");
   }
   return failures ? 1 : 0;
+}
+
+// "jfd_pip_move_test d3d11" moves the Direct3D 11 item; without an argument
+// the OpenGL one.
+int main(int argc, char* argv[])
+{
+  const bool d3d11 = argc > 1 && std::strcmp(argv[1], "d3d11") == 0;
+#ifndef JFD_HAVE_D3D11_VIDEO
+  if (d3d11)
+  {
+    std::printf("FAIL this build has no Direct3D 11 video item\n");
+    return 1;
+  }
+#endif
+  QQuickWindow::setGraphicsApi(d3d11 ? QSGRendererInterface::Direct3D11 : QSGRendererInterface::OpenGL);
+  QGuiApplication app(argc, argv);
+#ifdef JFD_HAVE_D3D11_VIDEO
+  if (d3d11)
+    return run<jfd::media::MpvD3D11VideoItem>(app);
+#endif
+  return run<jfd::media::MpvVideoItem>(app);
 }

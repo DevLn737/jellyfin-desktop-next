@@ -7,6 +7,7 @@
 #include <QPointer>
 #include <QString>
 
+#include <chrono>
 #include <functional>
 
 class QFile;
@@ -27,6 +28,14 @@ namespace jfd::integrations {
     explicit SignedDownload(QNetworkAccessManager* network, QObject* parent = nullptr);
     ~SignedDownload() override;
 
+    // How long a download may go without receiving any data before it is
+    // given up. An inactivity limit, not a limit on the whole transfer, so it
+    // holds for a 100 MB installer on a slow line too. Without it a stalled
+    // connection would keep the updater busy until the program restarts.
+    static constexpr std::chrono::milliseconds defaultTransferTimeout{60'000};
+    void setTransferTimeout(std::chrono::milliseconds timeout) { m_transferTimeout = timeout; }
+    std::chrono::milliseconds transferTimeout() const { return m_transferTimeout; }
+
     // The asset of a release by name, or nullptr.
     static const ReleaseAsset* findAsset(const Release& release, const QString& name);
 
@@ -46,6 +55,8 @@ namespace jfd::integrations {
     QFile* m_file = nullptr;
     QString m_path;
     Done m_done;
+    std::chrono::milliseconds m_transferTimeout = defaultTransferTimeout;
+    bool m_writeFailed = false;
   };
 
 } // namespace jfd::integrations

@@ -142,8 +142,12 @@ namespace {
     }
 
     QTemporaryDir m_dir;
-    QQmlApplicationEngine engine;
+    // Before the engine, so it is destroyed after it: the window, the pages'
+    // models and the image loader thread use the services until the engine
+    // is gone (issue #70: a reload in flight at the end of a test reached a
+    // destroyed client and image cache).
     std::unique_ptr<ui::LibraryScreens> screens;
+    QQmlApplicationEngine engine;
     ui::Navigator* navigator = nullptr;
     QQuickWindow* window = nullptr;
     QList<QPair<QString, qint64>> played;

@@ -90,6 +90,23 @@ TEST_CASE("A track shows its artist under the title") {
   CHECK(mediaControlsState(playing(), &details).subtitle == QStringLiteral("Artist"));
 }
 
+TEST_CASE("A track tells the media controls its artist and album apart") {
+  auto details = episode();
+  details.kind = PresenceInfo::Kind::Music;
+  details.artist = QStringLiteral("Artist");
+  details.album = QStringLiteral("Album");
+  const MediaControlsState state = mediaControlsState(playing(), &details);
+  CHECK(state.kind == MediaControlsState::Kind::Music);
+  CHECK(state.artist == QStringLiteral("Artist"));
+  CHECK(state.album == QStringLiteral("Album"));
+  // Video stays video, with no artist or album.
+  auto show = episode();
+  const MediaControlsState series = mediaControlsState(playing(), &show);
+  CHECK(series.kind == MediaControlsState::Kind::Video);
+  CHECK(series.artist.isEmpty());
+  CHECK(series.album.isEmpty());
+}
+
 TEST_CASE("A group can always step its queue; movies show their year") {
   auto snapshot = playing();
   snapshot.group.emplace();

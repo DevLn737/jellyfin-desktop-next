@@ -63,6 +63,9 @@ TEST_CASE("Signing in keeps the cookie, and a new run restores it") {
     CHECK(service.userName() == QStringLiteral("alice"));
     CHECK(service.mayRequest());
     CHECK(service.serverHost().startsWith(QStringLiteral("127.0.0.1:")));
+    // The server was probed once before the password went to it.
+    CHECK(count(seerr, "GET", QStringLiteral("/api/v1/status")) == 1);
+    CHECK(count(seerr, "POST", QStringLiteral("/api/v1/auth/jellyfin")) == 1);
   }
   SeerrService again(store);
   QSignalSpy changed(&again, &SeerrService::stateChanged);

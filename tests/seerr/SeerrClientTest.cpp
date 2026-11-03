@@ -316,6 +316,19 @@ TEST_CASE("A lost session is reported once and dropped; sign-out clears it") {
   CHECK(expired.count() == 1);
 }
 
+TEST_CASE("A late sign-out answer leaves a newer session alone") {
+  FakeSeerr seerr;
+  auto client = clientFor(seerr);
+  REQUIRE(signIn(*client).ok());
+  bool answered = false;
+  client->signOut(client.get(), [&](Result<Empty>) { answered = true; });
+  // A new sign-in completes before the logout answer arrives.
+  client->setSession(QStringLiteral("newer"), 7);
+  REQUIRE(waitFor([&] { return answered; }));
+  CHECK(client->isSignedIn());
+  CHECK(client->sessionCookie() == QStringLiteral("newer"));
+}
+
 TEST_CASE("A call whose owner went away never reports back") {
   FakeSeerr seerr;
   auto client = clientFor(seerr);

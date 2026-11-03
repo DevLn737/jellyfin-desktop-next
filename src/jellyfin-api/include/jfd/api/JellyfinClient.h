@@ -258,6 +258,7 @@ namespace jfd::api {
     void sessionChanged();
 
   private:
+    void abandonWith(QNetworkReply* reply, QObject* context);
     void finishRaw(QNetworkReply* reply, QObject* context, Callback<RawResponse> done);
     void storeSession(const AuthenticationResult& result);
     QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload);

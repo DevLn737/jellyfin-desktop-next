@@ -24,7 +24,7 @@ namespace jfd::session {
     m_client.item(request.itemId, this, [this, serial, request](api::Result<api::Item> item) {
       if (serial != m_serial) return;
       if (!item) {
-        Q_EMIT failed(request.itemId, item.error().message);
+        fail(request, item.error().message, false);
         return;
       }
       openWithItem(serial, request, *item);
@@ -36,7 +36,7 @@ namespace jfd::session {
     m_client.item(request.itemId, this, [this, serial, request](api::Result<api::Item> item) {
       if (serial != m_preloadSerial) return;
       if (!item) {
-        Q_EMIT failed(request.itemId, item.error().message);
+        fail(request, item.error().message, true);
         return;
       }
       openWithItem(serial, request, *item, true, true);
@@ -70,12 +70,13 @@ namespace jfd::session {
     m_client.playbackInfo(info, this, [this, serial, request, item, chosen, preload](api::Result<api::PlaybackInfo> result) {
       if (serial != (preload ? m_preloadSerial : m_serial)) return;
       if (!result) {
-        Q_EMIT failed(request.itemId, result.error().message);
+        fail(request, result.error().message, preload);
         return;
       }
       if (!result->errorCode.isEmpty() || result->mediaSources.isEmpty()) {
-        Q_EMIT failed(request.itemId, result->errorCode.isEmpty() ? QStringLiteral("No playable source.")
-                                                                  : result->errorCode);
+        fail(request,
+             result->errorCode.isEmpty() ? QStringLiteral("No playable source.") : result->errorCode,
+             preload);
         return;
       }
       const api::MediaSource* source = &result->mediaSources.front();
@@ -84,7 +85,7 @@ namespace jfd::session {
       const auto stream =
           api::resolvePlaybackStream(m_client.streamContext(), request.itemId, *result, *source);
       if (!stream) {
-        Q_EMIT failed(request.itemId, stream.error().message);
+        fail(request, stream.error().message, preload);
         return;
       }
       if (!chosen && m_chooseTracks) {
@@ -103,6 +104,11 @@ namespace jfd::session {
       }
       openResolved(request, item, *source, *stream, preload);
     });
+  }
+
+  void PlaybackLauncher::fail(const Request& request, const QString& message, bool preload) {
+    Q_EMIT failed(request.itemId, message);
+    if (!preload) Q_EMIT openFailed(request, message);
   }
 
   void PlaybackLauncher::openResolved(const Request& request, const api::Item& item,

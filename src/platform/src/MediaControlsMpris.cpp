@@ -233,8 +233,12 @@ namespace jfd::platform {
         return {{QStringLiteral("mpris:trackid"), QVariant::fromValue(QDBusObjectPath(NoTrackPath))}};
       QVariantMap metadata{{QStringLiteral("mpris:trackid"), QVariant::fromValue(QDBusObjectPath(TrackPath))},
                            {QStringLiteral("xesam:title"), state.title}};
-      if (!state.subtitle.isEmpty()) {
-        metadata.insert(QStringLiteral("xesam:album"), state.subtitle);
+      if (state.kind == MediaControlsState::Kind::Music) {
+        if (!state.artist.isEmpty()) metadata.insert(QStringLiteral("xesam:artist"), QStringList{state.artist});
+        if (!state.album.isEmpty()) metadata.insert(QStringLiteral("xesam:album"), state.album);
+      } else if (!state.subtitle.isEmpty()) {
+        // A video has no album; desktops show the artist line under the
+        // title, so the series and episode (or the year) go there.
         metadata.insert(QStringLiteral("xesam:artist"), QStringList{state.subtitle});
       }
       if (state.durationMs > 0) metadata.insert(QStringLiteral("mpris:length"), qlonglong(state.durationMs) * 1000);

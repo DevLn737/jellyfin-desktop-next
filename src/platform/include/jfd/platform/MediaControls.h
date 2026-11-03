@@ -17,10 +17,16 @@ namespace jfd::platform {
 
   struct MediaControlsState {
     enum class Status { Stopped, Playing, Paused };
+    // Music shows its artist and album (MPRIS xesam:artist and xesam:album,
+    // the music layout of the Windows overlay); video its subtitle.
+    enum class Kind { Video, Music };
 
     Status status = Status::Stopped;
-    QString title;    // Episode or movie name.
-    QString subtitle; // Series and episode number, or the year.
+    Kind kind = Kind::Video;
+    QString title;    // Episode, movie or track name.
+    QString subtitle; // Series and episode number, or the year; music: the artist.
+    QString artist;   // Music only.
+    QString album;    // Music only.
     QUrl artUrl;      // Poster; must load without credentials.
     qint64 durationMs = 0;
     qint64 positionMs = 0;

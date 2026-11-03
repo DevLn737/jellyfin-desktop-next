@@ -15,10 +15,24 @@ namespace {
 // spaces), then the secret. "token" also covers X-Emby-Token, AccessToken
 // and the Token="..." field of a MediaBrowser Authorization header;
 // "api-key" covers X-Api-Key; "cookie" covers Cookie and Set-Cookie, whose
-// whole value (every cookie on the line) is hidden.
-constexpr std::array<std::string_view, 9> SecretNames = {
-    "api_key", "api-key", "apikey", "token", "password", "\"pw", "authorization", "cookie",
-    "connect.sid"};
+// whole value (every cookie on the line) is hidden. "secret" is the Quick
+// Connect secret (exchanged for an access token), "pw" the password field
+// of a sign-in, in JSON or a query; both only at the start of a word, so
+// "rpw=" or "nosecret=" are not matched by accident.
+struct SecretName {
+  std::string_view name;
+  bool wordStart = false;
+};
+constexpr std::array<SecretName, 10> SecretNames = {{{"api_key"},
+                                                      {"api-key"},
+                                                      {"apikey"},
+                                                      {"token"},
+                                                      {"password"},
+                                                      {"pw", true},
+                                                      {"secret", true},
+                                                      {"authorization"},
+                                                      {"cookie"},
+                                                      {"connect.sid"}}};
 
 std::mutex ProtectedMutex;
 std::vector<std::string> ProtectedHosts;
@@ -168,15 +182,17 @@ void clearProtectedAddresses()
   ProtectedHosts.clear();
 }
 
-std::string redactSecrets(std::string_view line)
-{
-  std::string folded(line);
-  std::transform(folded.begin(), folded.end(), folded.begin(), lower);
+namespace {
 
-  std::vector<std::pair<std::size_t, std::size_t>> spans;
-  for (const std::string_view name : SecretNames) {
+bool isWordChar(char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'); }
+
+void addSecrets(std::string_view folded, std::vector<std::pair<std::size_t, std::size_t>>& spans)
+{
+  for (const auto& [name, wordStart] : SecretNames) {
     for (std::size_t found = folded.find(name); found != std::string::npos;
          found = folded.find(name, found + 1)) {
+      if (wordStart && found > 0 && isWordChar(folded[found - 1]))
+        continue;
       std::size_t at = found + name.size();
       if (at < folded.size() && folded[at] == '"')
         ++at;
@@ -218,9 +234,95 @@ std::string redactSecrets(std::string_view line)
         spans.emplace_back(at, end);
     }
   }
+}
+
+void addAll(std::string_view folded, std::vector<std::pair<std::size_t, std::size_t>>& spans)
+{
+  addSecrets(folded, spans);
   addServerAddresses(folded, spans);
   addBareAddresses(folded, spans);
   addProtectedHosts(folded, spans);
+}
+
+int hexValue(char c)
+{
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  return -1;
+}
+
+// `text` (folded) with %XX decoded, and for each decoded character the
+// range of `text` it came from.
+struct Decoded {
+  std::string text;
+  std::vector<std::size_t> from;
+  std::vector<std::size_t> to;
+};
+
+Decoded percentDecode(std::string_view text)
+{
+  Decoded out;
+  out.text.reserve(text.size());
+  for (std::size_t i = 0; i < text.size();) {
+    const int high = text[i] == '%' && i + 2 < text.size() ? hexValue(text[i + 1]) : -1;
+    const int low = high >= 0 ? hexValue(text[i + 2]) : -1;
+    if (high >= 0 && low >= 0) {
+      out.text.push_back(lower(static_cast<char>(high * 16 + low)));
+      out.from.push_back(i);
+      out.to.push_back(i + 3);
+      i += 3;
+    } else {
+      out.text.push_back(text[i]);
+      out.from.push_back(i);
+      out.to.push_back(i + 1);
+      ++i;
+    }
+  }
+  return out;
+}
+
+}
+
+std::string redactSecrets(std::string_view line)
+{
+  std::string folded(line);
+  std::transform(folded.begin(), folded.end(), folded.begin(), lower);
+
+  std::vector<std::pair<std::size_t, std::size_t>> spans;
+  addAll(folded, spans);
+
+  // Percent-encoded text (image://jfd/https%3A%2F%2F..., token%3D...),
+  // decoded up to twice (an encoded URL encoded again), is matched too; the
+  // spans found there are mapped back to the line.
+  if (folded.find('%') != std::string::npos) {
+    std::vector<std::size_t> from(folded.size());
+    std::vector<std::size_t> to(folded.size());
+    for (std::size_t i = 0; i < folded.size(); ++i) {
+      from[i] = i;
+      to[i] = i + 1;
+    }
+    std::string current = folded;
+    for (int pass = 0; pass < 2 && current.find('%') != std::string::npos; ++pass) {
+      Decoded decoded = percentDecode(current);
+      if (decoded.text.size() == current.size())
+        break;
+      std::vector<std::size_t> nextFrom(decoded.text.size());
+      std::vector<std::size_t> nextTo(decoded.text.size());
+      for (std::size_t i = 0; i < decoded.text.size(); ++i) {
+        nextFrom[i] = from[decoded.from[i]];
+        nextTo[i] = to[decoded.to[i] - 1];
+      }
+      current = std::move(decoded.text);
+      from = std::move(nextFrom);
+      to = std::move(nextTo);
+      std::vector<std::pair<std::size_t, std::size_t>> found;
+      addAll(current, found);
+      for (const auto& [start, end] : found)
+        spans.emplace_back(from[start], to[end - 1]);
+    }
+  }
   if (spans.empty())
     return std::string(line);
 

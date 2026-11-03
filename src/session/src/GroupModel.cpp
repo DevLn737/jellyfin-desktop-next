@@ -51,6 +51,13 @@ namespace jfd::session {
         [this](const core::SessionNotice& notice) { onNotice(notice); });
     connect(&socket, &api::SessionSocket::syncPlayGroupUpdate, this, &GroupModel::onGroupUpdate);
     connect(&runtime.transport(), &ApiTransport::replied, this, &GroupModel::onReplied);
+    connect(&runtime.launcher(), &PlaybackLauncher::openFailed, this,
+            [this](const PlaybackLauncher::Request& request) {
+              // SessionRuntime leaves the group for an item it cannot open.
+              if (!request.playlistItem.isEmpty() && m_group &&
+                  m_group->playlistItem == request.playlistItem)
+                Q_EMIT notice(tr("The group's item could not be opened, so you left the group."), true);
+            });
     checkRateSupport();
   }
 
@@ -247,6 +254,17 @@ namespace jfd::session {
   }
 
   void GroupModel::onNotice(const core::SessionNotice& notice) {
+    if (const auto* failed = std::get_if<core::notice::GroupRequestFailed>(&notice)) {
+      // Create, join and leave failures arrive as replies (onReplied).
+      if (failed->request == core::group::Request::Rejoin) {
+        const QString text = tr("Could not return to the group after the connection came back.");
+        setError(text);
+        Q_EMIT this->notice(text, true);
+      } else if (failed->request == core::group::Request::Ready ||
+               failed->request == core::group::Request::Buffering)
+        Q_EMIT this->notice(tr("The group did not hear from this player and may be waiting for it."), true);
+      return;
+    }
     const auto* rejected = std::get_if<core::notice::GroupRateRejected>(&notice);
     if (!rejected) return;
     if (rejected->httpStatus == 404 || rejected->httpStatus == 405) {
@@ -264,12 +282,22 @@ namespace jfd::session {
   void GroupModel::onGroupUpdate(const QJsonObject& update) {
     const QString type = update.value(QLatin1String("Type")).toString();
     if (type == QLatin1String("GroupDoesNotExist") || type == QLatin1String("JoinGroupDenied") ||
-        type == QLatin1String("LibraryAccessDenied")) {
+        type == QLatin1String("LibraryAccessDenied") || type == QLatin1String("CreateGroupDenied")) {
       if (m_busy > 0) endBusy();
       m_pendingQueue.reset();
-      setError(type == QLatin1String("GroupDoesNotExist") ? tr("This group no longer exists.")
-               : type == QLatin1String("JoinGroupDenied") ? tr("You may not join this group.")
-                                                         : tr("You cannot see what this group is playing."));
+      setError(type == QLatin1String("GroupDoesNotExist")   ? tr("This group no longer exists.")
+               : type == QLatin1String("JoinGroupDenied")   ? tr("You may not join this group.")
+               : type == QLatin1String("CreateGroupDenied") ? tr("You may not create groups on this server.")
+                                                           : tr("You cannot see what this group is playing."));
+      return;
+    }
+    if (type == QLatin1String("NotInGroup")) {
+      // An answer to a request for a group we are not in: whatever we were
+      // waiting for will not come.
+      const bool waiting = m_busy > 0 || m_pendingQueue.has_value();
+      if (m_busy > 0) endBusy();
+      m_pendingQueue.reset();
+      if (waiting) setError(tr("You are not in this group."));
       return;
     }
     if (type != QLatin1String("PlayQueue")) return;

@@ -2,6 +2,7 @@
 
 #include <jfd/api/Models.h>
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QList>
 #include <QObject>
@@ -22,7 +23,10 @@ namespace jfd::library {
   // collection's items but not an item's collections, so the index lists
   // every collection once, then the item ids of each, and answers from
   // that. It is built on the first question and built again on the first
-  // question after the library changes.
+  // question after a collection changes (or a new item could be one), and
+  // after a while in any case. At most a few collections are listed at
+  // once, so an item page's own requests do not wait behind hundreds of
+  // them on the client's connections.
   class CollectionIndex : public QObject {
     Q_OBJECT
 
@@ -42,6 +46,11 @@ namespace jfd::library {
 
     bool ready() const { return m_ready; }
 
+    // Collections listed at once.
+    static constexpr int MaxParallel = 3;
+    // An index older than this is built again on the next question.
+    static constexpr qint64 MaxAgeMs = 10 * 60 * 1000;
+
   Q_SIGNALS:
     void built();
 
@@ -53,6 +62,7 @@ namespace jfd::library {
     };
 
     void build();
+    void listNext(quint64 generation);
     void finish(quint64 generation, bool complete);
     QList<api::Item> lookup(const QString& itemId) const;
 
@@ -61,6 +71,9 @@ namespace jfd::library {
     bool m_ready = false;
     bool m_building = false;
     int m_pending = 0;
+    // The next row of m_collections to list.
+    int m_nextRow = 0;
+    QElapsedTimer m_builtAt;
     QList<api::Item> m_collections;
     // Item id -> rows of m_collections.
     QHash<QString, QList<int>> m_members;

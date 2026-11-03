@@ -222,11 +222,22 @@ namespace jfd::api {
     finishRaw(startRequest(Method::Get, target, nullptr), context, std::move(done));
   }
 
+  void JellyfinClient::abandonWith(QNetworkReply* reply, QObject* context) {
+    // Nobody waits for a read whose context is gone (a page that was left):
+    // stop it so it frees its connection. Writes (reports, marks) still go
+    // through.
+    if (context == nullptr || reply->operation() != QNetworkAccessManager::GetOperation) return;
+    connect(context, &QObject::destroyed, reply, [reply] {
+      if (reply->isRunning()) reply->abort();
+    });
+  }
+
   void JellyfinClient::finishRaw(QNetworkReply* reply, QObject* context,
                                  Callback<RawResponse> done) {
     const bool authenticated = !m_accessToken.isEmpty();
     const QPointer<QObject> guard(context);
     const bool hasContext = context != nullptr;
+    abandonWith(reply, context);
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, guard, hasContext, authenticated, done = std::move(done)]() {
               reply->deleteLater();
@@ -260,6 +271,7 @@ namespace jfd::api {
     const bool authenticated = !m_accessToken.isEmpty();
     const QPointer<QObject> guard(context);
     const bool hasContext = context != nullptr;
+    abandonWith(reply, context);
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, guard, hasContext, authenticated, done = std::move(done)]() {
               reply->deleteLater();
@@ -383,7 +395,9 @@ namespace jfd::api {
 
   void JellyfinClient::signIn(const QString& userName, const QString& password, QObject* context,
                               Callback<AuthenticationResult> done) {
-    m_accessToken.clear();
+    // A sign-in replaces the session: listeners learn it is gone now, not
+    // only when (if) the new one arrives.
+    if (isSignedIn() || !m_userId.isEmpty()) clearSession();
     const QJsonDocument body(
         QJsonObject{{QStringLiteral("Username"), userName}, {QStringLiteral("Pw"), password}});
     sendJson(Method::Post, QStringLiteral("Users/AuthenticateByName"), {}, body, context,
@@ -413,7 +427,7 @@ namespace jfd::api {
 
   void JellyfinClient::quickConnectSignIn(const QString& secret, QObject* context,
                                           Callback<AuthenticationResult> done) {
-    m_accessToken.clear();
+    if (isSignedIn() || !m_userId.isEmpty()) clearSession();
     const QJsonDocument body(QJsonObject{{QStringLiteral("Secret"), secret}});
     sendJson(Method::Post, QStringLiteral("Users/AuthenticateWithQuickConnect"), {}, body, context,
              [this, done = std::move(done)](Result<QJsonObject> result) {

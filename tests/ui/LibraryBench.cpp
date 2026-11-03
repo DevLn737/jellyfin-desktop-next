@@ -140,8 +140,9 @@ namespace {
       return waitFor([&] { return frames > seen; });
     }
 
-    QQmlApplicationEngine engine;
+    // Destroyed after the engine, which uses it (the application's order).
     std::unique_ptr<ui::LibraryScreens> screens;
+    QQmlApplicationEngine engine;
     ui::Navigator* navigator = nullptr;
     QQuickWindow* window = nullptr;
     int frames = 0;

@@ -15,6 +15,8 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
@@ -165,6 +167,11 @@ namespace {
     }
   };
 
+  double savedPosition(const QByteArray& state) {
+    return QJsonDocument::fromJson(state).object().value(QLatin1String("position")).toDouble();
+  }
+  double savedPosition(const music::MusicPlayer& player) { return savedPosition(player.saveState()); }
+
   struct Cleanup {
     Stand& stand;
     ~Cleanup() { stand.unplay(stand.touched); }
@@ -306,12 +313,48 @@ TEST_CASE("A video takes the session from music; the queue stays and the track's
   CHECK(s.player->currentIndex() == 1);
   // The track was replaced, not finished: its stop report arrived.
   CHECK(waitFor([&] { return s.played(tracks[1].id); }, 20000));
+  // And the queue remembers where the track stopped, for resume().
+  CHECK(savedPosition(*s.player) > 2.0);
 
   // And the player does not step when the video ends or Next arrives.
   s.runtime->post(core::intent::Stop{});
   REQUIRE(waitFor([&] { return !s.player->videoActive(); }, 20000));
   CHECK_FALSE(s.player->active());
   CHECK(s.player->currentIndex() == 1);
+}
+
+TEST_CASE("Stopping keeps the track's position; resume starts there") {
+  if (!hasExtrasStand()) return;
+  Stand s(QStringLiteral("jfd-music-resume"));
+  Cleanup cleanup{s};
+  const Item album = s.album(QStringLiteral("First Album"));
+  s.tracksOf(album);
+  QByteArray saved;
+  int saves = 0;
+  s.player->setPersistence([&](const QByteArray& state) {
+    saved = state;
+    ++saves;
+  });
+
+  s.player->playAlbum(album.id);
+  REQUIRE(waitFor([&] { return s.player->playing(); }, 60000));
+  REQUIRE(waitFor([&] { return s.player->position() > 4; }, 30000));
+  const double stoppedAt = s.player->position();
+  s.player->stop();
+  REQUIRE(waitFor([&] { return !s.player->active(); }, 20000));
+  // Saved a moment after the stop, at the position (not at 1 s in).
+  REQUIRE(waitFor([&] { return saves > 0 && savedPosition(saved) >= stoppedAt - 0.5; }, 5000));
+  CHECK(savedPosition(*s.player) >= stoppedAt - 0.5);
+
+  // A restart: the saved state comes back, and resume() starts there.
+  music::MusicPlayer restored(*s.runtime, *s.client);
+  restored.restoreState(saved);
+  s.player.reset();
+  restored.resume();
+  REQUIRE(waitFor([&] { return restored.playing(); }, 60000));
+  CHECK(restored.position() >= stoppedAt - 1.0);
+  restored.stop();
+  waitFor([&] { return !restored.active(); }, 5000);
 }
 
 namespace {
@@ -345,8 +388,8 @@ namespace {
   // One run through the three tone tracks. Returns how many times the backend
   // went on to the next track by itself. The output is untimed, so a 240 s
   // track ends in a blink: on a slow machine it can end before the next one
-  // is queued behind it, and the player opens that one itself. The seams are
-  // checked on every run either way.
+  // is queued behind it, and the player opens that one itself. Either way the
+  // album must play to its end, and the seams are checked on every run.
   int playToneAlbum() {
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
@@ -371,12 +414,14 @@ namespace {
         return seen == 2;
       },
       40000);
+  // Three tracks take a few seconds untimed; 40 s without reaching the last
+  // one is a stall, a failure (it was the next file queued while mpv held the
+  // end of the last one, see MpvMediaBackend's EofReached), never a retry.
   if (!reached) {
-    // A slow runner can stall the album; the caller tries again.
-    MESSAGE("album stalled before the last track: " << log.join(QStringLiteral("; ")).toStdString() << "; index "
-            << s.player->currentIndex() << " active " << s.player->active() << " loading " << s.player->loading()
-            << " handovers " << s.player->handoverCount() << " opens " << s.player->openCount());
-    return -1;
+    FAIL("album stalled before the last track: " << log.join(QStringLiteral("; ")).toStdString() << "; index "
+         << s.player->currentIndex() << " active " << s.player->active() << " playing " << s.player->playing()
+         << " loading " << s.player->loading() << " handovers " << s.player->handoverCount() << " opens "
+         << s.player->openCount());
   }
   // The last track plays out.
   // The output is untimed, so a track plays in a blink: wait for the end.
@@ -393,8 +438,9 @@ namespace {
       },
       40000);
   if (!ended) {
-    MESSAGE("album did not end: " << log.join(QStringLiteral("; ")).toStdString());
-    return -1;
+    FAIL("album did not end: " << log.join(QStringLiteral("; ")).toStdString() << "; index "
+         << s.player->currentIndex() << " active " << s.player->active() << " playing " << s.player->playing()
+         << " loading " << s.player->loading());
   }
   INFO("handovers " << s.player->handoverCount() << ", opens " << s.player->openCount());
   const int handovers = s.player->handoverCount();
@@ -422,9 +468,16 @@ namespace {
 
 TEST_CASE("The tracks of a continuous album meet without a gap") {
   if (!hasExtrasStand()) return;
-  // The backend moved on by itself at least once in some run.
+  // Every run must play the album to its end with unbroken seams (a stall
+  // fails the test at once). Whether the next track is queued before the
+  // untimed output reaches the end is chance, so the album plays up to four
+  // times until the backend has moved on by itself at least once.
   int handovers = 0;
-  for (int attempt = 0; attempt < 4 && handovers < 1; ++attempt)
+  int runs = 0;
+  while (runs < 4 && handovers < 1) {
+    ++runs;
     handovers = playToneAlbum();
+  }
+  INFO("runs " << runs);
   CHECK(handovers >= 1);
 }

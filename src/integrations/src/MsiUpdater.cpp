@@ -1,5 +1,7 @@
 #include <jfd/integrations/MsiUpdater.h>
 
+#include "ApplyUpdateScript.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -44,22 +46,9 @@ namespace jfd::integrations {
     // one back. The marker's .failed file tells the old version why it is
     // running again. msiexec exits with 0, or 3010 when a restart would be
     // needed (an install for one user has no files in use by the system).
-    return QStringLiteral(R"PS(param([int]$ProcessId, [string]$Msi, [string]$Exe, [string]$Log, [string]$Marker)
-$ErrorActionPreference = 'Stop'
-# msiexec does not open a package named with forward slashes.
-$Msi = [System.IO.Path]::GetFullPath($Msi)
-$Log = [System.IO.Path]::GetFullPath($Log)
-Remove-Item -LiteralPath "$Marker.failed" -Force -ErrorAction SilentlyContinue
-try { Wait-Process -Id $ProcessId -Timeout 120 } catch { }
-$code = 1
-try {
-  $install = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', "`"$Msi`"", '/qb', '/norestart', '/l*v', "`"$Log`"") -Wait -PassThru
-  $code = $install.ExitCode
-} catch { }
-if ($code -ne 0 -and $code -ne 3010) { New-Item -ItemType File -Path "$Marker.failed" -Force | Out-Null }
-Remove-Item -LiteralPath $Msi -Force -ErrorAction SilentlyContinue
-try { Start-Process -FilePath $Exe -WorkingDirectory (Split-Path -Parent $Exe) } catch { }
-)PS");
+    // The text is src/integrations/apply-update.ps1; package.yml runs that
+    // file against a real MSI (packaging/windows/test-msi-update.ps1).
+    return QString::fromUtf8(applyUpdateScript);
   }
 
   QStringList MsiUpdater::scriptArguments(const QString& scriptPath, qint64 pid, const QString& msi,

@@ -3,6 +3,7 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/LibraryUpdates.h>
 
+#include <algorithm>
 #include <utility>
 
 namespace jfd::library {
@@ -16,6 +17,7 @@ namespace jfd::library {
       : QObject(parent), m_client(client) {}
 
   void CollectionIndex::collectionsOf(const QString& itemId, QObject* context, Answer done) {
+    if (m_ready && m_builtAt.isValid() && m_builtAt.elapsed() > MaxAgeMs) invalidate();
     if (m_ready) {
       done(lookup(itemId));
       return;
@@ -29,6 +31,8 @@ namespace jfd::library {
     m_ready = false;
     m_building = false;
     m_pending = 0;
+    m_nextRow = 0;
+    m_builtAt.invalidate();
     m_collections.clear();
     m_members.clear();
     // Questions asked meanwhile get answers from the new index.
@@ -39,8 +43,20 @@ namespace jfd::library {
     connect(
         &updates, &LibraryUpdates::libraryChanged, this,
         [this](const QStringList& added, const QStringList& updated, const QStringList& removed) {
-          // A collection that gains or loses an item is "updated".
-          if (!added.isEmpty() || !updated.isEmpty() || !removed.isEmpty()) invalidate();
+          // A collection that gains or loses an item is "updated"; an added
+          // item may be a new collection. Other items' updates (metadata,
+          // images) leave the index as it is.
+          if (!m_ready && !m_building) return;
+          bool affected = !added.isEmpty();
+          for (const QStringList* ids : {&updated, &removed}) {
+            for (const QString& id : *ids) {
+              if (affected) break;
+              affected = std::any_of(m_collections.begin(), m_collections.end(),
+                                     [&id](const api::Item& c) { return c.id == id; });
+            }
+          }
+          // While the list is being fetched nothing is known yet.
+          if (affected || (m_building && m_collections.isEmpty())) invalidate();
         });
     connect(&updates, &LibraryUpdates::resynchronize, this, &CollectionIndex::invalidate);
   }
@@ -62,28 +78,38 @@ namespace jfd::library {
       }
       m_collections = result->items;
       m_pending = static_cast<int>(m_collections.size());
+      m_nextRow = 0;
       if (m_pending == 0) {
         finish(generation, true);
         return;
       }
-      for (int row = 0; row < m_collections.size(); ++row) {
-        m_client.collectionItemIds(m_collections[row].id, this,
-                                   [this, generation, row](api::Result<QStringList> ids) {
-                                     if (generation != m_generation) return;
-                                     if (ids) {
-                                       for (const QString& id : ids.value())
-                                         m_members[id].append(row);
-                                     }
-                                     if (--m_pending == 0) finish(generation, true);
-                                   });
-      }
+      for (int i = 0; i < MaxParallel; ++i) listNext(generation);
     });
+  }
+
+  void CollectionIndex::listNext(quint64 generation) {
+    if (generation != m_generation || m_nextRow >= m_collections.size()) return;
+    const int row = m_nextRow++;
+    m_client.collectionItemIds(m_collections[row].id, this,
+                               [this, generation, row](api::Result<QStringList> ids) {
+                                 if (generation != m_generation) return;
+                                 if (ids) {
+                                   for (const QString& id : ids.value())
+                                     m_members[id].append(row);
+                                 }
+                                 if (--m_pending == 0) {
+                                   finish(generation, true);
+                                   return;
+                                 }
+                                 listNext(generation);
+                               });
   }
 
   void CollectionIndex::finish(quint64 generation, bool complete) {
     if (generation != m_generation) return;
     m_building = false;
     m_ready = complete;
+    if (complete) m_builtAt.start();
     const QList<Waiter> waiting = std::exchange(m_waiting, {});
     for (const Waiter& waiter : waiting) {
       if (waiter.context) waiter.done(lookup(waiter.itemId));

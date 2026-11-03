@@ -99,6 +99,10 @@ namespace jfd::ui {
                 media::MpvPlayer* player, QObject* parent = nullptr);
     ~PlayerModel() override;
 
+    // Before quitting: sends Stopped for the playing file; done runs once
+    // the server answered, or at once when nothing was playing.
+    void endReport(std::function<void()> done) { m_reporter.end(std::move(done)); }
+
     bool active() const;
     bool paused() const;
     bool loading() const;

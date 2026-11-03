@@ -99,7 +99,8 @@ namespace jfd::seerr {
         Q_EMIT signInFinished(int(Outcome::NotJellyfin));
         return;
       }
-      m_client.signIn(userName, password, this, [this](api::Result<User> user) {
+      // Probed just now: the client need not probe again.
+      m_client.signInProbed(userName, password, this, [this](api::Result<User> user) {
         m_busy = false;
         if (!user.ok()) {
           Q_EMIT signInFinished(int(outcomeOf(refusalOf(user.error(), true))));

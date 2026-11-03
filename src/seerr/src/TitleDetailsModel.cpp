@@ -60,19 +60,27 @@ namespace jfd::seerr {
     return out;
   }
 
-  int TitleDetailsModel::myRequestId() const {
+  // The user's request to show: one still waiting for approval first (it
+  // can be cancelled; a series may also have approved seasons), otherwise
+  // the first that was not declined.
+  const UserRequest* TitleDetailsModel::myRequest() const {
+    const UserRequest* found = nullptr;
     for (const UserRequest& r : m_details.requests) {
-      if (r.requestedBy == m_service.userId() && r.status != RequestStatus::Declined) return r.id;
+      if (r.requestedBy != m_service.userId() || r.status == RequestStatus::Declined) continue;
+      if (r.status == RequestStatus::PendingApproval) return &r;
+      if (found == nullptr) found = &r;
     }
-    return 0;
+    return found;
+  }
+
+  int TitleDetailsModel::myRequestId() const {
+    const UserRequest* r = myRequest();
+    return r == nullptr ? 0 : r->id;
   }
 
   int TitleDetailsModel::myRequestStatus() const {
-    for (const UserRequest& r : m_details.requests) {
-      if (r.requestedBy == m_service.userId() && r.status != RequestStatus::Declined)
-        return int(r.status);
-    }
-    return 0;
+    const UserRequest* r = myRequest();
+    return r == nullptr ? 0 : int(r->status);
   }
 
   bool TitleDetailsModel::requestsNotAllowed() const {

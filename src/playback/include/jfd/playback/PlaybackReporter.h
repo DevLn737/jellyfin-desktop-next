@@ -8,6 +8,7 @@
 #include <QTimer>
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -28,7 +29,10 @@ namespace jfd::playback {
     virtual ~ReportSink() = default;
     virtual void started(const api::PlaybackProgress& progress) = 0;
     virtual void progress(const api::PlaybackProgress& progress) = 0;
-    virtual void stopped(const api::PlaybackProgress& progress, bool failed) = 0;
+    // answered, when set, runs once the server answered (or the request
+    // failed), so quitting can wait for the report.
+    virtual void stopped(const api::PlaybackProgress& progress, bool failed,
+                         std::function<void()> answered) = 0;
   };
 
   // Sends reports with JellyfinClient; failures are only logged, since a lost
@@ -46,8 +50,10 @@ namespace jfd::playback {
     // Ends the report of the previous file, if any.
     void begin(core::MediaEpoch epoch, const api::PlaybackStream& stream,
                std::optional<int> audioStreamIndex, std::optional<int> subtitleStreamIndex);
-    // Sends Stopped for the current file now (the app is closing).
-    void end();
+    // Sends Stopped for the current file now (the app is closing). done,
+    // when set, runs once the server answered it, or at once when there was
+    // nothing to report.
+    void end(std::function<void()> done = {});
 
     void setTracks(std::optional<int> audioStreamIndex, std::optional<int> subtitleStreamIndex);
     void setVolume(int level, bool muted);
@@ -59,7 +65,7 @@ namespace jfd::playback {
 
   private:
     void send(const QString& eventName);
-    void stop(bool failed);
+    void stop(bool failed, std::function<void()> answered = {});
 
     ReportSink& m_sink;
     QTimer m_timer;

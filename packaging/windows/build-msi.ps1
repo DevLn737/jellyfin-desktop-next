@@ -2,12 +2,19 @@
 # output). WiX comes from NuGet as a .NET tool at the version pinned in
 # deps/versions.json (windows.wix).
 #
-#   packaging/windows/build-msi.ps1 -Deployment build/package/app -Version 0.0.1 -Output build/jellyfin-desktop-next.msi
+#   packaging/windows/build-msi.ps1 -Deployment build/package/app -Version 0.0.1309 -DisplayVersion 0.0.1-beta.9 -Output build/jellyfin-desktop-next.msi
+#
+# -Version is the MSI ProductVersion, the "msi" output of
+# packaging/release-version.sh: Windows Installer orders packages by its
+# first three fields only, so the pre-release is encoded in the third.
+# -DisplayVersion is the release's own version, shown in the package's
+# summary and in Apps & features (ARPCOMMENTS).
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string]$Deployment,
     [Parameter(Mandatory)] [string]$Version,
     [Parameter(Mandatory)] [string]$Output,
+    [string]$DisplayVersion = '',
     [string]$ExeName = 'jellyfin-desktop.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -15,7 +22,10 @@ Set-StrictMode -Version Latest
 
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $wix = (Get-Content (Join-Path $root 'deps/versions.json') -Raw | ConvertFrom-Json).windows.wix
-if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "MSI versions have three numbers, got '$Version'" }
+if ($Version -notmatch '^(\d+)\.(\d+)\.(\d+)$' -or [int]$Matches[1] -gt 255 -or [int]$Matches[2] -gt 255 -or [int]$Matches[3] -gt 65535) {
+    throw "MSI versions are major.minor.build (at most 255.255.65535), got '$Version'"
+}
+if (-not $DisplayVersion) { $DisplayVersion = $Version }
 $Deployment = (Resolve-Path $Deployment).Path
 if (-not (Test-Path -LiteralPath (Join-Path $Deployment $ExeName))) { throw "$ExeName is not in $Deployment" }
 
@@ -41,7 +51,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path $outputPath) | Out-Null
 $arguments = @('build', (Join-Path $PSScriptRoot 'jellyfin-desktop-next.wxs'),
     '-acceptEula', $wix.eulaId, '-arch', 'x64',
     '-bindpath', "Deployment=$Deployment",
-    '-d', "Version=$Version", '-d', "ExeName=$ExeName",
+    '-d', "Version=$Version", '-d', "DisplayVersion=$DisplayVersion", '-d', "ExeName=$ExeName",
     '-d', "IconFile=$(Join-Path $root 'packaging/icons/jellyfin-desktop-next.ico')",
     '-o', $outputPath)
 foreach ($extension in $wix.extensions) { $arguments += @('-ext', $extension) }

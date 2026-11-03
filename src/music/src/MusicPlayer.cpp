@@ -16,6 +16,12 @@ namespace jfd::music {
     // Past this many seconds, Previous restarts the track.
     constexpr double RestartAfterSeconds = 3.0;
     constexpr int SaveDelayMs = 1000;
+    // While a track plays its position is saved this often, so the queue
+    // resumes near where it stopped even after a crash.
+    constexpr qint64 SaveEveryMs = 10'000;
+    // "Play artist" pages through the artist's songs up to this many.
+    constexpr int ArtistPageSize = 500;
+    constexpr int MaxArtistTracks = 5000;
 
     bool isOpen(PlaybackPhase phase) { return phase != PlaybackPhase::Idle && phase != PlaybackPhase::Ended; }
 
@@ -31,6 +37,7 @@ namespace jfd::music {
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(SaveDelayMs);
     connect(&m_saveTimer, &QTimer::timeout, this, [this] {
+      m_lastSave.start();
       if (m_save) m_save(saveState());
     });
     auto& launcher = runtime.launcher();
@@ -55,7 +62,8 @@ namespace jfd::music {
   MusicPlayer::~MusicPlayer() {
     m_subscription.reset();
     m_reporter.end();
-    if (m_saveTimer.isActive() && m_save) m_save(saveState());
+    // At exit: the queue as it is, with the position of a track still open.
+    if (m_save && (m_saveTimer.isActive() || active())) m_save(saveState());
   }
 
   bool MusicPlayer::active() const { return m_epoch.has_value() && isOpen(m_snapshot.phase); }
@@ -208,6 +216,8 @@ namespace jfd::music {
     const Track& track = m_queue.tracks()[index];
     m_error.clear();
     m_requested = track.entryId;
+    // Until the file plays, a saved state resumes where this one starts.
+    m_resumeTicks = startTicks;
     ++m_opens;
     m_pending.reset();
     m_preloaded.reset();
@@ -233,8 +243,7 @@ namespace jfd::music {
       if (m_queue.isEmpty()) return;
       m_queue.setCurrent(0);
     }
-    const std::int64_t ticks = std::exchange(m_resumeTicks, 0);
-    open(m_queue.current(), ticks);
+    open(m_queue.current(), m_resumeTicks);
   }
 
   void MusicPlayer::togglePause() {
@@ -251,6 +260,11 @@ namespace jfd::music {
   }
 
   void MusicPlayer::stop() {
+    // resume() picks up where it stopped.
+    if (active()) {
+      m_resumeTicks = m_snapshot.position.ticks();
+      changed();
+    }
     if (m_requested || m_pending) m_runtime.launcher().cancel();
     m_requested.reset();
     m_pending.reset();
@@ -348,6 +362,8 @@ namespace jfd::music {
     // last position.
     m_reporter.snapshotChanged(snapshot);
     const bool hadFile = m_epoch.has_value();
+    // Where the track stopped, for resume().
+    if (hadFile && isOpen(m_snapshot.phase)) m_resumeTicks = m_snapshot.position.ticks();
     m_epoch.reset();
     m_preloaded.reset();
     m_preloadAsked.reset();
@@ -356,17 +372,20 @@ namespace jfd::music {
     idle.group = snapshot.group;
     idle.personalRate = snapshot.personalRate;
     m_snapshot = idle;
-    if (hadFile) {
-      // Where the track stopped, for resume().
-      changed();
-    }
+    if (hadFile) changed();
     Q_EMIT positionChanged();
     Q_EMIT stateChanged();
   }
 
   void MusicPlayer::onSnapshot(const core::SessionSnapshot& snapshot) {
     if (!belongsToPlayer(snapshot)) {
-      m_foreignActive = isOpen(snapshot.phase);
+      // Every tick of a video that plays comes here: with no file of ours
+      // and nothing else changed, there is nothing to release.
+      const bool foreign = isOpen(snapshot.phase);
+      if (!m_epoch && !m_requested && !m_pending && foreign == m_foreignActive &&
+          snapshot.group == m_snapshot.group && snapshot.personalRate == m_snapshot.personalRate)
+        return;
+      m_foreignActive = foreign;
       // An open of ours still waiting loses to what the session plays now.
       if (m_foreignActive) {
         m_requested.reset();
@@ -414,6 +433,8 @@ namespace jfd::music {
 
     Q_EMIT positionChanged();
     if (!positionOnly) Q_EMIT stateChanged();
+    if (playing() && !m_saveTimer.isActive() && (!m_lastSave.isValid() || m_lastSave.elapsed() >= SaveEveryMs))
+      changed();
 
     if (justEnded && m_preloaded) {
       // Older mpv reports the end of the file before it starts the queued one.
@@ -459,13 +480,23 @@ namespace jfd::music {
         Q_EMIT failed(m_error);
         return;
       }
-      QList<Track> tracks;
-      for (const api::Item& item : page->items)
-        if (item.mediaType == QLatin1String("Audio")) tracks.append(Track::fromItem(item));
-      m_queue.setShuffle(shuffle);
-      Q_EMIT modeChanged();
-      play(std::move(tracks), startIndex);
+      playItems(page->items, startIndex, shuffle);
     });
+  }
+
+  void MusicPlayer::playItems(const QList<api::Item>& items, int startIndex, bool shuffle) {
+    // `startIndex` counts every item of the list (a playlist may hold
+    // videos too); the queue holds only the tracks.
+    QList<Track> tracks;
+    int start = -1;
+    for (int i = 0; i < items.size(); ++i) {
+      if (items[i].mediaType != QLatin1String("Audio")) continue;
+      if (start < 0 && i >= startIndex) start = static_cast<int>(tracks.size());
+      tracks.append(Track::fromItem(items[i]));
+    }
+    m_queue.setShuffle(shuffle);
+    Q_EMIT modeChanged();
+    play(std::move(tracks), std::max(start, 0));
   }
 
   void MusicPlayer::playAlbum(const QString& albumId, int startIndex, bool shuffle) {
@@ -485,14 +516,31 @@ namespace jfd::music {
   }
 
   void MusicPlayer::playArtist(const QString& artistId, bool shuffle) {
-    fetchAndPlay(artistId,
-                 [artistId](api::MusicApi& api, QObject* context, api::Callback<api::ItemPage> done) {
-                   api::MusicQuery query;
-                   query.artistIds = {artistId};
-                   query.limit = 500;
-                   api.songs(query, context, std::move(done));
-                 },
-                 0, shuffle);
+    if (!available()) return;
+    fetchArtist(artistId, shuffle, {});
+  }
+
+  // One page of the artist's songs after `sofar`, then the next, then play.
+  void MusicPlayer::fetchArtist(const QString& artistId, bool shuffle, QList<api::Item> sofar) {
+    api::MusicQuery query;
+    query.artistIds = {artistId};
+    query.startIndex = static_cast<int>(sofar.size());
+    query.limit = ArtistPageSize;
+    m_api.songs(query, this, [this, artistId, shuffle, sofar = std::move(sofar)](api::Result<api::ItemPage> page) mutable {
+      if (!page) {
+        m_error = page.error().message;
+        Q_EMIT failed(m_error);
+        return;
+      }
+      sofar.append(page->items);
+      const bool more = !page->items.isEmpty() && sofar.size() < page->totalRecordCount &&
+                        sofar.size() < MaxArtistTracks;
+      if (more) {
+        fetchArtist(artistId, shuffle, std::move(sofar));
+        return;
+      }
+      playItems(sofar, 0, shuffle);
+    });
   }
 
   void MusicPlayer::queueAlbum(const QString& albumId, bool next) {
@@ -511,7 +559,9 @@ namespace jfd::music {
   void MusicPlayer::changed() { m_saveTimer.start(); }
 
   QByteArray MusicPlayer::saveState() const {
-    const double seconds = m_epoch ? m_snapshot.position.seconds() : static_cast<double>(m_resumeTicks) / TicksPerSecond;
+    // A stopped file keeps its epoch with an idle snapshot; its position is
+    // then the one stop() kept for resume.
+    const double seconds = active() ? m_snapshot.position.seconds() : static_cast<double>(m_resumeTicks) / TicksPerSecond;
     const QJsonObject state{{QStringLiteral("version"), 1},
                             {QStringLiteral("owner"), ownerOf(m_client)},
                             {QStringLiteral("position"), seconds},

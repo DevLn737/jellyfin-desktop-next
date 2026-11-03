@@ -96,7 +96,8 @@ jobs:
         shell: pwsh
         run: >
           ./packaging/windows/build-msi.ps1 -Deployment build/package/app
-          -Version ${{ steps.version.outputs.base }} -ExeName "$env:APP_EXE.exe"
+          -Version ${{ steps.version.outputs.msi }} -DisplayVersion ${{ steps.version.outputs.version }}
+          -ExeName "$env:APP_EXE.exe"
           -Output "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.base }}-x64.msi"
 
       - name: Install, run and uninstall
@@ -104,6 +105,27 @@ jobs:
         run: >
           ./packaging/windows/test-msi.ps1 -Msi "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.base }}-x64.msi"
           -Logs build/package/msi-logs -ExeName "$env:APP_EXE.exe"
+
+      # The client's update script (src/integrations/apply-update.ps1, what
+      # MsiUpdater writes and starts) against real packages: an older MSI of
+      # the same build is installed, the script upgrades it to the MSI above
+      # and starts the installed program; a broken package must roll back
+      # and an older package must be refused as a downgrade.
+      - name: Update with the client's script
+        shell: pwsh
+        env:
+          QT_OPENGL: software
+          MSI_VERSION: ${{ steps.version.outputs.msi }}
+        run: |
+          $new = [version]$env:MSI_VERSION
+          if ($new.Build -lt 1) { throw "no older MSI version below $new" }
+          $old = '{0}.{1}.{2}' -f $new.Major, $new.Minor, ($new.Build - 1)
+          $oldMsi = "build/package-old/$env:APP_PACKAGE-old-x64.msi"
+          ./packaging/windows/build-msi.ps1 -Deployment build/package/app -Version $old -DisplayVersion "$old (update test)" `
+            -ExeName "$env:APP_EXE.exe" -Output $oldMsi
+          ./packaging/windows/test-msi-update.ps1 -OldMsi $oldMsi -OldVersion $old `
+            -NewMsi "build/package/$env:APP_PACKAGE-${{ steps.version.outputs.base }}-x64.msi" -NewVersion $env:MSI_VERSION `
+            -Script src/integrations/apply-update.ps1 -Logs build/package/msi-logs -ExeName "$env:APP_EXE.exe"
 
       - name: Upload installer logs
         if: failure()
@@ -202,9 +224,11 @@ jobs:
           chmod +x appimage/*.AppImage
           bash packaging/linux/smoke-appimage.sh appimage/*.AppImage
 
+  # After the AppImage ran on every distribution: nothing that failed there
+  # is signed, and so nothing is published (release needs sign).
   sign:
     name: Sign packages
-    needs: [msi, appimage]
+    needs: [msi, appimage, appimage-smoke]
     runs-on: ubuntu-24.04
     outputs:
       real-key: ${{ steps.key.outputs.real }}
@@ -295,6 +319,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v5
       - name: Check the version
@@ -305,6 +330,31 @@ jobs:
         run: |
           echo "::error::No MINISIGN_SECRET_KEY secret: nothing is published"
           exit 1
+      # The commit's CI, App and Session runs (pushes to main) must have
+      # passed. Runs still going are waited for, up to an hour each.
+      - name: Require green CI for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for workflow in ci.yml app.yml session.yml; do
+            for attempt in $(seq 1 60); do
+              run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
+                --jq '.workflow_runs[0] // {} | [.status // "missing", .conclusion // "none", .html_url // ""] | join("|")')
+              IFS='|' read -r status conclusion url <<< "$run"
+              if [ "$status" = "completed" ] || [ "$status" = "missing" ]; then break; fi
+              echo "$workflow: $status, waiting ($url)"
+              sleep 60
+            done
+            if [ "$status" = "missing" ]; then
+              echo "::error::$workflow has no run for $GITHUB_SHA on a push to main: release from a commit on main"
+              exit 1
+            fi
+            if [ "$conclusion" != "success" ]; then
+              echo "::error::$workflow is '$status/$conclusion' for $GITHUB_SHA ($url): nothing is published"
+              exit 1
+            fi
+            echo "$workflow: success ($url)"
+          done
       - uses: actions/download-artifact@v4
         with:
           name: ${{ env.APP_PACKAGE }}-signed

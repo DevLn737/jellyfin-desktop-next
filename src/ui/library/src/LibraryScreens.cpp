@@ -42,11 +42,19 @@ namespace jfd::ui {
     m_collections.follow(m_updates);
   }
 
-  LibraryScreens::~LibraryScreens() = default;
+  LibraryScreens::~LibraryScreens() {
+    m_socket.stop();
+    // When the engine outlives this (it should not; see the header), QML
+    // must not reach the services through the singleton, nor the loader
+    // thread the image cache through the provider.
+    if (m_ui) m_ui->attach({});
+    if (m_engine) m_engine->removeImageProvider(QLatin1String(LibraryImageProvider::Id));
+  }
 
   bool LibraryScreens::install(QQmlEngine& engine, Navigator& navigator) {
     m_ui = engine.singletonInstance<LibraryUi*>("Jfd.Ui.Library", "Library");
     if (m_ui == nullptr) return false;
+    m_engine = &engine;
 
     engine.addImageProvider(QLatin1String(LibraryImageProvider::Id),
                             new LibraryImageProvider(m_images, m_textures));

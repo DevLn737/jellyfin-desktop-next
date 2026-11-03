@@ -2,6 +2,7 @@
 
 #include <doctest/doctest.h>
 
+#include <initializer_list>
 #include <string>
 
 using namespace jfd::diagnostics;
@@ -138,4 +139,56 @@ TEST_CASE("configured addresses are hidden wherever they appear")
   CHECK(redactSecrets("nothing here") == "nothing here");
   clearProtectedAddresses();
   CHECK(redactSecrets("resolve media.lan failed") == "resolve media.lan failed");
+}
+
+TEST_CASE("the Quick Connect secret and a pw field in a query are hidden")
+{
+  const std::string s = Secret;
+  for (const std::string& line : std::initializer_list<std::string>{
+           "POST /QuickConnect/Connect?secret=" + s + "&userId=u",
+           "GET /QuickConnect/Connect?Secret=" + s,
+           "{\"Secret\":\"" + s + "\",\"Code\":\"123456\"}",
+           "{\"Authenticated\":true,\"Secret\": \"" + s + "\"}",
+           "Username=a&Pw=" + s + "&x=1",
+           "pw: " + s,
+           "client_secret=" + s,
+       }) {
+    CAPTURE(line);
+    CHECK_FALSE(leaks(redactSecrets(line)));
+  }
+  CHECK(redactSecrets("Username=a&Pw=" + s + "&x=1") == "Username=a&Pw=***&x=1");
+  CHECK(redactSecrets("GET /QuickConnect/Connect?secret=" + s + "&userId=u") ==
+        "GET /QuickConnect/Connect?secret=***&userId=u");
+  // Only at the start of a word.
+  CHECK(redactSecrets("rpw=3 nosecret=4 cpw: 5") == "rpw=3 nosecret=4 cpw: 5");
+  CHECK(redactSecrets("Secret Service: unlocked") == "Secret Service: unlocked");
+}
+
+TEST_CASE("percent-encoded addresses and secrets are hidden too")
+{
+  const std::string s = Secret;
+  for (const std::string& line : std::initializer_list<std::string>{
+           std::string("image://jfd/https%3A%2F%2Fjelly.example.org%2FItems%2Fa%2FImages%2FPrimary%3Ftag%3Dx"),
+           "redirect=https%3A%2F%2F10.0.0.5%3A8920%2Fweb",
+           "next?token%3D" + s + "%26x%3D1",
+           "u=%68ttps%3A%2F%2Fjelly.example.org",
+           // Encoded twice: an encoded URL as a parameter of another one.
+           "image://jfd/https%253A%252F%252Fjelly.example.org%252FItems%253Fapi_key%253D" + s,
+       }) {
+    CAPTURE(line);
+    const std::string out = redactSecrets(line);
+    CAPTURE(out);
+    CHECK_FALSE(leaks(out));
+    CHECK(out.find("jelly.example.org") == std::string::npos);
+    CHECK(out.find("10.0.0.5") == std::string::npos);
+    CHECK(out.find("***") != std::string::npos);
+  }
+  CHECK(redactSecrets("image://jfd/https%3A%2F%2Fjelly.example.org%2FItems%2Fa") ==
+        "image://jfd/https%3A%2F%2F***%2FItems%2Fa");
+  CHECK(redactSecrets("next?token%3D" + s + "%26x%3D1") == "next?token%3D***%26x%3D1");
+  // This computer's addresses and plain percentages stay as they are.
+  CHECK(redactSecrets("image://jfd/http%3A%2F%2F127.0.0.1%3A8096%2FItems") ==
+        "image://jfd/http%3A%2F%2F127.0.0.1%3A8096%2FItems");
+  CHECK(redactSecrets("buffered 50% of 100%") == "buffered 50% of 100%");
+  CHECK(redactSecrets("name=a%20b%zz") == "name=a%20b%zz");
 }

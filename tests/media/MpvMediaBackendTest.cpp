@@ -9,7 +9,10 @@
 #include <QFile>
 #include <QElapsedTimer>
 
+#include <algorithm>
 #include <cmath>
+#include <functional>
+#include <memory>
 #include <variant>
 #include <vector>
 
@@ -173,6 +176,74 @@ TEST_CASE("Loading over a held file ends it and tags events with the new epoch")
   const auto stopped = f.next<backend::Ended>(second);
   REQUIRE(stopped);
   CHECK(stopped->reason == backend::EndReason::Stopped);
+}
+
+TEST_CASE("A load replaced before mpv started it does not take the next file's events") {
+  Fixture f;
+  // A quick second click: the first loadfile is still queued in the core
+  // when the session stops it and loads another file.
+  const MediaEpoch first = f.files.advance();
+  f.backend.load(first, {Clip, false, true});
+  f.backend.stop(first);
+  const MediaEpoch second = f.files.advance();
+  f.backend.load(second, {Clip, false, true});
+
+  const auto opened = f.next<backend::SourceOpened>(second);
+  REQUIRE(opened);
+  f.backend.start(second, BackendSeconds {7.0});
+  const auto restarted = f.next<backend::PlaybackRestarted>(second);
+  REQUIRE(restarted);
+  CHECK(positionOf(restarted->sample) == doctest::Approx(7.0).epsilon(0.01));
+  // Whatever the first load got, it was never held as the second file.
+  for (const SessionInput& input : f.seen)
+    if (const auto* other = std::get_if<backend::PlaybackRestarted>(&input)) CHECK(other->epoch == second);
+
+  // And a third load after it still lines up.
+  const MediaEpoch third = f.files.advance();
+  f.backend.load(third, {Clip, false, true});
+  REQUIRE(f.next<backend::SourceOpened>(third));
+}
+
+TEST_CASE("A backend gone from the player leaves no hook holding its files") {
+  MpvPlayer player {headless()};
+  SteadyClock clock;
+  std::vector<SessionInput> inputs;
+  const auto post = [&inputs](SessionInput input) { inputs.push_back(std::move(input)); };
+  const auto spinUntil = [](const std::function<bool()>& done) {
+    QDeadlineTimer deadline(10000);
+    while (!done() && !deadline.hasExpired()) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    return done();
+  };
+  auto backend = std::make_unique<MpvMediaBackend>(player, clock, post);
+  backend.reset();
+
+  // The player alone plays a file to its first frame: no hook holds it.
+  bool firstFrame = false;
+  QObject::connect(&player, &MpvPlayer::firstFrame, &player, [&] { firstFrame = true; });
+  player.load(QString::fromLatin1(Clip));
+  CHECK(spinUntil([&] { return firstFrame; }));
+
+  // A second adapter on the same player holds each file once and lets it go.
+  backend = std::make_unique<MpvMediaBackend>(player, clock, post);
+  EpochCounter<MediaEpochTag> files;
+  const MediaEpoch epoch = files.advance();
+  backend->load(epoch, {Clip, false, true});
+  const auto opened = [&] {
+    return std::count_if(inputs.begin(), inputs.end(), [&](const SessionInput& input) {
+      const auto* event = std::get_if<backend::SourceOpened>(&input);
+      return event && event->epoch == epoch;
+    });
+  };
+  const auto restarted = [&] {
+    return std::count_if(inputs.begin(), inputs.end(), [&](const SessionInput& input) {
+      const auto* event = std::get_if<backend::PlaybackRestarted>(&input);
+      return event && event->epoch == epoch;
+    });
+  };
+  REQUIRE(spinUntil([&] { return opened() == 1; }));
+  backend->start(epoch, std::nullopt);
+  CHECK(spinUntil([&] { return restarted() >= 1; }));
+  CHECK(opened() == 1);
 }
 
 TEST_CASE("A file that cannot be opened ends with an error") {

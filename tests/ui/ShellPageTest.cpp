@@ -333,7 +333,20 @@ Item {
   const qint64 growth = residentBytes() - before;
   MESSAGE("slowest switch ", slowest, " ms, memory growth ", growth / 1024, " KiB");
   CHECK(slowest <= 100);
-  if (before > 0) CHECK(growth <= 5 * 1024 * 1024);
+  // AddressSanitizer keeps freed memory in quarantine, so resident memory
+  // grows by design there; the growth limit is checked in the normal builds.
+#if defined(__SANITIZE_ADDRESS__)
+  constexpr bool residentMeaningful = false;
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+  constexpr bool residentMeaningful = false;
+#else
+  constexpr bool residentMeaningful = true;
+#endif
+#else
+  constexpr bool residentMeaningful = true;
+#endif
+  if (residentMeaningful && before > 0) CHECK(growth <= 5 * 1024 * 1024);
 }
 
 TEST_CASE("Layout at window sizes from 640x420 to 4K, in logical pixels") {

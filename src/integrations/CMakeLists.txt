@@ -10,6 +10,16 @@ if(NOT JFD_RELEASE_PUBLIC_KEY STREQUAL "" AND NOT JFD_RELEASE_PUBLIC_KEY MATCHES
 endif()
 configure_file(src/ReleaseKey.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/ReleaseKey.h @ONLY)
 
+# The Windows update script (MsiUpdater::updateScript), kept as a file so
+# CI can run the same text against a real MSI (package.yml).
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated/ApplyUpdateScript.h
+  COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/apply-update.ps1
+          -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/generated/ApplyUpdateScript.h -DNAME=applyUpdateScript
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/EmbedScript.cmake
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/apply-update.ps1 ${CMAKE_CURRENT_SOURCE_DIR}/EmbedScript.cmake
+  VERBATIM)
+
 # Monocypher (third_party/monocypher): Ed25519 and BLAKE2b for minisign. Built
 # without the project's warning flags; it is vendored unchanged.
 enable_language(C)
@@ -31,6 +41,8 @@ add_library(jfd_integrations STATIC
   src/AppImageUpdater.cpp
   src/SignedDownload.cpp
   src/MsiUpdater.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/generated/ApplyUpdateScript.h
+  apply-update.ps1
   include/jfd/integrations/DiscordIpc.h
   include/jfd/integrations/DiscordActivity.h
   include/jfd/integrations/DiscordPresence.h

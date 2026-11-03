@@ -5,7 +5,9 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <iterator>
 #include <sstream>
+#include <variant>
 
 namespace jfd::sim {
 
@@ -198,6 +200,8 @@ namespace jfd::sim {
                 [&](const backend::Advanced&) { return true; },
                 [&](const group::Joined&) { return false; },
                 [&](const group::ClockSynced&) { return false; },
+                [&](const group::ClockLost&) { return false; },
+                [&](const group::RequestFailed&) { return false; },
                 [&](const TimerFired& fired) { return !armed.contains(fired.id.serial); },
                 [&](const auto& event) {
                   using EpochType = std::remove_cvref_t<decltype(event.epoch)>;
@@ -228,7 +232,10 @@ namespace jfd::sim {
                                       "TrackAdded", "Joined",      "Left",         "ConnectionLost",
                                       "State",     "Command",      "Queue",        "RateRejected",
                                       "ClockSynced", "Timer",      "Next",         "Previous",
-                                      "SelectTrack", "AddTrack",   "Participants"};
+                                      "SelectTrack", "AddTrack",   "Participants",
+                                      "SyncCorrection", "PreloadNext", "Advanced",  "ClockLost",
+                                      "GroupRequestFailed"};
+        static_assert(std::size(names) == std::variant_size_v<SessionInput>);
         std::string text = names[input.index()];
         std::visit(Overloaded{
                        [&](const group::Command& c) {

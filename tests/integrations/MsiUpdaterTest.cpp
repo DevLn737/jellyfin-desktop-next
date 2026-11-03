@@ -10,6 +10,8 @@
 #include <QNetworkAccessManager>
 #include <QTemporaryDir>
 
+#include <algorithm>
+
 using namespace jfd::integrations;
 using jfd::test::FakeServer;
 using jfd::test::HttpRequest;
@@ -59,8 +61,10 @@ namespace {
 
   Outcome prepare(MsiUpdater& updater, const Release& next) {
     Outcome outcome;
-    QObject::connect(&updater, &MsiUpdater::ready, [&](const QString& v) { outcome.ready = v; });
-    QObject::connect(&updater, &MsiUpdater::failed, [&](const QString& reason) { outcome.failure = reason; });
+    // Connected for this call only: outcome is gone once it returns.
+    QObject context;
+    QObject::connect(&updater, &MsiUpdater::ready, &context, [&](const QString& v) { outcome.ready = v; });
+    QObject::connect(&updater, &MsiUpdater::failed, &context, [&](const QString& reason) { outcome.failure = reason; });
     updater.prepare(next);
     REQUIRE(waitFor([&] { return outcome.done(); }));
     return outcome;
@@ -166,9 +170,14 @@ TEST_CASE("Only an installed application with a release key updates itself") {
 
 TEST_CASE("The update script waits, installs per user, and starts the program either way") {
   const QString script = MsiUpdater::updateScript();
+  CHECK(script.startsWith(QStringLiteral("param(")));
+  // Windows PowerShell 5.1 reads a file without a byte order mark as ANSI.
+  CHECK(std::all_of(script.cbegin(), script.cend(), [](QChar c) { return c.unicode() < 0x80; }));
   CHECK(script.contains(QStringLiteral("Wait-Process -Id $ProcessId")));
   CHECK(script.contains(QStringLiteral("'msiexec.exe'")));
-  CHECK(script.contains(QStringLiteral("'/qb', '/norestart', '/l*v'")));
+  // People see msiexec's progress and errors: the client never passes UiLevel.
+  CHECK(script.contains(QStringLiteral("[string]$UiLevel = '/qb'")));
+  CHECK(script.contains(QStringLiteral("$UiLevel, '/norestart', '/l*v'")));
   CHECK(script.contains(QStringLiteral("New-Item -ItemType File -Path \"$Marker.failed\"")));
   // The program is started after the failure marker is decided, not only on success.
   CHECK(script.indexOf(QStringLiteral("Start-Process -FilePath $Exe")) > script.indexOf(QStringLiteral(".failed")));
@@ -180,6 +189,7 @@ TEST_CASE("The update script waits, installs per user, and starts the program ei
                                                            QStringLiteral("C:/s/a b.msi"), QStringLiteral("C:/p/app.exe"),
                                                            QStringLiteral("C:/s/log.txt"), QStringLiteral("C:/s/marker"));
   CHECK(arguments.contains(QStringLiteral("Bypass")));
+  CHECK_FALSE(arguments.contains(QStringLiteral("-UiLevel")));
   const qsizetype file = arguments.indexOf(QStringLiteral("-File"));
   REQUIRE(file >= 0);
   CHECK(arguments.at(file + 1) == QDir::toNativeSeparators(QStringLiteral("C:/s/apply-update.ps1")));
