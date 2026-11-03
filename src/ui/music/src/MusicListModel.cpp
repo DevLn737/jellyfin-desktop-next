@@ -2,6 +2,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/CardImages.h>
+#include <jfd/library/ErrorText.h>
 #include <jfd/music/MusicPlayer.h>
 
 #include <QCoreApplication>
@@ -232,7 +233,7 @@ namespace jfd::ui {
       if (generation != m_generation) return;
       m_inFlight.remove(page);
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         Q_EMIT loadingChanged();
         return;
       }
@@ -348,7 +349,7 @@ namespace jfd::ui {
     if (!it || it->playlistItemId.isEmpty()) return;
     m_api.removeFromPlaylist(m_parentId, {it->playlistItemId}, this, [this](api::Result<api::Empty> result) {
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         return;
       }
       reload();

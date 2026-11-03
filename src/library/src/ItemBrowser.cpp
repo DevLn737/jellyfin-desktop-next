@@ -1,6 +1,7 @@
 #include <jfd/library/ItemBrowser.h>
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/library/ErrorText.h>
 
 namespace jfd::library {
 
@@ -25,7 +26,7 @@ namespace jfd::library {
     if (serial != m_serial) return;
     setLoading(false);
     if (!result) {
-      setErrorText(result.error().message);
+      setErrorText(library::errorText(result.error()));
       return;
     }
     QList<ItemListModel::Entry> entries;

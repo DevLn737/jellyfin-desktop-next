@@ -1,6 +1,7 @@
 #include <jfd/library/HomeModel.h>
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/library/ErrorText.h>
 #include <jfd/library/LibraryUpdates.h>
 #include <jfd/library/RecommendationRows.h>
 
@@ -146,7 +147,7 @@ namespace jfd::library {
     m_client.views(this, [this, generation](api::Result<api::ItemPage> result) {
       if (generation != m_generation) return;
       if (!result) {
-        setError(result.error().message);
+        setError(library::errorText(result.error()));
         requestDone();
         return;
       }
@@ -268,7 +269,7 @@ namespace jfd::library {
       updateVisible();
     } else {
       // A failed row keeps what it showed.
-      setError(result.error().message);
+      setError(library::errorText(result.error()));
     }
     requestDone();
   }

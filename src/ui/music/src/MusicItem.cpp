@@ -2,6 +2,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/CardImages.h>
+#include <jfd/library/ErrorText.h>
 
 namespace jfd::ui {
 
@@ -20,7 +21,7 @@ namespace jfd::ui {
     m_client.item(id, this, [this, serial](api::Result<api::Item> result) {
       if (serial != m_serial) return;
       if (!result) {
-        m_errorText = result.error().message;
+        m_errorText = library::errorText(result.error());
       } else {
         m_item = *result;
         m_imageUrl = library::cardImageUrl(
