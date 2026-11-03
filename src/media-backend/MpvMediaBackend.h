@@ -103,6 +103,9 @@ private:
   // The file mpv went on to by itself: its first restart can report a
   // position just before zero (timestamps carry on from the file before).
   bool m_followedOn = false;
+  // Whether the session wants playback paused (load() and setPaused()); a
+  // file mpv goes on to by itself plays or pauses as the session expects.
+  bool m_wantPaused = false;
   std::map<std::uint64_t, Pending> m_pending;
   std::uint64_t m_nextToken = 1;
 

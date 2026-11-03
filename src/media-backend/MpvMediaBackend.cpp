@@ -120,6 +120,7 @@ void MpvMediaBackend::load(core::MediaEpoch epoch, const core::BackendLoad& requ
   dropPreload();
   m_followedOn = false;
   mpv_set_property_string(m_mpv, "rebase-start-time", request.rebaseStartTime ? "yes" : "no");
+  m_wantPaused = request.startPaused;
   int pause = request.startPaused ? 1 : 0;
   mpv_set_property(m_mpv, "pause", MPV_FORMAT_FLAG, &pause);
   m_starting.push_back(epoch);
@@ -183,6 +184,7 @@ void MpvMediaBackend::setPaused(core::MediaEpoch epoch, bool paused)
 {
   if (!isCurrent(epoch))
     return;
+  m_wantPaused = paused;
   int flag = paused ? 1 : 0;
   mpv_set_property_async(m_mpv, 0, "pause", MPV_FORMAT_FLAG, &flag);
 }
@@ -342,6 +344,13 @@ void MpvMediaBackend::handle(const mpv_event& event)
         {
           m_gapless = *m_current;
           m_followedOn = true;
+          // Queued while mpv held the end of the last file, the file starts
+          // paused (keep-open-pause, see EofReached); the session is playing.
+          if (!m_wantPaused && flagProperty(m_mpv, "pause"))
+          {
+            int pause = 0;
+            mpv_set_property_async(m_mpv, 0, "pause", MPV_FORMAT_FLAG, &pause);
+          }
           m_post(core::backend::Advanced {left.epoch, *m_current});
         }
         else
@@ -416,9 +425,26 @@ void MpvMediaBackend::handle(const mpv_event& event)
       const auto* property = static_cast<const mpv_event_property*>(event.data);
       // keep-open=yes holds the last frame at the end instead of ending the file.
       // With a file queued mpv goes on to it instead of holding the last frame.
-      if (m_current && !m_preload && property->format == MPV_FORMAT_FLAG
-          && *static_cast<int*>(property->data))
+      if (!m_current || property->format != MPV_FORMAT_FLAG || !*static_cast<int*>(property->data))
+        break;
+      if (!m_preload)
+      {
         m_post(core::backend::Ended {*m_current, core::backend::EndReason::EndOfFile, {}});
+        break;
+      }
+      // The file was queued after mpv had already reached the end of this one
+      // as the last in its playlist: it held it there and paused
+      // (keep-open-pause). The queued file then starts paused (audio), or never
+      // (video: mpv does not leave a paused last frame), and playback stalls
+      // with the session still playing. Unpaused, mpv sees the queued file and
+      // goes on to it as at a natural end. Only while it is paused at the end
+      // and the session wants it playing: eof-reached is also set for a moment
+      // when mpv goes on by itself.
+      if (!m_wantPaused && flagProperty(m_mpv, "pause"))
+      {
+        int pause = 0;
+        mpv_set_property_async(m_mpv, 0, "pause", MPV_FORMAT_FLAG, &pause);
+      }
       break;
     }
     default:

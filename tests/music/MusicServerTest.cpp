@@ -345,8 +345,8 @@ namespace {
   // One run through the three tone tracks. Returns how many times the backend
   // went on to the next track by itself. The output is untimed, so a 240 s
   // track ends in a blink: on a slow machine it can end before the next one
-  // is queued behind it, and the player opens that one itself. The seams are
-  // checked on every run either way.
+  // is queued behind it, and the player opens that one itself. Either way the
+  // album must play to its end, and the seams are checked on every run.
   int playToneAlbum() {
   QTemporaryDir dir;
   REQUIRE(dir.isValid());
@@ -371,12 +371,14 @@ namespace {
         return seen == 2;
       },
       40000);
+  // Three tracks take a few seconds untimed; 40 s without reaching the last
+  // one is a stall, a failure (it was the next file queued while mpv held the
+  // end of the last one, see MpvMediaBackend's EofReached), never a retry.
   if (!reached) {
-    // A slow runner can stall the album; the caller tries again.
-    MESSAGE("album stalled before the last track: " << log.join(QStringLiteral("; ")).toStdString() << "; index "
-            << s.player->currentIndex() << " active " << s.player->active() << " loading " << s.player->loading()
-            << " handovers " << s.player->handoverCount() << " opens " << s.player->openCount());
-    return -1;
+    FAIL("album stalled before the last track: " << log.join(QStringLiteral("; ")).toStdString() << "; index "
+         << s.player->currentIndex() << " active " << s.player->active() << " playing " << s.player->playing()
+         << " loading " << s.player->loading() << " handovers " << s.player->handoverCount() << " opens "
+         << s.player->openCount());
   }
   // The last track plays out.
   // The output is untimed, so a track plays in a blink: wait for the end.
@@ -393,8 +395,9 @@ namespace {
       },
       40000);
   if (!ended) {
-    MESSAGE("album did not end: " << log.join(QStringLiteral("; ")).toStdString());
-    return -1;
+    FAIL("album did not end: " << log.join(QStringLiteral("; ")).toStdString() << "; index "
+         << s.player->currentIndex() << " active " << s.player->active() << " playing " << s.player->playing()
+         << " loading " << s.player->loading());
   }
   INFO("handovers " << s.player->handoverCount() << ", opens " << s.player->openCount());
   const int handovers = s.player->handoverCount();
@@ -422,9 +425,16 @@ namespace {
 
 TEST_CASE("The tracks of a continuous album meet without a gap") {
   if (!hasExtrasStand()) return;
-  // The backend moved on by itself at least once in some run.
+  // Every run must play the album to its end with unbroken seams (a stall
+  // fails the test at once). Whether the next track is queued before the
+  // untimed output reaches the end is chance, so the album plays up to four
+  // times until the backend has moved on by itself at least once.
   int handovers = 0;
-  for (int attempt = 0; attempt < 4 && handovers < 1; ++attempt)
+  int runs = 0;
+  while (runs < 4 && handovers < 1) {
+    ++runs;
     handovers = playToneAlbum();
+  }
+  INFO("runs " << runs);
   CHECK(handovers >= 1);
 }
