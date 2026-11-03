@@ -2,6 +2,7 @@ import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
+import Jfd.Ui.Settings
 import Jfd.Ui.Player
 import Jfd.Ui.Library
 
@@ -61,6 +62,8 @@ Window {
             accountName: Library.signIn ? (Library.signIn.userName.length > 0 ? Library.signIn.userName : Library.signIn.serverName) : ""
             onLibraryChosen: (itemId, type) => Navigator.navigate(Library.routeFor(itemId, type))
             onPaletteRequested: palette.toggle()
+            // The same action as Sign out on the settings page.
+            onSignOutRequested: AppSettings.trigger("account/signOut")
         }
 
         CommandPalette {

@@ -12,6 +12,7 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSignalSpy>
 #include <QWheelEvent>
 #include <QtQml/qqmlextensionplugin.h>
 
@@ -276,6 +277,43 @@ Item {
   CHECK(y >= 8);
   CHECK(x + w <= overlay->width() - 8 + 0.5);
   CHECK(y + h <= overlay->height() - 8 + 0.5);
+}
+
+TEST_CASE("The account menu signs out after a confirmation") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  window.resize(1000, 700);
+  auto object = create(engine, "import QtQuick\nimport Jfd.Ui.Shell\nSidebar { height: 700; accountName: \"Server\" }");
+  auto* sidebar = qobject_cast<QQuickItem*>(object.get());
+  REQUIRE(sidebar != nullptr);
+  sidebar->setParentItem(window.contentItem());
+  window.show();
+  QSignalSpy signOut(sidebar, SIGNAL(signOutRequested()));
+
+  auto* menu = sidebar->findChild<QObject*>(QStringLiteral("accountMenu"));
+  auto* confirm = sidebar->findChild<QObject*>(QStringLiteral("signOutConfirm"));
+  REQUIRE(menu != nullptr);
+  REQUIRE(confirm != nullptr);
+  const auto settle = [] {
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 300) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  };
+
+  // Sign out asks first; Cancel changes nothing.
+  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, 1));
+  settle();
+  CHECK(confirm->property("visible").toBool());
+  CHECK(signOut.isEmpty());
+  QMetaObject::invokeMethod(confirm, "reject");
+  settle();
+  CHECK(signOut.isEmpty());
+
+  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, 1));
+  settle();
+  QMetaObject::invokeMethod(confirm, "accept");
+  settle();
+  CHECK(signOut.count() == 1);
 }
 
 

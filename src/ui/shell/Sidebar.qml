@@ -19,6 +19,8 @@ FocusScope {
     property var libraries: null
     property string accountName
     signal libraryChosen(string itemId, string type)
+    // "Sign out" in the account menu, confirmed.
+    signal signOutRequested()
     // Registered by the screens' modules (Navigator.registerRoute).
     readonly property var entries: Navigator.sidebarEntries
     // An entry's icon is a name from Icons or a file URL.
@@ -153,7 +155,8 @@ FocusScope {
     }
 
     // The account line; choosing it opens a small menu (the first use of
-    // PopupMenu).
+    // PopupMenu): Settings, and Sign out after the same question the
+    // settings page asks.
     ListItem {
         id: account
         objectName: "sidebarAccount"
@@ -173,9 +176,26 @@ FocusScope {
         id: accountMenu
         objectName: "accountMenu"
         anchorItem: account
-        entries: [qsTr("Settings")]
+        entries: [qsTr("Settings"), qsTr("Sign out")]
         onActivated: index => {
+            if (index === 1) {
+                signOutConfirm.open()
+                return
+            }
             Navigator.navigate("settings")
+            sidebar.chosen()
+        }
+    }
+
+    AppDialog {
+        id: signOutConfirm
+        objectName: "signOutConfirm"
+        title: qsTr("Sign out")
+        text: qsTr("Sign out of this server? Playback stops and the password is asked for again.")
+        acceptText: qsTr("Sign out")
+        destructive: true
+        onAccepted: {
+            sidebar.signOutRequested()
             sidebar.chosen()
         }
     }
