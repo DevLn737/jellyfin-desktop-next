@@ -23,6 +23,11 @@ add_test(NAME jfd_core_tests COMMAND jfd_core_tests)
 add_test(NAME qml_literals_check
   COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/i18n/QmlLiterals.cmake")
 
+# Every file in an icons*/ folder has its line in LICENSES.md, and every
+# line there names a file that exists.
+add_test(NAME licenses_check
+  COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/licenses/IconLicenses.cmake")
+
 add_executable(jfd_diagnostics_tests
   core/main.cpp
   diagnostics/FrameStatsTest.cpp
