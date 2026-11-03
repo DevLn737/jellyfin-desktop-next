@@ -75,8 +75,12 @@ namespace jfd::session {
     void preloaded(const jfd::session::PlaybackLauncher::Request& request, const jfd::api::Item& item,
                    const jfd::api::MediaSource& source, const jfd::api::PlaybackStream& stream);
     void failed(const QString& itemId, const QString& message);
+    // With failed, for an open (not a preload): the request that failed, so
+    // a group item that cannot be opened is noticed.
+    void openFailed(const jfd::session::PlaybackLauncher::Request& request, const QString& message);
 
   private:
+    void fail(const Request& request, const QString& message, bool preload);
     // `chosen`: the chooser already ran for this request.
     void openWithItem(std::uint64_t serial, const Request& request, const api::Item& item,
                       bool chosen = false, bool preload = false);

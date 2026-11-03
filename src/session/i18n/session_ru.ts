@@ -71,5 +71,25 @@
         <source>Could not create the group.</source>
         <translation>Не удалось создать группу.</translation>
     </message>
+    <message>
+        <source>The group&apos;s item could not be opened, so you left the group.</source>
+        <translation>Не удалось открыть то, что смотрит группа, поэтому вы вышли из группы.</translation>
+    </message>
+    <message>
+        <source>Could not return to the group after the connection came back.</source>
+        <translation>Не удалось вернуться в группу после восстановления связи.</translation>
+    </message>
+    <message>
+        <source>The group did not hear from this player and may be waiting for it.</source>
+        <translation>Группа не получила ответа от этого плеера и, возможно, ждёт его.</translation>
+    </message>
+    <message>
+        <source>You may not create groups on this server.</source>
+        <translation>На этом сервере вам нельзя создавать группы.</translation>
+    </message>
+    <message>
+        <source>You are not in this group.</source>
+        <translation>Вы не состоите в этой группе.</translation>
+    </message>
 </context>
 </TS>
