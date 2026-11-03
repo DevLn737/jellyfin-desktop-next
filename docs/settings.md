@@ -38,7 +38,9 @@ the settings screen translates them with the section's `context`.
 
 Types: `Bool`, `Int`, `Double` (with `minimum`/`maximum`/`step`), `String`,
 `Choice` and `Action` (a button with no stored value; connect to
-`Settings::actionTriggered`). `hidden` keeps state such as window geometry
+`Settings::actionTriggered`; `confirmation`, also marked with
+`QT_TRANSLATE_NOOP`, is a question the screen asks first, as for Sign out).
+`hidden` keeps state such as window geometry
 off the settings screen. `legacyKey` names the 2.x client's key
 (`resources/settings/settings_description.json`, `section.value`) for the
 import planned in stage 2b.

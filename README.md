@@ -67,6 +67,9 @@ Interface strings are English in the source and translated per module in
 After changing strings, run `cmake --build build --target update_translations`,
 translate the new entries and commit the `.ts` files. The `translations_check`
 test fails on any string that is missing, untranslated or no longer used.
+Modules with plural strings (`qsTr("%n item(s)", "", n)`) also keep a
+`<module>_en.ts` with only those, so English reads "5 items"
+(`jfd_add_translations(<target> PLURALS)`).
 
 CI uses the versions pinned in [deps/versions.json](deps/versions.json) and passes
 `-DJFD_ENFORCE_PINS=ON` to reject any other.
