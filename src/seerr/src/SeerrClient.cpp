@@ -272,33 +272,38 @@ namespace jfd::seerr {
         done(notJellyfin());
         return;
       }
-      QJsonObject body;
-      body.insert(QStringLiteral("username"), userName);
-      body.insert(QStringLiteral("password"), password);
-      send(Method::Post, QStringLiteral("/auth/jellyfin"), {}, QJsonDocument(body), context,
-           [this, done = std::move(done)](Result<Raw> raw) {
-             if (!raw) {
-               done(raw.error());
-               return;
-             }
-             QJsonParseError parseError{};
-             const auto document = QJsonDocument::fromJson(raw->body, &parseError);
-             if (parseError.error != QJsonParseError::NoError || !document.isObject() ||
-                 raw->setCookie.isEmpty()) {
-               done(invalidResponse(QStringLiteral("Unexpected sign-in answer")));
-               return;
-             }
-             // Only the id, name, rights and count are read: the answer also
-             // carries the Jellyfin token of this user, which is dropped here.
-             const User user = json::user(document.object());
-             if (user.id <= 0) {
-               done(invalidResponse(QStringLiteral("Unexpected sign-in answer")));
-               return;
-             }
-             setSession(raw->setCookie, user.id);
-             done(user);
-           });
+      signInProbed(userName, password, context, std::move(done));
     });
+  }
+
+  void SeerrClient::signInProbed(const QString& userName, const QString& password, QObject* context,
+                                 Callback<User> done) {
+    QJsonObject body;
+    body.insert(QStringLiteral("username"), userName);
+    body.insert(QStringLiteral("password"), password);
+    send(Method::Post, QStringLiteral("/auth/jellyfin"), {}, QJsonDocument(body), context,
+         [this, done = std::move(done)](Result<Raw> raw) {
+           if (!raw) {
+             done(raw.error());
+             return;
+           }
+           QJsonParseError parseError{};
+           const auto document = QJsonDocument::fromJson(raw->body, &parseError);
+           if (parseError.error != QJsonParseError::NoError || !document.isObject() ||
+               raw->setCookie.isEmpty()) {
+             done(invalidResponse(QStringLiteral("Unexpected sign-in answer")));
+             return;
+           }
+           // Only the id, name, rights and count are read: the answer also
+           // carries the Jellyfin token of this user, which is dropped here.
+           const User user = json::user(document.object());
+           if (user.id <= 0) {
+             done(invalidResponse(QStringLiteral("Unexpected sign-in answer")));
+             return;
+           }
+           setSession(raw->setCookie, user.id);
+           done(user);
+         });
   }
 
   void SeerrClient::currentUser(QObject* context, Callback<User> done) {
@@ -312,10 +317,12 @@ namespace jfd::seerr {
   }
 
   void SeerrClient::signOut(QObject* context, Callback<Empty> done) {
+    const QString cookie = m_cookie;
     send(Method::Post, QStringLiteral("/auth/logout"), {}, std::nullopt, context,
-         [this, done = std::move(done)](Result<Raw>) {
-           // The local session goes whatever the answer.
-           clearSession();
+         [this, cookie, done = std::move(done)](Result<Raw>) {
+           // The local session goes whatever the answer, unless a newer
+           // sign-in replaced it meanwhile.
+           if (m_cookie == cookie) clearSession();
            done(Empty{});
          });
   }

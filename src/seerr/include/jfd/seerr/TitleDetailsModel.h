@@ -84,6 +84,7 @@ namespace jfd::seerr {
     void actionFinished(int outcome);
 
   private:
+    const UserRequest* myRequest() const;
     void apply(quint64 generation, api::Result<TitleDetails> result);
     void finishAction(Outcome outcome);
 
