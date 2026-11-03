@@ -2,7 +2,6 @@
 
 #include <jfd/library/ImageCache.h>
 
-#include <QPointer>
 #include <QQuickAsyncImageProvider>
 #include <QSize>
 
@@ -43,10 +42,12 @@ namespace jfd::ui {
   // budget. Any size beyond `maxSize` is clamped to it.
   //
   // The engine owns the provider and Qt Quick the responses and textures,
-  // and they can outlive the cache and the budget (the application shuts
-  // the library down before its window; a texture is dropped when its Image
-  // is). So the provider holds the cache weakly, answering nothing once it
-  // is gone, and shares the budget.
+  // and they can outlive the cache and the budget (LibraryScreens removes
+  // the provider when it goes, but the loader thread may hold it a moment
+  // longer; a texture is dropped when its Image is). The application
+  // destroys its window and engine before the library (src/desktop/main.cpp).
+  // So the provider reaches the cache only through its gate, which posts
+  // nothing once the cache is gone, and shares the budget.
   class LibraryImageProvider final : public QQuickAsyncImageProvider {
   public:
     static constexpr const char* Id = "jfd";
@@ -64,7 +65,7 @@ namespace jfd::ui {
     static QString sourceFor(const QUrl& url);
 
   private:
-    QPointer<library::ImageCache> m_cache;
+    std::shared_ptr<library::ImageCache::Gate> m_cache;
     std::shared_ptr<TextureBudget> m_budget;
     QSize m_maxSize;
   };

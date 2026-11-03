@@ -14,12 +14,12 @@
 #include <jfd/ui/LibraryImageProvider.h>
 
 #include <QJsonObject>
+#include <QPointer>
+#include <QQmlEngine>
 #include <QString>
 
 #include <functional>
 #include <memory>
-
-class QQmlEngine;
 
 namespace jfd::ui {
 
@@ -32,6 +32,12 @@ namespace jfd::ui {
   // and search models. install() puts them in front of QML: the image
   // provider, the `Library` singleton, the pages, and the move between
   // the login and home pages on sign-in and sign-out.
+  //
+  // Destroy the window and the engine first, then this: the pages' models
+  // hold the client by reference (src/desktop/main.cpp does so). When this
+  // goes first anyway, its destructor detaches the `Library` singleton,
+  // removes the image provider and stops the socket, so QML and the image
+  // loader thread reach nothing that is gone through them.
   class LibraryScreens {
   public:
     struct Config {
@@ -63,7 +69,7 @@ namespace jfd::ui {
     library::ImageCache& images() { return m_images; }
     const TextureBudget& textures() const { return *m_textures; }
     // Null before install().
-    LibraryUi* ui() const { return m_ui; }
+    LibraryUi* ui() const { return m_ui.data(); }
 
   private:
     qreal m_devicePixelRatio;
@@ -80,7 +86,9 @@ namespace jfd::ui {
     std::function<QJsonObject()> m_readFilters;
     std::function<void(const QJsonObject&)> m_writeFilters;
     std::shared_ptr<TextureBudget> m_textures;
-    LibraryUi* m_ui = nullptr;
+    // Both owned by the engine, which may go first.
+    QPointer<LibraryUi> m_ui;
+    QPointer<QQmlEngine> m_engine;
   };
 
 } // namespace jfd::ui

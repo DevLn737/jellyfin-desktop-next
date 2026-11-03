@@ -5,13 +5,16 @@
 #include <QHash>
 #include <QImage>
 #include <QList>
+#include <QMutex>
 #include <QObject>
 #include <QPointer>
 #include <QSize>
 #include <QString>
+#include <QThreadPool>
 #include <QUrl>
 
 #include <functional>
+#include <memory>
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -29,6 +32,10 @@ namespace jfd::library {
   // bounds what the GPU side can be asked to upload), the encoded files on
   // disk in the profile under their own limit, and the server. Images are
   // decoded at the size the card asks for, never at the original size.
+  //
+  // Files are read from disk and decoded on a small worker pool, never on
+  // the cache's thread, so a fast scroll over cached posters does not cost
+  // frames; only the bookkeeping runs on the cache's thread.
   //
   // Requests are queued newest first with a few running at once, so while
   // the user scrolls the cards now on screen load before the ones scrolled
@@ -50,6 +57,23 @@ namespace jfd::library {
     using Ticket = quint64;
     using Done = std::function<void(const QImage&)>;
 
+    // A way into the cache from other threads (Qt Quick's image loader).
+    // post() hands `work` to the cache's thread only while the cache lives:
+    // the destructor closes the gate under the same lock first, and Qt drops
+    // the events still queued for a destroyed object. Checking a QPointer on
+    // another thread and then posting to the raw pointer races with the
+    // destructor; this does not.
+    class Gate {
+    public:
+      // False when the cache is gone; `work` is not run then.
+      bool post(std::function<void(ImageCache&)> work);
+
+    private:
+      friend class ImageCache;
+      QMutex m_mutex;
+      ImageCache* m_cache = nullptr;
+    };
+
     // `diskDirectory` empty: no disk cache.
     ImageCache(api::JellyfinClient& client, const QString& diskDirectory, Limits limits,
                QObject* parent = nullptr);
@@ -59,8 +83,9 @@ namespace jfd::library {
 
     // Delivers the image scaled to fit within `size` (an empty size keeps the
     // original size) to `done`, on this object's thread and only while
-    // `context` lives. A null image means it could not be loaded. A cached
-    // image is delivered before this returns.
+    // `context` lives. A null image means it could not be loaded. An image
+    // already decoded in memory is delivered before this returns; one on
+    // disk a moment later, decoded off this thread.
     Ticket request(const QUrl& url, QSize size, QObject* context, Done done);
     void cancel(Ticket ticket);
 
@@ -73,6 +98,9 @@ namespace jfd::library {
     int pendingDownloads() const { return static_cast<int>(m_queue.size()); }
     int runningDownloads() const { return static_cast<int>(m_running.size()); }
     void clearMemory() { m_memory.clear(); }
+
+    // Shared with the threads that post to the cache; see Gate.
+    std::shared_ptr<Gate> gate() const { return m_gate; }
 
     // The key an URL is stored under: the URL without credentials.
     static QString cacheKey(const QUrl& url);
@@ -89,15 +117,31 @@ namespace jfd::library {
       QUrl url;
       QList<Waiter> waiters;
       QNetworkReply* reply = nullptr;
+      // The background job (disk read and decode) this fetch waits for; 0
+      // for none. An answer for another job is stale and dropped.
+      quint64 job = 0;
+      // The encoded image came from the disk cache: if it does not decode,
+      // the server is asked instead.
+      bool fromDisk = false;
+    };
+    struct Decoded {
+      QSize size;
+      QImage image;
     };
 
     static QString memoryKey(const QString& key, QSize size);
-    void deliver(const QString& key, const QByteArray& encoded);
+    // Reads `path` (when `encoded` is empty) and decodes at the sizes the
+    // fetch's waiters ask for, on the worker pool; the answer comes back
+    // through onDecoded.
+    void decodeLater(const QString& key, Fetch& fetch, const QByteArray& encoded,
+                     const QString& path);
+    void onDecoded(const QString& key, quint64 job, const QByteArray& encoded,
+                   const QList<Decoded>& images);
+    void enqueue(const QString& key);
     void fail(const QString& key);
     void pump();
     void start(const QString& key);
     QString diskPath(const QString& key) const;
-    QByteArray readDisk(const QString& key);
     void writeDisk(const QString& key, const QByteArray& data);
     void trimDisk();
 
@@ -114,6 +158,10 @@ namespace jfd::library {
     QList<QString> m_running;
     QHash<Ticket, QString> m_tickets;
     Ticket m_nextTicket = 0;
+    quint64 m_nextJob = 0;
+    std::shared_ptr<Gate> m_gate;
+    // Declared last: destroyed (and waited for) first.
+    QThreadPool m_pool;
   };
 
 } // namespace jfd::library

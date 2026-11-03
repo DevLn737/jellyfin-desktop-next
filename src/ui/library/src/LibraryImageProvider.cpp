@@ -54,7 +54,7 @@ namespace jfd::ui {
 
     class Response final : public QQuickImageResponse {
     public:
-      Response(std::shared_ptr<Shared> shared, QPointer<library::ImageCache> cache,
+      Response(std::shared_ptr<Shared> shared, std::shared_ptr<library::ImageCache::Gate> cache,
                std::shared_ptr<TextureBudget> budget)
           : m_shared(std::move(shared)), m_cache(std::move(cache)), m_budget(std::move(budget)) {
         m_shared->response = this;
@@ -77,18 +77,16 @@ namespace jfd::ui {
           m_error = QStringLiteral("Cancelled");
           Q_EMIT finished();
         }
-        // The cache lives on another thread, and may be gone; a request it
-        // has not started never reaches the network.
-        library::ImageCache* cache = m_cache.data();
-        if (cache == nullptr) return;
-        QMetaObject::invokeMethod(cache, [cache = m_cache, shared = m_shared] {
-          if (cache.isNull()) return;
+        // The cache lives on another thread, and may be gone (the gate then
+        // posts nothing); a request it has not started never reaches the
+        // network.
+        m_cache->post([shared = m_shared](library::ImageCache& cache) {
           library::ImageCache::Ticket ticket = 0;
           {
             QMutexLocker lock(&shared->mutex);
             ticket = shared->ticket;
           }
-          if (ticket != 0) cache->cancel(ticket);
+          if (ticket != 0) cache.cancel(ticket);
         });
       }
 
@@ -101,7 +99,7 @@ namespace jfd::ui {
 
     private:
       std::shared_ptr<Shared> m_shared;
-      QPointer<library::ImageCache> m_cache;
+      std::shared_ptr<library::ImageCache::Gate> m_cache;
       std::shared_ptr<TextureBudget> m_budget;
       QImage m_image;
       QString m_error;
@@ -119,7 +117,7 @@ namespace jfd::ui {
 
   LibraryImageProvider::LibraryImageProvider(library::ImageCache& cache,
                                              std::shared_ptr<TextureBudget> budget, QSize maxSize)
-      : m_cache(&cache), m_budget(std::move(budget)), m_maxSize(maxSize) {}
+      : m_cache(cache.gate()), m_budget(std::move(budget)), m_maxSize(maxSize) {}
 
   QString LibraryImageProvider::sourceFor(const QUrl& url) {
     if (url.isEmpty()) return {};
@@ -142,21 +140,22 @@ namespace jfd::ui {
                                           : m_maxSize.height());
     size = m_budget->allowedSize(size);
 
-    library::ImageCache* cache = m_cache.data();
-    if (cache == nullptr || !url.isValid() || url.isRelative()) {
+    const auto fail = [&] {
       QMutexLocker lock(&shared->mutex);
       shared->done = true;
       response->complete({});
+    };
+    if (!url.isValid() || url.isRelative()) {
+      fail();
       return response;
     }
 
-    QMetaObject::invokeMethod(cache, [cache = m_cache, shared, url, size] {
-      if (cache.isNull()) return;
+    const bool posted = m_cache->post([shared, url, size](library::ImageCache& cache) {
       {
         QMutexLocker lock(&shared->mutex);
         if (shared->done) return;
       }
-      const auto ticket = cache->request(url, size, cache, [shared](const QImage& image) {
+      const auto ticket = cache.request(url, size, &cache, [shared](const QImage& image) {
         QMutexLocker lock(&shared->mutex);
         if (shared->done || shared->response == nullptr) return;
         shared->done = true;
@@ -165,6 +164,8 @@ namespace jfd::ui {
       QMutexLocker lock(&shared->mutex);
       shared->ticket = ticket;
     });
+    // The cache is gone: nothing will answer.
+    if (!posted) fail();
     return response;
   }
 
