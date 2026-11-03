@@ -1,7 +1,9 @@
 #include "../support/DoctestQt.h"
 
 #include <jfd/music/MusicQueue.h>
+#include <jfd/music/MusicQueueModel.h>
 
+#include <QAbstractItemModelTester>
 #include <QJsonDocument>
 
 using namespace jfd::music;
@@ -156,4 +158,112 @@ TEST_CASE("A saved queue comes back as it was") {
   CHECK(restored->tracks()[restored->size() - 1].id == QStringLiteral("z0"));
 
   CHECK_FALSE(MusicQueue::fromJson(QJsonObject{}).has_value());
+}
+
+namespace {
+  // What a list view holds, kept only from the model's signals: after each
+  // edit it must match the queue.
+  struct View {
+    explicit View(MusicQueueModel& model) : m_model(model) {
+      reload();
+      QObject::connect(&model, &QAbstractItemModel::modelReset, &model, [this] {
+        ++resets;
+        reload();
+      });
+      QObject::connect(&model, &QAbstractItemModel::rowsInserted, &model,
+                       [this](const QModelIndex&, int first, int last) {
+                         ++edits;
+                         for (int row = first; row <= last; ++row) rows.insert(row, title(row));
+                       });
+      QObject::connect(&model, &QAbstractItemModel::rowsRemoved, &model,
+                       [this](const QModelIndex&, int first, int last) {
+                         ++edits;
+                         rows.remove(first, last - first + 1);
+                       });
+      QObject::connect(&model, &QAbstractItemModel::rowsMoved, &model,
+                       [this](const QModelIndex&, int first, int, const QModelIndex&, int destination) {
+                         ++edits;
+                         rows.move(first, destination > first ? destination - 1 : destination);
+                       });
+      QObject::connect(&model, &QAbstractItemModel::dataChanged, &model,
+                       [this](const QModelIndex& from, const QModelIndex& to) {
+                         for (int row = from.row(); row <= to.row(); ++row)
+                           if (m_model.data(m_model.index(row), MusicQueueModel::IsCurrent).toBool()) current = row;
+                       });
+    }
+
+    QString title(int row) const { return m_model.data(m_model.index(row), MusicQueueModel::Title).toString(); }
+    void reload() {
+      rows.clear();
+      for (int row = 0; row < m_model.rowCount(); ++row) rows.append(title(row));
+    }
+
+    MusicQueueModel& m_model;
+    QStringList rows;
+    int resets = 0;
+    int edits = 0;
+    int current = -1;
+  };
+} // namespace
+
+TEST_CASE("Queue edits reach the list as row inserts, removals and moves, shuffled or not") {
+  MusicQueue queue;
+  queue.seed(7);
+  MusicQueueModel model;
+  QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::Fatal);
+  model.setQueue(&queue);
+  View view(model);
+
+  for (const bool shuffled : {false, true}) {
+    CAPTURE(shuffled);
+    model.replace(tracks(6), 2);
+    model.setShuffle(shuffled);
+    const int resets = view.resets;
+    CHECK(view.rows == ids(queue));
+
+    model.append(tracks(2, "a"));
+    CHECK(view.rows == ids(queue));
+    CHECK(view.rows.mid(6) == QStringList{QStringLiteral("a0"), QStringLiteral("a1")});
+
+    model.playNext(tracks(2, "n"));
+    CHECK(view.rows == ids(queue));
+    CHECK(view.rows.mid(queue.current() + 1, 2) == QStringList{QStringLiteral("n0"), QStringLiteral("n1")});
+
+    // Down, up, and the current track itself.
+    model.move(0, 5);
+    CHECK(view.rows == ids(queue));
+    model.move(7, 1);
+    CHECK(view.rows == ids(queue));
+    const QString playing = queue.currentTrack()->id;
+    model.move(queue.current(), 0);
+    CHECK(view.rows == ids(queue));
+    CHECK(queue.currentTrack()->id == playing);
+    model.move(3, 3);
+    model.move(-1, 2);
+
+    // After the current track, before it, and the current one: the track
+    // that followed becomes current and its row says so.
+    model.remove(queue.size() - 1);
+    model.remove(0);
+    CHECK(view.rows == ids(queue));
+    model.remove(queue.current());
+    CHECK(view.rows == ids(queue));
+    CHECK(view.current == queue.current());
+    model.remove(99);
+
+    // None of these reset the list.
+    CHECK(view.resets == resets);
+    model.clear();
+    CHECK(view.rows.isEmpty());
+    CHECK(view.resets == resets);
+  }
+  CHECK(view.edits > 0);
+
+  // A restored queue replaces everything at once.
+  MusicQueue saved;
+  saved.replace(tracks(3, "s"), 1);
+  const int before = view.resets;
+  model.assign(saved);
+  CHECK(view.resets == before + 1);
+  CHECK(view.rows == ids(queue));
 }
