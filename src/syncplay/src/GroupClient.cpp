@@ -10,27 +10,60 @@ namespace jfd::syncplay {
       using Ts::operator()...;
     };
     template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
+
+    bool succeeded(int status) { return status >= 200 && status < 300; }
   } // namespace
 
-  GroupClient::GroupClient(Transport& transport, Clock& clock, InputSink sink)
-      : m_transport(transport), m_clock(clock), m_sink(std::move(sink)) {}
+  GroupClient::GroupClient(Transport& transport, Clock& clock, InputSink sink, Schedule schedule)
+      : m_transport(transport), m_clock(clock), m_sink(std::move(sink)),
+        m_schedule(std::move(schedule)) {}
+
+  void GroupClient::later(WallTicks delay, std::function<void()> task) {
+    if (!m_schedule) {
+      task();
+      return;
+    }
+    m_schedule(delay, [alive = std::weak_ptr<int>(m_alive), task = std::move(task)] {
+      if (!alive.expired()) task();
+    });
+  }
 
   ServerInstant GroupClient::serverNow() const { return m_offset.toServer(m_clock.now()); }
 
+  // Create and join failures are shown by the group screen (ApiTransport
+  // replies); here they go to the session journal.
   void GroupClient::createGroup(std::string_view name) {
-    m_transport.request(createGroupRequest(name), [](int, std::string) {});
+    m_transport.request(createGroupRequest(name),
+                        [this, alive = std::weak_ptr<int>(m_alive)](int status, std::string) {
+                          if (alive.expired() || succeeded(status)) return;
+                          m_sink(group::RequestFailed{GroupEpoch{}, group::Request::Create, status});
+                        });
   }
 
   void GroupClient::joinGroup(const GroupId& group) {
     m_desiredGroup = group;
-    m_transport.request(joinGroupRequest(group), [](int, std::string) {});
+    ++m_rejoinSerial;
+    m_transport.request(joinGroupRequest(group),
+                        [this, alive = std::weak_ptr<int>(m_alive)](int status, std::string) {
+                          if (alive.expired() || succeeded(status)) return;
+                          m_sink(group::RequestFailed{GroupEpoch{}, group::Request::Join, status});
+                        });
   }
 
   void GroupClient::leaveGroup() {
     m_desiredGroup.reset();
+    ++m_rejoinSerial;
     if (m_inGroup) {
-      // The server confirms with GroupLeft.
-      m_transport.request(leaveGroupRequest(), [](int, std::string) {});
+      // The server confirms with GroupLeft. A failed leave ends the
+      // membership here: the user asked to leave, and the server drops a
+      // member whose session goes.
+      const GroupEpoch epoch = m_epoch;
+      m_transport.request(leaveGroupRequest(), [this, epoch, alive = std::weak_ptr<int>(m_alive)](
+                                                   int status, std::string) {
+        if (alive.expired() || succeeded(status) || epoch != m_epoch) return;
+        m_sink(group::RequestFailed{epoch, group::Request::Leave, status});
+        if (!m_desiredGroup) endMembership();
+      });
     } else {
       endMembership();
     }
@@ -50,6 +83,7 @@ namespace jfd::syncplay {
     std::visit(
         Overloaded{
             [&](const wire::GroupJoined& joined) {
+              ++m_rejoinSerial;
               m_epoch = m_epochs.advance();
               m_inGroup = true;
               m_sessionHoldsGroup = true;
@@ -119,16 +153,51 @@ namespace jfd::syncplay {
   }
 
   void GroupClient::onConnectionLost() {
+    m_connectionLost = true;
+    ++m_rejoinSerial;
     if (!m_inGroup) return;
     m_inGroup = false;
     m_sink(group::ConnectionLost{m_epoch});
   }
 
   void GroupClient::onConnectionRestored() {
+    m_connectionLost = false;
+    // The old offset may be wrong by however long the computer slept: the
+    // session waits for a new measurement before using server time.
     m_timeSync.reset();
-    // The lost session's membership is gone on the server; join explicitly.
-    if (m_desiredGroup && !m_inGroup)
-      m_transport.request(joinGroupRequest(*m_desiredGroup), [](int, std::string) {});
+    m_offset = {};
+    m_sink(group::ClockLost{});
+    if (m_inGroup) return;
+    if (m_desiredGroup) {
+      // The lost session's membership is gone on the server; join explicitly.
+      ++m_rejoinSerial;
+      rejoin(0);
+    } else if (m_sessionHoldsGroup) {
+      // A leave was in flight when the connection dropped: it is done.
+      endMembership();
+    }
+  }
+
+  void GroupClient::rejoin(int attempt) {
+    const std::uint64_t serial = m_rejoinSerial;
+    m_transport.request(joinGroupRequest(*m_desiredGroup), [this, serial, attempt,
+                                                            alive = std::weak_ptr<int>(m_alive)](
+                                                               int status, std::string) {
+      // GroupJoined (or Refused) follows a success on the socket.
+      if (alive.expired() || serial != m_rejoinSerial || succeeded(status)) return;
+      if (m_inGroup || !m_desiredGroup || m_connectionLost) return;
+      if (attempt + 1 >= RejoinAttempts) {
+        // The user plays on their own, and is told why.
+        m_sink(group::RequestFailed{m_epoch, group::Request::Rejoin, status});
+        m_desiredGroup.reset();
+        endMembership();
+        return;
+      }
+      later(RejoinBackoff * (1 << attempt), [this, serial, attempt] {
+        if (serial != m_rejoinSerial || m_inGroup || !m_desiredGroup || m_connectionLost) return;
+        rejoin(attempt + 1);
+      });
+    });
   }
 
   void GroupClient::pollTime() {
@@ -150,10 +219,43 @@ namespace jfd::syncplay {
   void GroupClient::send(const SyncPlayMessage& message) {
     const GroupEpoch epoch = std::visit([](const auto& m) { return m.epoch; }, message);
     if (!m_inGroup || epoch != m_epoch) return;
+    if (std::holds_alternative<outgoing::Ready>(message) ||
+        std::holds_alternative<outgoing::Buffering>(message)) {
+      ++m_reportSerial;
+      sendReport(message, false);
+      return;
+    }
     const bool rateRequest = std::holds_alternative<outgoing::RequestPlaybackRate>(message);
-    m_transport.request(requestFor(message), [this, epoch, rateRequest](int status, std::string body) {
-      if (!rateRequest || (status >= 200 && status < 300)) return;
+    m_transport.request(requestFor(message), [this, epoch, rateRequest,
+                                              alive = std::weak_ptr<int>(m_alive)](int status,
+                                                                                   std::string body) {
+      if (alive.expired() || !rateRequest || succeeded(status)) return;
       m_sink(group::RateChangeRejected{epoch, status, parseUnsupportedParticipants(body)});
+    });
+  }
+
+  // The group waits for our Ready: a lost one is sent again once (its When
+  // and position still describe the same moment), and a second failure is
+  // reported, unless a newer report replaced it meanwhile.
+  void GroupClient::sendReport(const SyncPlayMessage& message, bool retried) {
+    const GroupEpoch epoch = m_epoch;
+    const std::uint64_t serial = m_reportSerial;
+    m_transport.request(requestFor(message), [this, message, epoch, serial, retried,
+                                              alive = std::weak_ptr<int>(m_alive)](int status,
+                                                                                   std::string) {
+      if (alive.expired() || succeeded(status)) return;
+      if (!m_inGroup || epoch != m_epoch || serial != m_reportSerial) return;
+      if (!retried) {
+        later(ReadyRetryDelay, [this, message, epoch, serial] {
+          if (!m_inGroup || epoch != m_epoch || serial != m_reportSerial) return;
+          sendReport(message, true);
+        });
+        return;
+      }
+      const auto request = std::holds_alternative<outgoing::Ready>(message)
+                               ? group::Request::Ready
+                               : group::Request::Buffering;
+      m_sink(group::RequestFailed{epoch, request, status});
     });
   }
 

@@ -7,7 +7,9 @@
 #include <jfd/syncplay/Protocol.h>
 #include <jfd/syncplay/TimeSync.h>
 
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -30,8 +32,18 @@ namespace jfd::syncplay {
   class GroupClient final : public SyncPlayOutbox {
   public:
     using InputSink = std::function<void(SessionInput)>;
+    // Runs task after delay on the session's thread (a retry). Without one,
+    // retries run at once.
+    using Schedule = std::function<void(WallTicks delay, std::function<void()> task)>;
 
-    GroupClient(Transport& transport, Clock& clock, InputSink sink);
+    // How often a rejoin after a reconnect is tried before the membership
+    // ends locally, and the first wait between tries (doubling after each).
+    static constexpr int RejoinAttempts = 4;
+    static constexpr WallTicks RejoinBackoff = std::chrono::seconds(1);
+    // A failed Ready or Buffering report is sent again once after this.
+    static constexpr WallTicks ReadyRetryDelay = std::chrono::milliseconds(500);
+
+    GroupClient(Transport& transport, Clock& clock, InputSink sink, Schedule schedule = {});
 
     // What the user does.
     void createGroup(std::string_view name);
@@ -61,10 +73,22 @@ namespace jfd::syncplay {
     ServerInstant serverNow() const;
     void handle(const WireMessage& message);
     void endMembership();
+    void rejoin(int attempt);
+    void later(WallTicks delay, std::function<void()> task);
+    void sendReport(const SyncPlayMessage& message, bool retried);
 
     Transport& m_transport;
     Clock& m_clock;
     InputSink m_sink;
+    Schedule m_schedule;
+    // Expires with the client, so a late reply or retry does nothing.
+    std::shared_ptr<int> m_alive = std::make_shared<int>(0);
+    // Advances with every rejoin round and every membership change, so a
+    // late reply or retry of an earlier round is ignored.
+    std::uint64_t m_rejoinSerial = 0;
+    // Advances with every Ready or Buffering sent: only the newest is retried.
+    std::uint64_t m_reportSerial = 0;
+    bool m_connectionLost = false;
     TimeSync m_timeSync;
     ClockOffset m_offset;
 
