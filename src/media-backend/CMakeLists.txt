@@ -4,6 +4,7 @@ qt_add_library(jfd_media_backend STATIC
   MpvMediaBackend.cpp MpvMediaBackend.h
   MpvPlayer.cpp MpvPlayer.h
   MpvVideoItem.cpp MpvVideoItem.h
+  RenderSetup.h
   RenderStatus.h
   RepaintRequest.h)
 add_library(jfd::media_backend ALIAS jfd_media_backend)

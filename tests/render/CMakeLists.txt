@@ -26,3 +26,9 @@ qt_add_executable(jfd_pip_move_test PipMoveTest.cpp)
 target_link_libraries(jfd_pip_move_test PRIVATE Qt6::Gui Qt6::Quick jfd::media_backend jfd::playback)
 add_test(NAME jfd_pip_move_test COMMAND jfd_pip_move_test)
 set_tests_properties(jfd_pip_move_test PROPERTIES TIMEOUT 90)
+if(WIN32 AND "JFD_HAVE_D3D11_VIDEO=1" IN_LIST _jfd_media_definitions)
+  # The same move with Qt Quick and mpv on Direct3D 11 (WARP on CI), where a
+  # retried render context used to leave the second window black.
+  add_test(NAME jfd_pip_move_test_d3d11 COMMAND jfd_pip_move_test d3d11)
+  set_tests_properties(jfd_pip_move_test_d3d11 PROPERTIES TIMEOUT 90)
+endif()

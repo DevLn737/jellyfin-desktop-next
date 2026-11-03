@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MpvHandle.h"
+#include "RenderSetup.h"
 #include "RenderStatus.h"
 
 #include <QPointer>
@@ -50,8 +51,12 @@ public:
   bool hdrActive() const { return m_hdrActive; }
   double sdrWhiteNits() const { return m_sdrWhiteNits; }
   double displayPeakNits() const { return m_displayPeakNits; }
-  // Render thread: the swap chain is HDR10; applied on the GUI thread.
-  void reportHdr(double sdrWhiteNits, double displayPeakNits);
+  // Render thread: whether the swap chain is HDR10 (and its levels);
+  // applied on the GUI thread.
+  void reportHdr(bool active, double sdrWhiteNits, double displayPeakNits);
+  // Render thread: context creation attempts, kept across the nodes that a
+  // retry drops (see RenderSetup::Retry).
+  RenderContextAttempts& contextAttempts() { return m_contextAttempts; }
 
 Q_SIGNALS:
   void playerChanged();
@@ -69,6 +74,7 @@ private:
   MpvHandle m_handle;
   RenderStatus m_status;
   bool m_renderFailed = false;
+  RenderContextAttempts m_contextAttempts;
   bool m_hdrActive = false;
   double m_sdrWhiteNits = 0;
   double m_displayPeakNits = 0;

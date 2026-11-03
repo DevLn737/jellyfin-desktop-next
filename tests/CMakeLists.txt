@@ -202,6 +202,12 @@ if(JFD_BUILD_APP)
   add_test(NAME jfd_media_backend_tests COMMAND jfd_media_backend_tests)
   set_tests_properties(jfd_media_backend_tests PROPERTIES TIMEOUT 120)
 
+  # The video items' render-thread decisions, without a GPU.
+  add_executable(jfd_render_setup_tests support/QtGuiTestMain.cpp media/RenderSetupTest.cpp)
+  target_link_libraries(jfd_render_setup_tests PRIVATE jfd::media_backend doctest)
+  add_test(NAME jfd_render_setup_tests COMMAND jfd_render_setup_tests)
+  set_tests_properties(jfd_render_setup_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+
   if(JFD_SERVER_TESTS AND TARGET jfd_session_runtime)
     # The same on headless mpv, playing the server's stream.
     jfd_add_qt_test(jfd_session_mpv_server_tests session/SessionRuntimeServerTest.cpp)

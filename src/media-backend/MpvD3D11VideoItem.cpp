@@ -1,6 +1,7 @@
 #include "MpvD3D11VideoItem.h"
 #include "MpvPlayer.h"
 #include "RepaintRequest.h"
+#include "RenderSetup.h"
 
 #include <QQuickWindow>
 #include <QSGRendererInterface>
@@ -64,23 +65,31 @@ public:
     delete m_repaint;
   }
 
-  // Scene graph sync (render thread, GUI thread blocked). Returns false
-  // after a failure, which has been reported through renderError().
-  bool sync(MpvD3D11VideoItem* item)
+  // Scene graph sync (render thread, GUI thread blocked). Failed has been
+  // reported through renderError(); Retry asks again on the next frame.
+  RenderSetup sync(MpvD3D11VideoItem* item)
   {
     if (!m_handle)
       m_handle = item->handle();
-    if (!m_context && !m_failed)
-      createContext(item);
+    if (m_failed)
+      return RenderSetup::Failed;
     if (!m_context)
-      return false;
+    {
+      const RenderSetup created = createContext(item);
+      if (created != RenderSetup::Ready)
+        return created;
+    }
+    // The window may have moved to another display, or its swap chain
+    // changed format: mpv's output follows it.
+    if (const HdrTarget target = hdrTarget(); target != m_hdr)
+      applyHdr(item, target);
     const QSize size = (item->size() * m_window->effectiveDevicePixelRatio()).toSize().expandedTo(QSize(1, 1));
-    if (!m_texture || size != m_size)
+    if (!m_texture || size != m_size || m_textureFormat != m_format)
       if (!createTexture(item, size))
-        return false;
+        return RenderSetup::Failed;
     setRect(item->boundingRect());
     m_renderPending = true;
-    return true;
+    return RenderSetup::Ready;
   }
 
 private:
@@ -103,7 +112,7 @@ private:
     m_window->endExternalCommands();
   }
 
-  void createContext(MpvD3D11VideoItem* item)
+  RenderSetup createContext(MpvD3D11VideoItem* item)
   {
     auto* renderer = m_window->rendererInterface();
     if (renderer->graphicsApi() != QSGRendererInterface::Direct3D11)
@@ -122,24 +131,28 @@ private:
     if (const int error = mpv_render_context_create(&m_context, m_handle.get(), params); error < 0)
     {
       m_context = nullptr;
-      // See MpvVideoItem: the old window's context may not be freed yet.
-      if (++m_attempts < MaxAttempts)
+      // See RenderSetup::Retry: the old window's context may not be freed
+      // yet. The item counts the attempts, since it drops this node.
+      if (item->contextAttempts().failed() == RenderSetup::Retry)
       {
         QMetaObject::invokeMethod(item, [item] { item->update(); }, Qt::QueuedConnection);
-        return;
+        return RenderSetup::Retry;
       }
       return fail(item, QString::fromUtf8(mpv_error_string(error)));
     }
+    item->contextAttempts().succeeded();
     m_repaint = new RepaintRequest(item);
     mpv_render_context_set_update_callback(m_context, [](void* request) {
       static_cast<RepaintRequest*>(request)->request();
     }, m_repaint);
-    const bool hdr = setUpHdr(item);
+    m_hdr = hdrTarget();
+    applyHdr(item, m_hdr);
     item->reportRenderContextReady(QStringLiteral("Direct3D 11 (feature level %1.%2%3): %4")
                                     .arg(m_device->GetFeatureLevel() >> 12)
                                     .arg((m_device->GetFeatureLevel() >> 8) & 0xf)
-                                    .arg(hdr ? QStringLiteral(", HDR10") : QString())
+                                    .arg(m_hdr.active ? QStringLiteral(", HDR10") : QString())
                                     .arg(adapterName(m_device.Get())));
+    return RenderSetup::Ready;
   }
 
   // HDR experiment (--hdr hdr10): when Qt Quick created an HDR10 swap chain,
@@ -147,24 +160,51 @@ private:
   // passes the texture's values through unchanged; the QML content is encoded
   // to PQ at the SDR white level by the window. Without an HDR swap chain mpv
   // keeps its SDR output and tone-maps HDR files itself.
-  bool setUpHdr(MpvD3D11VideoItem* item)
+  struct HdrTarget
+  {
+    bool active = false;
+    double peak = 0;
+    double sdrWhite = 0;
+    bool operator==(const HdrTarget&) const = default;
+  };
+
+  HdrTarget hdrTarget() const
   {
     auto* swapChain = static_cast<QRhiSwapChain*>(
       m_window->rendererInterface()->getResource(m_window, QSGRendererInterface::RhiSwapchainResource));
     if (!swapChain || swapChain->format() != QRhiSwapChain::HDR10)
-      return false;
+      return {};
     const QRhiSwapChainHdrInfo info = swapChain->hdrInfo();
-    const double peak = info.limitsType == QRhiSwapChainHdrInfo::LuminanceInNits
+    HdrTarget target;
+    target.active = true;
+    target.peak = info.limitsType == QRhiSwapChainHdrInfo::LuminanceInNits
         && info.limits.luminanceInNits.maxLuminance > 0
       ? static_cast<double>(info.limits.luminanceInNits.maxLuminance)
       : 1000.0;
-    const double sdrWhite = info.sdrWhiteLevel > 0 ? static_cast<double>(info.sdrWhiteLevel) : 203.0;
-    mpv_set_property_string(m_handle.get(), "target-prim", "bt.2020");
-    mpv_set_property_string(m_handle.get(), "target-trc", "pq");
-    mpv_set_property_string(m_handle.get(), "target-peak", QByteArray::number(peak, 'f', 0).constData());
-    m_format = DXGI_FORMAT_R10G10B10A2_UNORM;
-    item->reportHdr(sdrWhite, peak);
-    return true;
+    target.sdrWhite = info.sdrWhiteLevel > 0 ? static_cast<double>(info.sdrWhiteLevel) : 203.0;
+    return target;
+  }
+
+  // The target is a property of the shared core, so an SDR window resets
+  // what an HDR window set before (PiP, another display). The writes are
+  // asynchronous: a blocking client call on the render thread can deadlock
+  // with a core that waits for this thread.
+  void applyHdr(MpvD3D11VideoItem* item, const HdrTarget& target)
+  {
+    m_hdr = target;
+    const QByteArray peak = target.active ? QByteArray::number(target.peak, 'f', 0) : QByteArrayLiteral("auto");
+    setPropertyAsync("target-prim", target.active ? QByteArrayLiteral("bt.2020") : QByteArrayLiteral("auto"));
+    setPropertyAsync("target-trc", target.active ? QByteArrayLiteral("pq") : QByteArrayLiteral("auto"));
+    setPropertyAsync("target-peak", peak);
+    m_format = target.active ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
+    item->reportHdr(target.active, target.sdrWhite, target.peak);
+  }
+
+  void setPropertyAsync(const char* name, const QByteArray& value)
+  {
+    // mpv copies the value before returning; replies with id 0 are ignored.
+    const char* data = value.constData();
+    mpv_set_property_async(m_handle.get(), 0, name, MPV_FORMAT_STRING, &data);
   }
 
   bool createTexture(MpvD3D11VideoItem* item, const QSize& size)
@@ -205,13 +245,15 @@ private:
     delete previous;
     m_texture = created;
     m_size = size;
+    m_textureFormat = m_format;
     return true;
   }
 
-  void fail(MpvD3D11VideoItem* item, const QString& message)
+  RenderSetup fail(MpvD3D11VideoItem* item, const QString& message)
   {
     m_failed = true;
     item->reportRenderError(message);
+    return RenderSetup::Failed;
   }
 
   QQuickWindow* m_window;
@@ -221,13 +263,13 @@ private:
   ComPtr<ID3D11Texture2D> m_texture;
   QSize m_size;
   DXGI_FORMAT m_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  DXGI_FORMAT m_textureFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+  HdrTarget m_hdr;
   mpv_render_context* m_context = nullptr;
   RepaintRequest* m_repaint = nullptr;
   bool m_renderPending = false;
   bool m_rendered = false;
   bool m_failed = false;
-  int m_attempts = 0;
-  static constexpr int MaxAttempts = 100;
 };
 
 }
@@ -263,15 +305,19 @@ QSGNode* MpvD3D11VideoItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeDat
       return nullptr;
     node = new D3D11VideoNode(window());
   }
-  if (!node->sync(this))
+  const RenderSetup setup = node->sync(this);
+  if (setup == RenderSetup::Ready)
   {
-    // Already reported through renderError(); stop trying.
-    m_renderFailed = true;
-    delete node;
-    return nullptr;
+    node->markDirty(QSGNode::DirtyMaterial);
+    return node;
   }
-  node->markDirty(QSGNode::DirtyMaterial);
-  return node;
+  // Failed was reported through renderError(): stop trying. On Retry a
+  // queued update() asks again with a new node, and the item counts the
+  // attempts (contextAttempts()), so nothing stops it here.
+  if (setup == RenderSetup::Failed)
+    m_renderFailed = true;
+  delete node;
+  return nullptr;
 }
 
 void MpvD3D11VideoItem::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry)
@@ -293,10 +339,12 @@ void MpvD3D11VideoItem::reportRenderError(const QString& message)
   emit renderError(message);
 }
 
-void MpvD3D11VideoItem::reportHdr(double sdrWhiteNits, double displayPeakNits)
+void MpvD3D11VideoItem::reportHdr(bool active, double sdrWhiteNits, double displayPeakNits)
 {
-  QMetaObject::invokeMethod(this, [this, sdrWhiteNits, displayPeakNits] {
-    m_hdrActive = true;
+  QMetaObject::invokeMethod(this, [this, active, sdrWhiteNits, displayPeakNits] {
+    if (active == m_hdrActive && sdrWhiteNits == m_sdrWhiteNits && displayPeakNits == m_displayPeakNits)
+      return;
+    m_hdrActive = active;
     m_sdrWhiteNits = sdrWhiteNits;
     m_displayPeakNits = displayPeakNits;
     emit hdrChanged();

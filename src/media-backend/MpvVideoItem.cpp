@@ -1,6 +1,7 @@
 #include "MpvVideoItem.h"
 #include "MpvPlayer.h"
 #include "RepaintRequest.h"
+#include "RenderSetup.h"
 
 #include <QGuiApplication>
 #include <QOpenGLContext>
@@ -157,7 +158,7 @@ private:
       // Moving the video to another window frees the old window's context on
       // its own render thread, possibly a moment after this one asks for a
       // new one (mpv allows one per core): ask again on the next frame.
-      if (++m_attempts < MaxAttempts)
+      if (m_attempts.failed() == RenderSetup::Retry)
       {
         QMetaObject::invokeMethod(item, [item] { item->update(); }, Qt::QueuedConnection);
         return;
@@ -183,8 +184,7 @@ private:
   GLuint m_samplerUnits = 0;
   bool m_rendered = false;
   bool m_failed = false;
-  int m_attempts = 0;
-  static constexpr int MaxAttempts = 100;
+  RenderContextAttempts m_attempts;
 };
 
 }
