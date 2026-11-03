@@ -15,21 +15,21 @@ Item {
     property alias text: label.text
     property bool shown: false
     readonly property Item target: parent
-    readonly property Item layer: Window.window ? Window.window.contentItem : null
+    readonly property Item overlay: Window.window ? Window.window.contentItem : null
     readonly property real margin: Theme.spacingTiny
 
     width: 0
     height: 0
 
     function place() {
-        const layer = bubble.parent
-        if (!layer || !tip.target) return
-        const origin = tip.target.mapToItem(layer, 0, 0)
+        const overlay = bubble.parent
+        if (!overlay || !tip.target) return
+        const origin = tip.target.mapToItem(overlay, 0, 0)
         const below = origin.y + tip.target.height + tip.margin
-        bubble.above = below + bubble.height > layer.height
+        bubble.above = below + bubble.height > overlay.height
         bubble.y = bubble.above ? origin.y - bubble.height - tip.margin : below
         const centred = origin.x + (tip.target.width - bubble.width) / 2
-        bubble.x = Math.max(tip.margin, Math.min(layer.width - bubble.width - tip.margin, centred))
+        bubble.x = Math.max(tip.margin, Math.min(overlay.width - bubble.width - tip.margin, centred))
     }
 
     onShownChanged: if (shown) place()
@@ -40,7 +40,7 @@ Item {
         // Below or above its parent, decided on showing.
         property bool above: false
 
-        parent: tip.layer ? tip.layer : tip
+        parent: tip.overlay ? tip.overlay : tip
         width: label.implicitWidth + 2 * Theme.spacingSmall
         height: label.implicitHeight + Theme.spacingTiny * 2
         onWidthChanged: if (tip.shown) tip.place()
