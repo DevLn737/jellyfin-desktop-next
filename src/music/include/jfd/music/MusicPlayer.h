@@ -8,6 +8,7 @@
 #include <jfd/session/PlaybackLauncher.h>
 #include <jfd/session/SessionHub.h>
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QTimer>
 #include <QVariantMap>
@@ -172,6 +173,8 @@ namespace jfd::music {
     void currentMoved(int before);
     void fetchAndPlay(const QString& what, std::function<void(api::MusicApi&, QObject*, api::Callback<api::ItemPage>)> fetch,
                       int startIndex, bool shuffle);
+    void playItems(const QList<api::Item>& items, int startIndex, bool shuffle);
+    void fetchArtist(const QString& artistId, bool shuffle, QList<api::Item> sofar);
     void changed();
 
     session::SessionRuntime& m_runtime;
@@ -181,6 +184,9 @@ namespace jfd::music {
     playback::PlaybackReporter m_reporter;
     session::SessionHub::Subscription m_subscription;
     QTimer m_saveTimer;
+    // Since the state was last saved; the position is saved every few
+    // seconds while a track plays.
+    QElapsedTimer m_lastSave;
     std::function<void(const QByteArray&)> m_save;
     std::function<void(int)> m_applyVolume;
     std::function<void(const Track&)> m_beforeOpen;
@@ -198,7 +204,8 @@ namespace jfd::music {
     // The entry a preload was asked for (the answer may come later).
     std::optional<std::int64_t> m_preloadAsked;
     bool m_foreignActive = false;
-    // The saved position the next resume() starts at.
+    // Where the next resume() starts: the saved position, where the track
+    // stopped (stop(), or a video took the session) or where it opens.
     std::int64_t m_resumeTicks = 0;
     QString m_error;
     int m_handovers = 0;

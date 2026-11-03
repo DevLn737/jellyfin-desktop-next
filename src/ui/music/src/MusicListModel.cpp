@@ -324,11 +324,18 @@ namespace jfd::ui {
       // The tracks of its page, from this one on, are the queue.
       const auto page = m_pages.constFind(row / pageSize());
       if (page == m_pages.constEnd()) return;
+      // The queue holds only the tracks: the row's place among them.
       QList<music::Track> tracks;
-      for (const Entry& entry : *page)
-        if (entry.item.type == QLatin1String("Audio")) tracks.append(music::Track::fromItem(entry.item));
+      int start = 0;
+      const int at = row % pageSize();
+      for (int i = 0; i < page->size(); ++i) {
+        const Entry& entry = (*page)[i];
+        if (entry.item.type != QLatin1String("Audio")) continue;
+        if (i == at) start = static_cast<int>(tracks.size());
+        tracks.append(music::Track::fromItem(entry.item));
+      }
       m_player.setShuffle(shuffle);
-      m_player.play(std::move(tracks), row % pageSize());
+      m_player.play(std::move(tracks), start);
     }
   }
 

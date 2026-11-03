@@ -15,6 +15,8 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
@@ -165,6 +167,11 @@ namespace {
     }
   };
 
+  double savedPosition(const QByteArray& state) {
+    return QJsonDocument::fromJson(state).object().value(QLatin1String("position")).toDouble();
+  }
+  double savedPosition(const music::MusicPlayer& player) { return savedPosition(player.saveState()); }
+
   struct Cleanup {
     Stand& stand;
     ~Cleanup() { stand.unplay(stand.touched); }
@@ -306,12 +313,48 @@ TEST_CASE("A video takes the session from music; the queue stays and the track's
   CHECK(s.player->currentIndex() == 1);
   // The track was replaced, not finished: its stop report arrived.
   CHECK(waitFor([&] { return s.played(tracks[1].id); }, 20000));
+  // And the queue remembers where the track stopped, for resume().
+  CHECK(savedPosition(*s.player) > 2.0);
 
   // And the player does not step when the video ends or Next arrives.
   s.runtime->post(core::intent::Stop{});
   REQUIRE(waitFor([&] { return !s.player->videoActive(); }, 20000));
   CHECK_FALSE(s.player->active());
   CHECK(s.player->currentIndex() == 1);
+}
+
+TEST_CASE("Stopping keeps the track's position; resume starts there") {
+  if (!hasExtrasStand()) return;
+  Stand s(QStringLiteral("jfd-music-resume"));
+  Cleanup cleanup{s};
+  const Item album = s.album(QStringLiteral("First Album"));
+  s.tracksOf(album);
+  QByteArray saved;
+  int saves = 0;
+  s.player->setPersistence([&](const QByteArray& state) {
+    saved = state;
+    ++saves;
+  });
+
+  s.player->playAlbum(album.id);
+  REQUIRE(waitFor([&] { return s.player->playing(); }, 60000));
+  REQUIRE(waitFor([&] { return s.player->position() > 4; }, 30000));
+  const double stoppedAt = s.player->position();
+  s.player->stop();
+  REQUIRE(waitFor([&] { return !s.player->active(); }, 20000));
+  // Saved a moment after the stop, at the position (not at 1 s in).
+  REQUIRE(waitFor([&] { return saves > 0 && savedPosition(saved) >= stoppedAt - 0.5; }, 5000));
+  CHECK(savedPosition(*s.player) >= stoppedAt - 0.5);
+
+  // A restart: the saved state comes back, and resume() starts there.
+  music::MusicPlayer restored(*s.runtime, *s.client);
+  restored.restoreState(saved);
+  s.player.reset();
+  restored.resume();
+  REQUIRE(waitFor([&] { return restored.playing(); }, 60000));
+  CHECK(restored.position() >= stoppedAt - 1.0);
+  restored.stop();
+  waitFor([&] { return !restored.active(); }, 5000);
 }
 
 namespace {
