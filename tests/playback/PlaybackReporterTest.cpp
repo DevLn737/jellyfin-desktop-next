@@ -1,4 +1,5 @@
 #include "../support/DoctestQt.h"
+#include "../support/SessionHarness.h"
 
 #include <jfd/playback/PlaybackReporter.h>
 
@@ -23,10 +24,13 @@ namespace {
   public:
     void started(const api::PlaybackProgress& p) override { reports.push_back({QStringLiteral("start"), p}); }
     void progress(const api::PlaybackProgress& p) override { reports.push_back({QStringLiteral("progress"), p}); }
-    void stopped(const api::PlaybackProgress& p, bool failed) override {
+    void stopped(const api::PlaybackProgress& p, bool failed, std::function<void()> answered) override {
       reports.push_back({QStringLiteral("stopped"), p, failed});
+      if (answered) pendingAnswers.push_back(std::move(answered));
     }
     std::vector<Report> reports;
+    // The server's answers to Stopped, not given yet.
+    std::vector<std::function<void()>> pendingAnswers;
 
     QStringList events() const {
       QStringList list;
@@ -203,4 +207,104 @@ TEST_CASE("A file that never played sends nothing") {
   f.push(PlaybackPhase::Failed, 0);
   f.reporter.end();
   CHECK(f.sink.reports.empty());
+}
+
+namespace {
+
+  // Feeds the reporter what a real PlaybackSession publishes, not hand-made
+  // snapshots: an ended or failed file leaves the session without an epoch.
+  struct SessionFixture {
+    RecordingSink sink;
+    PlaybackReporter reporter{sink};
+    jfd::testing::SessionHarness harness;
+    std::size_t delivered = 0;
+    core::MediaEpoch epoch;
+
+    SessionFixture() {
+      reporter.setProgressInterval(std::chrono::hours(1));
+      harness.post(core::intent::Open{harness.media()});
+      epoch = harness.currentEpoch();
+      api::PlaybackStream stream;
+      stream.itemId = QStringLiteral("item");
+      reporter.begin(epoch, stream, std::nullopt, std::nullopt);
+      post(core::backend::SourceOpened{epoch, 0.0, 600.0});
+      post(core::backend::PlaybackRestarted{epoch, harness.sample(0.0, false)});
+    }
+
+    // A jump in the fake session's position also reads as a seek
+    // (TimeUpdate); what matters is one Start first and one Stopped last.
+    bool startedAndStoppedOnce() const {
+      const QStringList events = sink.events();
+      return !events.isEmpty() && events.front() == QStringLiteral("start") &&
+             events.back() == QStringLiteral("stopped") &&
+             events.count(QStringLiteral("start")) == 1 && events.count(QStringLiteral("stopped")) == 1;
+    }
+
+    void post(core::SessionInput input) {
+      harness.post(std::move(input));
+      const auto& snapshots = harness.observer.snapshots;
+      for (; delivered < snapshots.size(); ++delivered) reporter.snapshotChanged(snapshots[delivered]);
+    }
+  };
+
+} // namespace
+
+TEST_CASE("A file that fails in the session is reported as failed at its last position") {
+  SessionFixture f;
+  f.post(core::backend::Progress{f.epoch, f.harness.sample(42.0, false)});
+  f.post(core::backend::Ended{f.epoch, core::backend::EndReason::Error, "loading failed"});
+  REQUIRE(f.harness.snapshot().phase == PlaybackPhase::Failed);
+  CHECK_FALSE(f.harness.snapshot().media.isValid());
+  REQUIRE(f.startedAndStoppedOnce());
+  CHECK(f.sink.reports.back().failed);
+  CHECK(f.sink.reports.back().progress.positionTicks == 42 * Second);
+  f.reporter.end();
+  CHECK(f.sink.events().count(QStringLiteral("stopped")) == 1);
+}
+
+TEST_CASE("A file that ends or is stopped in the session is not reported as failed") {
+  SUBCASE("end of file") {
+    SessionFixture f;
+    f.post(core::backend::Progress{f.epoch, f.harness.sample(590.0, false)});
+    f.post(core::backend::Ended{f.epoch, core::backend::EndReason::EndOfFile, {}});
+    REQUIRE(f.startedAndStoppedOnce());
+    CHECK_FALSE(f.sink.reports.back().failed);
+    CHECK(f.sink.reports.back().progress.positionTicks == 590 * Second);
+  }
+  SUBCASE("stop") {
+    SessionFixture f;
+    f.post(core::backend::Progress{f.epoch, f.harness.sample(10.0, false)});
+    f.post(core::intent::Stop{});
+    REQUIRE(f.startedAndStoppedOnce());
+    CHECK_FALSE(f.sink.reports.back().failed);
+  }
+}
+
+TEST_CASE("Quitting during playback sends Stopped at the exit position and waits for the answer") {
+  SessionFixture f;
+  f.post(core::backend::Progress{f.epoch, f.harness.sample(1234.0, false)});
+  bool done = false;
+  f.reporter.end([&] { done = true; });
+  REQUIRE(f.startedAndStoppedOnce());
+  CHECK(f.sink.reports.back().progress.positionTicks == 1234 * Second);
+  CHECK_FALSE(f.sink.reports.back().failed);
+  CHECK_FALSE(done);
+  REQUIRE(f.sink.pendingAnswers.size() == 1);
+  f.sink.pendingAnswers.front()();
+  CHECK(done);
+
+  // Destroying the player afterwards sends nothing more.
+  bool again = false;
+  f.reporter.end([&] { again = true; });
+  CHECK(again);
+  CHECK(f.sink.events().count(QStringLiteral("stopped")) == 1);
+}
+
+TEST_CASE("Quitting with nothing playing does not wait") {
+  RecordingSink sink;
+  PlaybackReporter reporter{sink};
+  bool done = false;
+  reporter.end([&] { done = true; });
+  CHECK(done);
+  CHECK(sink.reports.empty());
 }

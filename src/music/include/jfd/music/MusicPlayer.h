@@ -63,6 +63,10 @@ namespace jfd::music {
     MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent = nullptr);
     ~MusicPlayer() override;
 
+    // Before quitting: sends Stopped for the playing track; done runs once
+    // the server answered, or at once when nothing was playing.
+    void endReport(std::function<void()> done) { m_reporter.end(std::move(done)); }
+
     bool available() const { return !m_snapshot.group.has_value(); }
     bool active() const;
     bool playing() const { return active() && m_snapshot.phase == core::PlaybackPhase::Playing; }

@@ -25,15 +25,19 @@ namespace jfd::playback {
       void progress(const api::PlaybackProgress& progress) override {
         m_client.reportPlaybackProgress(progress, this, logFailure("progress"));
       }
-      void stopped(const api::PlaybackProgress& progress, bool failed) override {
-        m_client.reportPlaybackStopped(progress, failed, this, logFailure("stopped"));
+      void stopped(const api::PlaybackProgress& progress, bool failed,
+                   std::function<void()> answered) override {
+        m_client.reportPlaybackStopped(progress, failed, this,
+                                       logFailure("stopped", std::move(answered)));
       }
 
     private:
-      static api::Callback<api::Empty> logFailure(const char* what) {
-        return [what](const api::Result<api::Empty>& result) {
+      static api::Callback<api::Empty> logFailure(const char* what,
+                                                  std::function<void()> answered = {}) {
+        return [what, answered = std::move(answered)](const api::Result<api::Empty>& result) {
           if (!result)
             qWarning().noquote() << "playback report" << what << "failed:" << result.error().message;
+          if (answered) answered();
         };
       }
 
@@ -85,15 +89,18 @@ namespace jfd::playback {
     m_progress.isMuted = muted;
   }
 
-  void PlaybackReporter::end() { stop(false); }
+  void PlaybackReporter::end(std::function<void()> done) { stop(false, std::move(done)); }
 
-  void PlaybackReporter::stop(bool failed) {
+  void PlaybackReporter::stop(bool failed, std::function<void()> answered) {
     m_timer.stop();
-    if (m_started && !m_ended) {
-      m_progress.eventName.clear();
-      m_sink.stopped(m_progress, failed);
-    }
+    const bool report = m_started && !m_ended;
     m_ended = true;
+    if (report) {
+      m_progress.eventName.clear();
+      m_sink.stopped(m_progress, failed, std::move(answered));
+    } else if (answered) {
+      answered();
+    }
   }
 
   void PlaybackReporter::send(const QString& eventName) {
@@ -122,10 +129,12 @@ namespace jfd::playback {
 
   void PlaybackReporter::snapshotChanged(const core::SessionSnapshot& snapshot) {
     if (!m_epoch || m_ended) return;
-    // Stopping leaves the session without a file (an empty epoch), and
-    // another file replaces this one: either way this file's report ends.
+    // Stopping, ending or failing leaves the session without a file (an
+    // empty epoch), and another file replaces this one: either way this
+    // file's report ends, with the last position seen while it played. A
+    // session without a file reports in its phase how that file ended.
     if (snapshot.media != *m_epoch) {
-      stop(false);
+      stop(!snapshot.media.isValid() && snapshot.phase == Phase::Failed);
       return;
     }
 

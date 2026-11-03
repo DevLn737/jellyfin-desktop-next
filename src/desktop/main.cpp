@@ -275,8 +275,8 @@ int main(int argc, char* argv[]) {
     windowState.save();
     // Before the window they are attached to.
     services.integrations.reset();
-    // Leave a SyncPlay group so the others are not left waiting; bounded
-    // by a timeout inside prepareExit.
+    // Report the playing file stopped and leave a SyncPlay group so the
+    // others are not left waiting; bounded by a timeout inside prepareExit.
     bool left = false;
     QEventLoop leaving;
     desktop::prepareExit(services, [&] {
