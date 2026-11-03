@@ -121,6 +121,12 @@ namespace jfd::ui {
     Q_EMIT autoNextChanged();
   }
 
+  void PlayerModel::setShowClock(bool on) {
+    if (on == m_showClock) return;
+    m_showClock = on;
+    Q_EMIT showClockChanged();
+  }
+
   void PlayerModel::setAutoSkip(bool on) {
     if (on == m_skipper.autoSkip()) return;
     m_skipper.setAutoSkip(on);

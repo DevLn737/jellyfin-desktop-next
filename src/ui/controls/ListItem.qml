@@ -12,6 +12,10 @@ T.ItemDelegate {
     property string subtitle
     property string trailingText
     property url iconSource
+    // Keeps the icon's room without an icon, so rows of a list where only
+    // some have one (the playing episode's check) line up.
+    property bool reserveIcon: false
+    readonly property bool iconShown: iconSource.toString().length > 0 || reserveIcon
 
     implicitWidth: 400
     implicitHeight: Math.max(Theme.controlHeight + Theme.spacingSmall, content.implicitHeight + 2 * Theme.spacingSmall)
@@ -36,13 +40,13 @@ T.ItemDelegate {
             spacing: Theme.spacing
 
             Icon {
-                visible: item.iconSource.toString().length > 0
+                visible: item.iconShown
                 source: item.iconSource
                 anchors.verticalCenter: parent.verticalCenter
             }
             Column {
                 anchors.verticalCenter: parent.verticalCenter
-                width: content.width - (item.iconSource.toString().length > 0 ? Theme.iconSize + content.spacing : 0)
+                width: content.width - (item.iconShown ? Theme.iconSize + content.spacing : 0)
                 Text {
                     width: parent.width
                     text: item.text
