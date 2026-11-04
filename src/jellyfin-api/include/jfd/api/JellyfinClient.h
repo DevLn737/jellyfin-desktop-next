@@ -31,7 +31,10 @@ namespace jfd::api {
   struct SessionCapabilities {
     QStringList playableMediaTypes{QStringLiteral("Audio"), QStringLiteral("Video")};
     QStringList supportedCommands;
-    bool supportsMediaControl = true;
+    // Off until the client handles the server's Play, Playstate and
+    // GeneralCommand messages; otherwise "Play on" from other clients would
+    // silently do nothing.
+    bool supportsMediaControl = false;
     // Advertise only when the player really applies group rates.
     bool supportsSyncPlayPlaybackRate = false;
     QJsonObject deviceProfile;
