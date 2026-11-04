@@ -222,7 +222,8 @@ TEST_CASE("Capabilities are reported in full and remembered") {
   CHECK(request.path == QStringLiteral("/Sessions/Capabilities/Full"));
   const auto body = QJsonDocument::fromJson(request.body).object();
   CHECK(body.value(QStringLiteral("SupportsSyncPlayPlaybackRate")).toBool());
-  CHECK(body.value(QStringLiteral("SupportsMediaControl")).toBool());
+  // Not advertised until remote control is handled (stage 3, package 3.4).
+  CHECK_FALSE(body.value(QStringLiteral("SupportsMediaControl")).toBool());
   CHECK(body.value(QStringLiteral("PlayableMediaTypes")).toArray().size() == 2);
   REQUIRE(client.capabilities());
   CHECK(client.capabilities()->supportsSyncPlayPlaybackRate);
