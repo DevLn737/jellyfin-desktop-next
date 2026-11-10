@@ -10,6 +10,8 @@
 #include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/platform/SingleInstance.h>
 #include <jfd/music/MusicPlayer.h>
+#include <jfd/remote/RemoteCommands.h>
+#include <jfd/remote/RemoteSettings.h>
 #include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
@@ -92,11 +94,30 @@ namespace {
     ok = integrations::registerIntegrationsSettings(registry) && ok;
     ok = desktop::registerPlayerSettings(registry) && ok;
     ok = desktop::registerGroupSettings(registry) && ok;
+    ok = remote::registerRemoteSettings(registry) && ok;
     ok = desktop::registerMusicSettings(registry) && ok;
     ok = desktop::registerSeerrSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
+  }
+
+  // `--command <name>`: hands the command to the running app and exits,
+  // before any settings or log file are touched. 0: delivered; 1: the app
+  // is not running; 2: not a command.
+  int sendCommand(int argc, char* argv[], const QString& text) {
+    QCoreApplication app(argc, argv);
+    if (!remote::parseLocalCommand(text)) {
+      std::fprintf(stderr, "Unknown command \"%s\". Commands: %s\n", qPrintable(text),
+                   qPrintable(remote::localCommandNames().join(QStringLiteral(", "))));
+      return 2;
+    }
+    platform::SingleInstance instance;
+    if (!instance.sendToPrimary(app.arguments())) {
+      std::fprintf(stderr, "Jellyfin Desktop Next is not running\n");
+      return 1;
+    }
+    return 0;
   }
 
 } // namespace
@@ -108,6 +129,12 @@ int main(int argc, char* argv[]) {
   QCoreApplication::setApplicationName(QStringLiteral("Jellyfin Desktop Next"));
   QCoreApplication::setApplicationVersion(QStringLiteral(JFD_VERSION));
   QGuiApplication::setApplicationDisplayName(QStringLiteral("Jellyfin"));
+
+  {
+    QStringList arguments;
+    for (int i = 0; i < argc; ++i) arguments.append(QString::fromLocal8Bit(argv[i]));
+    if (const auto command = remote::commandArgument(arguments)) return sendCommand(argc, argv, *command);
+  }
 
   const Options options = earlyOptions(argc, argv);
   // The smoke test never touches the user's settings.
@@ -159,6 +186,11 @@ int main(int argc, char* argv[]) {
   parser.addOption({QStringLiteral("reset-theme"),
                     QStringLiteral("Go back to the dark theme with the blue accent, then start.")});
   parser.addOption({QStringLiteral("settings-file"), QStringLiteral("Use this settings file."), QStringLiteral("path")});
+  // Handled above, before the application starts; listed for --help.
+  parser.addOption({QStringLiteral("command"),
+                    QStringLiteral("Send a command to the running app and exit: ") +
+                        remote::localCommandNames().join(QStringLiteral(", ")) + QLatin1Char('.'),
+                    QStringLiteral("name")});
   parser.process(app);
   if (options.flow && !desktop::FlowCheck::configured()) {
     std::fprintf(stderr, "--flow needs JFD_TEST_SERVER_URL, JFD_TEST_USER and JFD_TEST_PASSWORD\n");
@@ -237,14 +269,20 @@ int main(int argc, char* argv[]) {
     ui::WindowStateKeeper windowState(window, *services.settings);
     windowState.restoreAndShow(QSize(1280, 800));
     desktop::startIntegrations(services, *window, !options.smoke);
+    desktop::startRemote(services, *window);
     if (instance) {
-      QObject::connect(&*instance, &platform::SingleInstance::activated, window, [window] {
-        if (window->visibility() == QWindow::Minimized) {
-          window->showNormal();
-        }
-        window->raise();
-        window->requestActivate();
-      });
+      QObject::connect(&*instance, &platform::SingleInstance::activated, window,
+                       [window, &services](const QStringList& arguments) {
+                         // A --command acts without bringing the window forward.
+                         if (desktop::runCommand(services, arguments)) {
+                           return;
+                         }
+                         if (window->visibility() == QWindow::Minimized) {
+                           window->showNormal();
+                         }
+                         window->raise();
+                         window->requestActivate();
+                       });
     }
 
     // The smoke test checks below that the log file hides access keys.
@@ -278,6 +316,8 @@ int main(int argc, char* argv[]) {
     windowState.save();
     // Before the window they are attached to.
     services.integrations.reset();
+    // No remote commands while quitting.
+    services.remote.reset();
     // Report the playing file stopped and leave a SyncPlay group so the
     // others are not left waiting; bounded by a timeout inside prepareExit.
     bool left = false;

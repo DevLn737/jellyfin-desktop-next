@@ -20,6 +20,10 @@
         <translation>Не удалось запустить видео в группе.</translation>
     </message>
     <message>
+        <source>Could not add to the group&apos;s queue.</source>
+        <translation>Не удалось добавить в очередь группы.</translation>
+    </message>
+    <message>
         <source>%1 joined the group</source>
         <translation>%1 в группе</translation>
     </message>

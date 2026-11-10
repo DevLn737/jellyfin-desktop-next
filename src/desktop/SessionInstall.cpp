@@ -4,6 +4,7 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/SignIn.h>
 #include <jfd/music/MusicPlayer.h>
+#include <jfd/remote/RemoteSettings.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/PlayerModel.h>
 
@@ -24,18 +25,21 @@ namespace jfd::desktop {
     // server is slow to answer the group leave or the playback reports.
     constexpr int LeaveTimeoutMs = 700;
 
-    api::SessionCapabilities capabilities() {
+    api::SessionCapabilities capabilities(const AppServices& services) {
       api::SessionCapabilities capabilities;
       // The mpv backend applies group playback rates.
       capabilities.supportsSyncPlayPlaybackRate = true;
       capabilities.deviceProfile = api::buildDeviceProfile({});
+      // "Play on": only what the remote control carries out, and nothing
+      // when remote/allowServerControl is off.
+      applyRemoteCapabilities(services, capabilities);
       return capabilities;
     }
 
     // The client keeps the value, and the session socket reports it again
     // whenever it connects, so the server session always has it.
-    void reportCapabilities(api::JellyfinClient& client) {
-      client.reportCapabilities(capabilities(), &client, [](auto reported) {
+    void reportCapabilities(const AppServices& services, api::JellyfinClient& client) {
+      client.reportCapabilities(capabilities(services), &client, [](auto reported) {
         if (!reported) {
           qCWarning(lcSession) << "capabilities not accepted:" << reported.error().message;
         }
@@ -56,15 +60,25 @@ namespace jfd::desktop {
       return std::make_unique<media::MpvMediaBackend>(player, clock, std::move(post));
     };
     session::SessionRuntime::Settings settings;
-    settings.deviceProfile = capabilities().deviceProfile;
+    settings.deviceProfile = api::buildDeviceProfile({});
     services.session =
         std::make_shared<session::SessionRuntime>(client, *services.socket, backend, std::move(settings));
 
+    installRemote(services);
+
     library::SignIn& signIn = *services.signIn;
-    QObject::connect(&signIn, &library::SignIn::signedIn, &client, [&client] { reportCapabilities(client); });
+    QObject::connect(&signIn, &library::SignIn::signedIn, &client,
+                     [&services, &client] { reportCapabilities(services, client); });
+    // Turning remote control off or on tells the server at once.
+    QObject::connect(services.settings.get(), &settings::Settings::valueChanged, &client,
+                     [&services, &client, &signIn](const QString& key, const QVariant& value) {
+                       if (key != remote::keys::AllowServerControl) return;
+                       setRemoteEnabled(services, value.toBool());
+                       if (signIn.step() == library::SignIn::Step::SignedIn) reportCapabilities(services, client);
+                     });
     // installLibrary restores the saved session before this runs.
     if (signIn.step() == library::SignIn::Step::SignedIn) {
-      reportCapabilities(client);
+      reportCapabilities(services, client);
     }
   }
 

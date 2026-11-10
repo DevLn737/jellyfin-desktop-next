@@ -158,6 +158,20 @@ namespace jfd::session {
     createGroup(groupName);
   }
 
+  void GroupModel::playInGroup(const QStringList& itemIds, int startIndex, qint64 startTicks) {
+    if (!m_group || itemIds.isEmpty() || startIndex < 0 || startIndex >= itemIds.size()) return;
+    m_api->setNewQueue(itemIds, startIndex, startTicks, this, [this](api::Result<api::Empty> result) {
+      if (!result) setError(tr("Could not start the item in the group."));
+    });
+  }
+
+  void GroupModel::queueInGroup(const QStringList& itemIds, bool next) {
+    if (!m_group || itemIds.isEmpty()) return;
+    m_api->queue(itemIds, next, this, [this](api::Result<api::Empty> result) {
+      if (!result) setError(tr("Could not add to the group's queue."));
+    });
+  }
+
   void GroupModel::setRate(double rate) {
     if (!m_rateSupported) {
       Q_EMIT notice(tr("This server cannot change the group's speed."), true);

@@ -52,6 +52,8 @@ if(Qt6_FOUND)
   jfd_add_module(src/playback)
   jfd_add_module(src/integrations)
   jfd_add_module(src/seerr)
+  # After integrations: Playstate goes the way of the media controls.
+  jfd_add_module(src/remote)
 else()
   message(STATUS "Qt 6 with WebSockets not found: skipping the Qt network modules")
 endif()

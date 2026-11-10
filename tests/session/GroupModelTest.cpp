@@ -9,6 +9,7 @@
 
 #include <QCoreApplication>
 #include <QDeadlineTimer>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QSignalSpy>
 
@@ -116,4 +117,38 @@ TEST_CASE("A group item that cannot be opened leaves the group and says why") {
   for (const auto& args : notices)
     if (args.at(0).toString().contains(QLatin1String("could not be opened")) && args.at(1).toBool()) told = true;
   CHECK(told);
+}
+
+TEST_CASE("Remote control's Play in a group asks the group for a new queue or adds to it") {
+  Fixture f;
+  // Outside a group nothing is sent.
+  f.model->playInGroup({QStringLiteral("a")}, 0, 0);
+  f.model->queueInGroup({QStringLiteral("a")}, true);
+  QCoreApplication::processEvents();
+  CHECK(f.count("/SyncPlay/SetNewQueue") == 0);
+  CHECK(f.count("/SyncPlay/Queue") == 0);
+
+  f.joined();
+  f.model->playInGroup({QStringLiteral("a"), QStringLiteral("b")}, 1, 50'000'000);
+  REQUIRE(waitUntil([&] { return f.count("/SyncPlay/SetNewQueue") == 1; }));
+  f.model->queueInGroup({QStringLiteral("c")}, true);
+  f.model->queueInGroup({QStringLiteral("d")}, false);
+  REQUIRE(waitUntil([&] { return f.count("/SyncPlay/Queue") == 2; }));
+
+  QList<QJsonObject> queued;
+  for (const auto& request : f.server.requests()) {
+    const QJsonObject body = QJsonDocument::fromJson(request.body).object();
+    if (request.path == QLatin1String("/SyncPlay/SetNewQueue")) {
+      CHECK(body.value(QStringLiteral("PlayingQueue")).toArray().size() == 2);
+      CHECK(body.value(QStringLiteral("PlayingItemPosition")).toInt() == 1);
+      CHECK(body.value(QStringLiteral("StartPositionTicks")).toDouble() == 50'000'000.0);
+    } else if (request.path == QLatin1String("/SyncPlay/Queue")) {
+      queued.append(body);
+    }
+  }
+  REQUIRE(queued.size() == 2);
+  CHECK(queued.at(0).value(QStringLiteral("Mode")).toString() == QStringLiteral("QueueNext"));
+  CHECK(queued.at(0).value(QStringLiteral("ItemIds")).toArray().at(0).toString() == QStringLiteral("c"));
+  CHECK(queued.at(1).value(QStringLiteral("Mode")).toString() == QStringLiteral("Queue"));
+  CHECK(f.model->errorText().isEmpty());
 }

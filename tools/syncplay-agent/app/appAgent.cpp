@@ -102,6 +102,8 @@ namespace {
         if (!result) return fatal("sign-in failed: " + result.error().message.toStdString());
         api::SessionCapabilities capabilities;
         capabilities.supportsSyncPlayPlaybackRate = m_options.supportsRate;
+        // The agent has no remote control: not a target of "Play on".
+        capabilities.supportsMediaControl = false;
         capabilities.deviceProfile = api::buildDeviceProfile({});
         m_client.reportCapabilities(capabilities, this, [this, capabilities](auto reported) {
           if (!reported) return fatal("capabilities failed: " + reported.error().message.toStdString());
