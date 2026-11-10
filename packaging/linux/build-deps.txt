@@ -38,3 +38,5 @@ libwayland-dev
 wayland-protocols
 libxkbcommon-dev
 libsecret-1-dev
+# SDL3 (gamepads): udev support, loaded at run time.
+libudev-dev

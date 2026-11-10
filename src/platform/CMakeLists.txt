@@ -1,19 +1,35 @@
 # Operating system services: credential store, sleep inhibition, single
-# instance and system media controls (SMTC on Windows, MPRIS on Linux).
+# instance, system media controls (SMTC on Windows, MPRIS on Linux) and
+# gamepad input (SDL3).
 add_library(jfd_platform STATIC
   src/CredentialStore.cpp
   src/SleepInhibitor.cpp
   src/SingleInstance.cpp
   src/MediaControls.cpp
+  src/GamepadMapper.cpp
   include/jfd/platform/CredentialStore.h
   include/jfd/platform/SleepInhibitor.h
   include/jfd/platform/SingleInstance.h
-  include/jfd/platform/MediaControls.h)
+  include/jfd/platform/MediaControls.h
+  include/jfd/platform/InputAction.h
+  include/jfd/platform/GamepadMapper.h
+  include/jfd/platform/GamepadInput.h)
 add_library(jfd::platform ALIAS jfd_platform)
 target_include_directories(jfd_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(jfd_platform PUBLIC Qt6::Core Qt6::Network)
 target_compile_definitions(jfd_platform PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 set_target_properties(jfd_platform PROPERTIES AUTOMOC ON)
+
+if(JFD_GAMEPAD)
+  include(${PROJECT_SOURCE_DIR}/cmake/JfdSdl3.cmake)
+  target_sources(jfd_platform PRIVATE src/GamepadInputSdl.cpp)
+  target_link_libraries(jfd_platform PRIVATE jfd_sdl3)
+  # Tests drive SDL's virtual joystick.
+  target_compile_definitions(jfd_platform PUBLIC JFD_PLATFORM_GAMEPAD=1)
+else()
+  message(STATUS "Gamepad input off (JFD_GAMEPAD)")
+  target_sources(jfd_platform PRIVATE src/GamepadInputNone.cpp)
+endif()
 
 if(WIN32)
   find_package(Qt6 REQUIRED COMPONENTS Gui)

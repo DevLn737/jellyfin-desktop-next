@@ -13,6 +13,15 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   [SIL Open Font License 1.1](src/ui/theme/fonts/LICENSE-Manrope.txt),
   copyright 2018 The Manrope Project Authors. Embedded unmodified; the licence
   text ships with the font files.
+- **SDL3** 3.4.20 (gamepad input: the joystick, gamepad and HIDAPI
+  subsystems only), [zlib licence](packaging/licenses/SDL3.txt) (copyright
+  notice in that file). Built from the release archive pinned in
+  `deps/versions.json` (`cmake/JfdSdl3.cmake`) and linked into the
+  executable, unmodified. It contains **HIDAPI**, which offers GPL-3.0, a
+  BSD-style or its original licence; this program uses it under the
+  [BSD-style licence](packaging/licenses/HIDAPI.txt). Both texts ship in the
+  packages (AppImage: `usr/share/licenses/jellyfin-desktop-next`, MSI: the
+  `licenses` folder).
 - **doctest** (`third_party/doctest`, tests only), MIT; **nlohmann/json** and
   **Monocypher** under their own licences in `third_party/`.
 

@@ -64,4 +64,7 @@ rm -rf "$extract"
 export DISPLAY=:99 APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=xcb
 echo "$PRETTY_NAME, glibc $(ldd --version | head -1 | awk '{print $NF}')"
 timeout 120 "$appimage" --smoke
+# Gamepads (SDL) must start without udev too, as in containers and some
+# minimal systems: SDL then scans /dev/input itself.
+SDL_JOYSTICK_DISABLE_UDEV=1 SDL_HIDAPI_UDEV=0 timeout 120 "$appimage" --smoke
 echo "smoke test passed on $PRETTY_NAME"

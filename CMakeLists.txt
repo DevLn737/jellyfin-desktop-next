@@ -13,6 +13,9 @@ option(JFD_BUILD_APP "Build the Qt application (needs Qt 6 and libmpv)" OFF)
 option(JFD_REQUIRE_QT "Fail when Qt 6 is not found" OFF)
 # Tests against a live Jellyfin server (see scripts/test-server).
 option(JFD_SERVER_TESTS "Build tests that need a Jellyfin server" OFF)
+# Gamepad input through SDL3 (cmake/JfdSdl3.cmake downloads the pinned
+# release). Without it the application builds without gamepad support.
+option(JFD_GAMEPAD "Gamepad input with the pinned SDL3" ${JFD_BUILD_APP})
 set(JFD_SIM_SCENARIOS 10000 CACHE STRING "Randomized simulator scenarios run by ctest")
 
 if(MSVC)

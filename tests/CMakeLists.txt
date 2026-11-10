@@ -170,8 +170,15 @@ if(TARGET jfd_jellyfin_api)
   endif()
   endif()
 
-  jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp)
+  jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp
+    platform/GamepadMapperTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
+  if(JFD_GAMEPAD)
+    # GamepadInput on SDL's virtual joystick: layouts (Xbox, 8BitDo in
+    # XInput, Switch and DirectInput modes), repeat, dead zone, unplugging.
+    jfd_add_qt_test(jfd_platform_gamepad_tests platform/GamepadInputTest.cpp)
+    target_link_libraries(jfd_platform_gamepad_tests PRIVATE jfd::platform jfd_sdl3)
+  endif()
   find_package(Qt6 QUIET COMPONENTS DBus)
   if(Qt6DBus_FOUND AND NOT WIN32 AND NOT APPLE)
     # Against fake portal, screen saver and MPRIS clients on a private dbus-daemon.
@@ -260,6 +267,21 @@ if(JFD_BUILD_APP)
     target_compile_options(jfd_ui_palette_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_palette_tests COMMAND jfd_ui_palette_tests)
     set_tests_properties(jfd_ui_palette_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
+  if(JFD_GAMEPAD AND TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+    # A gamepad (SDL's virtual joystick) driving a window through
+    # InputRouter: button to focus change < 30 ms, Back, Select, Search,
+    # media actions to the session, repeat, unplugging; and on the real
+    # shell, Back leaves the page and closes the palette.
+    add_executable(jfd_ui_gamepad_tests support/QtGuiTestMain.cpp ui/GamepadFocusTest.cpp ui/GamepadShellTest.cpp)
+    target_link_libraries(jfd_ui_gamepad_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      jfd::platform jfd_sdl3 Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_gamepad_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_gamepad_tests COMMAND jfd_ui_gamepad_tests)
+    set_tests_properties(jfd_ui_gamepad_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(TARGET jfd_ui_library)

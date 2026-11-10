@@ -8,7 +8,8 @@
 # come from LIBMPV_PREFIX (packaging/linux/build-libmpv.sh). Libraries that
 # must match the running system stay out of the image: the graphics and VA-API
 # drivers' libraries, audio servers' client libraries, GnuTLS (it knows the
-# distribution's CA store) and Wayland.
+# distribution's CA store), Wayland and libudev (SDL, linked into the
+# executable for gamepads, loads the system's at run time).
 set -euo pipefail
 
 exe=$(realpath "${1:?usage: build-appimage.sh EXECUTABLE QML_DIR LIBMPV_PREFIX OUTPUT_DIR}")
@@ -47,12 +48,15 @@ fetch linuxdeployPluginQt
 
 install -m 755 "$exe" "$appdir/usr/bin/$name"
 install -m 644 "$here/$app_id.metainfo.xml" "$appdir/usr/share/metainfo/$app_id.metainfo.xml"
+# Licences of what is linked into the executable (LICENSES.md).
+install -d "$appdir/usr/share/licenses/$package"
+install -m 644 "$root/LICENSE" "$root/LICENSES.md" "$root"/packaging/licenses/*.txt "$appdir/usr/share/licenses/$package/"
 
 excludes=()
 for pattern in 'libva.so*' 'libva-*.so*' 'libvdpau*.so*' 'libdrm*.so*' 'libgbm.so*' \
                'libvulkan.so*' 'libEGL*.so*' 'libGL*.so*' 'libOpenGL.so*' \
                'libpipewire-*.so*' 'libpulse*.so*' 'libasound.so*' \
-               'libgnutls.so*' 'libwayland-*.so*' 'libdbus-1.so*' 'libsystemd.so*'; do
+               'libgnutls.so*' 'libwayland-*.so*' 'libdbus-1.so*' 'libsystemd.so*' 'libudev.so*'; do
   excludes+=(--exclude-library "$pattern")
 done
 
@@ -86,4 +90,14 @@ if readelf -d "$exe" | grep -q 'NEEDED.*libmpv\.so'; then
   test -n "$(find "$appdir/usr/lib" -name 'libmpv.so*' -print -quit)"
 fi
 test -n "$(find "$appdir/usr/lib" -name 'libfribidi.so*' -print -quit)"
+# Gamepads: the pinned SDL is inside the executable (static), never a system
+# libSDL3, and libudev stays the system's.
+if grep -q -a 'SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS' "$exe"; then
+  if readelf -d "$exe" | grep -q 'NEEDED.*libSDL3'; then
+    echo "the executable needs a system libSDL3" >&2
+    exit 1
+  fi
+  test -z "$(find "$appdir/usr/lib" -name 'libudev.so*' -print -quit)"
+  test -f "$appdir/usr/share/licenses/$package/SDL3.txt"
+fi
 echo "AppImage: $LDAI_OUTPUT ($(du -h "$LDAI_OUTPUT" | cut -f1))"

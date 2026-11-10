@@ -7,6 +7,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   DiagnosticsInstall.cpp
   FlowCheck.cpp FlowCheck.h
   IntegrationServices.cpp IntegrationServices.h
+  InputInstall.cpp
   GroupInstall.cpp
   LegacyInstall.cpp LegacyInstall.h
   LibraryInstall.cpp

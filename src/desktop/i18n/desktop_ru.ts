@@ -253,6 +253,29 @@
     </message>
 </context>
 <context>
+    <name>InputSettings</name>
+    <message>
+        <source>Gamepad</source>
+        <translation>Геймпад</translation>
+    </message>
+    <message>
+        <source>Use a gamepad</source>
+        <translation>Управление геймпадом</translation>
+    </message>
+    <message>
+        <source>Xbox, PlayStation, Switch and 8BitDo controllers. The stick and the d-pad move, the bottom button selects, the right one goes back, Start pauses, the triggers seek.</source>
+        <translation>Геймпады Xbox, PlayStation, Switch и 8BitDo. Стик и крестовина перемещают, нижняя кнопка выбирает, правая возвращает назад, Start ставит на паузу, курки перематывают.</translation>
+    </message>
+    <message>
+        <source>Gamepad works in the background</source>
+        <translation>Геймпад работает в фоне</translation>
+    </message>
+    <message>
+        <source>Off: the gamepad controls the app only while its window is active.</source>
+        <translation>Если выключено, геймпад управляет приложением, только пока его окно активно.</translation>
+    </message>
+</context>
+<context>
     <name>Integrations</name>
     <message>
         <source>Version %1 is available.</source>
