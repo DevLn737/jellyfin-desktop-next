@@ -15,6 +15,7 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   SeerrInstall.cpp
   SessionInstall.cpp
   ThemeInstall.cpp ThemeInstall.h
+  TvModeInstall.cpp
   PlayerInstall.cpp
   RemoteInstall.cpp
   Logging.cpp Logging.h

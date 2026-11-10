@@ -2,13 +2,21 @@ import QtQuick
 import QtQuick.Templates as T
 import Jfd.Ui.Theme
 
-// An on/off switch. Space toggles it.
+// An on/off switch. Space and Enter toggle it.
 T.Switch {
     id: control
     // Colours of the nearest colour scope (the video player has its own).
     readonly property var colors: Theme.colorsFor(control)
 
-    implicitWidth: 44
+    // As a click: the switch flips and says so (toggled).
+    function flip() {
+        control.toggle()
+        control.toggled()
+    }
+    Keys.onReturnPressed: flip()
+    Keys.onEnterPressed: flip()
+
+    implicitWidth: Theme.tvMode ? Theme.minHitSize : 44
     implicitHeight: Theme.controlHeight
     focusPolicy: Qt.StrongFocus
     padding: 0

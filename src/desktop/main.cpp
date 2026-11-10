@@ -187,6 +187,9 @@ int main(int argc, char* argv[]) {
   parser.addOption({QStringLiteral("reset-theme"),
                     QStringLiteral("Go back to the dark theme with the blue accent, then start.")});
   parser.addOption({QStringLiteral("settings-file"), QStringLiteral("Use this settings file."), QStringLiteral("path")});
+  parser.addOption({QStringLiteral("tv"),
+                    QStringLiteral("Start in TV mode (larger text and controls, arrow navigation), without changing "
+                                   "the setting.")});
   // Handled above, before the application starts; listed for --help.
   parser.addOption({QStringLiteral("command"),
                     QStringLiteral("Send a command to the running app and exit: ") +
@@ -264,6 +267,7 @@ int main(int argc, char* argv[]) {
     desktop::installAppearance(services, themeCatalog, engine, *window);
     desktop::installMiniPlayer(services, engine);
     desktop::startEffects(services, engine, *window);
+    desktop::installTvMode(services, engine, parser.isSet(QStringLiteral("tv")));
     desktop::announceLegacyImport(legacy, *window);
     desktop::installDiagnostics(services, *window);
 
@@ -271,7 +275,7 @@ int main(int argc, char* argv[]) {
     windowState.restoreAndShow(QSize(1280, 800));
     desktop::startIntegrations(services, *window, !options.smoke);
     desktop::startRemote(services, *window);
-    desktop::installInput(services, *window);
+    desktop::installInput(services, engine, *window);
     if (instance) {
       QObject::connect(&*instance, &platform::SingleInstance::activated, window,
                        [window, &services](const QStringList& arguments) {

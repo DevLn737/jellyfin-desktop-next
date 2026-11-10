@@ -1,19 +1,25 @@
 # Jfd.Ui.Shell: the window's frame. Navigator (routes and the page stack),
 # the sidebar, back and full-screen keys, the toast, remembering the
-# window's placement in settings, and InputRouter (gamepad actions to keys).
+# window's placement in settings, InputRouter (gamepad actions to keys),
+# SpatialNavigation (arrows to the nearest item) and GamepadStatus (the
+# connected gamepad and the button check).
 # QRhi (<rhi/qrhi.h>) to tell which GPU the window renders on.
 find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
 qt_add_library(jfd_ui_shell STATIC
   src/GraphicsInfo.cpp
   src/CommandRegistry.cpp
+  src/GamepadStatus.cpp
   src/InputRouter.cpp
   src/Navigator.cpp
+  src/SpatialNavigation.cpp
   src/WindowPlacement.cpp
   src/WindowStateKeeper.cpp
   include/jfd/ui/CommandRegistry.h
+  include/jfd/ui/GamepadStatus.h
   include/jfd/ui/GraphicsInfo.h
   include/jfd/ui/InputRouter.h
   include/jfd/ui/Navigator.h
+  include/jfd/ui/SpatialNavigation.h
   include/jfd/ui/WindowPlacement.h
   include/jfd/ui/WindowStateKeeper.h)
 target_include_directories(jfd_ui_shell PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -24,6 +30,7 @@ qt_add_qml_module(jfd_ui_shell
   VERSION 1.0
   QML_FILES
     AppShell.qml
+    GamepadCheck.qml
     PlaceholderPage.qml
     RoutePage.qml
     Sidebar.qml

@@ -52,7 +52,7 @@ RoutePage {
             Layout.fillHeight: true
             focus: true
             model: page.list
-            cardHeight: Math.round(Theme.squareWidth / Theme.squareAspect) + 52
+            cardHeight: Math.round(Theme.squareWidth / Theme.squareAspect) + Theme.cardCaptionHeight
             delegate: MusicCard {
                 listModel: page.list
                 guard: guard

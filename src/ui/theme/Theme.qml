@@ -17,6 +17,16 @@ QtObject {
     // Older name of reducedEffects.
     readonly property bool reduceMotion: reducedEffects
 
+    // TV mode, set by the application from Settings > Interface > TV mode
+    // (or --tv), changes at once without a restart: larger text, controls
+    // and cards to read across a room (body text 24 px at 1920x1080, every
+    // control at least 64 px high), a thicker focus ring, shorter
+    // animations. With tvSafeArea the pages keep safeMargin (a share of the
+    // window, 5 %) free at each edge, for TVs that cut their edges off.
+    property bool tvMode: false
+    property bool tvSafeArea: true
+    readonly property real safeMargin: tvMode && tvSafeArea ? 0.05 : 0
+
     // Colours come from a palette, a plain map of these names to colours
     // (Palettes.qml has the built-in ones). The names are shared by every
     // screen: they are only ever added, never renamed or removed.
@@ -76,11 +86,11 @@ QtObject {
     property int radiusOverride: 6
     property string fontFamilyOverride: ""
     readonly property string fontFamily: fontFamilyOverride.length > 0 ? fontFamilyOverride : Qt.application.font.family
-    readonly property int fontSizeSmall: 12
-    readonly property int fontSizeBody: 14
-    readonly property int fontSizeLarge: 17
-    readonly property int fontSizeTitle: 22
-    readonly property int fontSizeHeadline: 30
+    readonly property int fontSizeSmall: tvMode ? 20 : 12
+    readonly property int fontSizeBody: tvMode ? 24 : 14
+    readonly property int fontSizeLarge: tvMode ? 28 : 17
+    readonly property int fontSizeTitle: tvMode ? 34 : 22
+    readonly property int fontSizeHeadline: tvMode ? 44 : 30
     readonly property int fontWeightNormal: Font.Normal
     readonly property int fontWeightBold: Font.DemiBold
 
@@ -92,15 +102,15 @@ QtObject {
     readonly property int spacingHuge: 32
     readonly property int radius: radiusOverride
     readonly property int radiusSmall: Math.max(1, Math.round(radiusOverride / 2))
-    readonly property int focusRingWidth: 2
+    readonly property int focusRingWidth: tvMode ? 4 : 2
     // Larger corners for panels and menus ("Depth" uses 10 px and 14 px).
     readonly property int radiusLarge: Math.round(radiusOverride * 1.4)
     // Elevation: popups get one light shadow; flat panels get none.
     readonly property color shadowColor: "#66000000"
     readonly property int shadowRadius: 16
     readonly property int shadowOffset: 6
-    // TV mode: the smallest touch/remote target and the focus ring's gap.
-    readonly property int minHitSize: 44
+    // The smallest touch/remote target and the focus ring's gap.
+    readonly property int minHitSize: tvMode ? 64 : 44
     readonly property int focusRingOffset: 2
 
     // Window size classes, by the window's width in logical pixels (the
@@ -114,18 +124,22 @@ QtObject {
                                       : windowWidth > spaciousAbove ? "spacious" : "normal"
     readonly property bool compact: sizeClass === "compact"
     // Left and right margin of a page.
-    readonly property int pageMargin: compact ? spacingLarge : sizeClass === "spacious" ? 48 : spacingHuge
+    readonly property int pageMargin: compact ? spacingLarge : sizeClass === "spacious" || tvMode ? 48 : spacingHuge
 
     // Sizes
-    readonly property int controlHeight: 38
-    readonly property int iconSize: 22
-    readonly property int sidebarWidth: 216
-    readonly property int sidebarCollapsedWidth: 64
+    readonly property int controlHeight: tvMode ? 64 : 38
+    readonly property int iconSize: tvMode ? 32 : 22
+    readonly property int sidebarWidth: tvMode ? 300 : 216
+    readonly property int sidebarCollapsedWidth: tvMode ? 96 : 64
     // Card widths; heights follow from the aspect ratios.
     // Poster-shaped cards are 110 to 220 px wide in every size class.
-    readonly property int posterWidth: compact ? 130 : sizeClass === "spacious" ? 190 : 160
-    readonly property int thumbWidth: compact ? 220 : sizeClass === "spacious" ? 320 : 280
+    readonly property int posterWidth: tvMode ? (compact ? 160 : 220)
+                                     : compact ? 130 : sizeClass === "spacious" ? 190 : 160
+    readonly property int thumbWidth: tvMode ? (compact ? 280 : 400)
+                                    : compact ? 220 : sizeClass === "spacious" ? 320 : 280
     readonly property int squareWidth: posterWidth
+    // The room under a card's image for its title and subtitle.
+    readonly property int cardCaptionHeight: tvMode ? 84 : 52
     readonly property real posterAspect: 2 / 3
     readonly property real thumbAspect: 16 / 9
     readonly property real squareAspect: 1
@@ -138,11 +152,13 @@ QtObject {
         return shape === "thumb" ? thumbAspect : (shape === "square" || shape === "circle") ? squareAspect : posterAspect
     }
 
-    // Animation durations in milliseconds
-    readonly property int durationFast: reducedEffects ? 60 : 120
-    readonly property int durationNormal: reducedEffects ? 100 : 200
-    readonly property int durationSlow: reducedEffects ? 160 : 320
+    // Animation durations in milliseconds; halved with simplified effects
+    // and in TV mode (moving the focus across a big screen should not lag).
+    readonly property bool shortAnimations: reducedEffects || tvMode
+    readonly property int durationFast: shortAnimations ? 60 : 120
+    readonly property int durationNormal: shortAnimations ? 100 : 200
+    readonly property int durationSlow: shortAnimations ? 160 : 320
     // Long fades (a backdrop into the page, skeleton shimmer).
-    readonly property int durationLong: reducedEffects ? 240 : 600
+    readonly property int durationLong: shortAnimations ? 240 : 600
     readonly property int easing: Easing.OutCubic
 }

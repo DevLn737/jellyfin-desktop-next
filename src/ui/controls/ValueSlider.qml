@@ -3,10 +3,16 @@ import QtQuick.Templates as T
 import Jfd.Ui.Theme
 
 // A horizontal slider. Left/Right move it by `stepSize` when focused.
+// Enter confirms the value (`accepted`, like Enter in a field) and goes no
+// further, so it never also acts on the page around the slider.
 T.Slider {
     id: control
     // Colours of the nearest colour scope (the video player has its own).
     readonly property var colors: Theme.colorsFor(control)
+
+    signal accepted()
+    Keys.onReturnPressed: control.accepted()
+    Keys.onEnterPressed: control.accepted()
 
     implicitWidth: 220
     implicitHeight: Theme.controlHeight

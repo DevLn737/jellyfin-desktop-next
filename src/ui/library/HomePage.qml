@@ -83,7 +83,7 @@ RoutePage {
                 visible: count > 0
                 title: qsTr("My media")
                 model: page.home ? page.home.libraries : null
-                cardHeight: Math.round(Theme.thumbWidth / Theme.thumbAspect) + 52
+                cardHeight: Math.round(Theme.thumbWidth / Theme.thumbAspect) + Theme.cardCaptionHeight
                 delegate: ItemCard { shape: "thumb" }
                 KeyNavigation.down: rows
             }
@@ -129,7 +129,7 @@ RoutePage {
             width: rows.width
             focus: ListView.isCurrentItem
             model: items
-            cardHeight: Math.round(Theme.cardWidthFor(cardShape) / Theme.cardAspectFor(cardShape)) + 52
+            cardHeight: Math.round(Theme.cardWidthFor(cardShape) / Theme.cardAspectFor(cardShape)) + Theme.cardCaptionHeight
             delegate: ItemCard { shape: row.cardShape }
         }
 

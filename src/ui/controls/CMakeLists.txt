@@ -37,6 +37,7 @@ qt_add_qml_module(jfd_ui_controls
     icons/check.svg
     icons/close.svg
     icons/error.svg
+    icons/gamepad.svg
     icons/group.svg
     icons/home.svg
     icons/library.svg
@@ -50,6 +51,7 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/check.svg
     icons-dark/close.svg
     icons-dark/error.svg
+    icons-dark/gamepad.svg
     icons-dark/group.svg
     icons-dark/home.svg
     icons-dark/library.svg

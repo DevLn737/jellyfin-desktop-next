@@ -279,6 +279,17 @@ if(JFD_BUILD_APP)
     target_compile_options(jfd_ui_shell_page_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_shell_page_tests COMMAND jfd_ui_shell_page_tests)
     set_tests_properties(jfd_ui_shell_page_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+
+    # TV mode (package 3.3): SpatialNavigation (no traps, views, panes,
+    # pages), Enter on every control, TV sizes, the safe area and switching
+    # on 1000 cards, on synthetic screens and the real shell.
+    add_executable(jfd_ui_tv_tests support/QtGuiTestMain.cpp ui/TvModeTest.cpp)
+    target_link_libraries(jfd_ui_tv_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_tv_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_tv_tests COMMAND jfd_ui_tv_tests)
+    set_tests_properties(jfd_ui_tv_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)

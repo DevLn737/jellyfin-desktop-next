@@ -126,11 +126,11 @@ first next time. While it is open the player's keys do not reach the player.
 | --- | --- |
 | `ActionButton` | `text`, `iconSource`, `primary`, `clicked()` |
 | `IconButton` | `iconSource`, `toolTipText`, `clicked()` |
-| `Icon`, `Icons` | `Icon { source: Icons.play; size: 22 }`; icons: home, search, group, settings, back, close, play, check, error, library, menu |
+| `Icon`, `Icons` | `Icon { source: Icons.play; size: 22 }`; icons: home, search, group, settings, back, close, play, check, error, library, menu, up, down, gamepad |
 | `InputField` | `label`, `text`, `placeholderText`, `errorText`, `password`, `accepted()` |
-| `ToggleSwitch` | `checked`, `toggled()` |
-| `ChoiceBox` | `model: [{ value, label }]`, `currentValue`, `indexOfValue()`, `activated()` |
-| `ValueSlider` | `from`, `to`, `stepSize`, `value`, `moved()` |
+| `ToggleSwitch` | `checked`, `toggled()` (Space or Enter) |
+| `ChoiceBox` | `model: [{ value, label }]`, `currentValue`, `indexOfValue()`, `activated()`; Enter opens the list; in TV mode Up and Down move the focus, not the value (`navigationKeys`) |
+| `ValueSlider` | `from`, `to`, `stepSize`, `value`, `moved()`, `accepted()` (Enter) |
 | `PosterCard` | `title`, `subtitle`, `imageSource`, `shape` ("poster", "thumb", "square"), `progress` (0..1), `played`, `unplayedCount`, `cardWidth`, `clicked()` |
 | `CardRow` | `title`, `model`, `delegate`, `cardHeight`, `currentIndex`, `view` |
 | `CardGrid` | `model`, `delegate`, `cardWidth`, `cardHeight`, `currentIndex`, `view` |
@@ -147,7 +147,43 @@ first next time. While it is open the player's keys do not reach the player.
 
 Every interactive control takes keyboard focus (Tab, arrows in rows and
 grids, Enter or Space to activate) and draws `FocusFrame` when focused by
-keyboard.
+keyboard. Every focusable control answers Enter (a gamepad's Select): a test
+fails when a new one does not.
+
+## TV mode and arrow navigation
+
+`Theme.tvMode` (Settings > Interface > TV mode, the "TV mode" command of
+Ctrl+K, or `--tv` for one run) changes at once, without a restart: body text
+24 px (at 1920 by 1080 logical pixels), `controlHeight` and `minHitSize`
+64 px, larger cards, icons and sidebar, a 4 px focus ring and halved
+animations. Use the `Theme` sizes, not numbers, and a screen follows. With
+`Theme.tvSafeArea` (Settings > Interface > Keep clear of the TV's edges, on
+by default) the shell keeps `Theme.safeMargin` (5 %) free at each edge of
+the pages that have its sidebar; the player and the sign-in page place
+their controls themselves.
+
+`SpatialNavigation` (`Jfd.Ui.Shell`, attached to `AppShell`) moves the focus
+with the arrows nobody else took: the focused item, its `Keys` and
+`KeyNavigation` (which always win), a `ListView` or `GridView` moving between
+its delegates, and the page come first. It then focuses the nearest visible,
+enabled item with `activeFocusOnTab` in that direction, the offset across
+the direction weighted; a focus scope with focusable items inside is
+entered. A view's `currentIndex` follows the focus, and a `Flickable` scrolls
+to an item outside its visible part; delegates a view has not created are
+reached through the view's own keys. PageUp and PageDown (a gamepad's LB
+and RB) move about a page. A control whose own arrows would trap the focus
+lists the arrows to give up in `navigationKeys` (`ChoiceBox` in TV mode).
+`CardGrid` in TV mode leaves the grid at its edges instead of wrapping.
+
+The Menu key (a gamepad's View) opens the focused item's own menu where it
+has one (`Keys.onMenuPressed`), otherwise it goes to the sidebar's entry of
+the current page, and back. A new screen gets keyboard focus on its first
+item and needs no `KeyNavigation` of its own.
+
+Gamepads: `GamepadStatus` (a `Jfd.Ui.Shell` singleton) says whether one is
+connected (the sidebar shows its sign and name, as does Settings > Gamepad)
+and runs Settings > Gamepad > Check the buttons, where each press shows its
+action instead of acting, until Back is pressed twice.
 
 ## Pages and navigation
 
@@ -303,6 +339,15 @@ in a binding so it re-evaluates when values change. See
 [settings.md](settings.md) for registering a section.
 
 ## Tests
+
+`jfd_ui_tv_tests` checks `SpatialNavigation` on synthetic screens (rows of
+different length, a list, a scrolled pane, a grid of 200 mostly uncreated
+delegates; every item reaches every other, Back always gets out) and on the
+shell at 1920 by 1080 in TV mode (safe area, Menu, Back), Enter on every
+focusable control, the TV sizes, and switching TV mode 20 times on 1000
+cards (each switch at most 100 ms, memory at most 5 MiB more).
+`jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
+gamepad alone.
 
 `desktop_smoke` starts the application with a temporary profile, checks the
 login page, visits every route and back, and fails if shutdown takes a

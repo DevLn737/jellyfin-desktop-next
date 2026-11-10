@@ -16,7 +16,7 @@ FocusScope {
     readonly property alias view: list
     // Height of the tallest card; set it so the row does not resize while
     // images load.
-    property int cardHeight: Math.round(Theme.posterWidth / Theme.posterAspect) + 52
+    property int cardHeight: Math.round(Theme.posterWidth / Theme.posterAspect) + Theme.cardCaptionHeight
 
     implicitWidth: 800
     implicitHeight: header.implicitHeight + Theme.spacingSmall + cardHeight

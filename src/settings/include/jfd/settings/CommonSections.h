@@ -20,6 +20,11 @@ namespace jfd::settings {
     inline constexpr QLatin1String Language{"interface/language"};
     // Interface scale on top of the system's, 0.75 to 2.0.
     inline constexpr QLatin1String Scale{"interface/scale"};
+    // TV mode: larger text and controls, arrows move between everything.
+    // Changes at once; --tv turns it on for one run.
+    inline constexpr QLatin1String TvMode{"interface/tvMode"};
+    // In TV mode, keep 5 % free at the screen's edges (overscan).
+    inline constexpr QLatin1String TvSafeArea{"interface/tvSafeArea"};
 
     // appearance
     // "dark", "light", "system" or "file:<name>" for a file in the themes
