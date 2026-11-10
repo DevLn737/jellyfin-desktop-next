@@ -41,6 +41,9 @@ namespace jfd::api {
     void setNewQueue(const QStringList& itemIds, int playingItemPosition,
                      std::int64_t startPositionTicks, QObject* context, Callback<Empty> done);
     void setPlaylistItem(const QString& playlistItemId, QObject* context, Callback<Empty> done);
+    // POST SyncPlay/Queue: adds items after the playing one (next) or at
+    // the end of the group's queue.
+    void queue(const QStringList& itemIds, bool next, QObject* context, Callback<Empty> done);
 
     void unpause(QObject* context, Callback<Empty> done);
     void pause(QObject* context, Callback<Empty> done);

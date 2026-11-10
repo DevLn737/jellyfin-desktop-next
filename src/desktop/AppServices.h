@@ -16,6 +16,7 @@ class QQuickWindow;
 namespace jfd::api {
   class JellyfinClient;
   class SessionSocket;
+  struct SessionCapabilities;
 } // namespace jfd::api
 
 namespace jfd::library {
@@ -54,6 +55,7 @@ namespace jfd::desktop {
 
   struct IntegrationServices;
   struct LibraryServices;
+  struct RemoteServices;
 
   // The composition root: every long-lived service of the application,
   // created in startup order and destroyed in reverse.
@@ -117,6 +119,10 @@ namespace jfd::desktop {
     std::unique_ptr<platform::CredentialStore> seerrCredentials;
     std::unique_ptr<seerr::SeerrService> seerr;
 
+    // Remote control from the server and --command (installSession);
+    // released before the session it posts to.
+    std::shared_ptr<RemoteServices> remote;
+
     // installIntegrations; complete in main.cpp, which destroys it.
     std::unique_ptr<IntegrationServices> integrations;
   };
@@ -152,6 +158,22 @@ namespace jfd::desktop {
   // a sign-in completes, so the session socket registers with them.
   // Needs installLibrary.
   void installSession(AppServices& services);
+
+  // Remote control (RemoteInstall.cpp): the server's Play, Playstate and
+  // GeneralCommand messages and the second start's --command, on the
+  // session, the player, the music player and the group model, which may be
+  // installed later. installSession installs it, so the capabilities it
+  // reports already say what the client can be asked to do.
+  void installRemote(AppServices& services);
+  // SupportsMediaControl and SupportedCommands; nothing before installRemote.
+  void applyRemoteCapabilities(const AppServices& services, api::SessionCapabilities& capabilities);
+  // remote/allowServerControl changed.
+  void setRemoteEnabled(AppServices& services, bool enabled);
+  // After the window loads: DisplayMessage's toasts and ToggleFullscreen.
+  void startRemote(AppServices& services, QQuickWindow& window);
+  // A second start's arguments: runs its --command and returns true, or
+  // returns false when it has none (the window is raised instead).
+  bool runCommand(AppServices& services, const QStringList& arguments);
 
   // The playback settings section (auto-skip of intros and credits, HDR10
   // output).

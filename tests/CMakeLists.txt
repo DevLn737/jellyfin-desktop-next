@@ -135,6 +135,19 @@ if(TARGET jfd_jellyfin_api)
     target_link_libraries(jfd_integrations_tests PRIVATE jfd::integrations Qt6::WebSockets)
   endif()
 
+  if(TARGET jfd_remote)
+    # Remote control on fake server messages, and --command from a second start.
+    jfd_add_qt_test(jfd_remote_tests remote/RemoteCommandsTest.cpp remote/RemoteControlTest.cpp)
+    target_link_libraries(jfd_remote_tests PRIVATE jfd::remote jfd::platform Qt6::WebSockets)
+    if(JFD_SERVER_TESTS)
+      # A second session of the test user sends Play, Playstate and
+      # GeneralCommand through the live server.
+      jfd_add_qt_test(jfd_remote_server_tests remote/RemoteServerTest.cpp)
+      target_link_libraries(jfd_remote_server_tests PRIVATE jfd::remote Qt6::WebSockets)
+      set_tests_properties(jfd_remote_server_tests PROPERTIES TIMEOUT 120 RESOURCE_LOCK jellyfin_server)
+    endif()
+  endif()
+
   if(TARGET jfd_music)
     jfd_add_qt_test(jfd_music_tests music/MusicQueueTest.cpp)
     target_link_libraries(jfd_music_tests PRIVATE jfd::music)

@@ -222,7 +222,8 @@ TEST_CASE("Capabilities register the session") {
   const QJsonArray list = QJsonDocument::fromJson(sessions->body).array();
   REQUIRE(list.size() == 1);
   const QJsonObject caps = list.at(0).toObject().value(QStringLiteral("Capabilities")).toObject();
-  CHECK_FALSE(caps.value(QStringLiteral("SupportsMediaControl")).toBool());
+  CHECK(caps.value(QStringLiteral("SupportsMediaControl")).toBool());
+  CHECK(caps.value(QStringLiteral("SupportedCommands")).toArray().contains(QStringLiteral("DisplayMessage")));
   CHECK(caps.value(QStringLiteral("PlayableMediaTypes")).toArray().size() == 2);
   if (isFork()) CHECK(caps.value(QStringLiteral("SupportsSyncPlayPlaybackRate")).toBool());
 }

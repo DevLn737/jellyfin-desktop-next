@@ -30,11 +30,13 @@ namespace jfd::api {
   // sends all of it again after every reconnect.
   struct SessionCapabilities {
     QStringList playableMediaTypes{QStringLiteral("Audio"), QStringLiteral("Video")};
+    // The GeneralCommand names the client carries out, and whether other
+    // clients may control it ("Play on"). The app fills both from its remote
+    // control (jfd::remote), which handles the server's Play, Playstate and
+    // GeneralCommand messages, and clears them when the user turns remote
+    // control off.
     QStringList supportedCommands;
-    // Off until the client handles the server's Play, Playstate and
-    // GeneralCommand messages; otherwise "Play on" from other clients would
-    // silently do nothing.
-    bool supportsMediaControl = false;
+    bool supportsMediaControl = true;
     // Advertise only when the player really applies group rates.
     bool supportsSyncPlayPlaybackRate = false;
     QJsonObject deviceProfile;

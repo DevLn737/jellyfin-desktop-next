@@ -85,6 +85,11 @@ namespace jfd::session {
     // Creates a group and starts it on this item ("Watch together").
     Q_INVOKABLE void watchTogether(const QString& itemId, const QString& groupName,
                                    qint64 startTicks = 0);
+    // In a group: replaces the group's queue with these items and starts
+    // the one at startIndex (remote control's Play). Does nothing outside one.
+    void playInGroup(const QStringList& itemIds, int startIndex, qint64 startTicks);
+    // In a group: adds the items after the playing one (next) or at the end.
+    void queueInGroup(const QStringList& itemIds, bool next);
     Q_INVOKABLE void setRate(double rate);
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();

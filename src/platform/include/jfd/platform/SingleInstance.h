@@ -28,13 +28,15 @@ namespace jfd::platform {
     bool start(const QStringList& arguments, int timeoutMs = 2000);
     bool isPrimary() const;
     QString serverName() const { return m_name; }
+    // Hands the arguments to a running primary without ever becoming one
+    // (`--command`). False when no instance answered in time.
+    bool sendToPrimary(const QStringList& arguments, int timeoutMs = 2000);
 
   Q_SIGNALS:
     // Another start of the application; raise the window and handle arguments.
     void activated(const QStringList& arguments);
 
   private:
-    bool sendToPrimary(const QStringList& arguments, int timeoutMs);
     void acceptConnections();
 
     QString m_name;

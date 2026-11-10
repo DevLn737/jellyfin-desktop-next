@@ -102,6 +102,14 @@ namespace jfd::api {
         context, std::move(done));
   }
 
+  void SyncPlayApi::queue(const QStringList& itemIds, bool next, QObject* context, Callback<Empty> done) {
+    m_client.sendNoContent(
+        Method::Post, QStringLiteral("SyncPlay/Queue"), {},
+        body({{QStringLiteral("ItemIds"), QJsonArray::fromStringList(itemIds)},
+              {QStringLiteral("Mode"), next ? QStringLiteral("QueueNext") : QStringLiteral("Queue")}}),
+        context, std::move(done));
+  }
+
   void SyncPlayApi::setPlaylistItem(const QString& playlistItemId, QObject* context,
                                     Callback<Empty> done) {
     m_client.sendNoContent(Method::Post, QStringLiteral("SyncPlay/SetPlaylistItem"), {},

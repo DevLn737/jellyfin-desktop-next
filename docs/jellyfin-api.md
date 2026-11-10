@@ -12,7 +12,7 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `JellyfinClient.h` (library) | Libraries (`UserViews`), "Continue watching" (`UserItems/Resume`), "Next up" (`Shows/NextUp`), latest per library (`Items/Latest`), filtered and sorted pages, filter values (`Items/Filters`), similar items, people (`Persons`), favorites, image URLs, item details with trickplay, media segments, trickplay tile URLs and authorized fetches |
 | `ServerDiscovery.h` | Servers on the local network (UDP broadcast to port 7359) |
 | `SessionSocket.h` | The `/socket` connection: keep-alives, reconnect with backoff, capabilities re-reported on every connect, raw `SyncPlayCommand` and `SyncPlayGroupUpdate` |
-| `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, and `GetUtcTime` samples |
+| `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, `Queue` (next or last), and `GetUtcTime` samples |
 | `Playback.h` | `PlaybackInfo` to mpv URLs (direct play, static stream, transcode), external subtitles and audio, mpv track ids, report bodies |
 | `DeviceProfile.h` | The 2.x client's device profile and its options |
 | `ServerTime.h` | ISO 8601 with seven fractional digits to and from `core::ServerInstant` |
@@ -56,6 +56,49 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
   its own requests, such as the `syncplay` group client's `Transport`: it
   passes the status and body of any answer through (the 409 included) and
   reports status 0 when no answer arrived.
+
+## Remote control (`src/remote`)
+
+Module `remote` (`jfd::remote`, Qt Core) reads the session messages other
+clients of the same user send through the server ("Play on" in Jellyfin Web
+and the phone apps) and carries them out through `RemoteActions`, which
+`src/desktop/RemoteInstall.cpp` connects to the player, the music player, the
+group model, the navigator and the shell. It has no screens and does not
+depend on `ui/*`.
+
+What arrives on `/socket` (`SessionSocket::messageReceived`), and what the
+client does with it:
+
+| `MessageType` | `Data` fields | Done here |
+| --- | --- | --- |
+| `Play` | `ItemIds`, `StartIndex`, `StartPositionTicks`, `PlayCommand` (`PlayNow`, `PlayNext`, `PlayLast`, `PlayShuffle`, `PlayInstantMix`), `MediaSourceId`, `AudioStreamIndex`, `SubtitleStreamIndex`, `ControllingUserId` | Outside a group: tracks go to the music queue (`PlayNext`/`PlayLast` queue them while music plays); anything else plays alone in the player (`PlayNext`/`PlayLast` of a video while one plays are ignored). In a group: `PlayNow`/`PlayShuffle` replace the group's queue (`SyncPlay/SetNewQueue`), `PlayNext`/`PlayLast` add to it (`SyncPlay/Queue`). `PlayInstantMix` is ignored. Media source and stream choices are read but the player chooses its own |
+| `Playstate` | `Command` (`Stop`, `Pause`, `Unpause`, `PlayPause`, `NextTrack`, `PreviousTrack`, `Seek`, `Rewind`, `FastForward`), `SeekPositionTicks` | All of them, through `integrations::commandInput` and the session's `post`, as the system media controls do, so in a group they are requests to the group. `Rewind` and `FastForward` step 10 s back and 30 s forward |
+| `GeneralCommand` | `Name`, `Arguments` (strings) | Only the names in `SupportedCommands` (below); the parser knows every `GeneralCommandType` and logs the others as ignored |
+
+`SupportedCommands` (`RemoteControl::supportedCommands()`) comes from the
+same table that runs the commands, so a name is advertised exactly when its
+action is connected: `SetVolume`, `VolumeUp`, `VolumeDown`, `Mute`, `Unmute`,
+`ToggleMute`, `SetAudioStreamIndex`, `SetSubtitleStreamIndex`,
+`DisplayMessage` (a toast), `ToggleFullscreen`, `GoHome`, `GoToSearch`,
+`GoToSettings`, `SetRepeatMode`, `SetShuffleQueue` (music),
+`SetMaxStreamingBitrate`. Navigation (`MoveUp` ... `Back`) and `SendString`
+are handled by the table too, but are not advertised until the shell's input
+router (stage 3, package 3.3) connects them. Never advertised: `SendKey`,
+`PageUp`, `PageDown`, letters, `ToggleOsd`, `ToggleContextMenu`,
+`TakeScreenshot`, `DisplayContent`, channels and `Guide`, `ToggleStats`,
+`PlayMediaSource`, `PlayTrailers`, `SetPlaybackOrder`.
+
+The setting `remote/allowServerControl` (Settings > Remote control, on by
+default as in Jellyfin Web) turns it off: the capabilities are reported
+again with `SupportsMediaControl: false` and no commands, and messages that
+still arrive are ignored. The second start's `--command`
+([integrations-api.md](integrations-api.md)) goes through the same
+`RemoteControl` and works either way.
+
+Tests: `jfd_remote_tests` (fake server messages, a fake socket server, the
+second start over `SingleInstance`); `jfd_remote_server_tests` sends `Play`,
+`Playstate`, `GeneralCommand` and `Message` from a second session of the
+test user through the 12.2 server and checks each is carried out within 1 s.
 
 Tests: `jfd_api_tests`, `jfd_library_tests`, `jfd_platform_tests` run offline
 against an in-process fake server; `jfd_server_tests` runs against Jellyfin
