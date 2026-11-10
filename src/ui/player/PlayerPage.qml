@@ -491,6 +491,8 @@ RoutePage {
                 width: parent.width
                 from: 0
                 to: Math.max(page.player.duration, 1)
+                // A live channel has no timeline.
+                visible: !page.player.live
                 stepSize: 10
                 focusPolicy: Qt.TabFocus
                 // Follows playback except while dragged.
@@ -567,10 +569,12 @@ RoutePage {
                     }
                     Text {
                         id: timeText
+                        objectName: "timeText"
                         anchors.verticalCenter: parent.verticalCenter
                         // Hidden when the right-hand buttons need the room.
                         visible: rightControls.x - timeText.x >= implicitWidth + Theme.spacing
-                        text: page.clock(timeline.value) + " / " + page.clock(page.player.duration)
+                        text: page.player.live ? qsTr("Live")
+                                               : page.clock(timeline.value) + " / " + page.clock(page.player.duration)
                         color: Overlay.text
                         font.pixelSize: Theme.fontSizeBody
                     }

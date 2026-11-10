@@ -3,9 +3,11 @@
 # shared stand's item and track counts (stock-server.sh): a movie with an
 # external audio file, a two-episode show, a small music library (two
 # artists, three albums, one of them a continuous tone cut into tracks for
-# measuring gaps), and media segments (intro, credits) from a test
-# provider plugin (segments-plugin/). Prints the environment for the extras
-# tests. Never point this at a real server.
+# measuring gaps), media segments (intro, credits) from a test
+# provider plugin (segments-plugin/), and Live TV: an M3U tuner of 50
+# channels served from inside the container (livetv/tuner.pl) with an XMLTV
+# guide of 24 hours (livetv/make-guide.sh). Prints the environment for the
+# extras tests. Never point this at a real server.
 #
 #   scripts/test-server/extras-server.sh up      # start and print env
 #   scripts/test-server/extras-server.sh down    # remove the container
@@ -20,6 +22,9 @@ URL="http://127.0.0.1:${PORT}"
 DOCKER="${DOCKER:-docker}"
 AUTH='MediaBrowser Client="jfd-test-setup", Device="ci", DeviceId="jfd-extras-setup", Version="0.0.1"'
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# The Live TV tuner's port inside the container; not published.
+TUNER_PORT=18080
+CHANNELS=50
 
 log() { echo "[extras-server] $*" >&2; }
 
@@ -128,6 +133,48 @@ make_music() {
   '
 }
 
+make_livetv() {
+  # Two ten-minute MPEG-TS streams (H.264 and AAC, as IPTV sends them) with
+  # their length beside them for the tuner's pacing, the playlist and the
+  # guide, and the tuner itself, all inside the container.
+  $DOCKER exec "$NAME" bash -euc '
+    ff=/usr/lib/jellyfin-ffmpeg/ffmpeg
+    dir=/media/livetv
+    mkdir -p "$dir"
+    for n in 1 2; do
+      $ff -loglevel error -y -f lavfi -i "testsrc2=size=320x180:rate=25" \
+        -f lavfi -i "sine=frequency=$((400 * n)):sample_rate=48000" -t 600 \
+        -c:v libx264 -preset ultrafast -g 25 -b:v 150k -c:a aac -b:a 64k -f mpegts "$dir/stream-$n.ts"
+      echo 600 > "$dir/stream-$n.ts.seconds"
+    done
+  '
+  local guide
+  guide="$(mktemp -d)"
+  "$HERE/livetv/make-guide.sh" "$guide" "$TUNER_PORT" "$CHANNELS"
+  $DOCKER cp "$guide/." "$NAME:/media/livetv/" >/dev/null
+  rm -rf "$guide"
+  $DOCKER cp "$HERE/livetv/tuner.pl" "$NAME:/media/livetv/tuner.pl" >/dev/null
+  $DOCKER exec -d "$NAME" perl /media/livetv/tuner.pl "$TUNER_PORT" /media/livetv
+  wait_for "the test tuner" 30 $DOCKER exec "$NAME" curl -fsS -I "http://127.0.0.1:$TUNER_PORT/stream-1/channel-1.ts"
+}
+
+setup_livetv() {
+  local token="$1"
+  log "adding the M3U tuner and the XMLTV guide"
+  api POST /LiveTv/TunerHosts \
+    '{"Type":"m3u","Url":"/media/livetv/channels.m3u","FriendlyName":"JFD Test M3U","TunerCount":0,"ImportFavoritesOnly":false,"AllowHWTranscoding":false,"AllowFmp4TranscodingContainer":false,"AllowStreamSharing":true,"EnableStreamLooping":false,"IgnoreDts":true}' \
+    "$token" >/dev/null
+  api POST "/LiveTv/ListingProviders?validateListings=false&validateLogin=false" \
+    '{"Type":"xmltv","Path":"/media/livetv/guide.xml","EnableAllTuners":true}' "$token" >/dev/null
+  local task
+  task=$(api GET /ScheduledTasks '' "$token" | jq -r '.[] | select(.Key == "RefreshGuide") | .Id')
+  api POST "/ScheduledTasks/Running/$task" '' "$token" >/dev/null
+  wait_for "the channels" 180 bash -c \
+    "[[ \$(curl -fsS '$URL/LiveTv/Channels?limit=1' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge $CHANNELS ]]"
+  wait_for "the guide" 180 bash -c \
+    "[[ \$(curl -fsS '$URL/LiveTv/Programs?limit=1' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge $(( CHANNELS * 40 )) ]]"
+}
+
 up() {
   $DOCKER rm -f "$NAME" >/dev/null 2>&1 || true
   log "building the segment provider"
@@ -143,6 +190,7 @@ up() {
   make_media
   make_show
   make_music
+  make_livetv
 
   log "completing the startup wizard"
   wait_for "the startup wizard" 60 api GET /Startup/User
@@ -187,12 +235,14 @@ up() {
     "[[ \$(curl -fsS '$URL/Items/$id/PlaybackInfo' -X POST -H 'Content-Type: application/json' -d '{}' -H 'Authorization: $AUTH, Token=\"$token\"' | jq '[.MediaSources[0].MediaStreams[] | select(.Type == \"Audio\")] | length') -ge 2 ]]"
   wait_for "the external subtitles" 60 bash -c \
     "[[ \$(curl -fsS '$URL/Items/$id/PlaybackInfo' -X POST -H 'Content-Type: application/json' -d '{}' -H 'Authorization: $AUTH, Token=\"$token\"' | jq '[.MediaSources[0].MediaStreams[] | select(.Type == \"Subtitle\" and .IsExternal)] | length') -ge 2 ]]"
+  setup_livetv "$token"
   api POST /Sessions/Logout '' "$token" >/dev/null || true
 
   log "ready"
   echo "JFD_EXTRAS_SERVER_URL=$URL"
   echo "JFD_EXTRAS_USER=$USER_NAME"
   echo "JFD_EXTRAS_PASSWORD=$PASSWORD"
+  echo "JFD_EXTRAS_LIVETV_CHANNELS=$CHANNELS"
 }
 
 down() { $DOCKER rm -f "$NAME" >/dev/null 2>&1 || true; }

@@ -100,7 +100,7 @@ namespace {
 
     // What the launcher emits once the server resolved the item, then the
     // intent it posts.
-    void open() {
+    void open(bool live = false) {
       session::PlaybackLauncher::Request request;
       request.itemId = QStringLiteral("episode");
       api::MediaSource source;
@@ -113,6 +113,13 @@ namespace {
       played.method = api::PlayMethod::DirectPlay;
       played.itemId = request.itemId;
       played.mediaSourceId = source.id;
+      if (live) {
+        // A Live TV channel (PlaybackLauncher marks it from the source).
+        played.isLive = true;
+        played.liveStreamId = QStringLiteral("live-1");
+        source.liveStreamId = played.liveStreamId;
+        source.isInfiniteStream = true;
+      }
       api::ExternalTrack subtitle;
       subtitle.streamIndex = 0;
       subtitle.url = QUrl(QStringLiteral("https://srv/Subtitles/0/Stream.srt"));
@@ -349,4 +356,26 @@ TEST_CASE("Picture in picture keeps the file playing; its window is small, frame
   CHECK(f.player->pip());
   f.player->stop();
   CHECK_FALSE(f.player->pip());
+}
+
+TEST_CASE("A live channel shows no timeline, no end time and cannot be sought") {
+  Fixture f;
+  f.open(true);
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  CHECK(f.player->live());
+  // The backend's duration (what mpv buffered) is not shown as the end.
+  CHECK(f.player->duration() == doctest::Approx(0.0));
+  CHECK_FALSE(f.page->property("hasEnd").toBool());
+  QQuickItem* timeline = find(f.page, "timeline");
+  REQUIRE(timeline != nullptr);
+  CHECK_FALSE(timeline->isVisible());
+  QQuickItem* time = find(f.page, "timeText");
+  REQUIRE(time != nullptr);
+  CHECK(time->property("text").toString() == QStringLiteral("Live"));
+  const double before = f.player->position();
+  f.player->seek(before + 120);
+  QTest::qWait(200);
+  CHECK(f.player->position() < before + 60);
+  f.player->stop();
+  REQUIRE(waitFor([&] { return !f.player->active() || f.player->ended(); }, 2000));
 }

@@ -153,6 +153,10 @@
         <source>Fullscreen</source>
         <translation>Во весь экран</translation>
     </message>
+    <message>
+        <source>Live</source>
+        <translation>Прямой эфир</translation>
+    </message>
 </context>
 <context>
     <name>SegmentsMenu</name>

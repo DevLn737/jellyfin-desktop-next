@@ -20,6 +20,12 @@ namespace jfd::ui {
       return options;
     }
 
+    library::LiveTvChannels::Options liveTvOptions(qreal ratio) {
+      library::LiveTvChannels::Options options;
+      options.devicePixelRatio = ratio;
+      return options;
+    }
+
     QUrl page(const char* name) {
       return QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Library/%1.qml").arg(QLatin1String(name)));
     }
@@ -32,7 +38,8 @@ namespace jfd::ui {
         m_servers(config.serversFile), m_client(config.identity), m_socket(m_client),
         m_images(m_client, config.imageDirectory), m_signIn(m_client, m_servers, *m_tokens),
         m_home(m_client, homeOptions(config.devicePixelRatio)),
-        m_search(m_client, searchOptions(config.devicePixelRatio)), m_collections(m_client),
+        m_search(m_client, searchOptions(config.devicePixelRatio)),
+        m_liveTv(m_client, liveTvOptions(config.devicePixelRatio)), m_collections(m_client),
         m_readFilters(std::move(config.readFilters)),
         m_writeFilters(std::move(config.writeFilters)),
         m_textures(std::make_shared<TextureBudget>(config.textureBytes)) {
@@ -64,6 +71,7 @@ namespace jfd::ui {
     services.signIn = &m_signIn;
     services.home = &m_home;
     services.search = &m_search;
+    services.liveTv = &m_liveTv;
     services.updates = &m_updates;
     services.collections = &m_collections;
     services.readFilters = m_readFilters;
@@ -89,15 +97,33 @@ namespace jfd::ui {
     navigator.registerPage(QStringLiteral("search"), page("SearchPage"));
     navigator.registerPage(QStringLiteral("customizeHome"), page("CustomizeHomePage"));
 
+    // Live TV: listed only when the server has it for this user.
+    RouteSpec liveTv;
+    liveTv.name = QStringLiteral("livetv");
+    liveTv.page = page("LiveTvPage");
+    liveTv.hasSidebarEntry = true;
+    liveTv.sidebar.icon = QStringLiteral("qrc:/qt/qml/Jfd/Ui/Library/icons/livetv.svg");
+    liveTv.sidebar.text = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Live TV"));
+    liveTv.sidebar.translationContext = "Sidebar";
+    liveTv.sidebar.order = 160;
+    navigator.registerRoute(liveTv);
+    navigator.setRouteAvailable(liveTv.name, m_liveTv.available());
+    QObject::connect(&m_liveTv, &library::LiveTvChannels::availableChanged, &navigator,
+                     [this, &navigator] {
+                       navigator.setRouteAvailable(QStringLiteral("livetv"), m_liveTv.available());
+                     });
+
     QObject::connect(&m_signIn, &library::SignIn::signedIn, &navigator, [this, &navigator] {
       m_collections.invalidate();
       m_socket.start();
+      m_liveTv.checkAvailable();
       navigator.reset(QStringLiteral("home"));
     });
     QObject::connect(&m_signIn, &library::SignIn::signedOut, &navigator, [this, &navigator] {
       m_socket.stop();
       m_collections.invalidate();
       m_home.resetSession();
+      m_liveTv.clear();
       navigator.reset(QStringLiteral("login"));
     });
     return true;

@@ -103,15 +103,19 @@ namespace jfd::api {
     stream.itemId = itemId;
     stream.mediaSourceId = source.id;
     stream.playSessionId = info.playSessionId;
+    stream.liveStreamId = source.liveStreamId;
+    stream.isLive = source.isLive();
 
     const bool needsHeaders = !source.requiredHttpHeaders.isEmpty();
-    if (source.supportsDirectPlay && source.protocol == QLatin1String("Http") && !needsHeaders &&
-        isHttpUrl(source.path)) {
+    // A live source's own protocol is the tuner's: the server streams it.
+    const bool throughServer = stream.isLive && (source.supportsDirectStream || source.supportsDirectPlay);
+    if (!stream.isLive && source.supportsDirectPlay && source.protocol == QLatin1String("Http") &&
+        !needsHeaders && isHttpUrl(source.path)) {
       // A remote source the server only points at; mpv fetches it itself.
       stream.url = QUrl(source.path);
       stream.method = PlayMethod::DirectPlay;
-    } else if ((source.supportsDirectPlay || source.supportsDirectStream) &&
-               source.protocol != QLatin1String("Http")) {
+    } else if (throughServer || ((source.supportsDirectPlay || source.supportsDirectStream) &&
+                                 source.protocol != QLatin1String("Http"))) {
       QString path = QStringLiteral("/Videos/%1/stream").arg(percent(itemId));
       const QString container = source.container.section(QLatin1Char(','), 0, 0).trimmed();
       if (!container.isEmpty()) path += QLatin1Char('.') + percent(container);
@@ -124,9 +128,13 @@ namespace jfd::api {
       if (!info.playSessionId.isEmpty())
         query.addQueryItem(QStringLiteral("PlaySessionId"), info.playSessionId);
       if (!source.eTag.isEmpty()) query.addQueryItem(QStringLiteral("Tag"), source.eTag);
+      if (!source.liveStreamId.isEmpty())
+        query.addQueryItem(QStringLiteral("LiveStreamId"), source.liveStreamId);
       url.setQuery(query);
       stream.url = withApiKey(url, context.accessToken);
-      stream.method = source.supportsDirectPlay ? PlayMethod::DirectPlay : PlayMethod::DirectStream;
+      // The server remuxes a live source: never a direct play of a file.
+      stream.method = source.supportsDirectPlay && !stream.isLive ? PlayMethod::DirectPlay
+                                                                  : PlayMethod::DirectStream;
     } else if (source.supportsTranscoding && !source.transcodingUrl.isEmpty()) {
       // TranscodingUrl already carries the server's ApiKey and session.
       stream.url = withApiKey(resolveOnServer(context.serverUrl, source.transcodingUrl),
@@ -211,7 +219,8 @@ namespace jfd::api {
                        {QStringLiteral("VolumeLevel"), p.volumeLevel},
                        {QStringLiteral("PlayMethod"), playMethodName(p.playMethod)},
                        {QStringLiteral("PlaybackRate"), p.playbackRate},
-                       {QStringLiteral("CanSeek"), true}};
+                       {QStringLiteral("CanSeek"), p.canSeek}};
+      if (!p.liveStreamId.isEmpty()) body.insert(QStringLiteral("LiveStreamId"), p.liveStreamId);
       if (p.audioStreamIndex) body.insert(QStringLiteral("AudioStreamIndex"), *p.audioStreamIndex);
       if (p.subtitleStreamIndex)
         body.insert(QStringLiteral("SubtitleStreamIndex"), *p.subtitleStreamIndex);
@@ -229,11 +238,14 @@ namespace jfd::api {
   }
 
   QJsonObject playbackStoppedBody(const PlaybackProgress& p, bool failed) {
-    return QJsonObject{{QStringLiteral("ItemId"), p.itemId},
-                       {QStringLiteral("MediaSourceId"), p.mediaSourceId},
-                       {QStringLiteral("PlaySessionId"), p.playSessionId},
-                       {QStringLiteral("PositionTicks"), static_cast<double>(p.positionTicks)},
-                       {QStringLiteral("Failed"), failed}};
+    QJsonObject body{{QStringLiteral("ItemId"), p.itemId},
+                     {QStringLiteral("MediaSourceId"), p.mediaSourceId},
+                     {QStringLiteral("PlaySessionId"), p.playSessionId},
+                     {QStringLiteral("PositionTicks"), static_cast<double>(p.positionTicks)},
+                     {QStringLiteral("Failed"), failed}};
+    // The server closes the live stream when Stopped names it.
+    if (!p.liveStreamId.isEmpty()) body.insert(QStringLiteral("LiveStreamId"), p.liveStreamId);
+    return body;
   }
 
 } // namespace jfd::api

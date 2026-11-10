@@ -110,6 +110,8 @@ namespace jfd::ui {
   QString PlayerModel::title() const { return QString::fromStdString(m_snapshot.title); }
 
   double PlayerModel::duration() const {
+    // mpv reports what it has buffered of a live stream as its duration.
+    if (live()) return 0.0;
     return m_snapshot.duration ? m_snapshot.duration->seconds() : 0.0;
   }
 
@@ -171,7 +173,7 @@ namespace jfd::ui {
   }
 
   void PlayerModel::seek(double seconds) {
-    if (!m_current) return;
+    if (!m_current || live()) return;
     const double clamped = std::max(0.0, duration() > 0 ? std::min(seconds, duration()) : seconds);
     if (const auto position =
             core::MediaTicks::fromTicks(static_cast<std::int64_t>(clamped * TicksPerSecond)))

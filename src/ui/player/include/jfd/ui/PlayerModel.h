@@ -62,6 +62,9 @@ namespace jfd::ui {
     Q_PROPERTY(qint64 maxBitrate READ maxBitrate WRITE setMaxBitrate NOTIFY maxBitrateChanged)
     // How the file plays: "DirectPlay", "DirectStream" or "Transcode".
     Q_PROPERTY(QString playMethod READ playMethod NOTIFY tracksChanged)
+    // A Live TV channel: no end and no seeking, so `duration` is 0 and the
+    // page shows no timeline and no "ends at".
+    Q_PROPERTY(bool live READ live NOTIFY tracksChanged)
     Q_PROPERTY(bool inGroup READ inGroup NOTIFY stateChanged)
     Q_PROPERTY(QVariantList audioTracks READ audioTracks NOTIFY tracksChanged)
     Q_PROPERTY(QVariantList subtitleTracks READ subtitleTracks NOTIFY tracksChanged)
@@ -123,6 +126,7 @@ namespace jfd::ui {
     // Reopens the playing file at the same position under the new limit.
     void setMaxBitrate(qint64 bitsPerSecond);
     QString playMethod() const;
+    bool live() const { return m_current && m_current->stream.isLive; }
     // What the device profile allows (the transcoding settings); applies to
     // files opened from now on.
     void setProfileOptions(const api::DeviceProfileOptions& options);

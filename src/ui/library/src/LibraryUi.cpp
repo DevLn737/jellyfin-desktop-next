@@ -45,6 +45,11 @@ namespace jfd::ui {
     Q_EMIT handlersChanged();
   }
 
+  void LibraryUi::setChannelHandler(std::function<void(const QString&)> handler) {
+    m_channel = std::move(handler);
+    Q_EMIT handlersChanged();
+  }
+
   library::LibraryModel* LibraryUi::newModel(QObject* owner) const {
     library::LibraryModel::Options options;
     options.devicePixelRatio = m_services.devicePixelRatio;
@@ -142,10 +147,15 @@ namespace jfd::ui {
     if (type == QLatin1String("MusicArtist")) return QStringLiteral("artist/") + itemId;
     if (type == QLatin1String("Playlist")) return QStringLiteral("playlist/") + itemId;
     if (type == QLatin1String("Person")) return QStringLiteral("person/") + itemId;
+    if (type == QLatin1String("TvChannel") || type == QLatin1String("LiveTvChannel"))
+      return QStringLiteral("livetv");
     if (type == QLatin1String("CollectionFolder") || type == QLatin1String("UserView") ||
         type == QLatin1String("Folder")) {
       // Music libraries have screens of their own (src/ui/music).
-      if (collectionTypeOf(itemId) == QLatin1String("music")) return QStringLiteral("music");
+      const QString collectionType = collectionTypeOf(itemId);
+      if (collectionType == QLatin1String("music")) return QStringLiteral("music");
+      // The Live TV library is the channel list.
+      if (collectionType == QLatin1String("livetv")) return QStringLiteral("livetv");
       return QStringLiteral("library/") + itemId;
     }
     // A Seerr title (id like "movie:603"), added to the home screen by the
@@ -186,6 +196,16 @@ namespace jfd::ui {
       return;
     }
     m_play(itemId, startPositionTicks);
+  }
+
+  void LibraryUi::playChannel(const QString& channelId) {
+    if (channelId.isEmpty()) return;
+    if (!m_channel) {
+      qCInfo(lcLibraryUi) << "Channel" << channelId << "with no player installed";
+      Q_EMIT message(tr("Playback is not available in this build yet."), false);
+      return;
+    }
+    m_channel(channelId);
   }
 
   void LibraryUi::watchTogether(const QString& itemId, const QString& name,

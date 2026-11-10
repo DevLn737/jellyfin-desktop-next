@@ -563,6 +563,12 @@ namespace jfd::desktop {
         model.play(itemId, startTicks);
         navigator.navigate(QStringLiteral("player"));
       });
+      // Live TV: on this device only, even in a group (no shared position
+      // in a live stream; brief 3.7).
+      services.libraryUi->setChannelHandler([&model, &navigator](const QString& channelId) {
+        model.play(channelId, 0);
+        navigator.navigate(QStringLiteral("player"));
+      });
     }
   }
 

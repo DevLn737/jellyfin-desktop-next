@@ -108,6 +108,7 @@ if(TARGET jfd_jellyfin_api)
     jellyfin-api/ClientTest.cpp
     jellyfin-api/LibraryApiTest.cpp
     jellyfin-api/MusicApiTest.cpp
+    jellyfin-api/LiveTvApiTest.cpp
     jellyfin-api/SessionSocketTest.cpp)
   target_link_libraries(jfd_api_tests PRIVATE jfd::jellyfin_api)
 
@@ -119,6 +120,7 @@ if(TARGET jfd_jellyfin_api)
     library/LibraryModelTest.cpp
     library/DetailsSearchTest.cpp
     library/ImageCacheTest.cpp
+    library/LiveTvChannelsTest.cpp
     library/SignInTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
 
@@ -207,8 +209,14 @@ if(TARGET jfd_jellyfin_api)
     # The session runtime in a live group, on a virtual backend.
     jfd_add_qt_test(jfd_session_server_tests session/SessionRuntimeServerTest.cpp)
     target_link_libraries(jfd_session_server_tests PRIVATE jfd::session_runtime)
+    # Live TV on the extras stand (M3U tuner, XMLTV guide); skipped without it.
+    jfd_add_qt_test(jfd_livetv_server_tests server/LiveTvServerTest.cpp)
+    target_link_libraries(jfd_livetv_server_tests PRIVATE jfd::jellyfin_api jfd::library)
+
     # One live server: these tests do not run at the same time as each other.
-    set_tests_properties(jfd_server_tests jfd_session_server_tests PROPERTIES RESOURCE_LOCK jellyfin_server)
+    set_tests_properties(jfd_server_tests jfd_session_server_tests jfd_livetv_server_tests
+      PROPERTIES RESOURCE_LOCK jellyfin_server)
+    set_tests_properties(jfd_livetv_server_tests PROPERTIES TIMEOUT 120)
     set_tests_properties(jfd_session_server_tests PROPERTIES TIMEOUT 300)
   endif()
 endif()

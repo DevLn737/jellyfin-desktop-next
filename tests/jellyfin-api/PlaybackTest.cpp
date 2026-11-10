@@ -202,3 +202,86 @@ TEST_CASE("Item parsing tolerates missing optional fields and rejects a missing 
   CHECK_FALSE(json::item(QJsonDocument::fromJson(R"({"Name": "x"})").object()));
   CHECK_FALSE(json::itemPage(QJsonDocument::fromJson(R"({"TotalRecordCount": 1})").object()));
 }
+
+namespace {
+  // A Live TV channel's PlaybackInfo with AutoOpenLiveStream, as the 12.2
+  // extras stand answers it for an M3U channel: the opened stream sits on
+  // the server's internal address, with a User-Agent the tuner wants.
+  const char* LiveInfoJson = R"({
+    "MediaSources": [{
+      "Protocol": "Http", "Id": "live-src",
+      "Path": "http://172.17.0.2:8096/LiveTv/LiveStreamFiles/d9cd/stream.ts",
+      "Container": "ts", "IsRemote": false, "IgnoreDts": true,
+      "SupportsTranscoding": true, "SupportsDirectStream": true, "SupportsDirectPlay": true,
+      "IsInfiniteStream": true, "RequiresOpening": true, "RequiresClosing": true,
+      "LiveStreamId": "tuner_channel_live-src",
+      "RequiredHttpHeaders": {"User-Agent": "Mozilla/5.0"},
+      "TranscodingSubProtocol": "http", "DefaultAudioStreamIndex": -1,
+      "MediaStreams": [
+        {"Index": 0, "Type": "Video", "Codec": "h264"},
+        {"Index": 1, "Type": "Audio", "Codec": "aac"}
+      ]
+    }],
+    "PlaySessionId": "ps-live"
+  })";
+} // namespace
+
+TEST_CASE("A live channel streams through the server with its LiveStreamId") {
+  const PlaybackInfo info = parseInfo(LiveInfoJson);
+  const MediaSource& source = info.mediaSources.front();
+  CHECK(source.liveStreamId == QStringLiteral("tuner_channel_live-src"));
+  CHECK(source.isInfiniteStream);
+  CHECK(source.isLive());
+  CHECK_FALSE(source.runTimeTicks);
+
+  auto stream = resolvePlaybackStream(context(), QStringLiteral("channel1"), info, source);
+  REQUIRE(stream);
+  // Never the tuner's (or the server's internal) address, headers or not.
+  CHECK(stream->url.host() == QStringLiteral("media.example.org"));
+  CHECK(stream->url.path() == QStringLiteral("/jellyfin/Videos/channel1/stream.ts"));
+  CHECK(stream->method == PlayMethod::DirectStream);
+  CHECK(stream->isLive);
+  CHECK(stream->liveStreamId == QStringLiteral("tuner_channel_live-src"));
+  const QUrlQuery query(stream->url);
+  CHECK(query.queryItemValue(QStringLiteral("Static")) == QStringLiteral("true"));
+  CHECK(query.queryItemValue(QStringLiteral("MediaSourceId")) == QStringLiteral("live-src"));
+  CHECK(query.queryItemValue(QStringLiteral("LiveStreamId")) == QStringLiteral("tuner_channel_live-src"));
+  CHECK(query.queryItemValue(QStringLiteral("PlaySessionId")) == QStringLiteral("ps-live"));
+  CHECK(query.queryItemValue(QStringLiteral("ApiKey")) == QStringLiteral("token1"));
+}
+
+TEST_CASE("A live channel without a direct stream uses the server's transcode") {
+  PlaybackInfo info = parseInfo(LiveInfoJson);
+  MediaSource source = info.mediaSources.front();
+  source.supportsDirectPlay = false;
+  source.supportsDirectStream = false;
+  source.transcodingUrl =
+      QStringLiteral("/videos/channel1/master.m3u8?LiveStreamId=tuner_channel_live-src&ApiKey=k");
+  source.transcodingSubProtocol = QStringLiteral("hls");
+  auto stream = resolvePlaybackStream(context(), QStringLiteral("channel1"), info, source);
+  REQUIRE(stream);
+  CHECK(stream->method == PlayMethod::Transcode);
+  CHECK(stream->isHls);
+  CHECK(stream->isLive);
+  CHECK(stream->url.path() == QStringLiteral("/jellyfin/videos/channel1/master.m3u8"));
+}
+
+TEST_CASE("Reports of a live channel name its stream and cannot seek") {
+  PlaybackProgress progress;
+  progress.itemId = QStringLiteral("channel1");
+  progress.liveStreamId = QStringLiteral("tuner_channel_live-src");
+  progress.canSeek = false;
+  const QJsonObject start = playbackStartBody(progress);
+  CHECK(start.value(QStringLiteral("LiveStreamId")).toString() == QStringLiteral("tuner_channel_live-src"));
+  CHECK_FALSE(start.value(QStringLiteral("CanSeek")).toBool());
+  CHECK(playbackProgressBody(progress).value(QStringLiteral("LiveStreamId")).toString() ==
+        QStringLiteral("tuner_channel_live-src"));
+  // The server closes the stream on Stopped when it is named there.
+  CHECK(playbackStoppedBody(progress, false).value(QStringLiteral("LiveStreamId")).toString() ==
+        QStringLiteral("tuner_channel_live-src"));
+
+  PlaybackProgress file;
+  CHECK(playbackStartBody(file).value(QStringLiteral("CanSeek")).toBool());
+  CHECK_FALSE(playbackStartBody(file).contains(QStringLiteral("LiveStreamId")));
+  CHECK_FALSE(playbackStoppedBody(file, false).contains(QStringLiteral("LiveStreamId")));
+}

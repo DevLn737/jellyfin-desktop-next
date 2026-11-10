@@ -83,6 +83,8 @@ namespace jfd::playback {
     m_progress.mediaSourceId = stream.mediaSourceId;
     m_progress.playSessionId = stream.playSessionId;
     m_progress.playMethod = stream.method;
+    m_progress.liveStreamId = stream.liveStreamId;
+    m_progress.canSeek = !stream.isLive;
     m_progress.audioStreamIndex = audioStreamIndex;
     m_progress.subtitleStreamIndex = subtitleStreamIndex;
     m_progress.volumeLevel = volume;
