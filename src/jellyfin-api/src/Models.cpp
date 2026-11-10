@@ -313,6 +313,8 @@ namespace jfd::api::json {
     m.defaultAudioStreamIndex = smallInteger(o, "DefaultAudioStreamIndex");
     m.defaultSubtitleStreamIndex = smallInteger(o, "DefaultSubtitleStreamIndex");
     m.requiredHttpHeaders = o.value(QLatin1String("RequiredHttpHeaders")).toObject();
+    m.liveStreamId = text(o, "LiveStreamId");
+    m.isInfiniteStream = flag(o, "IsInfiniteStream");
     if (m.id.isEmpty()) return invalid(QStringLiteral("Media source has no Id"));
     for (const auto& value : o.value(QLatin1String("MediaStreams")).toArray()) {
       auto stream = mediaStream(value.toObject());

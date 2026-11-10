@@ -308,3 +308,40 @@ TEST_CASE("Quitting with nothing playing does not wait") {
   CHECK(done);
   CHECK(sink.reports.empty());
 }
+
+TEST_CASE("A live channel's reports carry its LiveStreamId to the end and say it cannot seek") {
+  RecordingSink sink;
+  PlaybackReporter reporter{sink};
+  reporter.setProgressInterval(std::chrono::hours(1));
+  core::EpochCounter<core::MediaEpochTag> files;
+  const core::MediaEpoch epoch = files.advance();
+  api::PlaybackStream stream;
+  stream.itemId = QStringLiteral("channel");
+  stream.mediaSourceId = QStringLiteral("source");
+  stream.playSessionId = QStringLiteral("play");
+  stream.liveStreamId = QStringLiteral("live-1");
+  stream.isLive = true;
+  reporter.begin(epoch, stream, std::nullopt, std::nullopt);
+  core::SessionSnapshot snapshot;
+  snapshot.media = epoch;
+  snapshot.phase = PlaybackPhase::Playing;
+  snapshot.position = *core::MediaTicks::fromTicks(Second);
+  reporter.snapshotChanged(snapshot);
+  reporter.end();
+  REQUIRE(sink.events() == QStringList{QStringLiteral("start"), QStringLiteral("stopped")});
+  for (const Report& r : sink.reports) {
+    CHECK(r.progress.liveStreamId == QStringLiteral("live-1"));
+    CHECK_FALSE(r.progress.canSeek);
+  }
+
+  // The next file is not live.
+  const core::MediaEpoch next = files.advance();
+  api::PlaybackStream file;
+  file.itemId = QStringLiteral("movie");
+  reporter.begin(next, file, std::nullopt, std::nullopt);
+  snapshot.media = next;
+  reporter.snapshotChanged(snapshot);
+  REQUIRE(sink.reports.size() == 3);
+  CHECK(sink.reports.back().progress.liveStreamId.isEmpty());
+  CHECK(sink.reports.back().progress.canSeek);
+}

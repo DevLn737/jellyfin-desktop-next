@@ -35,5 +35,16 @@ segment extraction task. It prints `JFD_EXTRAS_SERVER_URL`, `JFD_EXTRAS_USER`
 and `JFD_EXTRAS_PASSWORD`; `jfd_ui_player_server_tests` runs its extras cases
 when they are set and skips them otherwise.
 
+The extras server also has Live TV: an M3U tuner of 50 channels and an XMLTV
+guide of half-hour programmes for 24 hours (`livetv/make-guide.sh`), added
+through `LiveTv/TunerHosts` and `LiveTv/ListingProviders`. The channels are
+two generated ten-minute MPEG-TS streams that `livetv/tuner.pl` (perl-base
+only, which the image has) serves on `127.0.0.1:18080` inside the container,
+at about their own bit rate and over and over, so a channel behaves like an
+IPTV source and never ends during a test. Nothing points outside the
+container. `JFD_EXTRAS_LIVETV_CHANNELS` gives the channel count;
+`jfd_livetv_server_tests` checks Info, the channel list with now and next, a
+channel's stream through the server and the stream closed after Stopped.
+
 Never point these tests at a real server: they create groups, change watched
 state and sign sessions out.

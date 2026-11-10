@@ -56,6 +56,9 @@ namespace jfd::api {
     QString itemId;
     QString mediaSourceId;
     QString playSessionId;
+    // Live TV (MediaSource::isLive): the opened stream, for the reports.
+    QString liveStreamId;
+    bool isLive = false;
     QList<ExternalTrack> externalSubtitles;
     QList<ExternalTrack> externalAudio;
   };
@@ -69,7 +72,11 @@ namespace jfd::api {
   };
 
   // Chooses how to play `source`: direct play of a remote HTTP source, then a
-  // static stream of the original file, then the server's transcode. Media
+  // static stream of the original file, then the server's transcode. A live
+  // source is never played from its own address (the tuner is often only
+  // reachable from the server, and the server would not see the stream in
+  // use): it is streamed through the server with its LiveStreamId, as
+  // Jellyfin Web does, or transcoded. Media
   // URLs carry the token as `ApiKey`, since mpv cannot be given our headers
   // for one origin only; `api_key` is never generated. A source that needs
   // extra HTTP headers is never played directly.
@@ -94,6 +101,10 @@ namespace jfd::api {
     std::optional<int> audioStreamIndex;
     std::optional<int> subtitleStreamIndex;
     double playbackRate = 1.0;
+    // Live TV: the stream's id, so the server knows it in use and closes it
+    // on Stopped. A live stream cannot be sought.
+    QString liveStreamId;
+    bool canSeek = true;
     // "TimeUpdate", "Pause", "Unpause", "AudioTrackChange", ... or empty.
     QString eventName;
   };

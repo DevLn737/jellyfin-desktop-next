@@ -221,6 +221,13 @@ namespace jfd::api {
     // played directly.
     QJsonObject requiredHttpHeaders;
     QList<MediaStream> mediaStreams;
+    // Live TV: the stream PlaybackInfo opened (AutoOpenLiveStream). Reports
+    // name it, and the server closes it when the Stopped report does.
+    QString liveStreamId;
+    // A live channel: no end, no seeking.
+    bool isInfiniteStream = false;
+
+    bool isLive() const { return isInfiniteStream || !liveStreamId.isEmpty(); }
   };
 
   struct PlaybackInfo {

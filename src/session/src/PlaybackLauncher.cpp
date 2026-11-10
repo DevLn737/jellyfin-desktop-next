@@ -116,7 +116,9 @@ namespace jfd::session {
                                       bool preload) {
     const auto start = core::MediaTicks::fromTicks(request.startTicks).value_or(core::MediaTicks{});
     std::optional<core::MediaTicks> runTime;
-    if (source.runTimeTicks) runTime = core::MediaTicks::fromTicks(*source.runTimeTicks);
+    // A live channel has no end, whatever length the tuner guessed.
+    if (source.runTimeTicks && !stream.isLive)
+      runTime = core::MediaTicks::fromTicks(*source.runTimeTicks);
     core::MediaRequest media = playback::mediaRequest(
         stream, item.mediaType == QLatin1String("Audio"), start, runTime, request.startPaused);
     media.playlistItem = request.playlistItem;
