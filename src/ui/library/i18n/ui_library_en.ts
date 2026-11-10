@@ -22,6 +22,16 @@
     </message>
 </context>
 <context>
+    <name>LiveTvPage</name>
+    <message numerus="yes">
+        <source>%n channel(s)</source>
+        <translation>
+            <numerusform>%n channel</numerusform>
+            <numerusform>%n channels</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>PersonPage</name>
     <message numerus="yes">
         <source>%n title(s)</source>

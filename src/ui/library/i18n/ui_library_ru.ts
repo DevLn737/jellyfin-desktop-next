@@ -246,6 +246,41 @@
     </message>
 </context>
 <context>
+    <name>LiveTvPage</name>
+    <message>
+        <source>Live TV</source>
+        <translation>Эфир</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n channel(s)</source>
+        <translation>
+            <numerusform>%n канал</numerusform>
+            <numerusform>%n канала</numerusform>
+            <numerusform>%n каналов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>The server has no Live TV channels for you.</source>
+        <translation>На сервере нет телеканалов, доступных вам.</translation>
+    </message>
+    <message>
+        <source>%1, now: %2</source>
+        <translation>%1, сейчас: %2</translation>
+    </message>
+    <message>
+        <source>%1–%2  %3</source>
+        <translation>%1–%2  %3</translation>
+    </message>
+    <message>
+        <source>No programme information</source>
+        <translation>Нет данных о передаче</translation>
+    </message>
+    <message>
+        <source>Next at %1: %2</source>
+        <translation>Далее в %1: %2</translation>
+    </message>
+</context>
+<context>
     <name>LoginPage</name>
     <message>
         <source>Sign in</source>
@@ -344,6 +379,13 @@
     <message>
         <source>Films, series, episodes, music, people</source>
         <translation>Фильмы, сериалы, серии, музыка, люди</translation>
+    </message>
+</context>
+<context>
+    <name>Sidebar</name>
+    <message>
+        <source>Live TV</source>
+        <translation>Эфир</translation>
     </message>
 </context>
 <context>

@@ -60,6 +60,7 @@ only reformatted.
 | `src/ui/controls/icons-dark/search.svg` | Material Icons `search` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/settings.svg` | Material Icons `settings` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/up.svg` | Material Icons `keyboard_arrow_up` (dark fill) | Apache-2.0 |
+| `src/ui/library/icons/livetv.svg` | Material Icons `live_tv` | Apache-2.0 |
 | `src/ui/music/icons/expand.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
 | `src/ui/music/icons/more.svg` | Material Icons `more_vert` | Apache-2.0 |
 | `src/ui/music/icons/music.svg` | Material Icons `music_note` | Apache-2.0 |

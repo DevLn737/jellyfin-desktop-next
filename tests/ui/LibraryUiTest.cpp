@@ -127,3 +127,24 @@ TEST_CASE("A track goes to the music player, asking first while a video plays") 
   CHECK(played.size() == 2);
   CHECK(messages.count() == 2);
 }
+
+TEST_CASE("Live TV: channels lead to the channel list and play on this device only") {
+  LibraryUi ui;
+  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) == QStringLiteral("livetv"));
+  CHECK(ui.liveTv() == nullptr);
+
+  QSignalSpy messages(&ui, &LibraryUi::message);
+  ui.playChannel(QStringLiteral("ch"));
+  CHECK(messages.count() == 1);
+
+  // Not through Play, which a group would take over.
+  QString played;
+  ui.setPlayHandler([&](const QString&, qint64) { FAIL("Play is for files"); });
+  ui.setChannelHandler([&](const QString& id) { played = id; });
+  CHECK(ui.canPlayChannels());
+  ui.playChannel(QStringLiteral("ch"));
+  CHECK(played == QStringLiteral("ch"));
+  ui.playChannel(QString());
+  CHECK(played == QStringLiteral("ch"));
+  CHECK(messages.count() == 1);
+}

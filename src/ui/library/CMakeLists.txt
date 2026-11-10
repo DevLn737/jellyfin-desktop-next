@@ -26,9 +26,12 @@ qt_add_qml_module(jfd_ui_library
     ItemCard.qml
     ItemPage.qml
     LibraryPage.qml
+    LiveTvPage.qml
     LoginPage.qml
     PersonPage.qml
     SearchPage.qml
+  RESOURCES
+    icons/livetv.svg
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell)
 target_link_libraries(jfd_ui_library
   PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::library jfd_ui_shell

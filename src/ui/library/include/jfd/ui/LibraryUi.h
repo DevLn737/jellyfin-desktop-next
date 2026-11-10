@@ -3,6 +3,7 @@
 #include <jfd/library/HomeModel.h>
 #include <jfd/library/ItemDetails.h>
 #include <jfd/library/LibraryModel.h>
+#include <jfd/library/LiveTvChannels.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
 
@@ -40,9 +41,12 @@ namespace jfd::ui {
     Q_PROPERTY(jfd::library::SignIn* signIn READ signIn NOTIFY attached)
     Q_PROPERTY(jfd::library::HomeModel* home READ home NOTIFY attached)
     Q_PROPERTY(jfd::library::SearchModel* search READ search NOTIFY attached)
+    // The Live TV channel list (route "livetv").
+    Q_PROPERTY(jfd::library::LiveTvChannels* liveTv READ liveTv NOTIFY attached)
     Q_PROPERTY(bool canPlay READ canPlay NOTIFY handlersChanged)
     Q_PROPERTY(bool canWatchTogether READ canWatchTogether NOTIFY handlersChanged)
     Q_PROPERTY(bool canPlayTracks READ canPlayTracks NOTIFY handlersChanged)
+    Q_PROPERTY(bool canPlayChannels READ canPlayChannels NOTIFY handlersChanged)
     // The server's live connection (the session socket) is up. A screen
     // whose request failed while it is down says "No connection", and
     // reloads on reconnected().
@@ -54,6 +58,7 @@ namespace jfd::ui {
       library::SignIn* signIn = nullptr;
       library::HomeModel* home = nullptr;
       library::SearchModel* search = nullptr;
+      library::LiveTvChannels* liveTv = nullptr;
       library::LibraryUpdates* updates = nullptr;
       library::CollectionIndex* collections = nullptr;
       qreal devicePixelRatio = 1.0;
@@ -79,13 +84,18 @@ namespace jfd::ui {
     void setPlayHandler(PlayHandler handler);
     void setWatchTogetherHandler(WatchTogetherHandler handler);
     void setTrackHandler(TrackHandler handler);
+    // A Live TV channel plays on this device only, never for a group (a
+    // live stream has no shared position).
+    void setChannelHandler(std::function<void(const QString& channelId)> handler);
 
     library::SignIn* signIn() const { return m_services.signIn; }
     library::HomeModel* home() const { return m_services.home; }
     library::SearchModel* search() const { return m_services.search; }
+    library::LiveTvChannels* liveTv() const { return m_services.liveTv; }
     bool canPlay() const { return bool(m_play); }
     bool canWatchTogether() const { return bool(m_watchTogether); }
     bool canPlayTracks() const { return bool(m_track.play); }
+    bool canPlayChannels() const { return bool(m_channel); }
     bool online() const { return m_online; }
     // Called by LibraryScreens as the session socket comes and goes; a
     // change from offline to online emits reconnected().
@@ -110,8 +120,9 @@ namespace jfd::ui {
     Q_INVOKABLE QString image(const QUrl& url) const;
     // Where a card leads: "library/<id>" for a library, "collection/<id>"
     // for a collection, "person/<id>" for a person, the music pages for
-    // albums, artists and playlists, "item/<id>" for anything else. A
-    // track has no page: it plays (playTrack).
+    // albums, artists and playlists, "livetv" for the Live TV library and
+    // its channels, "item/<id>" for anything else. A track has no page: it
+    // plays (playTrack).
     Q_INVOKABLE QString routeFor(const QString& itemId, const QString& type) const;
     // A library's title from the home page's list, for the grid's heading.
     Q_INVOKABLE QString libraryName(const QString& libraryId) const;
@@ -119,6 +130,8 @@ namespace jfd::ui {
     Q_INVOKABLE QString formatRunTime(qint64 ticks) const;
 
     Q_INVOKABLE void play(const QString& itemId, qint64 startPositionTicks);
+    // Tunes to a Live TV channel (setChannelHandler).
+    Q_INVOKABLE void playChannel(const QString& channelId);
     Q_INVOKABLE void watchTogether(const QString& itemId, const QString& name,
                                    qint64 startPositionTicks);
     // Plays a track in its album. With a video playing it first asks
@@ -150,6 +163,7 @@ namespace jfd::ui {
     PlayHandler m_play;
     WatchTogetherHandler m_watchTogether;
     TrackHandler m_track;
+    std::function<void(const QString&)> m_channel;
     bool m_online = true;
   };
 
