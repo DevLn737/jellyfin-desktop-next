@@ -76,7 +76,7 @@ jobs:
           cmake --build build --parallel --target $env:APP_TARGET
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Deploy Qt and libmpv next to the executable
+      - name: Deploy Qt, libmpv and the licences next to the executable
         shell: pwsh
         run: |
           $stage = 'build/package/app'
@@ -89,6 +89,9 @@ jobs:
           windeployqt --release --compiler-runtime --qmldir $env:APP_QML_DIR --no-translations "$stage/$env:APP_EXE.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
+          # Licences of what is linked into the executable (SDL3 for gamepads, see LICENSES.md).
+          New-Item -ItemType Directory -Force -Path "$stage/licenses" | Out-Null
+          Copy-Item LICENSE, LICENSES.md, packaging/licenses/*.txt "$stage/licenses"
           @{ commit = '${{ github.sha }}'; ref = '${{ github.ref_name }}'; run = '${{ github.run_id }}' } |
             ConvertTo-Json | Set-Content -Encoding ASCII "$stage/build-info.json"
 

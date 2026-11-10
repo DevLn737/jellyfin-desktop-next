@@ -5,6 +5,8 @@
 
 #include <QCoreApplication>
 
+#include <algorithm>
+
 namespace jfd::integrations {
 
   namespace {
@@ -170,6 +172,15 @@ namespace jfd::integrations {
 
   void MediaSessionBridge::command(MediaCommand command) {
     if (auto input = commandInput(command, m_snapshot.phase)) m_post(std::move(*input));
+  }
+
+  void MediaSessionBridge::requestCommand(MediaCommand command) { this->command(command); }
+
+  void MediaSessionBridge::seekBy(qint64 deltaMs) {
+    if (!active(m_snapshot.phase)) return;
+    std::int64_t target = m_snapshot.position.milliseconds() + deltaMs;
+    if (m_snapshot.duration) target = std::min(target, m_snapshot.duration->milliseconds());
+    seek(std::max<std::int64_t>(target, 0));
   }
 
   void MediaSessionBridge::seek(qint64 positionMs) {

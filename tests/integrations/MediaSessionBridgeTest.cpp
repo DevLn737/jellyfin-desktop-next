@@ -195,6 +195,36 @@ TEST_CASE("The bridge feeds controls and sleep inhibition and posts their comman
   CHECK(posted.size() == 2);
 }
 
+TEST_CASE("Other inputs (a gamepad) send commands and relative seeks through the bridge") {
+  std::vector<SessionInput> posted;
+  MediaSessionBridge bridge([&](SessionInput input) { posted.push_back(std::move(input)); });
+  // Nothing plays: nothing to pause or seek.
+  bridge.requestCommand(MediaCommand::PlayPause);
+  bridge.seekBy(10'000);
+  CHECK(posted.empty());
+
+  bridge.update(playing());
+  bridge.requestCommand(MediaCommand::PlayPause);
+  bridge.seekBy(10'000);
+  bridge.seekBy(-10'000);
+  REQUIRE(posted.size() == 3);
+  CHECK(std::holds_alternative<intent::Pause>(posted[0]));
+  REQUIRE(std::holds_alternative<intent::Seek>(posted[1]));
+  CHECK(std::get<intent::Seek>(posted[1]).position.milliseconds() == 75'000);
+  REQUIRE(std::holds_alternative<intent::Seek>(posted[2]));
+  CHECK(std::get<intent::Seek>(posted[2]).position.milliseconds() == 55'000);
+
+  // Paused: PlayPause plays. Seeks stay inside the file.
+  bridge.update(playing(PlaybackPhase::Paused));
+  bridge.requestCommand(MediaCommand::PlayPause);
+  bridge.seekBy(-100'000);
+  bridge.seekBy(3'600'000);
+  REQUIRE(posted.size() == 6);
+  CHECK(std::holds_alternative<intent::Play>(posted[3]));
+  CHECK(std::get<intent::Seek>(posted[4]).position.milliseconds() == 0);
+  CHECK(std::get<intent::Seek>(posted[5]).position.milliseconds() == 1'800'000);
+}
+
 TEST_CASE("Music keeps the system awake but lets the screen go dark") {
   MediaSessionBridge bridge([](SessionInput) {});
   FakeInhibitor inhibitor;

@@ -211,6 +211,13 @@ namespace jfd::desktop {
   void installSeerr(AppServices& services, QQmlEngine& engine);
   void uninstallSeerr(AppServices& services);
 
+  // The gamepad settings section (on/off, in the background).
+  bool registerInputSettings(settings::SettingsRegistry& registry);
+  // After the window loads: gamepads (SDL3, polled on the GUI thread) drive
+  // the window through ui::InputRouter while it is active; PlayPause and the
+  // seek triggers go through the media controls' bridge (installIntegrations).
+  void installInput(AppServices& services, QQuickWindow& window);
+
   // Before quitting: reports the playing file (and music track) stopped and
   // leaves a SyncPlay group; calls done when the server answered all of
   // them or after a short timeout, so quitting never hangs on the network.

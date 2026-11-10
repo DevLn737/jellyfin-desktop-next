@@ -97,6 +97,7 @@ namespace {
     ok = remote::registerRemoteSettings(registry) && ok;
     ok = desktop::registerMusicSettings(registry) && ok;
     ok = desktop::registerSeerrSettings(registry) && ok;
+    ok = desktop::registerInputSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
@@ -270,6 +271,7 @@ int main(int argc, char* argv[]) {
     windowState.restoreAndShow(QSize(1280, 800));
     desktop::startIntegrations(services, *window, !options.smoke);
     desktop::startRemote(services, *window);
+    desktop::installInput(services, *window);
     if (instance) {
       QObject::connect(&*instance, &platform::SingleInstance::activated, window,
                        [window, &services](const QStringList& arguments) {

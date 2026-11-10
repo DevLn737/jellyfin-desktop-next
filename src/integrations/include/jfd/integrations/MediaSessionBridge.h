@@ -72,6 +72,13 @@ namespace jfd::integrations {
     // A session::SessionHub snapshot handler.
     void update(const core::SessionSnapshot& snapshot);
 
+    // Other inputs take the same path as the media controls (a gamepad's
+    // PlayPause and seek buttons), so in a group they are requests to the
+    // group, and they work whichever screen is shown.
+    void requestCommand(platform::MediaCommand command);
+    // Seeks this far from the position that plays, within the file.
+    void seekBy(qint64 deltaMs);
+
   private:
     const NowPlayingDetails* currentDetails() const;
     void publish();

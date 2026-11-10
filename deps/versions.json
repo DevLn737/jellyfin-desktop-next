@@ -6,6 +6,16 @@
     "windowsArch": "win64_msvc2022_64",
     "linuxArch": "linux_gcc_64"
   },
+  "sdl3": {
+    "comment": "Gamepad input (src/platform/src/GamepadInput.cpp): the release source archive, built by cmake/JfdSdl3.cmake as a static library with only the joystick, gamepad and HIDAPI subsystems, on Windows and Linux alike. zlib licence. commit is the object ls-remote reports for the tag (lightweight).",
+    "version": "3.4.20",
+    "tag": "release-3.4.20",
+    "commit": "f00dc919ca35b9756316e86c4777392de442f9b2",
+    "name": "SDL3-3.4.20.tar.gz",
+    "url": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.20/SDL3-3.4.20.tar.gz",
+    "sha256": "f3bb06f55bed9557227a700af2ea62e49497ebdf58037732a731a5fb3ef8581f",
+    "bytes": 15656494
+  },
   "windows": {
     "qt": {
       "comment": "Official Qt archives for win64_msvc2022_64, the same files the 2.x client pins. install-qt-action (aqtinstall 3.3) cannot read the 6.11 Windows repository layout.",
