@@ -15,6 +15,7 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, `Queue` (next or last), and `GetUtcTime` samples |
 | `Playback.h` | `PlaybackInfo` to mpv URLs (direct play, static stream, transcode), external subtitles and audio, mpv track ids, report bodies |
 | `DeviceProfile.h` | The 2.x client's device profile and its options |
+| `Downloads.h` | Offline downloads: the original's URL (`Items/{id}/Download`), the default quality from the user's policy, which sources have an original, and the "token only to this server" check (see [offline.md](offline.md)) |
 | `ServerTime.h` | ISO 8601 with seven fractional digits to and from `core::ServerInstant` |
 | `platform/CredentialStore.h` | Tokens in Windows Credential Manager or the Secret Service |
 | `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model (the measurement prototype's) |

@@ -1,6 +1,7 @@
 add_library(jfd_jellyfin_api STATIC
   src/ClientIdentity.cpp
   src/DeviceProfile.cpp
+  src/Downloads.cpp
   src/JellyfinClient.cpp
   src/LiveTv.cpp
   src/Models.cpp
@@ -15,6 +16,7 @@ add_library(jfd_jellyfin_api STATIC
   include/jfd/api/ClientIdentity.h
   include/jfd/api/Recommendations.h
   include/jfd/api/DeviceProfile.h
+  include/jfd/api/Downloads.h
   include/jfd/api/JellyfinClient.h
   include/jfd/api/LiveTv.h
   include/jfd/api/Models.h
