@@ -114,7 +114,7 @@ TEST_CASE("Gamepad Back leaves the page; Search opens the palette and Back close
   REQUIRE(pumpUntil([&] { return scene.input.connectedCount() == 1; }));
 
   // A page that is not a sidebar root, on the placeholder.
-  REQUIRE(scene.navigator->navigate(QStringLiteral("gamepad-test")));
+  REQUIRE(scene.navigator->navigate(QStringLiteral("customizeHome")));
   pump(50);
   REQUIRE(scene.navigator->depth() == 2);
   scene.tap(pad, SDL_GAMEPAD_BUTTON_EAST);
