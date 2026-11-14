@@ -363,3 +363,31 @@ TEST_CASE("A channel's page: the channel, then its programmes from now; ended on
   CHECK(model.count() == 3);
   CHECK(at(0, LiveTvSchedule::OnNowRole).toBool());
 }
+
+TEST_CASE("Right walks on through programmes that begin partway through a minute") {
+  QDateTime clock = utc("2026-11-10T16:15:00Z");
+  // Channel 1's programmes begin 30 s after the half hour.
+  QList<Program> programs = guide();
+  for (Program& p : programs) {
+    if (p.channel != 1) continue;
+    p.start = p.start.addSecs(30);
+    p.end = p.end.addSecs(30);
+  }
+  LibraryFixture f{Stand{programs, &clock}};
+  LiveTvGuide model{f.client, GuideFixture::options(&clock)};
+  model.setViewMinutes(180);
+  model.reload();
+  REQUIRE(waitFor([&] { return !model.loading(); }));
+  const auto focused = [&] { return model.focusedProgram().value(QStringLiteral("id")).toString(); };
+  CHECK(focused() == QStringLiteral("c1-101600"));
+  QStringList seen{focused()};
+  for (int i = 0; i < 3; ++i) {
+    REQUIRE(model.moveFocus(1, 0));
+    CHECK_FALSE(seen.contains(focused()));
+    seen.append(focused());
+  }
+  CHECK(seen.last() == QStringLiteral("c1-101730"));
+  // And back, one programme at a time.
+  REQUIRE(model.moveFocus(-1, 0));
+  CHECK(focused() == QStringLiteral("c1-101700"));
+}

@@ -270,3 +270,25 @@ TEST_CASE("One channel by id, and a whole guide window over pages, by start") {
   CHECK(s.param("startIndex") == QStringLiteral("2"));
   CHECK(s.param("channelIds") == QStringLiteral("c1"));
 }
+
+TEST_CASE("A guide page of only undated programmes does not end the list") {
+  Signed s([](const HttpRequest& r) {
+    if (r.path != QStringLiteral("/jf/LiveTv/Programs")) return HttpResponse{404, {}, {}, 0};
+    const int start = r.query.queryItemValue(QStringLiteral("startIndex")).toInt();
+    if (start == 0)
+      return HttpResponse{200, R"({"Items": [
+        {"Id": "x", "ChannelId": "c1", "Name": "No dates"},
+        {"Id": "y", "ChannelId": "c1", "Name": "No dates either"}], "TotalRecordCount": 3, "StartIndex": 0})",
+                          "application/json", 0};
+    return HttpResponse{200, R"({"Items": [
+        {"Id": "a", "ChannelId": "c1", "Name": "A", "StartDate": "2026-11-10T16:30:00Z", "EndDate": "2026-11-10T17:00:00Z"}],
+        "TotalRecordCount": 3, "StartIndex": 2})",
+                        "application/json", 0};
+  });
+  LiveTvProgramQuery query;
+  query.limit = 2;
+  auto all = run<QList<LiveTvProgram>>([&](auto done) { s.liveTv.allPrograms(query, nullptr, done); });
+  REQUIRE(all.ok());
+  REQUIRE(all->size() == 1);
+  CHECK(all->at(0).id == QStringLiteral("a"));
+}

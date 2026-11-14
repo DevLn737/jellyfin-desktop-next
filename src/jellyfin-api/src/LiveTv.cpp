@@ -166,7 +166,6 @@ namespace jfd::api {
       }
       page.totalRecordCount = count(o, "TotalRecordCount", static_cast<int>(page.channels.size()));
       page.startIndex = count(o, "StartIndex", 0);
-      page.itemCount = static_cast<int>(items.toArray().size());
       return page;
     }
 
@@ -183,6 +182,7 @@ namespace jfd::api {
       page.totalRecordCount =
           count(o, "TotalRecordCount", static_cast<int>(items.toArray().size()));
       page.startIndex = count(o, "StartIndex", 0);
+      page.itemCount = static_cast<int>(items.toArray().size());
       return page;
     }
 

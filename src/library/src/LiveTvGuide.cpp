@@ -272,8 +272,13 @@ namespace jfd::library {
     m_focusMinutes = std::clamp(minutes, 0, rangeMinutes() - 1);
     m_focusChannel = m_rows[m_focusRow].channel.id;
     if (snapToStart) {
-      if (const auto p = programAt(m_focusRow, m_focusMinutes))
-        m_focusMinutes = std::clamp(static_cast<int>(std::floor(minutesOf(p->start))), 0, rangeMinutes() - 1);
+      // The first whole minute inside the programme: one that begins at
+      // 16:30:30 snaps to 16:31, which still belongs to it.
+      if (const auto p = programAt(m_focusRow, m_focusMinutes)) {
+        const int first = static_cast<int>(std::ceil(minutesOf(p->start)));
+        if (first < minutesOf(p->end) && first <= m_focusMinutes)
+          m_focusMinutes = std::clamp(first, 0, rangeMinutes() - 1);
+      }
     }
     followFocus();
     loadChunks(m_focusMinutes, m_focusMinutes + 1);
