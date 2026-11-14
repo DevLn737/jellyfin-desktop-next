@@ -215,7 +215,7 @@ TEST_CASE("A channel plays through the server and its stream closes on Stopped")
 }
 
 TEST_CASE("The guide grid: every channel and the guide in view within a second, the rest by chunks") {
-  if (!hasStand()) return;
+  if (!hasExtrasStand()) return;
   Stand s;
   library::LiveTvGuide guide(*s.client);
   guide.setViewMinutes(180);
@@ -255,7 +255,7 @@ TEST_CASE("The guide grid: every channel and the guide in view within a second, 
 }
 
 TEST_CASE("On now and a channel's page on the stand") {
-  if (!hasStand()) return;
+  if (!hasExtrasStand()) return;
   Stand s;
   library::LiveTvOnNow onNow(*s.client);
   onNow.reload();
