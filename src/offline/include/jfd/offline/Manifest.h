@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QJsonObject>
+#include <QMap>
 #include <QString>
 
 #include <cstdint>
@@ -56,6 +57,30 @@ namespace jfd::offline {
     // Queue order: earlier first.
     QDateTime queuedAt;
     QDateTime completedAt;
+
+    // What else the item keeps, fetched once the media file is complete
+    // (ExtrasDownloader), as paths relative to the item folder:
+    // external subtitles by their MediaStreams index ("subs/0.srt"),
+    QMap<int, QString> subtitleFiles;
+    // images by type ("Primary", "Backdrop", "Logo", "Thumb" ->
+    // "images/Primary"),
+    QMap<QString, QString> imageFiles;
+    // the lyrics of a track (the body of Audio/{id}/Lyrics) and the media
+    // segments of a video (the body of MediaSegments/{id}); empty when the
+    // server has none.
+    QString lyricsFile;
+    QString segmentsFile;
+    // All of the above was fetched (or the server has none of it). False:
+    // asked again at the next sign-in.
+    bool extrasComplete = false;
+
+    // What the last look at the server found (OfflineSync): the item is no
+    // longer there (the copy still plays until deleted), or its file changed
+    // (the media source's ETag differs; downloading again is up to the
+    // user).
+    bool removedOnServer = false;
+    bool changedOnServer = false;
+    QDateTime refreshedAt;
   };
 
   // The manifest as stored, secrets removed.

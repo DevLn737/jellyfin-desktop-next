@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 
 class QQmlEngine;
 class QQuickWindow;
@@ -44,6 +45,14 @@ namespace jfd::session {
   class SessionRuntime;
 } // namespace jfd::session
 
+namespace jfd::playback {
+  class ReportSink;
+}
+
+namespace jfd::api {
+  struct Lyrics;
+}
+
 namespace jfd::ui {
   class AppSettings;
   class LibraryUi;
@@ -53,6 +62,7 @@ namespace jfd::ui {
 
 namespace jfd::desktop {
 
+  struct DownloadServices;
   struct IntegrationServices;
   struct LibraryServices;
   struct RemoteServices;
@@ -104,6 +114,11 @@ namespace jfd::desktop {
     // use these.
     std::shared_ptr<media::MpvPlayer> player;
     std::shared_ptr<session::SessionRuntime> session;
+    // Offline downloads (installDownloads): the catalog, the queue, the
+    // copies the launcher plays and the watch journal. The player models
+    // report through its journal, so it is declared before them and goes
+    // after them.
+    std::shared_ptr<DownloadServices> downloads;
     // The player screen's model (installPlayer), on the session above.
     std::unique_ptr<ui::PlayerModel> playerModel;
     // Watching together (installGroup): the group page's model, on the
@@ -174,6 +189,24 @@ namespace jfd::desktop {
   // A second start's arguments: runs its --command and returns true, or
   // returns false when it has none (the window is raised instead).
   bool runCommand(AppServices& services, const QStringList& arguments);
+
+  // The "Downloads" settings section (folder, space, playing from disk).
+  bool registerDownloadSettings(settings::SettingsRegistry& registry);
+  // Offline downloads (DownloadsInstall.cpp): the download folder's catalog
+  // and queue, the subtitles, images, lyrics and segments of finished
+  // items, playing downloaded copies (the launcher's LocalSource), the
+  // offline watch journal and its sync with the server when the session
+  // socket is Ready (and every 30 minutes). Needs installSession; before
+  // installPlayer and installMusic, which report through the journal.
+  // uninstallDownloads, after the player models are gone and before the
+  // session, unsets the launcher's local source.
+  void installDownloads(AppServices& services);
+  void uninstallDownloads(AppServices& services);
+  // The playback reports of a player model, with the offline journal
+  // behind them; empty before installDownloads (straight to the server).
+  std::unique_ptr<playback::ReportSink> downloadsReportSink(AppServices& services);
+  // Lyrics of downloaded tracks, for the music screens.
+  std::function<std::optional<api::Lyrics>(const QString&)> downloadsLyrics(AppServices& services);
 
   // The playback settings section (auto-skip of intros and credits, HDR10
   // output).

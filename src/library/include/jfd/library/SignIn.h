@@ -69,6 +69,8 @@ namespace jfd::library {
     bool busy() const;
     QString errorText() const { return m_errorText; }
     QString serverName() const { return m_server.name; }
+    // The server's own id (System/Info), for what is kept per server.
+    QString serverId() const { return m_server.id; }
     QString serverAddress() const { return m_server.url.toString(); }
     bool quickConnectAvailable() const { return m_quickConnect; }
     QString quickConnectCode() const { return m_quickConnectCode; }

@@ -61,6 +61,12 @@ namespace jfd::syncplay {
     // GET /GetUtcTime; call again after nextPollDelay().
     void pollTime();
     WallTicks nextPollDelay() const { return m_timeSync.nextPollDelay(); }
+    // The server's clock against the local steady clock, while a
+    // measurement since the last (re)connection exists.
+    std::optional<ClockOffset> clockOffset() const {
+      if (!m_timeSync.best()) return std::nullopt;
+      return m_offset;
+    }
 
     // SyncPlayOutbox
     void send(const SyncPlayMessage& message) override;

@@ -161,7 +161,7 @@ if(TARGET jfd_jellyfin_api)
     # Offline downloads against a file server with byte ranges
     # (offline/FakeFileServer.h); the kill test runs jfd_offline_killee.
     jfd_add_qt_test(jfd_offline_tests offline/StoreTest.cpp offline/DownloadTest.cpp
-      offline/CatalogTest.cpp offline/KillTest.cpp)
+      offline/CatalogTest.cpp offline/KillTest.cpp offline/JournalTest.cpp)
     target_link_libraries(jfd_offline_tests PRIVATE jfd::offline Qt6::WebSockets)
     add_executable(jfd_offline_killee offline/Killee.cpp)
     target_link_libraries(jfd_offline_killee PRIVATE jfd::offline)
@@ -170,6 +170,21 @@ if(TARGET jfd_jellyfin_api)
     target_compile_definitions(jfd_offline_tests PRIVATE
       JFD_OFFLINE_KILLEE="$<TARGET_FILE:jfd_offline_killee>")
     set_tests_properties(jfd_offline_tests PROPERTIES TIMEOUT 300)
+    if(TARGET jfd_session_runtime)
+      # Downloaded copies through the launcher's LocalSource (no request to
+      # the server), and the subtitles, images, lyrics and segments fetched
+      # for them.
+      jfd_add_qt_test(jfd_offline_playback_tests offline/LocalPlaybackTest.cpp)
+      target_link_libraries(jfd_offline_playback_tests PRIVATE jfd::offline jfd::session_runtime
+        Qt6::WebSockets)
+    endif()
+    if(JFD_SERVER_TESTS)
+      # Against scripts/test-server: Items/{id}/Download with Range and
+      # If-Range, and the journal's UserData writes on 12.2.
+      jfd_add_qt_test(jfd_offline_server_tests offline/OfflineServerTest.cpp)
+      target_link_libraries(jfd_offline_server_tests PRIVATE jfd::offline)
+      set_tests_properties(jfd_offline_server_tests PROPERTIES TIMEOUT 180 RESOURCE_LOCK jellyfin_server)
+    endif()
   endif()
 
   if(TARGET jfd_music)

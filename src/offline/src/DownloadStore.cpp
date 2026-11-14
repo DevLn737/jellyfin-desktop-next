@@ -1,5 +1,7 @@
 #include <jfd/offline/DownloadStore.h>
 
+#include <jfd/playback/StreamPlan.h>
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -111,12 +113,8 @@ namespace jfd::offline {
   }
 
   QString DownloadStore::windowsExternalPath(const QString& path) {
-    QString native = path;
-    native.replace(QLatin1Char('/'), QLatin1Char('\\'));
-    if (native.size() < 260 || native.startsWith(QLatin1String("\\\\?\\"))) return native;
-    if (native.startsWith(QLatin1String("\\\\")))
-      return QStringLiteral("\\\\?\\UNC\\") + native.mid(2);
-    return QStringLiteral("\\\\?\\") + native;
+    // One rule with what the player is given (playback::playerAddress).
+    return playback::windowsPlayerPath(path);
   }
 
   QString DownloadStore::externalPath(const QString& path) {

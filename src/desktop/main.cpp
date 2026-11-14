@@ -98,6 +98,7 @@ namespace {
     ok = desktop::registerMusicSettings(registry) && ok;
     ok = desktop::registerSeerrSettings(registry) && ok;
     ok = desktop::registerInputSettings(registry) && ok;
+    ok = desktop::registerDownloadSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
     // Other modules: ok = <module>::registerSettings(registry) && ok;
     return ok;
@@ -239,6 +240,7 @@ int main(int argc, char* argv[]) {
     desktop::installLibrary(services, engine);
     desktop::installLegacy(services, legacy, !options.smoke);
     desktop::installSession(services);
+    desktop::installDownloads(services);
     desktop::installPlayer(services, engine);
     desktop::installIntegrations(services, engine);
     // The media controls and Discord follow the playback session.
@@ -349,6 +351,7 @@ int main(int argc, char* argv[]) {
   desktop::uninstallGroup(services);
   desktop::uninstallMusic(services);
   desktop::uninstallSeerr(services);
+  desktop::uninstallDownloads(services);
   services.session.reset();
   services.player.reset();
   services.library.reset();

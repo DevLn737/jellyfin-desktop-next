@@ -18,6 +18,9 @@ namespace jfd::offline {
     // A download does not start, and a running one pauses, when the disk
     // would have less than this many GiB free. Default 5.
     inline constexpr QLatin1String ReserveGiB{"downloads/reserveGiB"};
+    // Play a downloaded copy from disk even while the server can be reached
+    // (without the server it always is). Default on.
+    inline constexpr QLatin1String PreferLocal{"downloads/preferLocal"};
   } // namespace keys
 
   // <Videos>/Jellyfin (QStandardPaths::MoviesLocation): ~/Videos/Jellyfin

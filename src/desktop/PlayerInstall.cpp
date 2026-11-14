@@ -506,7 +506,8 @@ namespace jfd::desktop {
   void installPlayer(AppServices& services, QQmlEngine&) {
     Q_ASSERT(services.session && services.client != nullptr && services.navigator != nullptr);
     services.playerModel =
-        std::make_unique<ui::PlayerModel>(*services.session, *services.client, services.player.get());
+        std::make_unique<ui::PlayerModel>(*services.session, *services.client, services.player.get(),
+                                          nullptr, downloadsReportSink(services));
     ui::PlayerModel& model = *services.playerModel;
     ui::PlayerSession::setInstance(&model);
 

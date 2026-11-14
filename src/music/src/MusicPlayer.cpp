@@ -30,9 +30,10 @@ namespace jfd::music {
     }
   } // namespace
 
-  MusicPlayer::MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent)
+  MusicPlayer::MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent,
+                           std::unique_ptr<playback::ReportSink> sink)
       : QObject(parent), m_runtime(runtime), m_client(client), m_api(client),
-        m_sink(playback::clientReportSink(client)), m_reporter(*m_sink) {
+        m_sink(sink ? std::move(sink) : playback::clientReportSink(client)), m_reporter(*m_sink) {
     m_model.setQueue(&m_queue);
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(SaveDelayMs);

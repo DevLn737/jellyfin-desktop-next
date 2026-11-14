@@ -58,6 +58,16 @@ namespace jfd::offline {
                             "much free space.");
     section.settings.append(reserve);
 
+    settings::SettingDescriptor preferLocal;
+    preferLocal.key = key(keys::PreferLocal);
+    preferLocal.type = settings::SettingType::Bool;
+    preferLocal.defaultValue = true;
+    preferLocal.label = QT_TRANSLATE_NOOP("DownloadSettings", "Play downloads from disk");
+    preferLocal.description = QT_TRANSLATE_NOOP(
+        "DownloadSettings", "A downloaded item plays from its file even when the server can be "
+                            "reached. Without the server it always does.");
+    section.settings.append(preferLocal);
+
     return registry.registerSection(std::move(section));
   }
 

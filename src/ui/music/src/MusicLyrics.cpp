@@ -60,6 +60,13 @@ namespace jfd::ui {
     m_loading = !m_trackId.isEmpty();
     Q_EMIT lyricsChanged();
     if (m_trackId.isEmpty()) return;
+    if (m_local)
+      if (std::optional<api::Lyrics> local = m_local(m_trackId)) {
+        m_loading = false;
+        setLyrics(std::move(*local));
+        Q_EMIT lyricsChanged();
+        return;
+      }
     m_api.lyrics(m_trackId, this, [this, serial](api::Result<api::Lyrics> result) {
       if (serial != m_serial) return;
       m_loading = false;

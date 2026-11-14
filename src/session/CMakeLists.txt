@@ -19,6 +19,7 @@ if(TARGET jfd_playback)
     include/jfd/session/ApiTransport.h
     include/jfd/session/GroupModel.h
     include/jfd/session/InputQueue.h
+    include/jfd/session/LocalSource.h
     include/jfd/session/PlaybackLauncher.h
     include/jfd/session/QtTimers.h
     include/jfd/session/SessionRuntime.h

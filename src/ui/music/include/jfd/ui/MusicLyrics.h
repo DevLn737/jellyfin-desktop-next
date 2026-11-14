@@ -5,6 +5,9 @@
 #include <QAbstractListModel>
 #include <QString>
 
+#include <functional>
+#include <optional>
+
 namespace jfd::api {
   class JellyfinClient;
 }
@@ -31,7 +34,14 @@ namespace jfd::ui {
   public:
     enum Role { TextRole = Qt::UserRole + 1, StartRole, IsCurrentRole };
 
+    // A downloaded track's lyrics, read from disk (nullopt: not downloaded,
+    // ask the server).
+    using LocalLyrics = std::function<std::optional<api::Lyrics>(const QString& trackId)>;
+
     explicit MusicLyrics(api::JellyfinClient& client, QObject* parent = nullptr);
+    // Asked before the server, so a downloaded track shows its lyrics
+    // offline.
+    void setLocalLyrics(LocalLyrics local) { m_local = std::move(local); }
 
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role) const override;
@@ -62,6 +72,7 @@ namespace jfd::ui {
     void updateCurrent();
 
     api::MusicApi m_api;
+    LocalLyrics m_local;
     QString m_trackId;
     double m_position = 0.0;
     api::Lyrics m_lyrics;

@@ -3,6 +3,7 @@
 #include <jfd/api/Models.h>
 #include <jfd/api/Playback.h>
 #include <jfd/core/SessionInput.h>
+#include <jfd/session/LocalSource.h>
 
 #include <QJsonObject>
 #include <QObject>
@@ -20,6 +21,14 @@ namespace jfd::session {
   // and media type) and its PlaybackInfo, chooses the stream, maps its
   // timeline with playback::mediaRequest, and posts the intent. Only the latest request is opened; one
   // that resolves after a newer request was made is dropped.
+  //
+  // With a local source set (downloads, stage 3.10a), an item it has a copy
+  // of opens from disk instead, without any request to the server: the item
+  // and source come from the copy, the stream is DirectPlay of the file
+  // path, external subtitles are the copy's files. A request for another
+  // version of the item (mediaSourceId) goes to the server. In a group
+  // (playlistItem set) only an original copy is used: it has the timeline
+  // the others stream.
   class PlaybackLauncher final : public QObject {
     Q_OBJECT
 
@@ -57,6 +66,10 @@ namespace jfd::session {
     // already resolving keeps the profile it was sent with.
     void setDeviceProfile(QJsonObject deviceProfile) { m_deviceProfile = std::move(deviceProfile); }
     const QJsonObject& deviceProfile() const { return m_deviceProfile; }
+    // Downloads; nullptr (the default) always asks the server. Not owned:
+    // it must outlive the launcher or be unset first.
+    void setLocalSource(const LocalSource* source) { m_local = source; }
+    const LocalSource* localSource() const { return m_local; }
     // Forgets any request still resolving.
     void cancel() {
       ++m_serial;
@@ -89,11 +102,14 @@ namespace jfd::session {
                       const api::PlaybackStream& stream, bool preload);
     Request withChosenTracks(const Request& request, const api::Item& item,
                              const api::MediaSource& source) const;
+    std::optional<LocalCopy> localCopyFor(const Request& request) const;
+    void openLocal(const Request& request, const LocalCopy& copy, bool preload);
 
     api::JellyfinClient& m_client;
     QJsonObject m_deviceProfile;
     Post m_post;
     TrackChooser m_chooseTracks;
+    const LocalSource* m_local = nullptr;
     std::uint64_t m_serial = 0;
     std::uint64_t m_preloadSerial = 0;
   };

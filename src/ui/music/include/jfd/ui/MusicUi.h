@@ -36,6 +36,8 @@ namespace jfd::ui {
       api::JellyfinClient* client = nullptr;
       music::MusicPlayer* player = nullptr;
       qreal devicePixelRatio = 1.0;
+      // Lyrics of downloaded tracks (MusicLyrics::setLocalLyrics).
+      MusicLyrics::LocalLyrics localLyrics;
     };
 
     explicit MusicUi(Config config, QObject* parent = nullptr);

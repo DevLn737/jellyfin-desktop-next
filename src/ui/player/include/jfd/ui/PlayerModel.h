@@ -113,8 +113,11 @@ namespace jfd::ui {
     Q_PROPERTY(bool hasTrickplay READ hasTrickplay NOTIFY trickplayChanged)
 
   public:
+    // `sink` takes the playback reports (the app's sends them through the
+    // offline journal); empty: straight to the server.
     PlayerModel(session::SessionRuntime& runtime, api::JellyfinClient& client,
-                media::MpvPlayer* player, QObject* parent = nullptr);
+                media::MpvPlayer* player, QObject* parent = nullptr,
+                std::unique_ptr<playback::ReportSink> sink = {});
     ~PlayerModel() override;
 
     // Before quitting: sends Stopped for the playing file; done runs once

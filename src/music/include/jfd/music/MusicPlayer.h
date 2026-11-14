@@ -61,7 +61,10 @@ namespace jfd::music {
     Q_PROPERTY(int volume READ volume WRITE setVolume NOTIFY volumeChanged)
 
   public:
-    MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent = nullptr);
+    // `sink` takes the playback reports (the app's sends them through the
+    // offline journal); empty: straight to the server.
+    MusicPlayer(session::SessionRuntime& runtime, api::JellyfinClient& client, QObject* parent = nullptr,
+                std::unique_ptr<playback::ReportSink> sink = {});
     ~MusicPlayer() override;
 
     // Before quitting: sends Stopped for the playing track; done runs once

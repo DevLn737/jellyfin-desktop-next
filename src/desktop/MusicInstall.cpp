@@ -107,7 +107,8 @@ namespace jfd::desktop {
   void installMusic(AppServices& services, QQmlEngine& engine) {
     Q_ASSERT(services.session && services.client != nullptr && services.navigator != nullptr);
     settings::Settings& settings = *services.settings;
-    services.music = std::make_unique<music::MusicPlayer>(*services.session, *services.client);
+    services.music = std::make_unique<music::MusicPlayer>(*services.session, *services.client, nullptr,
+                                                          downloadsReportSink(services));
     music::MusicPlayer& player = *services.music;
 
     media::MpvPlayer* mpv = services.player.get();
@@ -165,6 +166,7 @@ namespace jfd::desktop {
     ui::MusicUi::Config config;
     config.client = services.client;
     config.player = &player;
+    config.localLyrics = downloadsLyrics(services);
     if (const QScreen* screen = QGuiApplication::primaryScreen())
       config.devicePixelRatio = screen->devicePixelRatio();
     services.musicUi = std::make_unique<ui::MusicUi>(config);

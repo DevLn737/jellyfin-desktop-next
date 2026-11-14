@@ -3,6 +3,8 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/playback/StreamPlan.h>
 
+#include <QTimer>
+
 #include <utility>
 
 namespace jfd::session {
@@ -17,10 +19,40 @@ namespace jfd::session {
     return item.seriesName + QStringLiteral(" – ") + item.name;
   }
 
+  std::optional<LocalCopy> PlaybackLauncher::localCopyFor(const Request& request) const {
+    if (!m_local) return std::nullopt;
+    std::optional<LocalCopy> copy = m_local->find(request.itemId);
+    if (!copy) return std::nullopt;
+    if (!request.mediaSourceId.isEmpty() && request.mediaSourceId != copy->source.id)
+      return std::nullopt;
+    if (!request.playlistItem.isEmpty() && !copy->original) return std::nullopt;
+    return copy;
+  }
+
+  void PlaybackLauncher::openLocal(const Request& request, const LocalCopy& copy, bool preload) {
+    api::PlaybackStream stream;
+    stream.url = QUrl::fromLocalFile(copy.path);
+    stream.method = api::PlayMethod::DirectPlay;
+    stream.itemId = request.itemId;
+    stream.mediaSourceId = copy.source.id;
+    stream.externalSubtitles = copy.externalSubtitles;
+    // A file plays all its tracks: the player selects, nothing is reopened.
+    const Request withTracks = preload ? request : withChosenTracks(request, copy.item, copy.source);
+    openResolved(withTracks, copy.item, copy.source, stream, preload);
+  }
+
   void PlaybackLauncher::open(const Request& request) {
     const std::uint64_t serial = ++m_serial;
     // What was queued behind the old file goes with it.
     ++m_preloadSerial;
+    if (std::optional<LocalCopy> copy = localCopyFor(request)) {
+      // Later, as an answer from the server would be: callers set up their
+      // state after open() returns.
+      QTimer::singleShot(0, this, [this, serial, request, copy = std::move(*copy)] {
+        if (serial == m_serial) openLocal(request, copy, false);
+      });
+      return;
+    }
     m_client.item(request.itemId, this, [this, serial, request](api::Result<api::Item> item) {
       if (serial != m_serial) return;
       if (!item) {
@@ -33,6 +65,12 @@ namespace jfd::session {
 
   void PlaybackLauncher::preloadNext(const Request& request) {
     const std::uint64_t serial = ++m_preloadSerial;
+    if (std::optional<LocalCopy> copy = localCopyFor(request)) {
+      QTimer::singleShot(0, this, [this, serial, request, copy = std::move(*copy)] {
+        if (serial == m_preloadSerial) openLocal(request, copy, true);
+      });
+      return;
+    }
     m_client.item(request.itemId, this, [this, serial, request](api::Result<api::Item> item) {
       if (serial != m_preloadSerial) return;
       if (!item) {

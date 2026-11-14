@@ -94,6 +94,24 @@ namespace jfd::offline {
     o.insert(QStringLiteral("item"), scrubSecrets(m.item));
     o.insert(QStringLiteral("mediaSource"), scrubSecrets(m.mediaSource));
     o.insert(QStringLiteral("userData"), scrubSecrets(m.userData));
+    if (!m.subtitleFiles.isEmpty()) {
+      QJsonObject subtitles;
+      for (auto it = m.subtitleFiles.begin(); it != m.subtitleFiles.end(); ++it)
+        subtitles.insert(QString::number(it.key()), it.value());
+      o.insert(QStringLiteral("subtitleFiles"), subtitles);
+    }
+    if (!m.imageFiles.isEmpty()) {
+      QJsonObject images;
+      for (auto it = m.imageFiles.begin(); it != m.imageFiles.end(); ++it)
+        images.insert(it.key(), it.value());
+      o.insert(QStringLiteral("imageFiles"), images);
+    }
+    if (!m.lyricsFile.isEmpty()) o.insert(QStringLiteral("lyricsFile"), m.lyricsFile);
+    if (!m.segmentsFile.isEmpty()) o.insert(QStringLiteral("segmentsFile"), m.segmentsFile);
+    if (m.extrasComplete) o.insert(QStringLiteral("extrasComplete"), true);
+    if (m.removedOnServer) o.insert(QStringLiteral("removedOnServer"), true);
+    if (m.changedOnServer) o.insert(QStringLiteral("changedOnServer"), true);
+    if (m.refreshedAt.isValid()) o.insert(QStringLiteral("refreshedAt"), date(m.refreshedAt));
     return o;
   }
 
@@ -120,6 +138,29 @@ namespace jfd::offline {
     m.item = o.value(QLatin1String("item")).toObject();
     m.mediaSource = o.value(QLatin1String("mediaSource")).toObject();
     m.userData = o.value(QLatin1String("userData")).toObject();
+    // Files of the item are names inside its folder: nothing that climbs out.
+    const auto inside = [](const QString& file) {
+      return !file.isEmpty() && !file.contains(QLatin1String("..")) &&
+             !file.startsWith(QLatin1Char('/')) && !file.contains(QLatin1Char('\\')) &&
+             !file.contains(QLatin1Char(':'));
+    };
+    const QJsonObject subtitles = o.value(QLatin1String("subtitleFiles")).toObject();
+    for (auto it = subtitles.begin(); it != subtitles.end(); ++it) {
+      bool ok = false;
+      const int index = it.key().toInt(&ok);
+      if (ok && inside(it.value().toString())) m.subtitleFiles.insert(index, it.value().toString());
+    }
+    const QJsonObject images = o.value(QLatin1String("imageFiles")).toObject();
+    for (auto it = images.begin(); it != images.end(); ++it)
+      if (inside(it.value().toString())) m.imageFiles.insert(it.key(), it.value().toString());
+    if (const QString f = o.value(QLatin1String("lyricsFile")).toString(); inside(f)) m.lyricsFile = f;
+    if (const QString f = o.value(QLatin1String("segmentsFile")).toString(); inside(f))
+      m.segmentsFile = f;
+    m.extrasComplete = o.value(QLatin1String("extrasComplete")).toBool();
+    m.removedOnServer = o.value(QLatin1String("removedOnServer")).toBool();
+    m.changedOnServer = o.value(QLatin1String("changedOnServer")).toBool();
+    m.refreshedAt =
+        QDateTime::fromString(o.value(QLatin1String("refreshedAt")).toString(), Qt::ISODateWithMs);
     return m;
   }
 

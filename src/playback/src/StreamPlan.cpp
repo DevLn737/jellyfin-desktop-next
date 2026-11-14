@@ -1,5 +1,7 @@
 #include <jfd/playback/StreamPlan.h>
 
+#include <QDir>
+#include <QFileInfo>
 #include <QUrlQuery>
 
 namespace jfd::playback {
@@ -13,6 +15,25 @@ namespace jfd::playback {
       return false;
     }
   } // namespace
+
+  QString windowsPlayerPath(const QString& path) {
+    QString native = path;
+    native.replace(QLatin1Char('/'), QLatin1Char('\\'));
+    if (native.size() < 260 || native.startsWith(QLatin1String("\\\\?\\"))) return native;
+    if (native.startsWith(QLatin1String("\\\\")))
+      return QStringLiteral("\\\\?\\UNC\\") + native.mid(2);
+    return QStringLiteral("\\\\?\\") + native;
+  }
+
+  std::string playerAddress(const QUrl& url) {
+    if (!url.isLocalFile()) return url.toString(QUrl::FullyEncoded).toStdString();
+#ifdef Q_OS_WIN
+    return windowsPlayerPath(QDir::cleanPath(QFileInfo(url.toLocalFile()).absoluteFilePath()))
+        .toStdString();
+#else
+    return url.toLocalFile().toStdString();
+#endif
+  }
 
   core::StreamTimeline timelineFor(const api::PlaybackStream& stream, bool audioOnly,
                                    core::MediaTicks start) {
@@ -30,7 +51,7 @@ namespace jfd::playback {
     core::MediaRequest request;
     request.item = core::ItemId(stream.itemId.toStdString());
     request.mediaSource = core::MediaSourceId(stream.mediaSourceId.toStdString());
-    request.url = stream.url.toString(QUrl::FullyEncoded).toStdString();
+    request.url = playerAddress(stream.url);
     request.timeline = timelineFor(stream, audioOnly, start);
     request.start = start;
     request.runTime = runTime;
