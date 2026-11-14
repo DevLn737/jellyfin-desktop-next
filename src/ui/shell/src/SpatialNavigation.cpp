@@ -163,12 +163,15 @@ namespace jfd::ui {
     // advances as by its arrow key, the view shows the new current item,
     // and the focus goes to it. Nothing is sent to the focused item, so an
     // editor's value never changes. False when no view can step (at its
-    // end, or none around).
-    bool stepInView(QQuickItem* item, SpatialNavigation::Direction direction) {
+    // end, or none around). For a page move (`paging`) a view without key
+    // navigation steps too: CardGrid in TV mode turns it off for its own
+    // arrow handling (which leaves the grid at its edges), yet paging must
+    // go on through the delegates it has not created.
+    bool stepInView(QQuickItem* item, SpatialNavigation::Direction direction, bool paging = false) {
       const bool vertical = direction == SpatialNavigation::Up || direction == SpatialNavigation::Down;
       const bool forward = direction == SpatialNavigation::Down || direction == SpatialNavigation::Right;
       for (QQuickItem* view = item->parentItem(); view; view = view->parentItem()) {
-        if (!isItemView(view) || !view->property("keyNavigationEnabled").toBool()) continue;
+        if (!isItemView(view) || (!paging && !view->property("keyNavigationEnabled").toBool())) continue;
         const char* method = nullptr;
         if (view->inherits("QQuickGridView")) {
           method = direction == SpatialNavigation::Up     ? "moveCurrentIndexUp"
@@ -379,7 +382,7 @@ namespace jfd::ui {
     QPointer<QQuickItem> current = start;
     bool moved = false;
     for (int i = 0; i < MaxPageSteps; ++i) {
-      if (!step(direction)) break;
+      if (!stepInView(window->activeFocusItem(), direction, true) && !move(direction)) break;
       QQuickItem* now = window->activeFocusItem();
       if (!now || now == current) break;
       // Out of the scrolled area (the mini player under a page): one step

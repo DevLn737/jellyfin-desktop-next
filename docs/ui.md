@@ -171,8 +171,9 @@ the direction weighted; a focus scope with focusable items inside is
 entered. A view's `currentIndex` follows the focus, and a `Flickable` scrolls
 to an item outside its visible part; delegates a view has not created are
 reached through the view's own keys. PageUp and PageDown (a gamepad's LB
-and RB) move the focus about a page, step by step, and never send keys to
-the focused control. A control whose own arrows would trap the focus
+and RB) move the focus about a page, step by step through the containing
+view's currentIndex (also `CardGrid` in TV mode, whose key navigation is
+off), and never send keys to the focused control. A control whose own arrows would trap the focus
 lists the arrows to give up in `navigationKeys` (`ChoiceBox` in TV mode);
 those step through the containing view first (`step()`), so a row below
 the view's edge is reached, then by geometry.

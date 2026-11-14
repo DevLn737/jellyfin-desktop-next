@@ -65,8 +65,9 @@ namespace jfd::ui {
     // gives up and for page moves.
     Q_INVOKABLE bool step(jfd::ui::SpatialNavigation::Direction direction);
     // About a page (the height of the Flickable around the focus) up or
-    // down, by steps (step()); false when nothing around the focus scrolls or
-    // the focus could not move.
+    // down, by steps (step(), where a view steps even with its key
+    // navigation off, as CardGrid in TV mode); false when nothing around the
+    // focus scrolls or the focus could not move.
     Q_INVOKABLE bool movePage(jfd::ui::SpatialNavigation::Direction direction);
 
     // The item `from` moves to among the focusable items under `scope`, or

@@ -613,6 +613,71 @@ TEST_CASE("In TV mode Down from the last visible drop-down goes on to the settin
   CHECK(scene.root->property("changes").toInt() == 0);
 }
 
+TEST_CASE("In TV mode PageDown goes through a card grid to its end, scrolling, and arrows still leave at its edges") {
+  Scene scene(R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Shell
+import Jfd.Ui.Controls
+Item {
+  id: root
+  function setTvMode(on) { Theme.tvMode = on }
+  SpatialNavigation.enabled: true
+  Rectangle { objectName: "side"; x: 0; y: 10; width: 80; height: 50; activeFocusOnTab: true }
+  CardGrid {
+    objectName: "grid"
+    x: 100; width: 700; height: 600
+    model: 200
+    delegate: Rectangle {
+      required property int index
+      objectName: "card" + index
+      width: 150; height: 220
+      activeFocusOnTab: true
+    }
+  }
+}
+)");
+  QQuickWindow& window = scene.window;
+  scene.setTvMode(true);
+  pump(20);
+  auto* grid = qvariant_cast<QQuickItem*>(scene.item(QStringLiteral("grid"))->property("view"));
+  REQUIRE(grid != nullptr);
+  const int columns = grid->property("columns").toInt();
+  REQUIRE(columns > 1);
+  REQUIRE(grid->property("keyNavigationEnabled").toBool() == false);
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("card0")));
+  REQUIRE(focusName(window) == QStringLiteral("card0"));
+  const auto cardIndex = [&window] { return focusName(window).mid(4).toInt(); };
+  int last = 0;
+  int presses = 0;
+  for (; presses < 100; ++presses) {
+    tap(window, Qt::Key_PageDown);
+    pump(5);
+    REQUIRE(focusName(window).startsWith(QStringLiteral("card")));
+    if (cardIndex() == last) break;
+    CHECK(cardIndex() > last);
+    last = cardIndex();
+    QQuickItem* focused = window.activeFocusItem();
+    const QRectF shown = focused->mapRectToItem(grid, QRectF(0, 0, focused->width(), focused->height()));
+    CHECK(shown.top() >= -0.5);
+    CHECK(shown.bottom() <= grid->height() + 0.5);
+  }
+  CHECK(presses > 1);
+  CHECK(last >= 200 - columns);
+  CHECK(grid->property("contentY").toDouble() > grid->height());
+  CHECK(grid->property("currentIndex").toInt() == last);
+  // Back to the top by pages.
+  for (int i = 0; i < 100 && cardIndex() >= columns; ++i) tap(window, Qt::Key_PageUp);
+  CHECK(cardIndex() < columns);
+  // Plain arrows keep the TV edges: Left from the first column leaves the
+  // grid instead of wrapping to the row above.
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("card%1").arg(columns)));
+  pump(5);
+  REQUIRE(focusName(window) == QStringLiteral("card%1").arg(columns));
+  tap(window, Qt::Key_Left);
+  CHECK(focusName(window) == QStringLiteral("side"));
+}
+
 TEST_CASE("In TV mode text and controls are TV-sized, and switch back without a restart") {
   Scene scene(R"(
 import QtQuick
