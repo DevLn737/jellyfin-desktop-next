@@ -8,7 +8,7 @@ import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
 // An album or a playlist: the cover and facts, Play / Shuffle / queue
-// buttons and the tracks. `trackKind` is albumTracks or playlistTracks.
+// and Download buttons and the tracks. `trackKind` is albumTracks or playlistTracks.
 RoutePage {
     id: page
 
@@ -137,6 +137,12 @@ RoutePage {
                             for (let i = 0; i < page.list.count; ++i)
                                 page.list.enqueue(i, false)
                         }
+                    }
+                    DownloadActions {
+                        objectName: "musicDownload"
+                        itemId: page.routeArgument
+                        itemType: page.trackKind === "playlistTracks" ? "Playlist" : "MusicAlbum"
+                        itemName: page.item.name || ""
                     }
                     ActionButton {
                         objectName: "musicFavorite"

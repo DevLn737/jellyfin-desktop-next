@@ -12,6 +12,7 @@ qt_add_qml_module(jfd_ui_controls
     AppDialog.qml
     CardGrid.qml
     ChoiceBox.qml
+    DownloadBadge.qml
     CardRow.qml
     FocusFrame.qml
     GlassPanel.qml
@@ -47,6 +48,11 @@ qt_add_qml_module(jfd_ui_controls
     icons/settings.svg
     icons/up.svg
     icons/down.svg
+    icons/delete.svg
+    icons/download.svg
+    icons/downloaded.svg
+    icons/pause.svg
+    icons/retry.svg
     icons-dark/back.svg
     icons-dark/check.svg
     icons-dark/close.svg
@@ -61,6 +67,11 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/settings.svg
     icons-dark/up.svg
     icons-dark/down.svg
+    icons-dark/delete.svg
+    icons-dark/download.svg
+    icons-dark/downloaded.svg
+    icons-dark/pause.svg
+    icons-dark/retry.svg
   DEPENDENCIES Jfd.Ui.Theme)
 target_link_libraries(jfd_ui_controls PRIVATE Qt6::Quick jfd_ui_theme)
 jfd_add_translations(jfd_ui_controls)

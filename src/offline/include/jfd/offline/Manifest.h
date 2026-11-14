@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QString>
+#include <QStringList>
 
 #include <cstdint>
 #include <optional>
@@ -73,6 +74,11 @@ namespace jfd::offline {
     // All of the above was fetched (or the server has none of it). False:
     // asked again at the next sign-in.
     bool extrasComplete = false;
+
+    // The series, season, album, playlist or collection the user pressed
+    // "Download" on to get this item (besides the item's own SeriesId,
+    // SeasonId and AlbumId), so the group's page shows what it has.
+    QStringList parents;
 
     // What the last look at the server found (OfflineSync): the item is no
     // longer there (the copy still plays until deleted), or its file changed

@@ -110,9 +110,11 @@ namespace jfd::offline {
 
     // Queues the original of `mediaSource` (one of the item's versions).
     // `item`, `mediaSource` and `userData` are the server's JSON; secrets
-    // are removed before they are stored.
+    // are removed before they are stored. `parents`: what the user pressed
+    // "Download" on (ItemManifest::parents).
     EnqueueResult enqueueOriginal(const QJsonObject& item, const QJsonObject& mediaSource,
-                                  const QJsonObject& userData = {});
+                                  const QJsonObject& userData = {},
+                                  const QStringList& parents = {});
 
     void pause(const QString& itemId);
     void resume(const QString& itemId);

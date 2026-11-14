@@ -114,7 +114,8 @@ namespace jfd::offline {
 
   EnqueueResult DownloadQueue::enqueueOriginal(const QJsonObject& item,
                                                const QJsonObject& mediaSource,
-                                               const QJsonObject& userData) {
+                                               const QJsonObject& userData,
+                                               const QStringList& parents) {
     if (m_serverId.isEmpty() || m_userId.isEmpty()) return EnqueueResult::NotSignedIn;
     const QString itemId = item.value(QLatin1String("Id")).toString();
     const QString sourceId = mediaSource.value(QLatin1String("Id")).toString();
@@ -132,6 +133,8 @@ namespace jfd::offline {
     m.item = item;
     m.mediaSource = mediaSource;
     m.userData = userData;
+    for (const QString& parent : parents)
+      if (DownloadStore::isSafeId(parent) && !m.parents.contains(parent)) m.parents.append(parent);
     m.mediaFile = QStringLiteral("media.") + mediaExtension(mediaSource);
     const double size = mediaSource.value(QLatin1String("Size")).toDouble();
     m.expectedSize = size > 0 ? static_cast<std::int64_t>(size) : 0;

@@ -6,6 +6,7 @@
 #include <jfd/offline/DownloadQueue.h>
 #include <jfd/offline/DownloadSettings.h>
 #include <jfd/offline/DownloadStore.h>
+#include <jfd/offline/DownloadsController.h>
 #include <jfd/offline/ExtrasDownloader.h>
 #include <jfd/offline/JournalReportSink.h>
 #include <jfd/offline/OfflineCatalog.h>
@@ -13,12 +14,18 @@
 #include <jfd/offline/OfflineSync.h>
 #include <jfd/offline/StorageGuard.h>
 #include <jfd/offline/ViewJournal.h>
+#include <jfd/music/MusicPlayer.h>
+#include <jfd/music/MusicQueue.h>
 #include <jfd/session/SessionRuntime.h>
+#include <jfd/ui/DownloadsUi.h>
+#include <jfd/ui/Navigator.h>
 
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QLoggingCategory>
+#include <QQmlApplicationEngine>
+#include <QQmlEngine>
 #include <QStandardPaths>
 #include <QTimer>
 
@@ -40,7 +47,7 @@ namespace jfd::desktop {
     explicit DownloadServices(const QString& root, const QString& journalPath)
         : store(root), catalog(store), guard(std::make_shared<offline::StorageGuard>()),
           queue(store, catalog, guard), extras(store, catalog), local(store, catalog),
-          journal(journalPath) {}
+          journal(journalPath), controller(store, catalog, queue, *guard) {}
 
     offline::DownloadStore store;
     offline::OfflineCatalog catalog;
@@ -49,10 +56,15 @@ namespace jfd::desktop {
     offline::ExtrasDownloader extras;
     offline::OfflineLocalSource local;
     offline::ViewJournal journal;
+    // The screens' lists and actions (the `Downloads` QML singleton).
+    offline::DownloadsController controller;
     std::unique_ptr<offline::OfflineSync> sync;
     QTimer refresh;
     QString serverId;
     QString userId;
+    // "Continue downloads when the app starts" is off: the first sign-in
+    // of this run pauses what was left unfinished.
+    bool pauseLeftovers = false;
   };
 
   namespace {
@@ -77,6 +89,11 @@ namespace jfd::desktop {
       downloads.extras.setAccess(downloads.serverId, downloads.userId, serverUrl, authorization);
       downloads.local.setUser(downloads.serverId, downloads.userId);
       downloads.sync->setUser(downloads.serverId, downloads.userId);
+      downloads.controller.setUser(downloads.serverId, downloads.userId);
+      if (signedIn && downloads.pauseLeftovers) {
+        downloads.pauseLeftovers = false;
+        for (const QString& itemId : downloads.queue.order()) downloads.queue.pause(itemId);
+      }
     }
 
     bool online(const AppServices& services) {
@@ -115,6 +132,10 @@ namespace jfd::desktop {
     applyLimits(downloads, settings);
     downloads.local.setPreferLocal(settings.value(offline::keys::PreferLocal).toBool());
     downloads.local.setOnline(online(services));
+    downloads.queue.setMaxParallel(settings.value(offline::keys::MaxParallel).toInt());
+    downloads.pauseLeftovers = !settings.value(offline::keys::ResumeOnStart).toBool();
+    downloads.controller.setClient(services.client);
+    downloads.controller.setOnline(online(services));
 
     // Playing goes to the copy on disk first (see LocalSource).
     services.session->launcher().setLocalSource(&downloads.local);
@@ -126,6 +147,10 @@ namespace jfd::desktop {
                          applyLimits(d, *services.settings);
                        else if (key == offline::keys::PreferLocal)
                          d.local.setPreferLocal(value.toBool());
+                       else if (key == offline::keys::MaxParallel)
+                         d.queue.setMaxParallel(value.toInt());
+                       if (key == offline::keys::MaxGiB || key == offline::keys::ReserveGiB)
+                         d.controller.refresh();
                      });
 
     library::SignIn& signIn = *services.signIn;
@@ -149,6 +174,7 @@ namespace jfd::desktop {
                        DownloadServices& d = *services.downloads;
                        const bool ready = state == api::SessionSocket::State::Ready;
                        d.local.setOnline(ready);
+                       d.controller.setOnline(ready);
                        if (!ready) return;
                        // Back in touch: what was watched offline goes out,
                        // watched marks from other devices come in.
@@ -160,6 +186,13 @@ namespace jfd::desktop {
       if (online(services)) services.downloads->sync->syncNow();
     });
     downloads.refresh.start();
+
+    // Watched marks from the server and fetched images change what the
+    // screens show.
+    QObject::connect(downloads.sync.get(), &offline::OfflineSync::finished, &downloads.controller,
+                     [&services] { services.downloads->controller.refresh(); });
+    QObject::connect(&downloads.extras, &offline::ExtrasDownloader::finished, &downloads.controller,
+                     [&services] { services.downloads->controller.refresh(); });
 
     // A finished file gets its subtitles, images, lyrics and segments.
     QObject::connect(&downloads.queue, &offline::DownloadQueue::completed, &downloads.queue,
@@ -200,7 +233,33 @@ namespace jfd::desktop {
     };
   }
 
+  void installDownloadScreens(AppServices& services, QQmlEngine& engine) {
+    if (!services.downloads) return;
+    ui::DownloadsUi::setService(&services.downloads->controller);
+    ui::DownloadsUi::registerRoutes(*services.navigator);
+    // Downloaded tracks play in the music player without the server.
+    ui::DownloadsUi::setTrackListHandler([&services](const QList<api::Item>& items, int start) {
+      if (!services.music || !services.music->available()) return false;
+      QList<music::Track> tracks;
+      for (const api::Item& item : items) tracks.append(music::Track::fromItem(item));
+      services.music->play(std::move(tracks), start);
+      return true;
+    });
+    // Messages for the shell's toast, as the library's.
+    auto* ui = engine.singletonInstance<ui::DownloadsUi*>("Jfd.Ui.Library", "Downloads");
+    if (ui == nullptr) return;
+    QObject::connect(ui, &ui::DownloadsUi::message, &engine, [&engine](const QString& text, bool error) {
+      auto* app = qobject_cast<QQmlApplicationEngine*>(&engine);
+      if (app == nullptr || app->rootObjects().isEmpty()) return;
+      QObject* shell = app->rootObjects().first()->findChild<QObject*>(QStringLiteral("shell"));
+      if (shell == nullptr) return;
+      QMetaObject::invokeMethod(shell, error ? "showError" : "showMessage", Q_ARG(QVariant, QVariant(text)));
+    });
+  }
+
   void uninstallDownloads(AppServices& services) {
+    ui::DownloadsUi::setTrackListHandler({});
+    ui::DownloadsUi::setService(nullptr);
     if (services.session) services.session->launcher().setLocalSource(nullptr);
     services.downloads.reset();
   }

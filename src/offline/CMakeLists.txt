@@ -1,10 +1,13 @@
 # Offline downloads (stage 3, package 3.10a): the download folder and its
 # manifests, the catalog built from them, the space limits and the queue
 # with its worker thread; playing copies through the launcher's LocalSource,
-# the offline watch journal and its sync with the server. Qt Core and Network only; the screens come later
-# in src/ui/library.
+# the offline watch journal and its sync with the server; the lists and
+# actions behind the download screens (DownloadsController). Qt Core and
+# Network only; the screens are in src/ui/library.
 add_library(jfd_offline STATIC
+  src/DownloadListModel.cpp
   src/DownloadQueue.cpp
+  src/DownloadsController.cpp
   src/DownloadSettings.cpp
   src/DownloadStore.cpp
   src/DownloadWorker.cpp
@@ -16,7 +19,9 @@ add_library(jfd_offline STATIC
   src/OfflineSync.cpp
   src/StorageGuard.cpp
   src/ViewJournal.cpp
+  include/jfd/offline/DownloadListModel.h
   include/jfd/offline/DownloadQueue.h
+  include/jfd/offline/DownloadsController.h
   include/jfd/offline/DownloadSettings.h
   include/jfd/offline/DownloadStore.h
   include/jfd/offline/DownloadWorker.h
@@ -38,5 +43,5 @@ set_target_properties(jfd_offline PROPERTIES AUTOMOC ON)
 target_compile_definitions(jfd_offline PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 # See src/jellyfin-api/CMakeLists.txt: C4702 from inlined Qt headers.
 target_compile_options(jfd_offline PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
-# The settings section's strings, in i18n/offline_ru.ts.
+# The settings section's and the download screens' strings, in i18n/offline_ru.ts.
 jfd_add_translations(jfd_offline)

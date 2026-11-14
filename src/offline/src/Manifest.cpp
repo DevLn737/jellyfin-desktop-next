@@ -1,4 +1,5 @@
 #include <jfd/offline/Manifest.h>
+#include <jfd/offline/DownloadStore.h>
 
 #include <QJsonArray>
 #include <QRegularExpression>
@@ -109,6 +110,8 @@ namespace jfd::offline {
     if (!m.lyricsFile.isEmpty()) o.insert(QStringLiteral("lyricsFile"), m.lyricsFile);
     if (!m.segmentsFile.isEmpty()) o.insert(QStringLiteral("segmentsFile"), m.segmentsFile);
     if (m.extrasComplete) o.insert(QStringLiteral("extrasComplete"), true);
+    if (!m.parents.isEmpty())
+      o.insert(QStringLiteral("parents"), QJsonArray::fromStringList(m.parents));
     if (m.removedOnServer) o.insert(QStringLiteral("removedOnServer"), true);
     if (m.changedOnServer) o.insert(QStringLiteral("changedOnServer"), true);
     if (m.refreshedAt.isValid()) o.insert(QStringLiteral("refreshedAt"), date(m.refreshedAt));
@@ -157,6 +160,9 @@ namespace jfd::offline {
     if (const QString f = o.value(QLatin1String("segmentsFile")).toString(); inside(f))
       m.segmentsFile = f;
     m.extrasComplete = o.value(QLatin1String("extrasComplete")).toBool();
+    for (const QJsonValue& parent : o.value(QLatin1String("parents")).toArray())
+      if (parent.isString() && DownloadStore::isSafeId(parent.toString()))
+        m.parents.append(parent.toString());
     m.removedOnServer = o.value(QLatin1String("removedOnServer")).toBool();
     m.changedOnServer = o.value(QLatin1String("changedOnServer")).toBool();
     m.refreshedAt =

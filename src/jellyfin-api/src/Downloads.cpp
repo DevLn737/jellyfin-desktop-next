@@ -95,6 +95,30 @@ namespace jfd::api {
                     });
   }
 
+  void fetchDownloadableChildren(JellyfinClient& client, const QString& parentId, bool keepOrder,
+                                 bool unplayedOnly, QObject* context,
+                                 std::function<void(Result<QJsonArray>)> done) {
+    QUrlQuery query = userQuery(client);
+    query.addQueryItem(QStringLiteral("ParentId"), parentId);
+    query.addQueryItem(QStringLiteral("Recursive"), QStringLiteral("true"));
+    query.addQueryItem(QStringLiteral("IncludeItemTypes"),
+                       QStringLiteral("Movie,Episode,Video,MusicVideo,Audio,AudioBook"));
+    query.addQueryItem(QStringLiteral("Fields"), QStringLiteral("MediaSources"));
+    query.addQueryItem(QStringLiteral("enableUserData"), QStringLiteral("true"));
+    if (!keepOrder)
+      query.addQueryItem(QStringLiteral("SortBy"),
+                         QStringLiteral("ParentIndexNumber,IndexNumber,SortName"));
+    if (unplayedOnly) query.addQueryItem(QStringLiteral("Filters"), QStringLiteral("IsUnplayed"));
+    client.sendJson(JellyfinClient::Method::Get, QStringLiteral("Items"), query, std::nullopt,
+                    context, [done = std::move(done)](Result<QJsonObject> result) {
+                      if (!result) {
+                        done(result.error());
+                        return;
+                      }
+                      done(result->value(QLatin1String("Items")).toArray());
+                    });
+  }
+
   bool isServerUrl(const QUrl& serverUrl, const QUrl& target) {
     return target.isValid() && serverUrl.isValid() &&
            target.scheme().compare(serverUrl.scheme(), Qt::CaseInsensitive) == 0 &&

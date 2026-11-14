@@ -1,11 +1,15 @@
 # Jfd.Ui.Library: the sign-in, home, library, item and search screens, on
 # the models of src/library. `Library` (LibraryUi) is the screens' way into
 # those models; image://jfd/ serves card images through the library's image
-# cache under a video memory budget.
+# cache under a video memory budget. `Downloads` (DownloadsUi) is their way
+# into the offline downloads (src/offline): the Download buttons and
+# dialog, the badges, the Downloads page and the offline home rows.
 qt_add_library(jfd_ui_library STATIC
+  src/DownloadsUi.cpp
   src/LibraryImageProvider.cpp
   src/LibraryScreens.cpp
   src/LibraryUi.cpp
+  include/jfd/ui/DownloadsUi.h
   include/jfd/ui/LibraryImageProvider.h
   include/jfd/ui/LibraryScreens.h
   include/jfd/ui/LibraryTypes.h
@@ -21,6 +25,10 @@ qt_add_qml_module(jfd_ui_library
     CollectionPage.qml
     CommandPalette.qml
     CustomizeHomePage.qml
+    DownloadActions.qml
+    DownloadDialog.qml
+    DownloadRow.qml
+    DownloadsPage.qml
     EpisodeRow.qml
     GenrePicker.qml
     GuidePage.qml
@@ -36,7 +44,7 @@ qt_add_qml_module(jfd_ui_library
     icons/livetv.svg
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell)
 target_link_libraries(jfd_ui_library
-  PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::library jfd_ui_shell
+  PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::library jfd::offline jfd_ui_shell
   PRIVATE jfd_ui_theme jfd_ui_controls)
 target_compile_definitions(jfd_ui_library PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 target_compile_options(jfd_ui_library PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)

@@ -18,4 +18,9 @@ QtObject {
     readonly property url up: Qt.resolvedUrl("icons/up.svg")
     readonly property url down: Qt.resolvedUrl("icons/down.svg")
     readonly property url gamepad: Qt.resolvedUrl("icons/gamepad.svg")
+    readonly property url download: Qt.resolvedUrl("icons/download.svg")
+    readonly property url downloaded: Qt.resolvedUrl("icons/downloaded.svg")
+    readonly property url pause: Qt.resolvedUrl("icons/pause.svg")
+    readonly property url retry: Qt.resolvedUrl("icons/retry.svg")
+    readonly property url remove: Qt.resolvedUrl("icons/delete.svg")
 }
