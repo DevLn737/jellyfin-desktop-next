@@ -773,19 +773,21 @@ Item {
   settle();
   const qint64 growth = residentBytes() - before;
   MESSAGE("slowest TV mode switch ", slowest, " ms, memory growth ", growth / 1024, " KiB");
-  CHECK(slowest <= 100);
+  // ASan slows Qt Quick several times and holds freed memory in quarantine, so
+  // neither the time nor the resident size means anything under it.
 #if defined(__SANITIZE_ADDRESS__)
-  constexpr bool residentMeaningful = false;
+  constexpr bool measurable = false;
 #elif defined(__has_feature)
 #if __has_feature(address_sanitizer)
-  constexpr bool residentMeaningful = false;
+  constexpr bool measurable = false;
 #else
-  constexpr bool residentMeaningful = true;
+  constexpr bool measurable = true;
 #endif
 #else
-  constexpr bool residentMeaningful = true;
+  constexpr bool measurable = true;
 #endif
-  if (residentMeaningful && before > 0) CHECK(growth <= 5 * 1024 * 1024);
+  if (measurable) CHECK(slowest <= 100);
+  if (measurable && before > 0) CHECK(growth <= 5 * 1024 * 1024);
 }
 
 namespace {
