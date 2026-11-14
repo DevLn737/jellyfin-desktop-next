@@ -335,6 +335,9 @@ namespace jfd::ui {
     QString m_liveChannel;
     QList<api::LiveTvProgram> m_livePrograms;
     bool m_programsLoading = false;
+    // When the last guide request ended: a failed, empty or stale answer is
+    // asked again after a minute, not on every tick.
+    QDateTime m_programsTriedAt;
     std::optional<api::LiveTvProgram> m_program;
     QTimer m_liveTick;
   };

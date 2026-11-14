@@ -513,6 +513,7 @@ namespace jfd::ui {
     m_liveChannel = channelId;
     if (!sameChannel) {
       m_livePrograms.clear();
+      m_programsTriedAt = {};
       m_program.reset();
     }
     m_liveTick.start();
@@ -558,6 +559,7 @@ namespace jfd::ui {
     query.limit = 100;
     m_liveTv.allPrograms(query, this, [this, channelId](api::Result<QList<api::LiveTvProgram>> programs) {
       m_programsLoading = false;
+      m_programsTriedAt = now();
       if (channelId != m_liveChannel) {
         // Switched while it loaded: the new channel's guide.
         loadLivePrograms();
@@ -585,7 +587,9 @@ namespace jfd::ui {
     // The guide ran out: the next hours.
     const bool ranOut = std::none_of(m_livePrograms.cbegin(), m_livePrograms.cend(),
                                      [&](const api::LiveTvProgram& p) { return p.end > at; });
-    if (ranOut && !m_livePrograms.isEmpty()) loadLivePrograms();
+    // The guide ran out, or the last request failed or came back empty: ask
+    // again, at most once a minute.
+    if (ranOut && (!m_programsTriedAt.isValid() || m_programsTriedAt.secsTo(at) >= 60)) loadLivePrograms();
     m_program = on;
     Q_EMIT liveInfoChanged();
   }
@@ -602,6 +606,7 @@ namespace jfd::ui {
     // The header shows the new channel at once, while it tunes in.
     m_liveChannel = target;
     m_livePrograms.clear();
+    m_programsTriedAt = {};
     m_program.reset();
     updateProgram();
     loadLivePrograms();

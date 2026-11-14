@@ -377,7 +377,7 @@ RoutePage {
                     Text {
                         // The title stays readable when the programme began
                         // before the left edge.
-                        x: Math.max(Theme.spacingSmall, page.offset - cell.x + Theme.spacingSmall)
+                        x: Math.max(Theme.spacingSmall, -cell.x + Theme.spacingSmall)
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, cell.width - x - Theme.spacingSmall)
                         text: cell.modelData.title
