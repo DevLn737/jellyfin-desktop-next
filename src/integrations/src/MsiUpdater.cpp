@@ -23,6 +23,17 @@ namespace jfd::integrations {
     QString scriptFile(const QString& stateDirectory) {
       return QDir(stateDirectory).filePath(QStringLiteral("apply-update.ps1"));
     }
+
+    // MSIs of other versions in the state directory: downloaded, never
+    // installed (the script removes the one it installs) and superseded by
+    // keep. About 90 MB each, so only the newest verified one stays.
+    void removeOtherDownloads(const QString& stateDirectory, const QString& keep) {
+      QDir directory(stateDirectory);
+      const QString pattern = MsiUpdater::assetName(QStringLiteral("*"));
+      for (const QString& name : directory.entryList({pattern, pattern + QStringLiteral(".minisig")}, QDir::Files)) {
+        if (name != keep) directory.remove(name);
+      }
+    }
   } // namespace
 
   QString MsiUpdater::assetName(const QString& version) {
@@ -99,12 +110,15 @@ namespace jfd::integrations {
     m_preparing = release.version;
     // Downloaded under its final name: the signature check is what makes
     // the file trustworthy, and a failed one removes it.
-    m_download.start(*file, *signature, msiPath(release.version), name, *m_key, [this](const QString& error) {
+    m_download.start(*file, *signature, msiPath(release.version), name, *m_key, [this, name](const QString& error) {
       if (!error.isEmpty()) {
         m_preparing.clear();
         Q_EMIT failed(error);
         return;
       }
+      // Only once the new one is verified: a failed download keeps the
+      // version that was ready.
+      removeOtherDownloads(m_stateDirectory, name);
       m_readyVersion = m_preparing;
       m_preparing.clear();
       Q_EMIT ready(m_readyVersion);

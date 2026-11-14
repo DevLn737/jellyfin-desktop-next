@@ -210,6 +210,45 @@ TEST_CASE("The updated version confirms and gets the screen to reopen") {
   CHECK(updater.confirmStart(QStringLiteral("0.2.0")).kind == AppImageUpdater::StartState::Kind::None);
 }
 
+TEST_CASE("The next version starts without the AppImage's entries but with the user's") {
+  const QString appDir = QStringLiteral("/tmp/.mount_jfdAbc");
+  QProcessEnvironment environment;
+  environment.insert(QStringLiteral("APPDIR"), appDir);
+  environment.insert(QStringLiteral("APPIMAGE"), QStringLiteral("/home/alice/Apps/app.AppImage"));
+  environment.insert(QStringLiteral("ARGV0"), QStringLiteral("app.AppImage"));
+  environment.insert(QStringLiteral("OWD"), QStringLiteral("/home/alice"));
+  // An AppRun hook put its folders in front of the user's.
+  environment.insert(QStringLiteral("PATH"), appDir + QStringLiteral("/usr/bin:/home/alice/bin:/usr/bin"));
+  environment.insert(QStringLiteral("XDG_DATA_DIRS"),
+                     appDir + QStringLiteral("/usr/share:/usr/local/share:") + appDir + QStringLiteral("/share"));
+  environment.insert(QStringLiteral("LD_LIBRARY_PATH"), appDir + QStringLiteral("/usr/lib:/opt/alice/lib"));
+  // Only the AppImage's: gone.
+  environment.insert(QStringLiteral("QT_PLUGIN_PATH"), appDir + QStringLiteral("/usr/plugins"));
+  environment.insert(QStringLiteral("GSETTINGS_SCHEMA_DIR"), appDir + QStringLiteral("/usr/share/glib-2.0/schemas"));
+  // Nothing to do with the AppImage: unchanged.
+  environment.insert(QStringLiteral("HOME"), QStringLiteral("/home/alice"));
+  environment.insert(QStringLiteral("LANG"), QStringLiteral("ru_RU.UTF-8"));
+
+  const QProcessEnvironment next = AppImageUpdater::relaunchEnvironment(environment);
+  for (const char* key : {"APPDIR", "APPIMAGE", "ARGV0", "OWD", "QT_PLUGIN_PATH", "GSETTINGS_SCHEMA_DIR"}) {
+    CAPTURE(key);
+    CHECK_FALSE(next.contains(QString::fromLatin1(key)));
+  }
+  CHECK(next.value(QStringLiteral("PATH")) == QStringLiteral("/home/alice/bin:/usr/bin"));
+  CHECK(next.value(QStringLiteral("XDG_DATA_DIRS")) == QStringLiteral("/usr/local/share"));
+  CHECK(next.value(QStringLiteral("LD_LIBRARY_PATH")) == QStringLiteral("/opt/alice/lib"));
+  CHECK(next.value(QStringLiteral("HOME")) == QStringLiteral("/home/alice"));
+  CHECK(next.value(QStringLiteral("LANG")) == QStringLiteral("ru_RU.UTF-8"));
+
+  // Outside an AppImage nothing but the runtime's own names is touched.
+  QProcessEnvironment plain;
+  plain.insert(QStringLiteral("PATH"), QStringLiteral("/usr/bin"));
+  plain.insert(QStringLiteral("OWD"), QStringLiteral("/home/alice"));
+  const QProcessEnvironment same = AppImageUpdater::relaunchEnvironment(plain);
+  CHECK(same.value(QStringLiteral("PATH")) == QStringLiteral("/usr/bin"));
+  CHECK_FALSE(same.contains(QStringLiteral("OWD")));
+}
+
 TEST_CASE("Restart links are recognised by their scheme") {
   QNetworkAccessManager network;
   AppImageUpdater updater(&network, QString(), QString(), std::nullopt);
