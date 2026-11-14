@@ -39,6 +39,14 @@ download GitHub archive tarballs (one Web dependency is one) can use the
 payloads CI publishes from `main` instead: `PAYLOAD=release scripts/server-up.sh`.
 `PAYLOAD=/dir` uses `/dir/server` and `/dir/web` built some other way.
 
+The payloads are the `syncplay-test-server` pre-release of this repository
+(`syncplay-harness.yml` publishes it; the Session workflow's fork leg downloads
+it). The client never offers it as an update: only `v<version>` tags are
+client releases (`newestRelease` in `src/integrations`, checked in
+`UpdateCheckerTest`). The 2b plan moves it to the fork repository
+(`jellyfin-syncplay-speed`); until that repository publishes the payloads it
+stays here, and moving it means changing both workflows' URLs together.
+
 The server listens on `http://localhost:8096` (`PORT` to change). Accounts:
 `admin`/`admin` and `alice`, `bob`, `carol`, `dave`, each with its name as the
 password. The library holds one item, *SyncPlay Test Clip*.

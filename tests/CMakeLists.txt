@@ -34,6 +34,12 @@ if(UNIX AND JFD_BASH)
   add_test(NAME release_version_check
     COMMAND "${JFD_BASH}" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/release-version-test.sh" "${PROJECT_SOURCE_DIR}")
 endif()
+# The pre-release notes packaging/release-notes.sh writes from the history.
+find_program(JFD_GIT git)
+if(UNIX AND JFD_BASH AND JFD_GIT)
+  add_test(NAME release_notes_check
+    COMMAND "${JFD_BASH}" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/release-notes-test.sh" "${PROJECT_SOURCE_DIR}")
+endif()
 
 add_executable(jfd_diagnostics_tests
   core/main.cpp

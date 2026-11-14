@@ -258,7 +258,9 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   paletteInput->setProperty("text", QStringLiteral("Test"));
   REQUIRE(waitFor([&] { return palette->property("mediaCount").toInt() >= 1; }, 5000));
   MESSAGE("palette search answered in ", paletteTimer.elapsed(), " ms");
-  CHECK(paletteTimer.elapsed() < 2000);
+  // The 2c threshold: a search result in under 1 s on the stand (CI
+  // answers in about 230 ms).
+  CHECK(paletteTimer.elapsed() < 1000);
   screens.screenshot(QStringLiteral("palette"));
   QMetaObject::invokeMethod(palette, "close");
 
