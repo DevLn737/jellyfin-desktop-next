@@ -400,6 +400,9 @@ TEST_CASE("A live channel names its programme, and Page Up and Down change the c
         {"Id": "p2", "ChannelId": "ch2", "Name": "Weather", "StartDate": "2026-11-10T16:30:00Z",
          "EndDate": "2026-11-10T16:40:00Z"}], "TotalRecordCount": 2, "StartIndex": 0})");
     if (r.path == QStringLiteral("/LiveTv/Programs")) return json(R"({"Items": [], "TotalRecordCount": 0})");
+    // The channel the player tunes to: the lookup stays open, so the switch
+    // is still under way when the test looks (a failed one goes back).
+    if (r.path.startsWith(QStringLiteral("/Items/ch"))) return test::HttpResponse{200, "{}", "application/json", 60000};
     return test::HttpResponse{404, {}, {}, 0};
   });
   Fixture f;
@@ -443,7 +446,7 @@ TEST_CASE("A live channel names its programme, and Page Up and Down change the c
   };
   const auto asked = [&](const char* id) {
     for (const test::HttpRequest& r : server.requests())
-      if (r.path == QStringLiteral("/Items/%1/PlaybackInfo").arg(QLatin1String(id))) return true;
+      if (r.path == QStringLiteral("/Items/%1").arg(QLatin1String(id))) return true;
     return false;
   };
   // Channel up: the next in the list, named at once while it tunes in.
