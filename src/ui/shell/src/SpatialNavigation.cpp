@@ -135,6 +135,14 @@ namespace jfd::ui {
              rect.right() <= viewport->width() + 0.5;
     }
 
+    // The view scrolls just enough to show its item at `index`.
+    void showIndex(QQuickItem* view, int index) {
+      const QMetaObject* meta = view->metaObject();
+      const int enumIndex = meta->indexOfEnumerator("PositionMode");
+      const int contain = enumIndex >= 0 ? meta->enumerator(enumIndex).keyToValue("Contain") : -1;
+      if (contain >= 0) QMetaObject::invokeMethod(view, "positionViewAtIndex", Q_ARG(int, index), Q_ARG(int, contain));
+    }
+
     // The views around `item` make its delegate their current one, so their
     // own keys go on from there, and show it.
     void followInViews(QQuickItem* item) {
@@ -146,12 +154,45 @@ namespace jfd::ui {
         const int index = delegateIndex(node, item);
         if (index < 0 || node->property("currentIndex").toInt() == index) continue;
         node->setProperty("currentIndex", index);
-        if (fullyInside(item, node)) continue;
-        const QMetaObject* meta = node->metaObject();
-        const int enumIndex = meta->indexOfEnumerator("PositionMode");
-        const int contain = enumIndex >= 0 ? meta->enumerator(enumIndex).keyToValue("Contain") : -1;
-        if (contain >= 0) QMetaObject::invokeMethod(node, "positionViewAtIndex", Q_ARG(int, index), Q_ARG(int, contain));
+        if (!fullyInside(item, node)) showIndex(node, index);
       }
+    }
+
+    // A step through the innermost ListView or GridView around `item` that
+    // moves that way and has its own key navigation: its currentIndex
+    // advances as by its arrow key, the view shows the new current item,
+    // and the focus goes to it. Nothing is sent to the focused item, so an
+    // editor's value never changes. False when no view can step (at its
+    // end, or none around).
+    bool stepInView(QQuickItem* item, SpatialNavigation::Direction direction) {
+      const bool vertical = direction == SpatialNavigation::Up || direction == SpatialNavigation::Down;
+      const bool forward = direction == SpatialNavigation::Down || direction == SpatialNavigation::Right;
+      for (QQuickItem* view = item->parentItem(); view; view = view->parentItem()) {
+        if (!isItemView(view) || !view->property("keyNavigationEnabled").toBool()) continue;
+        const char* method = nullptr;
+        if (view->inherits("QQuickGridView")) {
+          method = direction == SpatialNavigation::Up     ? "moveCurrentIndexUp"
+                   : direction == SpatialNavigation::Down ? "moveCurrentIndexDown"
+                   : direction == SpatialNavigation::Left ? "moveCurrentIndexLeft"
+                                                          : "moveCurrentIndexRight";
+        } else if (view->inherits("QQuickListView")) {
+          const bool listVertical = view->property("orientation").toInt() == Qt::Vertical;
+          if (listVertical != vertical) continue;
+          method = forward ? "incrementCurrentIndex" : "decrementCurrentIndex";
+        } else {
+          continue;
+        }
+        followInViews(item);
+        const int before = view->property("currentIndex").toInt();
+        QMetaObject::invokeMethod(view, method);
+        const int after = view->property("currentIndex").toInt();
+        if (after == before) return false;
+        showIndex(view, after);
+        if (auto* current = qvariant_cast<QQuickItem*>(view->property("currentItem")))
+          current->forceActiveFocus(Qt::TabFocusReason);
+        return true;
+      }
+      return false;
     }
 
     // contentX or contentY moved so [start, end) (in the viewport) fits in
@@ -311,6 +352,14 @@ namespace jfd::ui {
     return true;
   }
 
+  bool SpatialNavigation::step(Direction direction) {
+    QQuickItem* scope = item();
+    QQuickWindow* window = scope ? scope->window() : nullptr;
+    QQuickItem* focused = window ? window->activeFocusItem() : nullptr;
+    if (focused && scope->isAncestorOf(focused) && stepInView(focused, direction)) return true;
+    return move(direction);
+  }
+
   bool SpatialNavigation::movePage(Direction direction) {
     QQuickItem* scope = item();
     QQuickWindow* window = scope ? scope->window() : nullptr;
@@ -324,17 +373,13 @@ namespace jfd::ui {
     if (!reference) return false;
     const double page = vertical ? flickable->height() : flickable->width();
     const QPointF from = centreIn(start, reference);
-    const Qt::Key key = direction == Up ? Qt::Key_Up : direction == Down ? Qt::Key_Down
-                        : direction == Left ? Qt::Key_Left : Qt::Key_Right;
-    // Step by step, through the views' own keys and this navigation, as
-    // arrow presses would.
+    // Step by step, through the views' own navigation and this one. No key
+    // is sent: the focused item (an editor whose arrows change its value)
+    // never sees one.
     QPointer<QQuickItem> current = start;
     bool moved = false;
-    for (int step = 0; step < MaxPageSteps; ++step) {
-      QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier);
-      QCoreApplication::sendEvent(window, &press);
-      QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier);
-      QCoreApplication::sendEvent(window, &release);
+    for (int i = 0; i < MaxPageSteps; ++i) {
+      if (!step(direction)) break;
       QQuickItem* now = window->activeFocusItem();
       if (!now || now == current) break;
       // Out of the scrolled area (the mini player under a page): one step
@@ -382,7 +427,7 @@ namespace jfd::ui {
       const QVariantList list = keys.toList();
       const bool listed = std::any_of(list.begin(), list.end(), [key](const QVariant& k) { return k.toInt() == key; });
       if (!listed) return false;
-      move(direction);
+      step(direction);
       return true;
     }
     if (directionOfKey(key, &direction)) return move(direction);

@@ -32,8 +32,9 @@
 // A control that has to keep some arrows from its own key handling (a
 // drop-down list, whose Up and Down would change the value) names them in a
 // `navigationKeys` property (a list of Qt.Key values); those keys move the
-// focus before the control sees them. Jfd.Ui.Controls cannot import this
-// module, hence a property by convention instead of an attached one.
+// focus before the control sees them, through the view around it first
+// (step()), so a list of settings scrolls on. Jfd.Ui.Controls cannot import
+// this module, hence a property by convention instead of an attached one.
 namespace jfd::ui {
 
   class SpatialNavigation : public QObject {
@@ -58,8 +59,13 @@ namespace jfd::ui {
     // Moves the window's focus from its focused item; false when there is
     // nothing in that direction (the focus stays).
     Q_INVOKABLE bool move(jfd::ui::SpatialNavigation::Direction direction);
+    // One arrow's worth without sending the key to the focused item: the
+    // ListView or GridView around the focus advances its currentIndex (and
+    // scrolls) as its own key would, otherwise move(). For keys a control
+    // gives up and for page moves.
+    Q_INVOKABLE bool step(jfd::ui::SpatialNavigation::Direction direction);
     // About a page (the height of the Flickable around the focus) up or
-    // down, by arrow steps; false when nothing around the focus scrolls or
+    // down, by steps (step()); false when nothing around the focus scrolls or
     // the focus could not move.
     Q_INVOKABLE bool movePage(jfd::ui::SpatialNavigation::Direction direction);
 

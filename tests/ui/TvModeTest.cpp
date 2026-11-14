@@ -529,6 +529,90 @@ Item {
   CHECK(choice->property("currentIndex").toInt() == 2);
 }
 
+namespace {
+
+  // A settings list: 30 rows of 50 px in a 300 px list, each a drop-down
+  // that counts its changes (as SettingRow saves them at once).
+  constexpr auto SettingsListQml = R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Shell
+import Jfd.Ui.Controls
+Item {
+  property int changes: 0
+  function setTvMode(on) { Theme.tvMode = on }
+  SpatialNavigation.enabled: true
+  ListView {
+    objectName: "settings"
+    width: 400; height: 300
+    clip: true
+    focus: true
+    model: 30
+    delegate: FocusScope {
+      required property int index
+      objectName: "setting" + index
+      width: 400; height: 50
+      ChoiceBox {
+        objectName: "choice" + index
+        focus: true
+        model: [{ value: "a", label: "A" }, { value: "b", label: "B" }, { value: "c", label: "C" }]
+        currentIndex: 1
+        onActivated: changes++
+        onCurrentIndexChanged: if (currentIndex !== 1) changes++
+      }
+    }
+  }
+}
+)";
+
+} // namespace
+
+TEST_CASE("PageDown over a drop-down list moves the focus a page and never changes its value") {
+  Scene scene(SettingsListQml);
+  QQuickWindow& window = scene.window;
+  QQuickItem* first = scene.item(QStringLiteral("choice0"));
+  REQUIRE(first != nullptr);
+  SpatialNavigation::focusItem(first);
+  REQUIRE(focusName(window) == QStringLiteral("choice0"));
+
+  // TV mode off: the drop-down's own Up and Down would change the value.
+  tap(window, Qt::Key_PageDown);
+  const int paged = focusName(window).mid(6).toInt();
+  CHECK(focusName(window).startsWith(QLatin1String("choice")));
+  CHECK(paged >= 5);
+  CHECK(scene.item(QStringLiteral("settings"))->property("currentIndex").toInt() == paged);
+  tap(window, Qt::Key_PageUp);
+  CHECK(focusName(window) == QStringLiteral("choice0"));
+  CHECK(first->property("currentIndex").toInt() == 1);
+  CHECK(scene.root->property("changes").toInt() == 0);
+}
+
+TEST_CASE("In TV mode Down from the last visible drop-down goes on to the setting below the list's edge") {
+  Scene scene(SettingsListQml);
+  QQuickWindow& window = scene.window;
+  QQuickItem* list = scene.item(QStringLiteral("settings"));
+  REQUIRE(list != nullptr);
+  scene.setTvMode(true);
+  pump(20);
+  // Rows 0 to 5 fill the list; row 6 is under its edge.
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("choice5")));
+  REQUIRE(focusName(window) == QStringLiteral("choice5"));
+  for (int row = 6; row <= 12; ++row) {
+    CAPTURE(row);
+    tap(window, Qt::Key_Down);
+    REQUIRE(focusName(window) == QStringLiteral("choice%1").arg(row));
+    // The row is what the list scrolls into view (a TV-sized control may be taller than it).
+    QQuickItem* shownRow = scene.item(QStringLiteral("setting%1").arg(row));
+    REQUIRE(shownRow != nullptr);
+    const QRectF shown = shownRow->mapRectToItem(list, QRectF(0, 0, shownRow->width(), shownRow->height()));
+    CHECK(shown.top() >= -0.5);
+    CHECK(shown.bottom() <= list->height() + 0.5);
+  }
+  tap(window, Qt::Key_Up);
+  CHECK(focusName(window) == QStringLiteral("choice11"));
+  CHECK(scene.root->property("changes").toInt() == 0);
+}
+
 TEST_CASE("In TV mode text and controls are TV-sized, and switch back without a restart") {
   Scene scene(R"(
 import QtQuick
