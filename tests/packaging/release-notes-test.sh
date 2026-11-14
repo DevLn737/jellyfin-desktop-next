@@ -3,6 +3,8 @@
 # the previous client tag and carries the install and SmartScreen notes.
 #   release-notes-test.sh <repository root>
 set -euo pipefail
+# CI sets it; each call below passes it only where the link is expected.
+unset GITHUB_REPOSITORY
 script="$(cd "$1" && pwd)/packaging/release-notes.sh"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
