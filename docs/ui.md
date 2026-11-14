@@ -127,7 +127,7 @@ first next time. While it is open the player's keys do not reach the player.
 | `ActionButton` | `text`, `iconSource`, `primary`, `clicked()` |
 | `IconButton` | `iconSource`, `toolTipText`, `clicked()` |
 | `Icon`, `Icons` | `Icon { source: Icons.play; size: 22 }`; icons: home, search, group, settings, back, close, play, check, error, library, menu, up, down, gamepad |
-| `InputField` | `label`, `text`, `placeholderText`, `errorText`, `password`, `accepted()` |
+| `InputField` | `label`, `text`, `placeholderText`, `errorText`, `password`, `accepted()`; `keyboardOnSelect` (default on: Select opens the on-screen keyboard in TV mode) |
 | `ToggleSwitch` | `checked`, `toggled()` (Space or Enter) |
 | `ChoiceBox` | `model: [{ value, label }]`, `currentValue`, `indexOfValue()`, `activated()`; Enter opens the list; in TV mode Up and Down move the focus, not the value (`navigationKeys`) |
 | `ValueSlider` | `from`, `to`, `stepSize`, `value`, `moved()`, `accepted()` (Enter) |
@@ -183,6 +183,19 @@ The Menu key (a gamepad's View) opens the focused item's own menu where it
 has one (`Keys.onMenuPressed`), otherwise it goes to the sidebar's entry of
 the current page, and back. A new screen gets keyboard focus on its first
 item and needs no `KeyNavigation` of its own.
+
+On-screen keyboard: in TV mode a text field reached by an arrow, Tab or a
+page key, or Select on a field, opens `OnScreenKeyboard` along the bottom
+of the window, over dialogs and the command palette (`TextEntry`, in
+`AppShell`). The field keeps the focus; the keyboard shows its label and
+text (masked for a password) and takes the arrows, Select and Back while
+open. English and Russian letters, symbols, digits, Shift, the cursor,
+space, erase and Done (Enter in the field: the keyboard follows when that
+moves the focus to the next field). A physical keyboard that types keeps it
+away until the gamepad or the phone is used again. Text from the phone
+(`SendString`) goes through `InputRouter::sendText` into the focused field.
+Own implementation: Qt Virtual Keyboard is GPL-3.0. Keys, buttons and the
+CEC decision: [tv-mode.md](tv-mode.md).
 
 Gamepads: `GamepadStatus` (a `Jfd.Ui.Shell` singleton) says whether one is
 connected (the sidebar shows its sign and name, as does Settings > Gamepad)
@@ -349,7 +362,9 @@ different length, a list, a scrolled pane, a grid of 200 mostly uncreated
 delegates; every item reaches every other, Back always gets out) and on the
 shell at 1920 by 1080 in TV mode (safe area, Menu, Back), Enter on every
 focusable control, the TV sizes, and switching TV mode 20 times on 1000
-cards (each switch at most 100 ms, memory at most 5 MiB more).
+cards (each switch at most 100 ms, memory at most 5 MiB more), and the
+on-screen keyboard (opening, every layout, Done to the next field, a
+physical keyboard keeping it away, text from the phone).
 `jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
 gamepad alone.
 

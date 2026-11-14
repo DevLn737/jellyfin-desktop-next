@@ -16,6 +16,10 @@ FocusScope {
     property bool password: false
     property alias inputMethodHints: field.inputMethodHints
     property alias readOnly: field.readOnly
+    // TV mode: Select (Enter) on the field opens the on-screen keyboard.
+    // Off where Enter must keep its meaning (the command palette, once a
+    // result is chosen with the arrows).
+    property bool keyboardOnSelect: true
     readonly property alias field: field
 
     signal accepted()
@@ -51,6 +55,8 @@ FocusScope {
             selectedTextColor: colors.accentText
             font.pixelSize: Theme.fontSizeBody
             echoMode: root.password ? TextInput.Password : TextInput.Normal
+            // Read by the shell's TextEntry.
+            readonly property bool keyboardOnSelect: root.keyboardOnSelect
             Accessible.name: root.label.length > 0 ? root.label : placeholderText
             onAccepted: root.accepted()
 

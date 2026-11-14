@@ -1,6 +1,8 @@
 #include "InputRouter.h"
 
 #include <QCoreApplication>
+#include <QInputMethodEvent>
+#include <QInputMethodQueryEvent>
 #include <QKeyEvent>
 
 namespace jfd::ui {
@@ -59,6 +61,19 @@ namespace jfd::ui {
     if (!window) return;
     QKeyEvent release(QEvent::KeyRelease, key->key, key->modifiers, text, repeat);
     QCoreApplication::sendEvent(window, &release);
+  }
+
+  bool InputRouter::sendText(const QString& text) {
+    if (text.isEmpty() || !m_window) return false;
+    QObject* target = m_window->focusObject();
+    if (!target) return false;
+    QInputMethodQueryEvent query(Qt::ImEnabled | Qt::ImReadOnly);
+    QCoreApplication::sendEvent(target, &query);
+    if (!query.value(Qt::ImEnabled).toBool() || query.value(Qt::ImReadOnly).toBool()) return false;
+    QInputMethodEvent commit;
+    commit.setCommitString(text);
+    QCoreApplication::sendEvent(target, &commit);
+    return true;
   }
 
 } // namespace jfd::ui

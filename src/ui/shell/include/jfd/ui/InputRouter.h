@@ -18,7 +18,8 @@
 // Backspace and Alt+Left; only the player knows Key_Back). Search opens the
 // Ctrl+K palette. The media actions are not keys: they go to the media
 // handler (MediaSessionBridge), the path of the system media controls, so
-// they work on every screen and in a SyncPlay group.
+// they work on every screen and in a SyncPlay group. The server's remote
+// navigation (MoveUp ... Back, SendString) comes the same way.
 namespace jfd::ui {
 
   class InputRouter final : public QObject {
@@ -44,6 +45,10 @@ namespace jfd::ui {
 
   public Q_SLOTS:
     void route(jfd::platform::InputAction action, bool repeat);
+    // Text from elsewhere (the phone's SendString) into the focused text
+    // field, as an input method commits it; false when no field has the
+    // focus. With the on-screen keyboard open the field still has it.
+    bool sendText(const QString& text);
 
   private:
     QPointer<QWindow> m_window;
