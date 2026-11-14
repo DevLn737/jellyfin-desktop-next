@@ -315,6 +315,12 @@ namespace jfd::ui {
     m_runtime.launcher().cancel();
     if (m_current) m_runtime.post(core::intent::Stop{});
     if (m_pip) setPip(false);
+    // The channel list belongs to the signed-in user: read it again next time.
+    m_channels.clear();
+    m_channelsAge.invalidate();
+    m_channelsLoading = false;
+    ++m_channelsGeneration;
+    endLive();
     Q_EMIT stateChanged();
   }
 
@@ -530,7 +536,9 @@ namespace jfd::ui {
       m_channelsLoading = true;
       api::LiveTvChannelQuery query;
       query.addCurrentProgram = true;
-      m_liveTv.allChannels(query, this, [this](api::Result<QList<api::LiveTvChannel>> channels) {
+      m_liveTv.allChannels(query, this, [this, generation = m_channelsGeneration](
+                                            api::Result<QList<api::LiveTvChannel>> channels) {
+        if (generation != m_channelsGeneration) return;
         m_channelsLoading = false;
         if (!channels) {
           qCInfo(lcPlayer) << "no channel list:" << channels.error().message;
@@ -720,6 +728,10 @@ namespace jfd::ui {
     const bool justEnded = snapshot.phase == PlaybackPhase::Ended &&
                            (newFile || m_snapshot.phase != PlaybackPhase::Ended);
     m_snapshot = snapshot;
+
+    // Stopped or ended: no more guide polling, unless a channel is opening.
+    const bool terminal = snapshot.phase == PlaybackPhase::Idle || snapshot.phase == PlaybackPhase::Ended;
+    if (terminal && !(m_pending && m_pending->stream.isLive)) endLive();
 
     if (newFile && m_pending &&
         snapshot.item.value() == m_pending->request.itemId.toStdString())

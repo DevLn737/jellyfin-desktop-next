@@ -332,6 +332,8 @@ namespace jfd::ui {
     QList<api::LiveTvChannel> m_channels;
     QElapsedTimer m_channelsAge;
     bool m_channelsLoading = false;
+    // Bumped by stop() (also on sign-out): a list asked for before it is dropped.
+    int m_channelsGeneration = 0;
     QString m_liveChannel;
     QList<api::LiveTvProgram> m_livePrograms;
     bool m_programsLoading = false;
