@@ -42,7 +42,6 @@ jobs:
         run: |
           echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
           echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
-          echo "libmpv-deb=$(jq -r '.linux.libmpvPackage + "=" + .linux.libmpvPackageVersion' deps/versions.json)" >> "$GITHUB_OUTPUT"
 
       - name: Install Qt ${{ steps.pins.outputs.qt }}
         uses: jurplel/install-qt-action@v4
@@ -52,12 +51,16 @@ jobs:
           modules: qtwebsockets
           cache: true
 
-      - name: Install libmpv and build tools
+      # The libmpv the AppImage ships (mpv 01e2533f, client API 2.6), not the
+      # distribution's 0.37: the server tests check what users run.
+      # After Qt: install-qt-action sets PKG_CONFIG_PATH.
+      - name: Pinned libmpv
+        uses: ./.github/actions/linux-libmpv
+
+      - name: Install display libraries
         run: |
-          sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ${{ steps.pins.outputs.libmpv-deb }} ninja-build libsecret-1-dev \
-            libgl1-mesa-dev libegl1 libfontconfig1 libxkbcommon-x11-0
+            libegl1 libfontconfig1 libxkbcommon-x11-0
 
       - name: Build the fork server image
         if: matrix.server.fork == '1'
@@ -83,7 +86,7 @@ jobs:
         run: scripts/test-server/extras-server.sh up | tee -a "$GITHUB_ENV"
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_ENFORCE_PINS=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
         run: cmake --build build --parallel --target jfd_session_mpv_server_tests jfd_ui_group_server_tests jfd_ui_player_server_tests jfd_music_server_tests jfd_livetv_server_tests jfd_syncplay_app_agent
@@ -91,6 +94,9 @@ jobs:
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
+          # The stock leg starts the extras stand: there a missing stand fails
+          # the extras cases (tests/support/ExtrasStand.h) instead of skipping.
+          JFD_REQUIRE_EXTRAS: ${{ matrix.server.fork == '0' && '1' || '0' }}
         run: ctest --test-dir build --output-on-failure -V -R 'jfd_session_mpv_server_tests|jfd_ui_group_server_tests|jfd_ui_player_server_tests|jfd_music_server_tests|jfd_livetv_server_tests'
 
       - uses: actions/setup-node@v4

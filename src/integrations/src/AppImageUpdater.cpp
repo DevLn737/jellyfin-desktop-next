@@ -14,19 +14,30 @@ namespace jfd::integrations {
   namespace {
     // The new version has this long to confirm, in tenths of a second.
     constexpr int ConfirmTenths = 600;
-
-    // Variables the AppImage runtime and its AppRun set for this process;
-    // the next AppImage sets its own.
-    QProcessEnvironment cleanEnvironment() {
-      QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-      const QString appDir = environment.value(QStringLiteral("APPDIR"));
-      for (const QString& key : environment.keys()) {
-        if (!appDir.isEmpty() && environment.value(key).contains(appDir)) environment.remove(key);
-      }
-      for (const char* key : {"APPDIR", "APPIMAGE", "ARGV0", "OWD"}) environment.remove(QString::fromLatin1(key));
-      return environment;
-    }
   } // namespace
+
+  QProcessEnvironment AppImageUpdater::relaunchEnvironment(const QProcessEnvironment& source) {
+    // The next AppImage sets its own; only what this one added goes.
+    QProcessEnvironment environment = source;
+    const QString appDir = environment.value(QStringLiteral("APPDIR"));
+    for (const char* key : {"APPDIR", "APPIMAGE", "ARGV0", "OWD"}) environment.remove(QString::fromLatin1(key));
+    if (appDir.isEmpty()) return environment;
+    for (const QString& key : environment.keys()) {
+      const QString value = environment.value(key);
+      if (!value.contains(appDir)) continue;
+      QStringList kept;
+      for (const QString& entry : value.split(QLatin1Char(':'))) {
+        // Empty entries mean "the current directory" in PATH: none is added.
+        if (!entry.isEmpty() && !entry.contains(appDir)) kept.append(entry);
+      }
+      if (kept.isEmpty()) {
+        environment.remove(key);
+      } else {
+        environment.insert(key, kept.join(QLatin1Char(':')));
+      }
+    }
+    return environment;
+  }
 
   QString AppImageUpdater::assetName(const QString& version) {
     return QStringLiteral("jellyfin-desktop-next-%1-x86_64.AppImage").arg(version);
@@ -132,7 +143,7 @@ exec "$app"
     watchdog.setArguments({QStringLiteral("-c"), watchdogScript(), QStringLiteral("sh"),
                            QString::number(QCoreApplication::applicationPid()), m_appImage, old, markerPath(),
                            QString::number(ConfirmTenths)});
-    watchdog.setProcessEnvironment(cleanEnvironment());
+    watchdog.setProcessEnvironment(relaunchEnvironment(QProcessEnvironment::systemEnvironment()));
     watchdog.setWorkingDirectory(QDir::homePath());
     watchdog.setStandardOutputFile(QProcess::nullDevice());
     watchdog.setStandardErrorFile(QProcess::nullDevice());

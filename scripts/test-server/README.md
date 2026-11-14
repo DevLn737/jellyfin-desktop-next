@@ -32,8 +32,11 @@ builds a small test plugin (`segments-plugin/`, segments from a
 `<video>.segments.json` beside the file) against the image's own assemblies in
 the .NET SDK container, installs it before the first start and runs the
 segment extraction task. It prints `JFD_EXTRAS_SERVER_URL`, `JFD_EXTRAS_USER`
-and `JFD_EXTRAS_PASSWORD`; `jfd_ui_player_server_tests` runs its extras cases
-when they are set and skips them otherwise.
+and `JFD_EXTRAS_PASSWORD`; `jfd_ui_player_server_tests`,
+`jfd_music_server_tests` and `jfd_livetv_server_tests` run their extras cases
+when they are set and skip them otherwise. With `JFD_REQUIRE_EXTRAS=1` (CI's
+stock leg, which starts this server) a missing `JFD_EXTRAS_SERVER_URL` fails
+those cases instead.
 
 The extras server also has Live TV: an M3U tuner of 50 channels and an XMLTV
 guide of half-hour programmes for 24 hours (`livetv/make-guide.sh`), added

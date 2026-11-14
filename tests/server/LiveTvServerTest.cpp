@@ -1,4 +1,5 @@
 #include "../support/DoctestQt.h"
+#include "../support/ExtrasStand.h"
 #include "../support/FakeServer.h"
 
 #include <jfd/api/DeviceProfile.h>
@@ -22,16 +23,11 @@
 
 using namespace jfd;
 using namespace jfd::api;
+using jfd::test::hasExtrasStand;
 using jfd::test::waitFor;
 
 namespace {
   QString env(const char* name) { return qEnvironmentVariable(name); }
-
-  bool hasStand() {
-    if (!env("JFD_EXTRAS_SERVER_URL").isEmpty()) return true;
-    MESSAGE("JFD_EXTRAS_SERVER_URL is not set (scripts/test-server/extras-server.sh up): skipped");
-    return false;
-  }
 
   int expectedChannels() {
     bool ok = false;
@@ -100,7 +96,7 @@ namespace {
 } // namespace
 
 TEST_CASE("The stand's Live TV is there for the test user") {
-  if (!hasStand()) return;
+  if (!hasExtrasStand()) return;
   Stand s;
   LiveTvApi liveTv(*s.client);
   auto info = run<LiveTvInfo>([&](auto done) { liveTv.info(nullptr, done); });
@@ -110,7 +106,7 @@ TEST_CASE("The stand's Live TV is there for the test user") {
 }
 
 TEST_CASE("All channels with now and next on the screen's model, within a second") {
-  if (!hasStand()) return;
+  if (!hasExtrasStand()) return;
   Stand s;
   library::LiveTvChannels model(*s.client);
   QElapsedTimer clock;
@@ -137,7 +133,7 @@ TEST_CASE("All channels with now and next on the screen's model, within a second
 }
 
 TEST_CASE("A channel plays through the server and its stream closes on Stopped") {
-  if (!hasStand()) return;
+  if (!hasExtrasStand()) return;
   Stand s;
   LiveTvApi liveTv(*s.client);
   LiveTvChannelQuery query;
