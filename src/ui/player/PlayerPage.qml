@@ -15,7 +15,9 @@ import Jfd.Ui.Player
 //
 // Keys: Space or K play/pause, ←/→ ∓10 s, ↑/↓ volume, M mute, F fullscreen,
 // S skip, N next, E episodes, P picture in picture, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
-// Shift+J/L audio delay, Esc back.
+// Shift+J/L audio delay, Esc back. On a Live TV channel: Page Up / Channel
+// Up (and a gamepad's LB) the next channel, Page Down / Channel Down (RB) the
+// one before; N the next channel.
 RoutePage {
     id: page
 
@@ -98,6 +100,14 @@ RoutePage {
 
     function delayText(seconds) {
         return (seconds > 0 ? "+" : "") + Number(seconds).toLocaleString(Qt.locale(), "f", 1) + " " + qsTr("s")
+    }
+
+    // Live TV: up or down the channel list; the line names the channel.
+    function changeChannel(step) {
+        if (!player.canChangeChannel) return
+        player.changeChannel(step)
+        notify(player.channelNumber.length > 0 ? player.channelNumber + "  " + player.channelName
+                                               : player.channelName)
     }
 
     function changeVolume(step) {
@@ -282,15 +292,55 @@ RoutePage {
                 toolTipText: qsTr("Back")
                 onClicked: page.leave()
             }
-            Text {
+            Column {
                 anchors.verticalCenter: parent.verticalCenter
                 // The clock's room only while it shows.
                 width: Math.max(0, parent.width - Theme.controlHeight - groupOsd.width
                                    - (timeInfo.visible ? timeInfo.width + Theme.spacing : 0) - 3 * Theme.spacing)
-                text: page.player.title
-                color: Overlay.text
-                font.pixelSize: Theme.fontSizeLarge
-                elide: Text.ElideRight
+                Text {
+                    width: parent.width
+                    text: page.player.live && page.player.channelName.length > 0
+                          ? (page.player.channelNumber.length > 0 ? page.player.channelNumber + "  " : "")
+                            + page.player.channelName
+                          : page.player.title
+                    color: Overlay.text
+                    font.pixelSize: Theme.fontSizeLarge
+                    elide: Text.ElideRight
+                }
+                // A channel: the programme on now, its times and progress.
+                Row {
+                    visible: page.player.live && page.player.programTitle.length > 0
+                    width: parent.width
+                    spacing: Theme.spacingSmall
+                    Text {
+                        id: programText
+                        objectName: "programTitle"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, parent.width - programBar.width - Theme.spacingSmall)
+                        text: qsTr("%1–%2  %3").arg(page.shortTime(page.player.programStart))
+                                               .arg(page.shortTime(page.player.programEnd))
+                                               .arg(page.player.programTitle)
+                        color: Overlay.text
+                        opacity: 0.85
+                        font.pixelSize: Theme.fontSizeSmall
+                        elide: Text.ElideRight
+                    }
+                    Rectangle {
+                        id: programBar
+                        objectName: "programProgress"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 96
+                        height: 3
+                        radius: 1
+                        color: Overlay.surfaceHover
+                        Rectangle {
+                            width: parent.width * Math.max(0, Math.min(1, page.player.programProgress))
+                            height: parent.height
+                            radius: parent.radius
+                            color: Theme.accent
+                        }
+                    }
+                }
             }
             // Time now and when the file ends, at the playback speed.
             Column {
@@ -548,21 +598,36 @@ RoutePage {
                         onClicked: page.player.togglePause()
                     }
                     OsdButton {
-                        visible: page.width >= 720
+                        // A live channel cannot be sought.
+                        visible: page.width >= 720 && !page.player.live
                         iconSource: PlayerIcons.replay
                         toolTipText: qsTr("Back 10 seconds")
                         onClicked: page.player.seekBy(-10)
                     }
                     OsdButton {
-                        visible: page.width >= 720
+                        visible: page.width >= 720 && !page.player.live
                         iconSource: PlayerIcons.forward
                         toolTipText: qsTr("Forward 10 seconds")
                         onClicked: page.player.seekBy(10)
                     }
                     OsdButton {
+                        objectName: "channelDown"
+                        visible: page.player.live && page.player.canChangeChannel
+                        iconSource: PlayerIcons.previous
+                        toolTipText: qsTr("Previous channel")
+                        onClicked: page.changeChannel(-1)
+                    }
+                    OsdButton {
+                        objectName: "channelUp"
+                        visible: page.player.live && page.player.canChangeChannel
+                        iconSource: PlayerIcons.next
+                        toolTipText: qsTr("Next channel")
+                        onClicked: page.changeChannel(1)
+                    }
+                    OsdButton {
                         objectName: "next"
                         // A group's queue is the server's; alone, the series'.
-                        visible: page.player.inGroup || page.player.hasNext
+                        visible: !page.player.live && (page.player.inGroup || page.player.hasNext)
                         iconSource: PlayerIcons.next
                         toolTipText: qsTr("Next")
                         onClicked: page.player.next()
@@ -706,7 +771,17 @@ RoutePage {
         case Qt.Key_BracketLeft:
             page.player.jumpToSegment(-1); break
         case Qt.Key_N:
-            page.player.next(); break
+            if (page.player.live) page.changeChannel(1)
+            else page.player.next()
+            break
+        case Qt.Key_PageUp:
+        case Qt.Key_ChannelUp:
+            if (!page.player.live) return
+            page.changeChannel(1); break
+        case Qt.Key_PageDown:
+        case Qt.Key_ChannelDown:
+            if (!page.player.live) return
+            page.changeChannel(-1); break
         case Qt.Key_E:
             if (!page.hasEpisodes) return
             page.toggleMenu("episodes"); break

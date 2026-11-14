@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jfd/api/DeviceProfile.h>
+#include <jfd/api/LiveTv.h>
 #include <jfd/api/Models.h>
 #include <jfd/api/Playback.h>
 #include <jfd/core/SessionSnapshot.h>
@@ -11,13 +12,17 @@
 #include <jfd/session/PlaybackLauncher.h>
 #include <jfd/session/SessionHub.h>
 
+#include <QDateTime>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QTimer>
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -65,6 +70,16 @@ namespace jfd::ui {
     // A Live TV channel: no end and no seeking, so `duration` is 0 and the
     // page shows no timeline and no "ends at".
     Q_PROPERTY(bool live READ live NOTIFY tracksChanged)
+    // Live TV: the channel playing, the programme on it now (title, start
+    // and end in local time, how far it is, 0..1) and whether there are
+    // other channels to switch to. Empty for anything but a channel.
+    Q_PROPERTY(QString channelName READ channelName NOTIFY liveInfoChanged)
+    Q_PROPERTY(QString channelNumber READ channelNumber NOTIFY liveInfoChanged)
+    Q_PROPERTY(QString programTitle READ programTitle NOTIFY liveInfoChanged)
+    Q_PROPERTY(QDateTime programStart READ programStart NOTIFY liveInfoChanged)
+    Q_PROPERTY(QDateTime programEnd READ programEnd NOTIFY liveInfoChanged)
+    Q_PROPERTY(double programProgress READ programProgress NOTIFY liveInfoChanged)
+    Q_PROPERTY(bool canChangeChannel READ canChangeChannel NOTIFY liveInfoChanged)
     Q_PROPERTY(bool inGroup READ inGroup NOTIFY stateChanged)
     Q_PROPERTY(QVariantList audioTracks READ audioTracks NOTIFY tracksChanged)
     Q_PROPERTY(QVariantList subtitleTracks READ subtitleTracks NOTIFY tracksChanged)
@@ -127,6 +142,15 @@ namespace jfd::ui {
     void setMaxBitrate(qint64 bitsPerSecond);
     QString playMethod() const;
     bool live() const { return m_current && m_current->stream.isLive; }
+    QString channelName() const;
+    QString channelNumber() const;
+    QString programTitle() const { return m_program ? m_program->name : QString(); }
+    QDateTime programStart() const { return m_program ? m_program->start.toLocalTime() : QDateTime(); }
+    QDateTime programEnd() const { return m_program ? m_program->end.toLocalTime() : QDateTime(); }
+    double programProgress() const;
+    bool canChangeChannel() const { return !m_liveChannel.isEmpty() && m_channels.size() > 1; }
+    // The clock for the programme on now; tests set their own.
+    void setClock(std::function<QDateTime()> clock) { m_clock = std::move(clock); }
     // What the device profile allows (the transcoding settings); applies to
     // files opened from now on.
     void setProfileOptions(const api::DeviceProfileOptions& options);
@@ -175,6 +199,12 @@ namespace jfd::ui {
     Q_INVOKABLE void jumpToSegment(int direction);
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
+    // Live TV: the next channel in the server's order (step 1, channel up)
+    // or the one before (-1), round the list; on this device only, like
+    // the channel itself.
+    Q_INVOKABLE void changeChannel(int step);
+    // Moves the programme on with the clock (a timer does it too).
+    Q_INVOKABLE void updateProgram();
     // Plays one of `episodes` from the start, alone.
     Q_INVOKABLE void playEpisode(const QString& itemId);
     Q_INVOKABLE void stop();
@@ -210,6 +240,7 @@ namespace jfd::ui {
     void pipChanged();
     void leftPip();
     void trickplayChanged();
+    void liveInfoChanged();
     // A play request could not be resolved, or the renderer failed.
     void failed(const QString& message);
 
@@ -242,6 +273,13 @@ namespace jfd::ui {
     void loadTrickplay(const QString& itemId);
     void chooseTrickplay();
     QVariantList tracks(core::TrackKind kind) const;
+    // Live TV: the channel list (for switching) and the guide of the
+    // channel playing (for the programme on now).
+    void beginLive(const QString& channelId);
+    void endLive();
+    void loadLivePrograms();
+    QDateTime now() const;
+    const api::LiveTvChannel* liveChannel() const;
 
     session::SessionRuntime& m_runtime;
     api::JellyfinClient& m_client;
@@ -288,6 +326,17 @@ namespace jfd::ui {
     bool m_videoSuspended = false;
     QPointer<QQuickItem> m_video;
     std::optional<std::pair<QString, qint64>> m_waitingPlay;
+
+    api::LiveTvApi m_liveTv;
+    std::function<QDateTime()> m_clock;
+    QList<api::LiveTvChannel> m_channels;
+    QElapsedTimer m_channelsAge;
+    bool m_channelsLoading = false;
+    QString m_liveChannel;
+    QList<api::LiveTvProgram> m_livePrograms;
+    bool m_programsLoading = false;
+    std::optional<api::LiveTvProgram> m_program;
+    QTimer m_liveTick;
   };
 
 } // namespace jfd::ui

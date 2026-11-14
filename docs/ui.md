@@ -407,3 +407,25 @@ makes the plain vertical wheel scroll it with an eased animation and a fixed
 step of 130 px per notch (quick notches add up); touchpads, which send exact
 pixel deltas, move it one to one. Shift + wheel and sideways swipes stay with
 the view. Every page's main scrolling view has one; add it to a new page's.
+
+## Live TV
+
+- `livetv`: the channel list with what is on now and next; Guide opens the
+  grid. Its sidebar entry shows only when `LiveTv/Info` has Live TV for the
+  user, and so does the home screen's "On now" row (section `livetv.onNow`,
+  a card per channel with a programme on; a card tunes in).
+- `guide` (`GuidePage`, model `LiveTvGuide`): a row per channel and the
+  programmes along a time line from the half hour before now, 24 hours on.
+  Only the rows on screen are made, and in a row only the programmes in view
+  and an hour either side; the guide loads in six-hour chunks as the view
+  reaches them. Arrows move between programmes (Up and Down keep the time),
+  Page Up and Page Down (a gamepad's LB and RB) a screen of time, Home back
+  to now; Enter on what is on the air tunes in, on a later programme it
+  opens the channel. Shift + wheel or a sideways swipe moves along time.
+- `channel/<id>` (`ChannelPage`, model `LiveTvSchedule`): the channel, Watch
+  (focused) and its programmes from now.
+- In the player a channel has no timeline, no "Ends at" and no seeking; the
+  header names the channel and the programme on now with its times and
+  progress. Page Up / Channel Up / N (and LB) go to the next channel, Page
+  Down / Channel Down (RB) to the one before, round the server's list. A
+  channel always plays on this device, also in a group.
