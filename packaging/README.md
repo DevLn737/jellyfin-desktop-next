@@ -61,6 +61,8 @@ organization name; keep them in step if the application's names change.
 2. The app is built against it with the pinned Qt. SDL3 for gamepads is
    built from its pinned release and linked statically (no libSDL3 in the
    image); it loads the system's libudev at run time and works without it.
+   Display modes (refresh rate switching on X11) link libX11 and libXrandr,
+   which libmpv already needs, so the image carries nothing new for them.
 3. [linux/build-appimage.sh](linux/build-appimage.sh) packs it with linuxdeploy
    and its Qt plugin (X11 and Wayland). Libraries that must match the running
    system stay out: Mesa/GL/EGL/Vulkan, VA-API and VDPAU, libdrm/gbm, PipeWire,
@@ -81,6 +83,7 @@ Build dependencies on Ubuntu 24.04 are in [linux/build-deps.txt](linux/build-dep
 
 ## Not covered by CI
 
-Hardware decoding (VA-API, NVDEC, D3D11VA), HDR, real displays, fractional
+Hardware decoding (VA-API, NVDEC, D3D11VA), HDR, real displays (CI switches
+refresh rates only on Xvfb and only lists them on Windows), fractional
 scaling, Wayland sessions and real gamepads (CI uses SDL's virtual joystick)
 are checked on real machines.

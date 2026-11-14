@@ -209,9 +209,16 @@ if(TARGET jfd_jellyfin_api)
   endif()
   endif()
 
+  # DisplayModesTest also lists the system's display modes (never switches).
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp
-    platform/GamepadMapperTest.cpp)
+    platform/GamepadMapperTest.cpp platform/DisplayModesTest.cpp platform/DisplayModeSwitcherTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
+  if(TARGET PkgConfig::JFD_XRANDR)
+    # The XRandR backend switching modes on Xvfb (CI runs ctest under
+    # xvfb-run); on other X servers it switches nothing.
+    jfd_add_qt_test(jfd_platform_xrandr_tests platform/DisplayModesXvfbTest.cpp)
+    target_link_libraries(jfd_platform_xrandr_tests PRIVATE jfd::platform PkgConfig::JFD_XRANDR)
+  endif()
   if(JFD_GAMEPAD)
     # GamepadInput on SDL's virtual joystick: layouts (Xbox, 8BitDo in
     # XInput, Switch and DirectInput modes), repeat, dead zone, unplugging.
