@@ -213,6 +213,10 @@
         <source>Previous track</source>
         <translation>Предыдущий трек</translation>
     </message>
+    <message>
+        <source>TV mode</source>
+        <translation>Режим ТВ</translation>
+    </message>
 </context>
 <context>
     <name>Diagnostics</name>
@@ -273,6 +277,14 @@
     <message>
         <source>Off: the gamepad controls the app only while its window is active.</source>
         <translation>Если выключено, геймпад управляет приложением, только пока его окно активно.</translation>
+    </message>
+    <message>
+        <source>Check the buttons</source>
+        <translation>Проверить кнопки</translation>
+    </message>
+    <message>
+        <source>Shows the connected gamepad and what each button does, without doing it.</source>
+        <translation>Показывает подключённый геймпад и что делает каждая кнопка, не выполняя действие.</translation>
     </message>
 </context>
 <context>

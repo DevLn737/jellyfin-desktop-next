@@ -2,10 +2,17 @@ import QtQuick
 import QtQuick.Controls.Basic as Basic
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
+// Its own module, for the attached SpatialNavigation.
+import Jfd.Ui.Shell
 
 // The window's content: sidebar, the page stack driven by Navigator, and
 // the toast. Back: Esc, Backspace outside text fields, Alt+Left and the
 // mouse back button. F11 toggles full screen; Esc leaves it first.
+// Arrows nobody else takes move the focus to the nearest item in that
+// direction, PageUp and PageDown by a page (SpatialNavigation); the Menu
+// key, when the focused item has no menu of its own, goes to the sidebar
+// and back. In TV mode the pages keep 5 % away from the screen's edges
+// (Theme.safeMargin).
 FocusScope {
     id: shell
 
@@ -62,6 +69,21 @@ FocusScope {
         window.visibility = window.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
     }
 
+    // The Menu key: the sidebar's current entry, or back to the page.
+    function toggleSidebarFocus() {
+        if (!sidebar.visible)
+            return false
+        if (sidebar.activeFocus) {
+            shell.menuOpen = false
+            stack.forceActiveFocus(Qt.TabFocusReason)
+            return true
+        }
+        if (Theme.compact)
+            shell.menuOpen = true
+        sidebar.focusCurrentEntry()
+        return true
+    }
+
     function goBack() {
         const window = shell.Window.window
         if (window && window.visibility === Window.FullScreen) {
@@ -72,6 +94,7 @@ FocusScope {
     }
 
     focus: true
+    SpatialNavigation.enabled: true
 
     // The size classes follow the window's width (logical pixels).
     Binding { target: Theme; property: "windowWidth"; value: shell.width }
@@ -86,70 +109,84 @@ FocusScope {
         visible: shell.backgroundVisible
     }
 
-    Sidebar {
-        id: sidebar
-        objectName: "sidebar"
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        x: Navigator.chromeVisible ? 0 : -width
-        visible: x > -width
-        z: 2
-        collapsed: Theme.compact && !shell.menuOpen
-        menuButton: Theme.compact
-        onMenuToggled: shell.menuOpen = !shell.menuOpen
-        onChosen: shell.menuOpen = false
-        onLibraryChosen: (itemId, type) => shell.libraryChosen(itemId, type)
-        onSignOutRequested: shell.signOutRequested()
-        Behavior on x { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
-        KeyNavigation.right: stack
-    }
-
-    // The room the sidebar takes from the pages: the full sidebar, or only
-    // the rail while the menu is open over them.
+    // Everything that can take the focus, inside the TV's safe area (the
+    // video player and the sign-in page have no sidebar and place their
+    // controls themselves).
     Item {
-        id: rail
-        x: sidebar.x
-        width: Theme.compact ? Theme.sidebarCollapsedWidth : Theme.sidebarWidth
-        height: parent.height
-    }
+        id: frame
+        objectName: "safeArea"
+        readonly property real share: Navigator.chromeVisible ? Theme.safeMargin : 0
+        anchors.fill: parent
+        anchors.leftMargin: Math.round(shell.width * share)
+        anchors.rightMargin: Math.round(shell.width * share)
+        anchors.topMargin: Math.round(shell.height * share)
+        anchors.bottomMargin: Math.round(shell.height * share)
 
-    Item {
-        id: miniPlayerSlot
-        objectName: "miniPlayerSlot"
-        anchors.left: stack.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        // The first child's height: childrenRect would loop, since it counts
-        // visible children only and the strip is visible by its height.
-        height: Navigator.chromeVisible && children.length > 0 ? children[0].height : 0
-        visible: height > 0
-    }
+        Sidebar {
+            id: sidebar
+            objectName: "sidebar"
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            x: Navigator.chromeVisible ? 0 : -width
+            visible: x > -width
+            z: 2
+            collapsed: Theme.compact && !shell.menuOpen
+            menuButton: Theme.compact
+            onMenuToggled: shell.menuOpen = !shell.menuOpen
+            onChosen: shell.menuOpen = false
+            onLibraryChosen: (itemId, type) => shell.libraryChosen(itemId, type)
+            onSignOutRequested: shell.signOutRequested()
+            Behavior on x { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            KeyNavigation.right: stack
+        }
 
-    Basic.StackView {
-        id: stack
-        objectName: "pageStack"
-        anchors.top: parent.top
-        anchors.bottom: miniPlayerSlot.top
-        anchors.right: parent.right
-        anchors.left: sidebar.visible ? rail.right : parent.left
-        focus: true
-        clip: true
+        // The room the sidebar takes from the pages: the full sidebar, or only
+        // the rail while the menu is open over them.
+        Item {
+            id: rail
+            x: sidebar.x
+            width: Theme.compact ? Theme.sidebarCollapsedWidth : Theme.sidebarWidth
+            height: parent.height
+        }
 
-        pushEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
-        pushExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
-        popEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
-        popExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
-        replaceEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
-        replaceExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
-    }
+        Item {
+            id: miniPlayerSlot
+            objectName: "miniPlayerSlot"
+            anchors.left: stack.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            // The first child's height: childrenRect would loop, since it counts
+            // visible children only and the strip is visible by its height.
+            height: Navigator.chromeVisible && children.length > 0 ? children[0].height : 0
+            visible: height > 0
+        }
 
-    // Dims the page while the menu is open over it.
-    Rectangle {
-        anchors.fill: stack
-        z: 1
-        color: Theme.scrim
-        visible: shell.menuOpen && sidebar.visible
-        TapHandler { onTapped: shell.menuOpen = false }
+        Basic.StackView {
+            id: stack
+            objectName: "pageStack"
+            anchors.top: parent.top
+            anchors.bottom: miniPlayerSlot.top
+            anchors.right: parent.right
+            anchors.left: sidebar.visible ? rail.right : parent.left
+            focus: true
+            clip: true
+
+            pushEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
+            pushExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
+            popEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
+            popExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
+            replaceEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
+            replaceExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
+        }
+
+        // Dims the page while the menu is open over it.
+        Rectangle {
+            anchors.fill: stack
+            z: 1
+            color: Theme.scrim
+            visible: shell.menuOpen && sidebar.visible
+            TapHandler { onTapped: shell.menuOpen = false }
+        }
     }
 
     Connections {
@@ -185,6 +222,8 @@ FocusScope {
         } else if (event.key === Qt.Key_Escape && shell.menuOpen) {
             shell.menuOpen = false
             event.accepted = true
+        } else if (event.key === Qt.Key_Menu && event.modifiers === Qt.NoModifier) {
+            event.accepted = shell.toggleSidebarFocus()
         } else if (event.key === Qt.Key_F11) {
             shell.toggleFullScreen()
             event.accepted = true
@@ -202,5 +241,9 @@ FocusScope {
     Toast {
         id: toast
         objectName: "toast"
+        parent: frame
     }
+
+    // Settings > Gamepad > Check the buttons.
+    GamepadCheck {}
 }

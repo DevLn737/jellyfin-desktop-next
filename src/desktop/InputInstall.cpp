@@ -5,8 +5,10 @@
 #include <jfd/platform/GamepadInput.h>
 #include <jfd/settings/Settings.h>
 #include <jfd/settings/SettingsRegistry.h>
+#include <jfd/ui/GamepadStatus.h>
 #include <jfd/ui/InputRouter.h>
 
+#include <QQmlEngine>
 #include <QQuickWindow>
 
 namespace jfd::desktop {
@@ -14,6 +16,7 @@ namespace jfd::desktop {
   namespace {
     const QString GamepadKey = QStringLiteral("input/gamepad");
     const QString BackgroundKey = QStringLiteral("input/gamepadInBackground");
+    const QString CheckKey = QStringLiteral("input/checkButtons");
     // The player's own arrow-key step.
     constexpr qint64 SeekStepMs = 10'000;
 
@@ -59,28 +62,50 @@ namespace jfd::desktop {
         "InputSettings", "Off: the gamepad controls the app only while its window is active.");
     section.settings.append(background);
 
+    settings::SettingDescriptor check;
+    check.key = QStringLiteral("checkButtons");
+    check.type = settings::SettingType::Action;
+    check.label = QT_TRANSLATE_NOOP("InputSettings", "Check the buttons");
+    check.description = QT_TRANSLATE_NOOP(
+        "InputSettings", "Shows the connected gamepad and what each button does, without doing it.");
+    section.settings.append(check);
+
     return registry.registerSection(std::move(section));
   }
 
-  void installInput(AppServices& services, QQuickWindow& window) {
+  void installInput(AppServices& services, QQmlEngine& engine, QQuickWindow& window) {
     if (!platform::GamepadInput::isSupported()) return;
+    auto* status = engine.singletonInstance<ui::GamepadStatus*>("Jfd.Ui.Shell", "GamepadStatus");
+    Q_ASSERT(status != nullptr);
     // Both live as long as the window they serve.
     auto* gamepad = new platform::GamepadInput(&window);
     auto* router = new ui::InputRouter(&window);
     router->setWindow(&window);
     router->setMediaHandler([&services](platform::InputAction action) { mediaAction(services, action); });
-    QObject::connect(gamepad, &platform::GamepadInput::actionTriggered, router, &ui::InputRouter::route);
+    // During the button check the presses only show (GamepadStatus).
+    QObject::connect(gamepad, &platform::GamepadInput::actionTriggered, router,
+                     [status, router](platform::InputAction action, bool repeat) {
+                       if (!status->takePress(action, repeat)) router->route(action, repeat);
+                     });
+    QObject::connect(gamepad, &platform::GamepadInput::controllersChanged, status,
+                     [status, gamepad] { status->setControllers(gamepad->controllerNames()); });
+    QObject::connect(services.settings.get(), &settings::Settings::actionTriggered, status,
+                     [status](const QString& key) {
+                       if (key == CheckKey) status->startCheck();
+                     });
 
     settings::Settings& settings = *services.settings;
     // Only while the window is active, unless allowed in the background.
     auto follow = [gamepad, &window, &settings] {
       gamepad->setAcceptsInput(window.isActive() || settings.value(BackgroundKey).toBool());
     };
-    auto enable = [gamepad, &settings] {
+    auto enable = [gamepad, status, &settings] {
       if (settings.value(GamepadKey).toBool())
         gamepad->start();
       else
         gamepad->stop();
+      status->setAvailable(gamepad->isRunning());
+      status->setControllers(gamepad->isRunning() ? gamepad->controllerNames() : QStringList());
     };
     QObject::connect(&window, &QWindow::activeChanged, gamepad, follow);
     QObject::connect(&settings, &settings::Settings::valueChanged, gamepad,

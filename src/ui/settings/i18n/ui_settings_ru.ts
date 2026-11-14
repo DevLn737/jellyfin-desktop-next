@@ -11,6 +11,14 @@
         <source>This value is not allowed.</source>
         <translation>Такое значение недопустимо.</translation>
     </message>
+    <message>
+        <source>Connected: %1</source>
+        <translation>Подключён: %1</translation>
+    </message>
+    <message>
+        <source>No gamepad is connected.</source>
+        <translation>Геймпад не подключён.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsPage</name>

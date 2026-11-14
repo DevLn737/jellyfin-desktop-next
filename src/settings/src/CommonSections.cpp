@@ -70,6 +70,26 @@ namespace jfd::settings {
       scale.requiresRestart = true;
       section.settings.append(scale);
 
+      SettingDescriptor tvMode;
+      tvMode.key = key(keys::TvMode);
+      tvMode.type = SettingType::Bool;
+      tvMode.defaultValue = false;
+      tvMode.label = QT_TRANSLATE_NOOP("CommonSettings", "TV mode");
+      tvMode.description = QT_TRANSLATE_NOOP(
+          "CommonSettings",
+          "Larger text and controls to read from the sofa; the arrows, Enter and Back of a remote, keyboard or "
+          "gamepad reach everything. Also in Ctrl+K.");
+      section.settings.append(tvMode);
+
+      SettingDescriptor safeArea;
+      safeArea.key = key(keys::TvSafeArea);
+      safeArea.type = SettingType::Bool;
+      safeArea.defaultValue = true;
+      safeArea.label = QT_TRANSLATE_NOOP("CommonSettings", "Keep clear of the TV's edges");
+      safeArea.description = QT_TRANSLATE_NOOP(
+          "CommonSettings", "In TV mode, leaves 5 % free at each edge of the screen, for TVs that cut the edges off.");
+      section.settings.append(safeArea);
+
       // Version 1 had a "Reduce animations" switch; on becomes "on", off
       // becomes automatic.
       section.version = 2;

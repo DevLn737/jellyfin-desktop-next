@@ -39,6 +39,7 @@ only reformatted.
 | `src/ui/controls/icons/close.svg` | Material Icons `close` | Apache-2.0 |
 | `src/ui/controls/icons/down.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
 | `src/ui/controls/icons/error.svg` | Material Icons `error` | Apache-2.0 |
+| `src/ui/controls/icons/gamepad.svg` | Material Icons `sports_esports` | Apache-2.0 |
 | `src/ui/controls/icons/group.svg` | Material Icons `people` | Apache-2.0 |
 | `src/ui/controls/icons/home.svg` | Material Icons `home` | Apache-2.0 |
 | `src/ui/controls/icons/library.svg` | Material Icons `video_library` | Apache-2.0 |
@@ -52,6 +53,7 @@ only reformatted.
 | `src/ui/controls/icons-dark/close.svg` | Material Icons `close` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/down.svg` | Material Icons `keyboard_arrow_down` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/error.svg` | Material Icons `error` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/gamepad.svg` | Material Icons `sports_esports` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/group.svg` | Material Icons `people` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/home.svg` | Material Icons `home` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/library.svg` | Material Icons `video_library` (dark fill) | Apache-2.0 |

@@ -17,4 +17,5 @@ QtObject {
     readonly property url menu: Qt.resolvedUrl("icons/menu.svg")
     readonly property url up: Qt.resolvedUrl("icons/up.svg")
     readonly property url down: Qt.resolvedUrl("icons/down.svg")
+    readonly property url gamepad: Qt.resolvedUrl("icons/gamepad.svg")
 }

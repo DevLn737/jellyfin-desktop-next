@@ -211,12 +211,21 @@ namespace jfd::desktop {
   void installSeerr(AppServices& services, QQmlEngine& engine);
   void uninstallSeerr(AppServices& services);
 
-  // The gamepad settings section (on/off, in the background).
+  // The gamepad settings section (on/off, in the background, the button
+  // check).
   bool registerInputSettings(settings::SettingsRegistry& registry);
   // After the window loads: gamepads (SDL3, polled on the GUI thread) drive
   // the window through ui::InputRouter while it is active; PlayPause and the
   // seek triggers go through the media controls' bridge (installIntegrations).
-  void installInput(AppServices& services, QQuickWindow& window);
+  // The shell's GamepadStatus shows the connected gamepad and runs the
+  // button check.
+  void installInput(AppServices& services, QQmlEngine& engine, QQuickWindow& window);
+
+  // After the window loads: Theme.tvMode and Theme.tvSafeArea from
+  // Settings > Interface, and the "TV mode" command of Ctrl+K, which turns
+  // it on and off. forcedOn (--tv): on for this run without changing the
+  // setting, until the setting or the command is used.
+  void installTvMode(AppServices& services, QQmlEngine& engine, bool forcedOn);
 
   // Before quitting: reports the playing file (and music track) stopped and
   // leaves a SyncPlay group; calls done when the server answered all of

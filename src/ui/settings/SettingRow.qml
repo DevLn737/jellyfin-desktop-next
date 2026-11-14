@@ -2,6 +2,7 @@ import QtQuick
 import Jfd.Ui.Theme
 import QtQuick.Templates as T
 import Jfd.Ui.Controls
+import Jfd.Ui.Shell
 
 // One setting: label and description on the left, the editor for its type
 // on the right. Changes are written at once.
@@ -71,6 +72,27 @@ FocusScope {
             color: Theme.textSecondary
             font.pixelSize: Theme.fontSizeSmall
             wrapMode: Text.Wrap
+        }
+        // The gamepad switch says which gamepad is connected, with the
+        // shell's gamepad sign.
+        Row {
+            objectName: "gamepadState"
+            visible: row.key === "input/gamepad" && GamepadStatus.available
+            spacing: Theme.spacingSmall
+            Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                size: Math.round(Theme.iconSize * 0.8)
+                source: Icons.gamepad
+                color: GamepadStatus.connected ? Theme.text : Theme.textDisabled
+                opacity: GamepadStatus.connected ? 1 : 0.5
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: GamepadStatus.connected ? qsTr("Connected: %1").arg(GamepadStatus.controllerNames.join(", "))
+                                              : qsTr("No gamepad is connected.")
+                color: GamepadStatus.connected ? Theme.text : Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSmall
+            }
         }
         Text {
             width: parent.width

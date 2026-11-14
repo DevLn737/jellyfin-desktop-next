@@ -214,5 +214,21 @@
         <source>Window</source>
         <translation>Окно</translation>
     </message>
+    <message>
+        <source>TV mode</source>
+        <translation>Режим ТВ</translation>
+    </message>
+    <message>
+        <source>Larger text and controls to read from the sofa; the arrows, Enter and Back of a remote, keyboard or gamepad reach everything. Also in Ctrl+K.</source>
+        <translation>Крупный текст и элементы, чтобы читать с дивана; стрелки, Enter и «Назад» пульта, клавиатуры или геймпада доходят до всего. Есть и в Ctrl+K.</translation>
+    </message>
+    <message>
+        <source>Keep clear of the TV&apos;s edges</source>
+        <translation>Отступ от краёв телевизора</translation>
+    </message>
+    <message>
+        <source>In TV mode, leaves 5 % free at each edge of the screen, for TVs that cut the edges off.</source>
+        <translation>В режиме ТВ оставляет свободными 5 % у каждого края экрана — для телевизоров, которые обрезают края.</translation>
+    </message>
 </context>
 </TS>

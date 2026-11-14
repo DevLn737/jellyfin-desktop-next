@@ -1,6 +1,7 @@
 import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
+import Jfd.Ui.Shell
 
 // Main navigation on the left, a glass panel: destinations, libraries and
 // the account at the bottom. Collapses to an icon rail on narrow windows.
@@ -25,6 +26,21 @@ FocusScope {
     readonly property var entries: Navigator.sidebarEntries
     // An entry's icon is a name from Icons or a file URL.
     function iconFor(name) { return Icons[name] !== undefined ? Icons[name] : name }
+    // The Menu key: focus on the entry of the current page (or the first).
+    function focusCurrentEntry() {
+        let target = null
+        for (let i = 0; i < destinations.count; ++i) {
+            const entry = destinations.itemAt(i)
+            if (entry && (target === null || entry.highlighted))
+                target = entry
+            if (entry && entry.highlighted)
+                break
+        }
+        if (target)
+            target.forceActiveFocus(Qt.TabFocusReason)
+        else
+            sidebar.forceActiveFocus(Qt.TabFocusReason)
+    }
 
     width: collapsed ? Theme.sidebarCollapsedWidth : Theme.sidebarWidth
     activeFocusOnTab: true
@@ -76,7 +92,7 @@ FocusScope {
         id: scroller
         anchors.top: header.bottom
         anchors.topMargin: Theme.spacingSmall
-        anchors.bottom: account.top
+        anchors.bottom: gamepadSign.top
         anchors.bottomMargin: Theme.spacingSmall
         anchors.left: parent.left
         anchors.right: parent.right
@@ -93,6 +109,7 @@ FocusScope {
             spacing: Theme.spacingTiny
 
             Repeater {
+                id: destinations
                 model: sidebar.entries
                 ListItem {
                     required property var modelData
@@ -151,6 +168,42 @@ FocusScope {
                     }
                 }
             }
+        }
+    }
+
+    // A gamepad is connected: its sign and name over the account line.
+    // Only a sign; the gamepad is checked in Settings > Gamepad.
+    Item {
+        id: gamepadSign
+        objectName: "gamepadSign"
+        anchors.bottom: account.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacingSmall
+        anchors.rightMargin: Theme.spacingSmall
+        visible: GamepadStatus.connected
+        height: visible ? Math.max(Theme.iconSize, gamepadName.implicitHeight) + Theme.spacingSmall : 0
+        Accessible.role: Accessible.StaticText
+        Accessible.name: qsTr("Gamepad connected: %1").arg(GamepadStatus.controllerName)
+
+        Icon {
+            id: gamepadIcon
+            x: sidebar.collapsed ? (parent.width - width) / 2 : Theme.spacing
+            anchors.verticalCenter: parent.verticalCenter
+            source: Icons.gamepad
+            color: Theme.textSecondary
+        }
+        Text {
+            id: gamepadName
+            visible: !sidebar.collapsed
+            anchors.left: gamepadIcon.right
+            anchors.leftMargin: Theme.spacingSmall
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: GamepadStatus.controllerName
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeSmall
+            elide: Text.ElideRight
         }
     }
 
