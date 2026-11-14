@@ -86,6 +86,8 @@ namespace jfd::api {
     QList<LiveTvProgram> programs;
     int totalRecordCount = 0;
     int startIndex = 0;
+    // Entries the server sent, with the undated ones `programs` leaves out.
+    int itemCount = 0;
   };
 
   struct LiveTvChannelQuery {

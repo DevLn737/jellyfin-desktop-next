@@ -82,7 +82,14 @@ namespace jfd::ui {
       m_trackPreference.choose(source, request.audioStreamIndex, request.subtitleStreamIndex);
     });
     connect(&runtime.launcher(), &session::PlaybackLauncher::failed, this,
-            [this](const QString&, const QString& message) { Q_EMIT failed(message); });
+            [this](const QString&, const QString& message) {
+              // A channel switch that failed before it opened: the old channel
+              // still plays, so the header and channel up/down go back to it.
+              if (m_current && m_current->stream.isLive && !m_liveChannel.isEmpty() &&
+                  m_current->request.itemId != m_liveChannel)
+                beginLive(m_current->request.itemId);
+              Q_EMIT failed(message);
+            });
     // Next and Previous outside a group; in a group the server's queue moves.
     connect(&runtime, &session::SessionRuntime::queueStepRequested, this, &PlayerModel::step);
     m_subscription = runtime.hub().subscribe(
