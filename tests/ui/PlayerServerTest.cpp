@@ -1,4 +1,5 @@
 #include "support/DoctestQt.h"
+#include "support/ExtrasStand.h"
 #include "support/FakeServer.h"
 
 #include <jfd/api/DeviceProfile.h>
@@ -34,10 +35,10 @@
 
 using namespace jfd;
 using namespace jfd::api;
+using jfd::test::hasExtrasStand;
 using jfd::test::waitFor;
 
 namespace {
-  QString env(const char* name) { return qEnvironmentVariable(name); }
 
   template <class T> Result<T> run(std::function<void(Callback<T>)> call, int timeoutMs = 20000) {
     std::optional<Result<T>> out;
@@ -471,14 +472,6 @@ TEST_CASE("The seek bar has the server's trickplay thumbnails") {
   CHECK(later.value(QStringLiteral("source")) == source);
   CHECK(later.value(QStringLiteral("x")) != frame.value(QStringLiteral("x")));
 }
-
-namespace {
-  bool hasExtrasStand() {
-    if (!env("JFD_EXTRAS_SERVER_URL").isEmpty()) return true;
-    MESSAGE("JFD_EXTRAS_SERVER_URL is not set (scripts/test-server/extras-server.sh up): skipped");
-    return false;
-  }
-} // namespace
 
 TEST_CASE("An external audio file plays, through a transcode, at the same position") {
   if (!hasExtrasStand()) return;
