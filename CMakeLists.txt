@@ -57,6 +57,8 @@ if(Qt6_FOUND)
   jfd_add_module(src/seerr)
   # After integrations: Playstate goes the way of the media controls.
   jfd_add_module(src/remote)
+  # Offline downloads: the store, catalog and queue (no screens).
+  jfd_add_module(src/offline)
 else()
   message(STATUS "Qt 6 with WebSockets not found: skipping the Qt network modules")
 endif()

@@ -110,7 +110,7 @@ jobs:
           tests=$(ctest --test-dir build -N -E "^(mutation_|simulator_)" | sed -nE 's/^ *Test +#[0-9]+: //p')
           echo "$tests"
           for name in jfd_api_tests jfd_library_tests jfd_playback_tests jfd_integrations_tests \
-                      jfd_settings_tests jfd_seerr_tests jfd_music_tests jfd_session_runtime_tests jfd_remote_tests \
+                      jfd_settings_tests jfd_seerr_tests jfd_music_tests jfd_session_runtime_tests jfd_remote_tests jfd_offline_tests \
                       jfd_ui_tests jfd_ui_library_tests jfd_ui_player_tests jfd_ui_shell_page_tests desktop_smoke \
                       jfd_platform_gamepad_tests jfd_ui_gamepad_tests; do
             grep -qx "$name" <<< "$tests" || { echo "::error::$name was not built"; exit 1; }

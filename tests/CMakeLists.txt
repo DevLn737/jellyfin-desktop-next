@@ -150,6 +150,21 @@ if(TARGET jfd_jellyfin_api)
     endif()
   endif()
 
+  if(TARGET jfd_offline)
+    # Offline downloads against a file server with byte ranges
+    # (offline/FakeFileServer.h); the kill test runs jfd_offline_killee.
+    jfd_add_qt_test(jfd_offline_tests offline/StoreTest.cpp offline/DownloadTest.cpp
+      offline/CatalogTest.cpp offline/KillTest.cpp)
+    target_link_libraries(jfd_offline_tests PRIVATE jfd::offline Qt6::WebSockets)
+    add_executable(jfd_offline_killee offline/Killee.cpp)
+    target_link_libraries(jfd_offline_killee PRIVATE jfd::offline)
+    target_compile_options(jfd_offline_killee PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_dependencies(jfd_offline_tests jfd_offline_killee)
+    target_compile_definitions(jfd_offline_tests PRIVATE
+      JFD_OFFLINE_KILLEE="$<TARGET_FILE:jfd_offline_killee>")
+    set_tests_properties(jfd_offline_tests PROPERTIES TIMEOUT 300)
+  endif()
+
   if(TARGET jfd_music)
     jfd_add_qt_test(jfd_music_tests music/MusicQueueTest.cpp)
     target_link_libraries(jfd_music_tests PRIVATE jfd::music)

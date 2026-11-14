@@ -34,6 +34,12 @@ namespace jfd::api {
     bool hasPassword = true;
     // SyncPlay access policy: "CreateAndJoinGroups", "JoinGroups" or "None".
     QString syncPlayAccess;
+    // Policy: may download original files (Items/{id}/Download), and may the
+    // server transcode for this user (a compressed download needs that).
+    // False when the answer has no Policy.
+    bool enableContentDownloading = false;
+    bool enableVideoPlaybackTranscoding = false;
+    bool enableAudioPlaybackTranscoding = false;
   };
 
   struct AuthenticationResult {
@@ -214,6 +220,10 @@ namespace jfd::api {
     // "http" or "hls".
     QString transcodingSubProtocol;
     std::optional<std::int64_t> runTimeTicks;
+    // The file's size in bytes and its overall bitrate in bits per second,
+    // when the server knows them (estimates for downloads).
+    std::optional<std::int64_t> size;
+    std::optional<std::int64_t> bitrate;
     std::optional<int> defaultAudioStreamIndex;
     std::optional<int> defaultSubtitleStreamIndex;
     // Headers the source needs. Not forwarded (see the contract's

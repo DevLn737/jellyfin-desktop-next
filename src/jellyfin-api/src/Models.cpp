@@ -123,10 +123,11 @@ namespace jfd::api::json {
     u.name = text(o, "Name");
     u.serverId = text(o, "ServerId");
     u.hasPassword = flag(o, "HasPassword", true);
-    u.syncPlayAccess = o.value(QLatin1String("Policy"))
-                           .toObject()
-                           .value(QLatin1String("SyncPlayAccess"))
-                           .toString();
+    const QJsonObject policy = o.value(QLatin1String("Policy")).toObject();
+    u.syncPlayAccess = policy.value(QLatin1String("SyncPlayAccess")).toString();
+    u.enableContentDownloading = flag(policy, "EnableContentDownloading");
+    u.enableVideoPlaybackTranscoding = flag(policy, "EnableVideoPlaybackTranscoding");
+    u.enableAudioPlaybackTranscoding = flag(policy, "EnableAudioPlaybackTranscoding");
     if (u.id.isEmpty()) return invalid(QStringLiteral("User has no Id"));
     return u;
   }
@@ -310,6 +311,8 @@ namespace jfd::api::json {
     m.transcodingUrl = text(o, "TranscodingUrl");
     m.transcodingSubProtocol = text(o, "TranscodingSubProtocol");
     m.runTimeTicks = integer(o, "RunTimeTicks");
+    m.size = integer(o, "Size");
+    m.bitrate = integer(o, "Bitrate");
     m.defaultAudioStreamIndex = smallInteger(o, "DefaultAudioStreamIndex");
     m.defaultSubtitleStreamIndex = smallInteger(o, "DefaultSubtitleStreamIndex");
     m.requiredHttpHeaders = o.value(QLatin1String("RequiredHttpHeaders")).toObject();
