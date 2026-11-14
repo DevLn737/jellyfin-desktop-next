@@ -16,7 +16,8 @@ class QNetworkAccessManager;
 // Installs a newer release of the Windows build over the running one.
 //
 // prepare() downloads the release's MSI and its .minisig into the state
-// directory and checks the signature. apply() writes a PowerShell script next
+// directory and checks the signature; once it passes, the MSIs of other
+// versions left there (downloaded, never installed) are removed. apply() writes a PowerShell script next
 // to it and starts that detached; the script waits for this process to exit,
 // runs msiexec on the MSI (the installer is per user, so no administrator
 // rights) and starts the application again. The MSI is a major upgrade with a

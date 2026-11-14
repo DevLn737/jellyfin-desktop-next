@@ -110,6 +110,40 @@ TEST_CASE("A signed MSI is downloaded into the state directory") {
   CHECK_FALSE(QFile::exists(msi.fileName() + QStringLiteral(".minisig")));
 }
 
+TEST_CASE("A verified MSI replaces the downloads of older versions, a failed one keeps them") {
+  QTemporaryDir dir;
+  const QString folder = install(dir);
+  const QString state = dir.filePath(QStringLiteral("state"));
+  REQUIRE(QDir().mkpath(state));
+  // An earlier download that was never installed, a leftover signature and
+  // files that are not downloads.
+  const QString older = state + QStringLiteral("/") + MsiUpdater::assetName(QStringLiteral("0.1.0-beta.7"));
+  REQUIRE(write(older, "older installer"));
+  REQUIRE(write(older + QStringLiteral(".minisig"), "older signature"));
+  REQUIRE(write(state + QStringLiteral("/update-install.log"), "log"));
+  REQUIRE(write(state + QStringLiteral("/other.msi"), "not ours"));
+  QByteArray signature = otherSignature;
+  FakeServer server([&](const HttpRequest& request) {
+    return HttpResponse{200, request.path == QStringLiteral("/a") ? newMsi : signature, "application/octet-stream"};
+  });
+  QNetworkAccessManager network;
+  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKey(testKey));
+
+  CHECK(prepare(updater, release(server, signature)).failure.startsWith(QStringLiteral("signature check failed")));
+  CHECK(QFile::exists(older));
+  CHECK(QFile::exists(older + QStringLiteral(".minisig")));
+
+  signature = msiSignature;
+  const Outcome outcome = prepare(updater, release(server, signature));
+  CHECK_MESSAGE(outcome.failure.isEmpty(), outcome.failure.toStdString());
+  CHECK_FALSE(QFile::exists(older));
+  CHECK_FALSE(QFile::exists(older + QStringLiteral(".minisig")));
+  QStringList left = QDir(state).entryList(QDir::Files);
+  left.sort();
+  CHECK(left == QStringList{QStringLiteral("jellyfin-desktop-next-0.2.0-x64.msi"), QStringLiteral("other.msi"),
+                            QStringLiteral("update-install.log")});
+}
+
 TEST_CASE("A tampered MSI or a signature of another file is rejected and removed") {
   for (const bool tamper : {true, false}) {
     CAPTURE(tamper);

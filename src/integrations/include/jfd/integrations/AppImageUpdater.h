@@ -5,6 +5,7 @@
 #include <jfd/integrations/UpdateChecker.h>
 
 #include <QObject>
+#include <QProcessEnvironment>
 #include <QString>
 #include <QUrl>
 
@@ -60,6 +61,14 @@ namespace jfd::integrations {
 
     // The watchdog's script; public for the tests.
     static QString watchdogScript();
+
+    // The environment the next version starts with: this process's without
+    // what the AppImage runtime and its AppRun added. Variables the runtime
+    // sets (APPDIR, APPIMAGE, ARGV0, OWD) go; in the others only the
+    // ':'-separated entries that mention $APPDIR go, and the user's own
+    // entries stay (PATH, XDG_DATA_DIRS, LD_LIBRARY_PATH and the like); a
+    // variable left with no entry goes. Public for the tests.
+    static QProcessEnvironment relaunchEnvironment(const QProcessEnvironment& environment);
 
   Q_SIGNALS:
     void ready(const QString& version);

@@ -22,8 +22,10 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
   SmokeTest.cpp SmokeTest.h
   Translations.cpp Translations.h)
 # Release builds of pre-release tags add the tag's suffix (-beta.1), so the
-# update check compares pre-releases with each other.
-set(JFD_VERSION_SUFFIX "" CACHE STRING "Pre-release suffix of the version, such as -beta.1")
+# update check compares pre-releases with each other. A build without a tag is
+# -0.dev, which sorts below every pre-release of the same version
+# (packaging/release-version.sh); a release passes "" for none.
+set(JFD_VERSION_SUFFIX "-0.dev" CACHE STRING "Pre-release suffix of the version, such as -beta.1")
 target_compile_definitions(jellyfin-desktop PRIVATE JFD_VERSION="${PROJECT_VERSION}${JFD_VERSION_SUFFIX}")
 set_target_properties(jellyfin-desktop PROPERTIES AUTOMOC ON)
 

@@ -29,6 +29,20 @@ TEST_CASE("Versions compare by semantic version precedence") {
   CHECK_FALSE(isNewerVersion(QStringLiteral("1.0.0"), QStringLiteral("dev")));
 }
 
+TEST_CASE("A build without a release tag sorts below every pre-release of its version") {
+  // packaging/release-version.sh and src/desktop/CMakeLists.txt give such
+  // builds the suffix -0.dev[.<run>]: a numeric first identifier sorts below
+  // alpha, beta and rc, so CI artifacts and local builds see the betas.
+  for (const char* release : {"0.0.1-alpha.1", "0.0.1-beta.1", "0.0.1-beta.8", "0.0.1-rc.1", "0.0.1"}) {
+    CAPTURE(release);
+    CHECK(isNewerVersion(QString::fromLatin1(release), QStringLiteral("0.0.1-0.dev")));
+    CHECK(isNewerVersion(QString::fromLatin1(release), QStringLiteral("0.0.1-0.dev.4321")));
+  }
+  CHECK(isNewerVersion(QStringLiteral("0.0.1-0.dev.12"), QStringLiteral("0.0.1-0.dev.11")));
+  // The next version's development builds are newer than this release.
+  CHECK(isNewerVersion(QStringLiteral("0.0.2-0.dev.1"), QStringLiteral("0.0.1")));
+}
+
 namespace {
   struct Result {
     QString version;

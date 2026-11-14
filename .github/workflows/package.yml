@@ -325,6 +325,9 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The history and tags, for the change list in the notes.
+          fetch-depth: 0
       - name: Check the version
         id: version
         run: packaging/release-version.sh >> "$GITHUB_OUTPUT"
@@ -367,17 +370,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # What changed since the previous client tag, how to install, and
+          # the SmartScreen warning for the MSI without a code-signing certificate.
+          packaging/release-notes.sh "$RELEASE_TAG" "$GITHUB_SHA" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
           cd packages
           name="$APP_PACKAGE-$VERSION-x86_64.AppImage"
           msi="$APP_PACKAGE-$VERSION-x64.msi"
           grep -E " ($name|$msi)\$" SHA256SUMS > SHA256SUMS.txt
-          notes="Pre-release for testing. Linux: the AppImage (make it executable and run it). Windows: the .msi installer (per user, no administrator rights). Both are signed with minisign (minisign.pub); SHA-256 in SHA256SUMS.txt."
           # A release made from the tag by hand (gh release create) gets the files.
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --prerelease --title "Jellyfin Desktop $VERSION" --notes "$notes"
+            gh release edit "$RELEASE_TAG" --prerelease --title "Jellyfin Desktop $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
             gh release upload "$RELEASE_TAG" --clobber "$name" "$name.minisig" "$msi" "$msi.minisig" SHA256SUMS.txt minisign.pub
           else
             gh release create "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" \
-              --title "Jellyfin Desktop $VERSION" --notes "$notes" \
+              --title "Jellyfin Desktop $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
               "$name" "$name.minisig" "$msi" "$msi.minisig" SHA256SUMS.txt minisign.pub
           fi

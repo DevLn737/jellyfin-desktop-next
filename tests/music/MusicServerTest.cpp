@@ -1,4 +1,5 @@
 #include "../support/DoctestQt.h"
+#include "../support/ExtrasStand.h"
 #include "../support/FakeServer.h"
 
 #include <jfd/api/DeviceProfile.h>
@@ -31,16 +32,11 @@
 
 using namespace jfd;
 using namespace jfd::api;
+using jfd::test::hasExtrasStand;
 using jfd::test::waitFor;
 
 namespace {
   QString env(const char* name) { return qEnvironmentVariable(name); }
-
-  bool hasExtrasStand() {
-    if (!env("JFD_EXTRAS_SERVER_URL").isEmpty()) return true;
-    MESSAGE("JFD_EXTRAS_SERVER_URL is not set (scripts/test-server/extras-server.sh up): skipped");
-    return false;
-  }
 
   template <class T> Result<T> run(std::function<void(Callback<T>)> call, int timeoutMs = 20000) {
     std::optional<Result<T>> out;

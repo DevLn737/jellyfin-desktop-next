@@ -51,6 +51,29 @@ refuse 0.0.1 v0.0.2-beta.1
 refuse 0.0.65 v0.0.65
 refuse 256.0.0 v256.0.0
 
+# A build without a release tag is a -0.dev pre-release (below -alpha.1) with
+# the CI run number when there is one; a release tag keeps its own suffix.
+output() { # base tag run key
+  printf 'project(JellyfinDesktopNext VERSION %s LANGUAGES CXX)\n' "$1" > "$work/CMakeLists.txt"
+  (cd "$work" && RELEASE_TAG="$2" GITHUB_RUN_NUMBER="$3" bash "$script") | sed -n "s/^$4=//p"
+}
+expect_output() { # base tag run key expected
+  local got
+  got=$(output "$1" "$2" "$3" "$4")
+  if [[ "$got" != "$5" ]]; then
+    echo "FAIL: $1 tag '$2' run '$3': $4=$got, expected $5"
+    failures=$((failures + 1))
+  fi
+}
+expect_output 0.0.1 "" "" suffix -0.dev
+expect_output 0.0.1 "" "" version 0.0.1-0.dev
+expect_output 0.0.1 "" 4321 suffix -0.dev.4321
+expect_output 0.0.1 "" 4321 version 0.0.1-0.dev.4321
+expect_output 0.0.1 "" 4321 release false
+expect_output 0.0.1 v0.0.1-beta.9 4321 suffix -beta.9
+expect_output 0.0.1 v0.0.1 4321 suffix ""
+expect_output 0.0.1 v0.0.1 4321 version 0.0.1
+
 # Every version in SemVer order gets a strictly larger MSI build number.
 ordered=("0.0.1 " "0.0.1 v0.0.1-alpha.1" "0.0.1 v0.0.1-alpha.299" "0.0.1 v0.0.1-beta.1" "0.0.1 v0.0.1-beta.8"
          "0.0.1 v0.0.1-beta.299" "0.0.1 v0.0.1-rc.1" "0.0.1 v0.0.1-rc.299" "0.0.1 v0.0.1"

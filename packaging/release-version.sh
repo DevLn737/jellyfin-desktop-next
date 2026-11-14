@@ -2,10 +2,14 @@
 # Prints the version a package is built with, as GitHub Actions outputs:
 #   base=0.1.0             CMakeLists.txt's version
 #   version=0.1.0-beta.1   the full version (CMake's plus a tag's suffix)
-#   suffix=-beta.1         the pre-release suffix ("" for none)
+#   suffix=-beta.1         the pre-release suffix ("" for a release, -0.dev[.<run>]
+#                          for a build without a release tag)
 #   release=true|false     whether this is a release tag (v<version>)
 #   msi=0.1.1301           the MSI ProductVersion (see below)
 # RELEASE_TAG is the tag being released (v0.1.0 or v0.1.0-beta.1).
+# A build without one (CI artifacts) is 0.1.0-0.dev.<GITHUB_RUN_NUMBER>: a
+# numeric first identifier sorts below -alpha, -beta and -rc under SemVer, so
+# its update check still offers every pre-release of the same version.
 # Release tags must carry CMakeLists.txt's version: v0.1.0 or v0.1.0-beta.1.
 #
 # MSI ProductVersion. Windows Installer compares only the first three fields
@@ -42,6 +46,8 @@ if [[ "${RELEASE_TAG:-}" == v* ]]; then
   fi
   suffix=${BASH_REMATCH[2]}
   release=true
+else
+  suffix="-0.dev${GITHUB_RUN_NUMBER:+.$GITHUB_RUN_NUMBER}"
 fi
 
 IFS=. read -r major minor patch <<< "$base"

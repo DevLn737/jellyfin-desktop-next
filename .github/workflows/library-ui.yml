@@ -26,7 +26,6 @@ jobs:
         run: |
           echo "qt=$(jq -r .qt.version deps/versions.json)" >> "$GITHUB_OUTPUT"
           echo "qt-arch=$(jq -r .qt.linuxArch deps/versions.json)" >> "$GITHUB_OUTPUT"
-          echo "libmpv-deb=$(jq -r '.linux.libmpvPackage + "=" + .linux.libmpvPackageVersion' deps/versions.json)" >> "$GITHUB_OUTPUT"
 
       - name: Install Qt ${{ steps.pins.outputs.qt }}
         uses: jurplel/install-qt-action@v4
@@ -36,12 +35,14 @@ jobs:
           modules: qtwebsockets
           cache: true
 
-      - name: Install libmpv and build tools
+      # After Qt: install-qt-action sets PKG_CONFIG_PATH.
+      - name: Pinned libmpv
+        uses: ./.github/actions/linux-libmpv
+
+      - name: Install display libraries
         run: |
-          sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ${{ steps.pins.outputs.libmpv-deb }} ninja-build libsecret-1-dev \
-            libgl1-mesa-dev libegl1 libfontconfig1 libxkbcommon-x11-0 fonts-dejavu-core \
+            libegl1 libfontconfig1 libxkbcommon-x11-0 fonts-dejavu-core \
             xvfb xauth libgl1-mesa-dri libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
 
@@ -49,7 +50,7 @@ jobs:
         run: scripts/test-server/stock-server.sh up | tee -a "$GITHUB_ENV"
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_SERVER_TESTS=ON
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_ENFORCE_PINS=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
         run: cmake --build build --parallel --target jfd_ui_library_server_tests jfd_library_bench
