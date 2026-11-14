@@ -127,6 +127,7 @@ if(TARGET jfd_jellyfin_api)
     library/DetailsSearchTest.cpp
     library/ImageCacheTest.cpp
     library/LiveTvChannelsTest.cpp
+    library/LiveTvGuideTest.cpp
     library/SignInTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
 
@@ -322,6 +323,20 @@ if(JFD_BUILD_APP)
     target_compile_options(jfd_ui_gamepad_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_gamepad_tests COMMAND jfd_ui_gamepad_tests)
     set_tests_properties(jfd_ui_gamepad_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
+  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+    # The Live TV screens on a fake server: the guide grid by keys and
+    # gamepad actions, a channel's page, the home screen's "On now" cards.
+    add_executable(jfd_ui_livetv_tests support/QtGuiTestMain.cpp ui/LiveTvPagesTest.cpp)
+    target_include_directories(jfd_ui_livetv_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_livetv_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
+    target_compile_options(jfd_ui_livetv_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_livetv_tests COMMAND jfd_ui_livetv_tests)
+    set_tests_properties(jfd_ui_livetv_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(TARGET jfd_ui_library)

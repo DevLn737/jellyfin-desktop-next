@@ -128,10 +128,13 @@ TEST_CASE("A track goes to the music player, asking first while a video plays") 
   CHECK(messages.count() == 2);
 }
 
-TEST_CASE("Live TV: channels lead to the channel list and play on this device only") {
+TEST_CASE("Live TV: a channel leads to its page and plays on this device only") {
   LibraryUi ui;
-  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) == QStringLiteral("livetv"));
+  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) == QStringLiteral("channel/ch"));
   CHECK(ui.liveTv() == nullptr);
+  // Without a client there is no guide or channel page to make.
+  CHECK(ui.createGuide(nullptr) == nullptr);
+  CHECK(ui.createSchedule(QStringLiteral("ch"), nullptr) == nullptr);
 
   QSignalSpy messages(&ui, &LibraryUi::message);
   ui.playChannel(QStringLiteral("ch"));

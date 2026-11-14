@@ -2,6 +2,33 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>ChannelPage</name>
+    <message>
+        <source>Channel</source>
+        <translation>Канал</translation>
+    </message>
+    <message>
+        <source>Watch</source>
+        <translation>Смотреть</translation>
+    </message>
+    <message>
+        <source>%1, %2</source>
+        <translation>%1, %2</translation>
+    </message>
+    <message>
+        <source>%1–%2</source>
+        <translation>%1–%2</translation>
+    </message>
+    <message>
+        <source>On now</source>
+        <translation>Сейчас в эфире</translation>
+    </message>
+    <message>
+        <source>No programme information</source>
+        <translation>Нет данных о передаче</translation>
+    </message>
+</context>
+<context>
     <name>CollectionPage</name>
     <message>
         <source>Collection</source>
@@ -98,6 +125,41 @@
     <message>
         <source>Clear</source>
         <translation>Сбросить</translation>
+    </message>
+</context>
+<context>
+    <name>GuidePage</name>
+    <message>
+        <source>Guide</source>
+        <translation>Телепрограмма</translation>
+    </message>
+    <message>
+        <source>Now</source>
+        <translation>Сейчас</translation>
+    </message>
+    <message>
+        <source>Earlier</source>
+        <translation>Раньше</translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation>Позже</translation>
+    </message>
+    <message>
+        <source>No programme information</source>
+        <translation>Нет данных о передаче</translation>
+    </message>
+    <message>
+        <source>%1–%2 · %3</source>
+        <translation>%1–%2 · %3</translation>
+    </message>
+    <message>
+        <source>On now</source>
+        <translation>Сейчас в эфире</translation>
+    </message>
+    <message>
+        <source>The server has no Live TV channels for you.</source>
+        <translation>На сервере нет телеканалов, доступных вам.</translation>
     </message>
 </context>
 <context>
@@ -278,6 +340,17 @@
     <message>
         <source>Next at %1: %2</source>
         <translation>Далее в %1: %2</translation>
+    </message>
+    <message>
+        <source>Guide</source>
+        <translation>Телепрограмма</translation>
+    </message>
+</context>
+<context>
+    <name>LiveTvSection</name>
+    <message>
+        <source>On now</source>
+        <translation>Сейчас в эфире</translation>
     </message>
 </context>
 <context>

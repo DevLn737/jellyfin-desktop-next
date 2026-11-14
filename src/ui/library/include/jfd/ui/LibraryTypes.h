@@ -5,6 +5,8 @@
 #include <jfd/library/ItemListModel.h>
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LiveTvChannels.h>
+#include <jfd/library/LiveTvGuide.h>
+#include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
 
@@ -63,6 +65,20 @@ namespace jfd::ui {
     QML_FOREIGN(jfd::library::LiveTvChannels)
     QML_NAMED_ELEMENT(LiveTvChannels)
     QML_UNCREATABLE("Use Library.liveTv")
+  };
+
+  struct LiveTvGuideForeign {
+    Q_GADGET
+    QML_FOREIGN(jfd::library::LiveTvGuide)
+    QML_NAMED_ELEMENT(LiveTvGuide)
+    QML_UNCREATABLE("Use Library.createGuide()")
+  };
+
+  struct LiveTvScheduleForeign {
+    Q_GADGET
+    QML_FOREIGN(jfd::library::LiveTvSchedule)
+    QML_NAMED_ELEMENT(LiveTvSchedule)
+    QML_UNCREATABLE("Use Library.createSchedule()")
   };
 
 } // namespace jfd::ui

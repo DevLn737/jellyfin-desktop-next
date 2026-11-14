@@ -124,8 +124,17 @@ namespace jfd::api {
     void info(QObject* context, Callback<LiveTvInfo> done);
     // GET LiveTv/Channels, in the server's channel order (number, then name).
     void channels(const LiveTvChannelQuery& query, QObject* context, Callback<LiveTvChannelPage> done);
+    // Every channel, page after page from query.startIndex (query.limit a
+    // page); fails with the first page that fails.
+    void allChannels(const LiveTvChannelQuery& query, QObject* context,
+                     Callback<QList<LiveTvChannel>> done);
+    // GET LiveTv/Channels/{id}: one channel with what is on now.
+    void channel(const QString& channelId, QObject* context, Callback<LiveTvChannel> done);
     // GET LiveTv/Programs for a window of the guide, one page.
     void programs(const LiveTvProgramQuery& query, QObject* context, Callback<LiveTvProgramPage> done);
+    // The whole window, page after page (query.limit a page), by start.
+    void allPrograms(const LiveTvProgramQuery& query, QObject* context,
+                     Callback<QList<LiveTvProgram>> done);
     // POST LiveStreams/Close.
     void closeLiveStream(const QString& liveStreamId, QObject* context, Callback<Empty> done);
 
@@ -133,6 +142,13 @@ namespace jfd::api {
     static QString queryDate(const QDateTime& when);
 
   private:
+    static void allChannelPages(JellyfinClient& client, LiveTvChannelQuery query,
+                                QList<LiveTvChannel> got, QObject* context,
+                                Callback<QList<LiveTvChannel>> done);
+    static void allProgramPages(JellyfinClient& client, LiveTvProgramQuery query,
+                                QList<LiveTvProgram> got, QObject* context,
+                                Callback<QList<LiveTvProgram>> done);
+
     JellyfinClient& m_client;
   };
 
