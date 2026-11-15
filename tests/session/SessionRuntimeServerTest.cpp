@@ -7,6 +7,7 @@
 #include <jfd/api/SessionSocket.h>
 #include <jfd/api/SyncPlayApi.h>
 #include <jfd/session/GroupModel.h>
+#include <jfd/session/RoomsModel.h>
 #include <jfd/session/SessionRuntime.h>
 
 #ifdef JFD_SESSION_TEST_MPV
@@ -438,12 +439,10 @@ TEST_CASE("The group model creates, lists, joins, changes speed and leaves group
   REQUIRE(waitFor([&] { return model.inGroup() && !model.busy(); }, 20000));
   CHECK(model.groupName() == device("model-group"));
   CHECK(model.participants().contains(user));
-  model.refreshGroups();
-  REQUIRE(waitFor([&] { return !model.busy(); }, 10000));
-  bool listed = false;
-  for (const QVariant& group : model.groups())
-    listed = listed || group.toMap().value(QStringLiteral("id")).toString() == model.groupId();
-  CHECK(listed);
+  session::RoomsModel rooms(model, *host.client);
+  rooms.refresh();
+  REQUIRE(waitFor([&] { return rooms.loaded() && !rooms.loading(); }, 10000));
+  CHECK(rooms.indexOf(model.groupId()) >= 0);
 
   // Another member joins: the model says so and shows the queue they start.
   const QString groupId = model.groupId();
@@ -491,5 +490,84 @@ TEST_CASE("The group model creates, lists, joins, changes speed and leaves group
   REQUIRE(waitFor([&] { return !model.busy(); }, 20000));
   CHECK_FALSE(model.inGroup());
   CHECK_FALSE(model.errorText().isEmpty());
+}
+// Package 3.9, test 4: rooms on a server without the rooms extension (stock
+// 12.2 and the SyncPlay fork alike). One session makes a room; another sees
+// it in its live list within 6 s (a 5 s poll), with the member on its card,
+// joins and leaves; a room that is gone says so in words.
+TEST_CASE("Rooms: a new room shows in another session's list within 6 s; its card, join and leave") {
+  Connection host(device("rooms-host"));
+  Connection guest(device("rooms-guest"));
+  Backend hostBackend;
+  Backend guestBackend;
+  SessionRuntime::Settings settings;
+  settings.deviceProfile = buildDeviceProfile({});
+  SessionRuntime hostRuntime(*host.client, *host.socket, hostBackend.factory(), settings);
+  SessionRuntime guestRuntime(*guest.client, *guest.socket, guestBackend.factory(), settings);
+  session::GroupModel hostGroup(hostRuntime, *host.client, *host.socket);
+  session::GroupModel guestGroup(guestRuntime, *guest.client, *guest.socket);
+  session::RoomsModel hostRooms(hostGroup, *host.client);
+  session::RoomsModel guestRooms(guestGroup, *guest.client);
+  const QString user = env("JFD_TEST_USER");
+
+  // The test user is an administrator: full access.
+  REQUIRE(waitFor([&] { return guestGroup.access() == QStringLiteral("CreateAndJoinGroups"); }, 10000));
+  CHECK(guestRooms.canCreate());
+
+  // The guest's tab is open and polls at the app's interval.
+  CHECK(guestRooms.pollInterval() == session::RoomsModel::DefaultPollInterval);
+  guestRooms.setActive(true);
+  REQUIRE(waitFor([&] { return guestRooms.loaded(); }, 10000));
+  const int before = guestRooms.count();
+
+  hostRooms.create(device("rooms-room"));
+  REQUIRE(waitFor([&] { return hostGroup.inGroup() && !hostGroup.busy(); }, 20000));
+  const QString roomId = hostGroup.groupId();
+  QElapsedTimer seen;
+  seen.start();
+  REQUIRE(waitFor([&] { return guestRooms.indexOf(roomId) >= 0; }, 10000));
+  MESSAGE("the guest saw the new room after " << seen.elapsed() << " ms");
+  CHECK(seen.elapsed() <= 6000);
+  CHECK(guestRooms.count() == before + 1);
+
+  // Its card: the name, the member, the state.
+  guestRooms.select(roomId);
+  const QVariantMap card = guestRooms.selected();
+  CHECK(card.value(QStringLiteral("name")).toString() == device("rooms-room"));
+  CHECK(card.value(QStringLiteral("participants")).toStringList().contains(user));
+  CHECK(card.value(QStringLiteral("participantCount")).toInt() == 1);
+  CHECK(card.value(QStringLiteral("state")).toString() == QStringLiteral("idle"));
+
+  // Join from the card; the host sees the second member.
+  guestRooms.join(roomId);
+  REQUIRE(waitFor([&] { return guestGroup.inGroup() && !guestGroup.busy(); }, 20000));
+  CHECK(guestGroup.groupId() == roomId);
+  CHECK(guestGroup.errorText().isEmpty());
+  REQUIRE(waitFor([&] { return hostGroup.participants().size() == 2; }, 20000));
+  // (The server's list names each user once, and both sessions here are
+  // the same test user: the card's count stays at one.)
+
+  // Leave: the room stays, with the host in it.
+  guestGroup.leaveGroup();
+  REQUIRE(waitFor([&] { return !guestGroup.inGroup() && !guestGroup.busy(); }, 20000));
+  REQUIRE(waitFor([&] { return hostGroup.participants().size() == 1; }, 20000));
+  CHECK(guestRooms.indexOf(roomId) >= 0);
+
+  // The last member leaves: the room is gone from the list and the card.
+  hostGroup.leaveGroup();
+  REQUIRE(waitFor([&] { return !hostGroup.inGroup(); }, 20000));
+  REQUIRE(waitFor([&] { return guestRooms.selectedGone(); }, 10000));
+  CHECK(guestRooms.indexOf(roomId) < 0);
+
+  // Joining it now: the refusal in words, not a spinner.
+  guestRooms.join(roomId);
+  REQUIRE(waitFor([&] { return !guestGroup.busy(); }, 20000));
+  CHECK_FALSE(guestGroup.inGroup());
+  CHECK(guestGroup.errorText() == session::GroupModel::refusalText(QStringLiteral("GroupDoesNotExist")));
+
+  // Hidden: no more polls.
+  guestRooms.setActive(false);
+  QTest::qWait(200);
+  CHECK_FALSE(guestRooms.loading());
 }
 #endif

@@ -123,6 +123,11 @@ namespace jfd::desktop {
     void playInGroup(AppServices& services, const PlayRequest& request) {
       if (!services.group) return;
       session::GroupModel& group = *services.group;
+      // SyncPlayAccess None: the phone does not play into a group either.
+      if (!group.canJoin()) {
+        qCInfo(lcRemote) << "Play: watching together is closed for this user";
+        return;
+      }
       switch (request.command) {
       case PlayCommand::PlayNext: group.queueInGroup(request.itemIds, true); return;
       case PlayCommand::PlayLast: group.queueInGroup(request.itemIds, false); return;

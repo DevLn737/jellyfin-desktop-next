@@ -93,6 +93,13 @@ namespace jfd::ui {
     // default.
     Q_INVOKABLE void setRouteAvailable(const QString& name, bool available);
     bool routeAvailable(const QString& name) const;
+    // A route the user may not open at all (watching together without the
+    // right to: SyncPlayAccess None): unavailable as above, and navigate(),
+    // replace() and reset() refuse it, whoever asks (the sidebar, Ctrl+K,
+    // a command from another start, the phone). A page of it in the stack
+    // is left for home.
+    void setRouteClosed(const QString& name, bool closed);
+    bool routeClosed(const QString& name) const { return m_closed.contains(name); }
     QVariantList sidebarEntries() const;
     Q_INVOKABLE QUrl pageFor(const QString& name) const;
     // Shown for names without a registered page.
@@ -131,6 +138,8 @@ namespace jfd::ui {
   private:
     void registerBuiltinRoutes();
     QVariantMap propertiesFor(const Route& route) const;
+    // parse(), and a warning for invalid and closed routes.
+    Route accept(const QString& route) const;
     void emitChange(Operation operation);
 
     QList<Route> m_stack;
@@ -138,6 +147,7 @@ namespace jfd::ui {
     // Registration order, for ties in the sidebar and routeNames().
     QStringList m_registered;
     QStringList m_unavailable;
+    QStringList m_closed;
     QUrl m_placeholder;
   };
 

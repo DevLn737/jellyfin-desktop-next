@@ -103,7 +103,36 @@ namespace jfd::ui {
   }
 
   bool Navigator::routeAvailable(const QString& name) const {
-    return m_routes.contains(name) && !m_unavailable.contains(name);
+    return m_routes.contains(name) && !m_unavailable.contains(name) && !m_closed.contains(name);
+  }
+
+  void Navigator::setRouteClosed(const QString& name, bool closed) {
+    if (closed == m_closed.contains(name)) {
+      return;
+    }
+    if (closed) {
+      m_closed.append(name);
+    } else {
+      m_closed.removeAll(name);
+    }
+    Q_EMIT sidebarChanged();
+    if (closed && std::any_of(m_stack.cbegin(), m_stack.cend(), [&name](const Route& r) { return r.name == name; })) {
+      qCInfo(lcNavigator) << "route" << name << "closed while open";
+      reset(QStringLiteral("home"));
+    }
+  }
+
+  Navigator::Route Navigator::accept(const QString& route) const {
+    const Route parsed = parse(route);
+    if (parsed.name.isEmpty()) {
+      qCWarning(lcNavigator) << "invalid route" << route;
+      return {};
+    }
+    if (m_closed.contains(parsed.name)) {
+      qCInfo(lcNavigator) << "route" << route << "is closed";
+      return {};
+    }
+    return parsed;
   }
 
   QVariantList Navigator::sidebarEntries() const {
@@ -161,9 +190,8 @@ namespace jfd::ui {
   }
 
   bool Navigator::navigate(const QString& route) {
-    const Route parsed = parse(route);
+    const Route parsed = accept(route);
     if (parsed.name.isEmpty()) {
-      qCWarning(lcNavigator) << "invalid route" << route;
       return false;
     }
     if (m_routes.value(parsed.name).root) {
@@ -189,9 +217,8 @@ namespace jfd::ui {
   }
 
   bool Navigator::replace(const QString& route) {
-    const Route parsed = parse(route);
+    const Route parsed = accept(route);
     if (parsed.name.isEmpty()) {
-      qCWarning(lcNavigator) << "invalid route" << route;
       return false;
     }
     if (m_stack.isEmpty()) {
@@ -205,9 +232,8 @@ namespace jfd::ui {
   }
 
   bool Navigator::reset(const QString& route) {
-    const Route parsed = parse(route);
+    const Route parsed = accept(route);
     if (parsed.name.isEmpty()) {
-      qCWarning(lcNavigator) << "invalid route" << route;
       return false;
     }
     if (m_stack.size() == 1 && m_stack.first().toString() == parsed.toString()) {

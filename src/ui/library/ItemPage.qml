@@ -223,7 +223,9 @@ RoutePage {
                         }
                         ActionButton {
                             objectName: "watchTogetherButton"
-                            visible: page.details && page.details.playTargetId.length > 0
+                            // Not offered without the right to create a room
+                            // (SyncPlayAccess), unless already in one.
+                            visible: page.details && page.details.playTargetId.length > 0 && Library.canWatchTogether
                             iconSource: Icons.group
                             text: qsTr("Watch together")
                             onClicked: page.details.watchTogether()

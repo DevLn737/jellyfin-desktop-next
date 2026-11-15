@@ -392,6 +392,11 @@ the focus, the address and the password typed on the on-screen keyboard,
 Quick Connect first, and Back between the steps.
 `jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
 gamepad alone.
+`jfd_ui_rooms_tests` drives the rooms tab on a fake server with the keyboard
+alone, checks that a poll keeps the cards of unchanged rooms, the empty,
+offline and access states, and the room card's contrast and focus ring in
+both themes; with `JFD_UI_SCREENSHOTS` it saves the tab in both themes at
+four window sizes.
 
 `desktop_smoke` starts the application with a temporary profile, checks the
 login page, visits every route and back, and fails if shutdown takes a
@@ -491,3 +496,42 @@ the view. Every page's main scrolling view has one; add it to a new page's.
   server streams it as a live source): its button stops it, after a
   question, and what it recorded stays. A schedule row's button (Enter on
   the row reaches it) cancels it.
+
+## Watching together: rooms
+
+The route `group` (sidebar "Watch together"; the tab keeps that name until
+the owner decides on "Rooms") is `GroupPage`, which shows one of two pages:
+
+- `RoomsPage` outside a room: the server's rooms (SyncPlay groups) as
+  `RoomCard`s, Create room (a name only), and a room's card before joining:
+  its state and members, Join and Back to rooms. Esc or Back closes an open
+  card before it leaves the page. "No rooms right now" when the list is
+  empty (the text does not promise every room of the server: 12.2 hides
+  rooms whose queue holds something the user may not see), "No connection"
+  while `Library.online` is false, a refusal from the server in words above
+  the list.
+- `RoomPage` in a room: the former group screen (members, speed for
+  everyone, queue, how well we keep up, Leave room).
+
+Both read the session's `GroupModel` (QML `GroupSession`) and `RoomsModel`
+(QML `RoomsSession`, `src/session`). `RoomsModel` is the list: it asks for
+`SyncPlay/List` at once when the page shows in the active window
+(`RoomsSession.active`, which the page binds to its visibility and
+`Window.active`) and then every 5 s, never while hidden, offline or without
+the right to join; each answer is compared with the rows, so an unchanged
+room keeps its card (no model signal at all) and a changed one is updated in
+place. Joining, creating and leaving go through `GroupModel`.
+
+The user's `SyncPlayAccess` (from `Users/Me`, asked again after each sign-in):
+
+| Access | What the app offers |
+| --- | --- |
+| `CreateAndJoinGroups` (or unknown) | everything |
+| `JoinGroups` | the rooms and Join; no Create room, no Watch together on item pages outside a room |
+| `None` | no tab and no Watch together: `Navigator.setRouteClosed("group")` hides the entry, drops Ctrl+K's "Open Watch together" and refuses the route from anywhere (a command from a second start, the phone); the phone's Play in a group plays nothing in one |
+
+On stock 12.2 a room has only a name, a state and its members' names, so the
+card shows those; marks for a member limit, a password or an invitation, and
+what is playing, wait for the rooms extension of the server fork (package
+3.9, steps 3 and 4).
+

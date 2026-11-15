@@ -2,19 +2,24 @@
 
 #include <jfd/library/SignIn.h>
 #include <jfd/session/GroupModel.h>
+#include <jfd/session/RoomsModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/Settings.h>
 #include <jfd/settings/SettingsRegistry.h>
 #include <jfd/ui/GroupSession.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/RoomsSession.h>
 
+#include <QLoggingCategory>
 #include <QQmlEngine>
 #include <QUrl>
 
 namespace jfd::desktop {
 
   namespace {
+    Q_LOGGING_CATEGORY(lcGroupInstall, "jfd.app.group")
+
     const QString SpeedCorrectionKey = QStringLiteral("syncplay/speedCorrection");
     const QString SeekThresholdKey = QStringLiteral("syncplay/seekThresholdMs");
 
@@ -66,6 +71,9 @@ namespace jfd::desktop {
     services.group = std::make_unique<session::GroupModel>(*services.session, *services.client, *services.socket);
     session::GroupModel& group = *services.group;
     ui::GroupSession::setInstance(&group);
+    services.rooms = std::make_unique<session::RoomsModel>(group, *services.client);
+    session::RoomsModel& rooms = *services.rooms;
+    ui::RoomsSession::setInstance(&rooms);
 
     // The correction settings apply while playing, from the next decision.
     session::SessionRuntime& runtime = *services.session;
@@ -76,32 +84,62 @@ namespace jfd::desktop {
                        if (key == SpeedCorrectionKey || key == SeekThresholdKey)
                          runtime.setSyncCorrection(syncCorrection(settings));
                      });
-    services.navigator->registerPage(QStringLiteral("group"),
-                                     QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Group/GroupPage.qml")));
+    ui::Navigator* navigator = services.navigator;
+    navigator->registerPage(QStringLiteral("group"), QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Group/GroupPage.qml")));
 
-    // Another server may or may not have the playback-rate extension.
+    // Another server may or may not have the playback-rate extension, and
+    // another user other rights. Signed out: nobody's rooms.
     if (services.signIn != nullptr) {
       QObject::connect(services.signIn, &library::SignIn::signedIn, &group, &session::GroupModel::checkRateSupport);
+      QObject::connect(services.signIn, &library::SignIn::signedIn, &group, &session::GroupModel::checkAccess);
+      QObject::connect(services.signIn, &library::SignIn::signedOut, &rooms, [&group, &rooms] {
+        rooms.clear();
+        group.setAccess({});
+      });
+    }
+
+    // The list waits while the server cannot be reached.
+    if (services.libraryUi != nullptr) {
+      ui::LibraryUi* libraryUi = services.libraryUi;
+      rooms.setOnline(libraryUi->online());
+      QObject::connect(libraryUi, &ui::LibraryUi::onlineChanged, &rooms,
+                       [&rooms, libraryUi] { rooms.setOnline(libraryUi->online()); });
     }
 
     // "Watch together" on an item page: a group named after the item that
     // starts it for everyone (or the item played in the group we are in),
-    // then the group page with its members and queue.
-    if (services.libraryUi != nullptr) {
-      ui::Navigator* navigator = services.navigator;
-      services.libraryUi->setWatchTogetherHandler(
-          [&group, navigator](const QString& itemId, const QString& name, qint64 startPositionTicks) {
-            group.watchTogether(itemId, name, startPositionTicks);
-            navigator->navigate(QStringLiteral("group"));
-          });
-    }
+    // then the group page with its members and queue. Offered to users who
+    // may create a room, or who are in one.
+    const auto watchTogether = [&group, navigator](const QString& itemId, const QString& name,
+                                                    qint64 startPositionTicks) {
+      group.watchTogether(itemId, name, startPositionTicks);
+      navigator->navigate(QStringLiteral("group"));
+    };
+    // SyncPlayAccess (brief 3.9): None closes the route everywhere (the
+    // sidebar, Ctrl+K, a command from another start, the phone) and takes
+    // Watch together away; JoinGroups keeps the rooms without Create.
+    const auto applyAccess = [&group, navigator, libraryUi = services.libraryUi, watchTogether] {
+      navigator->setRouteClosed(QStringLiteral("group"), !group.canJoin());
+      if (libraryUi == nullptr) return;
+      const bool offered = group.canCreate() || (group.inGroup() && group.canJoin());
+      if (offered != libraryUi->canWatchTogether()) {
+        qCInfo(lcGroupInstall) << "Watch together" << (offered ? "offered" : "not offered");
+        libraryUi->setWatchTogetherHandler(offered ? ui::LibraryUi::WatchTogetherHandler(watchTogether)
+                                                   : ui::LibraryUi::WatchTogetherHandler());
+      }
+    };
+    QObject::connect(&group, &session::GroupModel::accessChanged, &group, applyAccess);
+    QObject::connect(&group, &session::GroupModel::changed, &group, applyAccess);
+    applyAccess();
   }
 
   void uninstallGroup(AppServices& services) {
     // The watch-together handler stays on LibraryUi: nothing calls it once
     // the window is gone, and LibraryUi's signals must not fire after the
     // QML engine that bound them.
+    ui::RoomsSession::setInstance(nullptr);
     ui::GroupSession::setInstance(nullptr);
+    services.rooms.reset();
     services.group.reset();
   }
 

@@ -13,6 +13,7 @@
 #include <jfd/remote/RemoteCommands.h>
 #include <jfd/remote/RemoteSettings.h>
 #include <jfd/session/GroupModel.h>
+#include <jfd/session/RoomsModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/MusicUi.h>
