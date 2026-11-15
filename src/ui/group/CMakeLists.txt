@@ -1,9 +1,12 @@
-# Jfd.Ui.Group: watching together. The group page (the server's groups,
-# create, join, members, speed, queue, leave) and the group indicator for
-# the player's OSD, both bound to the session's GroupModel (src/session),
-# which the application hands to QML as the GroupSession singleton.
+# Jfd.Ui.Group: watching together. The route "group" (GroupPage): the
+# rooms (RoomsPage: the server's live list, a room's card, create, join)
+# and, in one, the room (RoomPage: members, speed, queue, leave); the group
+# indicator for the player's OSD. Bound to the session's GroupModel and
+# RoomsModel (src/session), which the application hands to QML as the
+# GroupSession and RoomsSession singletons.
 qt_add_library(jfd_ui_group STATIC
-  include/jfd/ui/GroupSession.h)
+  include/jfd/ui/GroupSession.h
+  include/jfd/ui/RoomsSession.h)
 target_include_directories(jfd_ui_group PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # The generated QML type registration includes the header by file name.
 target_include_directories(jfd_ui_group PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/jfd/ui)
@@ -13,6 +16,8 @@ qt_add_qml_module(jfd_ui_group
   QML_FILES
     GroupOsd.qml
     GroupPage.qml
+    RoomPage.qml
+    RoomsPage.qml
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell)
 target_link_libraries(jfd_ui_group
   PUBLIC Qt6::Core Qt6::Qml jfd::session_runtime

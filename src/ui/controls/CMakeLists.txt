@@ -25,6 +25,7 @@ qt_add_qml_module(jfd_ui_controls
     LoadingIndicator.qml
     PopupMenu.qml
     PosterCard.qml
+    RoomCard.qml
     SectionHeader.qml
     SkeletonBox.qml
     SmoothWheel.qml

@@ -52,8 +52,13 @@ namespace jfd::session {
     Q_PROPERTY(QString correction READ correction NOTIFY changed)
     // The group's queue: [{playlistItemId, itemId, name, current}].
     Q_PROPERTY(QVariantList queue READ queue NOTIFY queueChanged)
-    // The server's groups: [{id, name, state, participants}].
-    Q_PROPERTY(QVariantList groups READ groups NOTIFY groupsChanged)
+    // The user's SyncPlayAccess policy: "CreateAndJoinGroups", "JoinGroups"
+    // or "None"; "" until the server said (everything is offered then, and
+    // the server still decides). The list of the server's groups lives in
+    // RoomsModel.
+    Q_PROPERTY(QString access READ access NOTIFY accessChanged)
+    Q_PROPERTY(bool canJoin READ canJoin NOTIFY accessChanged)
+    Q_PROPERTY(bool canCreate READ canCreate NOTIFY accessChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
 
@@ -74,11 +79,17 @@ namespace jfd::session {
     int driftMs() const;
     QString correction() const;
     QVariantList queue() const;
-    QVariantList groups() const { return m_groups; }
+    QString access() const { return m_access; }
+    // None closes watching together altogether; JoinGroups only creating.
+    bool canJoin() const { return m_access != QLatin1String("None"); }
+    bool canCreate() const { return canJoin() && m_access != QLatin1String("JoinGroups"); }
+    // Unknown and empty values count as full access: the server checks.
+    void setAccess(const QString& access);
+    // Asks the server for the signed-in user's policy (Users/Me).
+    Q_INVOKABLE void checkAccess();
     bool busy() const { return m_busy > 0; }
     QString errorText() const { return m_errorText; }
 
-    Q_INVOKABLE void refreshGroups();
     Q_INVOKABLE void createGroup(const QString& name);
     Q_INVOKABLE void joinGroup(const QString& groupId);
     Q_INVOKABLE void leaveGroup();
@@ -100,11 +111,19 @@ namespace jfd::session {
   Q_SIGNALS:
     void changed();
     void queueChanged();
-    void groupsChanged();
+    void accessChanged();
     void busyChanged();
     void errorTextChanged();
     void rateSupportedChanged();
     void notice(const QString& text, bool error);
+
+  public:
+    // What the room page says for a group update that refuses a request
+    // (JoinGroupDenied, CreateGroupDenied, GroupDoesNotExist,
+    // LibraryAccessDenied, NotInGroup), translated; "" for any other type.
+    static QString refusalText(const QString& type);
+    // For a refusal nobody here knows (a newer server's).
+    static QString unknownRefusalText();
 
   private:
     void onSnapshot(const core::SessionSnapshot& snapshot);
@@ -134,7 +153,7 @@ namespace jfd::session {
     QList<QueueEntry> m_queue;
     int m_queueIndex = -1;
     QHash<QString, QString> m_names;
-    QVariantList m_groups;
+    QString m_access;
     int m_busy = 0;
     QString m_errorText;
     bool m_rateSupported = false;

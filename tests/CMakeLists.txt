@@ -237,7 +237,7 @@ if(TARGET jfd_jellyfin_api)
 
   if(TARGET jfd_session_runtime)
     jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp
-      session/OpenGateTest.cpp)
+      session/OpenGateTest.cpp session/RoomsModelTest.cpp)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
@@ -489,6 +489,20 @@ if(JFD_BUILD_APP)
       jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
       Qt6::Quick Qt6::WebSockets)
     target_compile_options(jfd_library_bench PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+  endif()
+
+  if(TARGET jfd_ui_group)
+    # The rooms tab (package 3.9) on a fake server in an offscreen window:
+    # keyboard only, cards kept across polls, empty, offline and access
+    # states, the room card's contrast and focus in both themes, TV mode.
+    add_executable(jfd_ui_rooms_tests support/QtGuiTestMain.cpp ui/RoomsPageTest.cpp)
+    target_include_directories(jfd_ui_rooms_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_rooms_tests PRIVATE
+      jfd_ui_group jfd_ui_groupplugin jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd::session_runtime Qt6::Gui Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
+    target_compile_options(jfd_ui_rooms_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_rooms_tests COMMAND jfd_ui_rooms_tests)
+    set_tests_properties(jfd_ui_rooms_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(JFD_SERVER_TESTS AND TARGET jfd_ui_group)

@@ -28,7 +28,7 @@ keys) and, through the input router, from a gamepad or the phone.
 |---|---|---|---|
 | Arrows | Move the focus | Move over the keys; Up from the top row closes it | Display hidden: Left/Right seek 10 s (held: faster), Up/Down show it; shown: move the focus |
 | Enter (Select) | Activate the focused control; on a text field, open the keyboard | Type the key | Display hidden: play/pause; on a button: press it |
-| Esc, Backspace outside a field (Back) | Back to the previous screen (on sign-in: the previous step) | Close it, back on the field | Close the menu, then the display, then the player |
+| Esc, Backspace outside a field (Back) | Back to the previous screen (on sign-in: the previous step; on Watch together: an open room card first) | Close it, back on the field | Close the menu, then the display, then the player |
 | Page Up / Page Down | About a page up or down | Erase / space | Live TV: next / previous channel |
 | Menu key | The focused item's menu, else the sidebar and back | — | — |
 | Ctrl+K | Commands and search | — | — |

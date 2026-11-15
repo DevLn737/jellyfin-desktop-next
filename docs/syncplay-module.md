@@ -36,3 +36,30 @@ PlaybackSession session({backend, clock, timers, group, observer});
 Messages are copied from the contract fixtures of the 2.x client
 (`tests/syncplay/fixtures`). Sequences recorded from the Docker test server
 will be added there and replayed through the simulator.
+
+## Rooms on a stock 12.2 server
+
+The rooms tab (`RoomsModel`, `src/session`; screens in `docs/ui.md`) adds
+no request of its own beyond `GET SyncPlay/List`, which it polls every 5 s
+only while the tab shows in the active window. Joining and creating are the
+usual `SyncPlay/Join` and `SyncPlay/New`; both answer 204 and the server
+refuses later, over the socket, as a `SyncPlayGroupUpdate`:
+
+| `Type` | Text on the tab |
+| --- | --- |
+| `JoinGroupDenied` | You may not join this room. |
+| `CreateGroupDenied` | You may not create rooms on this server. |
+| `GroupDoesNotExist` | This room no longer exists. |
+| `LibraryAccessDenied` | This room is playing something from a library you cannot see. |
+| `NotInGroup` (while waiting for an answer) | You are not in this room. |
+| any other type the client does not know | The server refused. Try again later. (and a warning in the log, `jfd.session.group`) |
+
+`GroupModel::refusalText` holds these; the Russian ones are in
+`src/session/i18n/session_ru.ts`. The client checks the user's
+`Policy.SyncPlayAccess` before it asks: with `None` it sends no SyncPlay
+request at all (the list, join, create, a new queue or items added from the
+phone), with `JoinGroups` no `New`.
+
+The member list of `SyncPlay/List` names each user once, so two sessions of
+one user in a room count as one member on the card.
+

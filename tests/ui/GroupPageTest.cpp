@@ -8,8 +8,10 @@
 #include <jfd/api/SessionSocket.h>
 #include <jfd/api/SyncPlayApi.h>
 #include <jfd/session/GroupModel.h>
+#include <jfd/session/RoomsModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/GroupSession.h>
+#include <jfd/ui/RoomsSession.h>
 
 #include <QGuiApplication>
 #include <QQmlComponent>
@@ -28,8 +30,8 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
 
 // The group page on a live server (scripts/test-server), stock 12.2 or the
-// SyncPlay fork (JFD_TEST_SERVER_FORK=1): create a group from the page,
-// change its speed, leave, and join another member's group from the list.
+// SyncPlay fork (JFD_TEST_SERVER_FORK=1): create a room from the page,
+// change its speed, leave, and join another member's room from its card.
 
 using namespace jfd;
 using namespace jfd::api;
@@ -113,6 +115,8 @@ TEST_CASE("The group page creates a group, changes its speed, leaves and joins a
       settings);
   session::GroupModel model(runtime, *host.client, *host.socket);
   ui::GroupSession::setInstance(&model);
+  session::RoomsModel rooms(model, *host.client);
+  ui::RoomsSession::setInstance(&rooms);
   if (forkServer()) REQUIRE(waitFor([&] { return model.rateSupported(); }, 10000));
 
   QQmlEngine engine;
@@ -127,10 +131,10 @@ TEST_CASE("The group page creates a group, changes its speed, leaves and joins a
   page->setSize(QSizeF(1000, 900));
   window.show();
 
-  // Outside a group: the name field and the server's list.
+  // Outside a room: the name field and the server's rooms.
   CHECK(shown(page, "createButton"));
   CHECK_FALSE(shown(page, "leaveButton"));
-  QQuickItem* nameField = find(page, "groupNameField");
+  QQuickItem* nameField = find(page, "roomNameField");
   REQUIRE(nameField != nullptr);
   nameField->setProperty("text", QStringLiteral("jfd-group-page"));
   click(find(page, "createButton"));
@@ -143,7 +147,7 @@ TEST_CASE("The group page creates a group, changes its speed, leaves and joins a
   REQUIRE(rateBox != nullptr);
   if (forkServer()) {
     REQUIRE(waitFor([&] { return rateBox->isVisible(); }, 5000));
-    const QVariantList rates = page->property("rates").toList();
+    const QVariantList rates = find(page, "roomPage")->property("rates").toList();
     const int index = int(rates.indexOf(QVariant(1.5)));
     REQUIRE(index >= 0);
     rateBox->setProperty("currentIndex", index);
@@ -162,9 +166,12 @@ TEST_CASE("The group page creates a group, changes its speed, leaves and joins a
   });
   REQUIRE(made.ok());
   click(find(page, "refreshButton"));
-  const QByteArray itemName = "group_" + made->groupId.toLatin1();
+  const QByteArray itemName = "room_" + made->groupId.toLatin1();
   REQUIRE(waitFor([&] { return shown(page, itemName.constData()); }, 20000));
+  // A room opens its card first; Join there.
   click(find(page, itemName.constData()));
+  REQUIRE(waitFor([&] { return shown(page, "joinButton"); }, 5000));
+  click(find(page, "joinButton"));
   REQUIRE(waitFor([&] { return model.inGroup() && model.groupId() == made->groupId; }, 20000));
   // The server lists each user once on joining, and both sessions here
   // sign in as the same test user.
@@ -175,6 +182,7 @@ TEST_CASE("The group page creates a group, changes its speed, leaves and joins a
   REQUIRE(waitFor([&] { return !model.inGroup(); }, 20000));
   REQUIRE(run<Empty>([&](auto done) { guest.syncPlay->leaveGroup(nullptr, done); }).ok());
   object.reset();
+  ui::RoomsSession::setInstance(nullptr);
   ui::GroupSession::setInstance(nullptr);
 }
 

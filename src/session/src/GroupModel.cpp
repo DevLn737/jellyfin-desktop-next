@@ -7,6 +7,7 @@
 
 #include <QJsonArray>
 #include <QLocale>
+#include <QLoggingCategory>
 
 #include <algorithm>
 #include <chrono>
@@ -15,6 +16,16 @@
 namespace jfd::session {
 
   namespace {
+    Q_LOGGING_CATEGORY(lcGroup, "jfd.session.group")
+
+    // Group updates of 12.2 (GroupUpdateType) that are not refusals. Any
+    // type outside these and the refusals is a newer server's.
+    bool knownUpdate(const QString& type) {
+      for (const char* known : {"GroupJoined", "GroupLeft", "UserJoined", "UserLeft", "StateUpdate", "PlayQueue"})
+        if (type == QLatin1String(known)) return true;
+      return false;
+    }
+
     // A position change this much beyond what playing explains is a jump
     // (someone seeked); drift corrections stay well below it.
     constexpr std::int64_t JumpMs = 3000;
@@ -59,6 +70,7 @@ namespace jfd::session {
                 Q_EMIT notice(tr("The group's item could not be opened, so you left the group."), true);
             });
     checkRateSupport();
+    checkAccess();
   }
 
   GroupModel::~GroupModel() = default;
@@ -110,31 +122,21 @@ namespace jfd::session {
 
   // ---- Requests ------------------------------------------------------------
 
-  void GroupModel::refreshGroups() {
-    startBusy();
-    m_api->listGroups(this, [this](api::Result<QList<api::SyncPlayGroup>> result) {
-      endBusy();
-      if (!result) {
-        setError(tr("Could not load the server's groups."));
-        return;
-      }
-      m_groups.clear();
-      for (const auto& group : *result)
-        m_groups.append(QVariantMap{{QStringLiteral("id"), group.groupId},
-                                    {QStringLiteral("name"), group.groupName},
-                                    {QStringLiteral("state"), group.state.toLower()},
-                                    {QStringLiteral("participants"), group.participants}});
-      Q_EMIT groupsChanged();
-    });
-  }
-
   void GroupModel::createGroup(const QString& name) {
+    if (!canCreate()) {
+      setError(refusalText(QStringLiteral("CreateGroupDenied")));
+      return;
+    }
     setError({});
     startBusy();
     m_runtime.createGroup(name.trimmed().isEmpty() ? tr("Watching together") : name.trimmed());
   }
 
   void GroupModel::joinGroup(const QString& groupId) {
+    if (!canJoin()) {
+      setError(refusalText(QStringLiteral("JoinGroupDenied")));
+      return;
+    }
     setError({});
     startBusy();
     m_runtime.joinGroup(groupId);
@@ -149,6 +151,13 @@ namespace jfd::session {
   }
 
   void GroupModel::watchTogether(const QString& itemId, const QString& groupName, qint64 startTicks) {
+    // Without the right to create (or, in a group, to be in one) the item
+    // page offers no Watch together; this catches the other ways in.
+    if (m_group ? !canJoin() : !canCreate()) {
+      qCInfo(lcGroup) << "Watch together refused by the user's SyncPlay access" << m_access;
+      Q_EMIT notice(refusalText(QStringLiteral("CreateGroupDenied")), true);
+      return;
+    }
     m_pendingQueue = std::make_pair(itemId, startTicks);
     if (m_group) {
       // Already in a group: play the item there.
@@ -159,14 +168,14 @@ namespace jfd::session {
   }
 
   void GroupModel::playInGroup(const QStringList& itemIds, int startIndex, qint64 startTicks) {
-    if (!m_group || itemIds.isEmpty() || startIndex < 0 || startIndex >= itemIds.size()) return;
+    if (!m_group || !canJoin() || itemIds.isEmpty() || startIndex < 0 || startIndex >= itemIds.size()) return;
     m_api->setNewQueue(itemIds, startIndex, startTicks, this, [this](api::Result<api::Empty> result) {
       if (!result) setError(tr("Could not start the item in the group."));
     });
   }
 
   void GroupModel::queueInGroup(const QStringList& itemIds, bool next) {
-    if (!m_group || itemIds.isEmpty()) return;
+    if (!m_group || !canJoin() || itemIds.isEmpty()) return;
     m_api->queue(itemIds, next, this, [this](api::Result<api::Empty> result) {
       if (!result) setError(tr("Could not add to the group's queue."));
     });
@@ -197,6 +206,32 @@ namespace jfd::session {
       }
     });
   }
+
+  void GroupModel::setAccess(const QString& access) {
+    if (access == m_access) return;
+    m_access = access;
+    qCInfo(lcGroup) << "SyncPlay access" << (access.isEmpty() ? QStringLiteral("unknown") : access);
+    Q_EMIT accessChanged();
+  }
+
+  void GroupModel::checkAccess() {
+    m_client.currentUser(this, [this](api::Result<api::UserInfo> user) {
+      // Unanswered: keep what we had (the server still refuses on its own).
+      if (user) setAccess(user->syncPlayAccess);
+    });
+  }
+
+  QString GroupModel::refusalText(const QString& type) {
+    if (type == QLatin1String("GroupDoesNotExist")) return tr("This room no longer exists.");
+    if (type == QLatin1String("JoinGroupDenied")) return tr("You may not join this room.");
+    if (type == QLatin1String("CreateGroupDenied")) return tr("You may not create rooms on this server.");
+    if (type == QLatin1String("LibraryAccessDenied"))
+      return tr("This room is playing something from a library you cannot see.");
+    if (type == QLatin1String("NotInGroup")) return tr("You are not in this room.");
+    return {};
+  }
+
+  QString GroupModel::unknownRefusalText() { return tr("The server refused. Try again later."); }
 
   // ---- What the session and the server tell us -----------------------------
 
@@ -295,23 +330,31 @@ namespace jfd::session {
 
   void GroupModel::onGroupUpdate(const QJsonObject& update) {
     const QString type = update.value(QLatin1String("Type")).toString();
-    if (type == QLatin1String("GroupDoesNotExist") || type == QLatin1String("JoinGroupDenied") ||
-        type == QLatin1String("LibraryAccessDenied") || type == QLatin1String("CreateGroupDenied")) {
-      if (m_busy > 0) endBusy();
-      m_pendingQueue.reset();
-      setError(type == QLatin1String("GroupDoesNotExist")   ? tr("This group no longer exists.")
-               : type == QLatin1String("JoinGroupDenied")   ? tr("You may not join this group.")
-               : type == QLatin1String("CreateGroupDenied") ? tr("You may not create groups on this server.")
-                                                           : tr("You cannot see what this group is playing."));
-      return;
-    }
     if (type == QLatin1String("NotInGroup")) {
       // An answer to a request for a group we are not in: whatever we were
       // waiting for will not come.
       const bool waiting = m_busy > 0 || m_pendingQueue.has_value();
       if (m_busy > 0) endBusy();
       m_pendingQueue.reset();
-      if (waiting) setError(tr("You are not in this group."));
+      if (waiting) setError(refusalText(type));
+      return;
+    }
+    if (const QString refusal = refusalText(type); !refusal.isEmpty()) {
+      // Refusals arrive here, over the socket: Join and New answer 204.
+      qCInfo(lcGroup) << "Refused:" << type;
+      if (m_busy > 0) endBusy();
+      m_pendingQueue.reset();
+      setError(refusal);
+      return;
+    }
+    if (!knownUpdate(type)) {
+      qCWarning(lcGroup) << "Unknown group update" << type;
+      // Whatever we were waiting for is not coming the usual way.
+      if (m_busy > 0) {
+        endBusy();
+        m_pendingQueue.reset();
+        setError(unknownRefusalText());
+      }
       return;
     }
     if (type != QLatin1String("PlayQueue")) return;

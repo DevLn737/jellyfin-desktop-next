@@ -4,10 +4,6 @@
 <context>
     <name>jfd::session::GroupModel</name>
     <message>
-        <source>Could not load the server&apos;s groups.</source>
-        <translation>Не удалось загрузить группы сервера.</translation>
-    </message>
-    <message>
         <source>Watching together</source>
         <translation>Смотрим вместе</translation>
     </message>
@@ -52,18 +48,6 @@
         <translation>Сервер отклонил смену скорости.</translation>
     </message>
     <message>
-        <source>This group no longer exists.</source>
-        <translation>Этой группы больше нет.</translation>
-    </message>
-    <message>
-        <source>You may not join this group.</source>
-        <translation>Вход в эту группу запрещён.</translation>
-    </message>
-    <message>
-        <source>You cannot see what this group is playing.</source>
-        <translation>У вас нет доступа к тому, что смотрит эта группа.</translation>
-    </message>
-    <message>
         <source>The server cannot be reached.</source>
         <translation>Сервер недоступен.</translation>
     </message>
@@ -88,12 +72,28 @@
         <translation>Группа не получила ответа от этого плеера и, возможно, ждёт его.</translation>
     </message>
     <message>
-        <source>You may not create groups on this server.</source>
-        <translation>На этом сервере вам нельзя создавать группы.</translation>
+        <source>This room no longer exists.</source>
+        <translation>Этой комнаты больше нет.</translation>
     </message>
     <message>
-        <source>You are not in this group.</source>
-        <translation>Вы не состоите в этой группе.</translation>
+        <source>You may not join this room.</source>
+        <translation>Вам нельзя войти в эту комнату.</translation>
+    </message>
+    <message>
+        <source>You may not create rooms on this server.</source>
+        <translation>Вам нельзя создавать комнаты на этом сервере.</translation>
+    </message>
+    <message>
+        <source>This room is playing something from a library you cannot see.</source>
+        <translation>В этой комнате играет что-то из библиотеки, к которой у вас нет доступа.</translation>
+    </message>
+    <message>
+        <source>You are not in this room.</source>
+        <translation>Вы не в этой комнате.</translation>
+    </message>
+    <message>
+        <source>The server refused. Try again later.</source>
+        <translation>Сервер отказал. Попробуйте позже.</translation>
     </message>
 </context>
 </TS>

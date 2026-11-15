@@ -86,6 +86,36 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   CHECK_FALSE(navigator.chromeVisible());
 }
 
+TEST_CASE("A closed route is refused from anywhere and leaves the stack (SyncPlayAccess None)") {
+  Navigator navigator;
+  REQUIRE(navigator.reset(QStringLiteral("home")));
+  REQUIRE(navigator.navigate(QStringLiteral("group")));
+  QSignalSpy sidebar(&navigator, &Navigator::sidebarChanged);
+  QSignalSpy current(&navigator, &Navigator::currentChanged);
+
+  // Closing it while open goes home and drops the sidebar entry (and with
+  // it Ctrl+K's "Open Watch together", which follows the sidebar).
+  navigator.setRouteClosed(QStringLiteral("group"), true);
+  CHECK(sidebar.count() == 1);
+  CHECK(current.count() >= 1);
+  CHECK(navigator.currentRoute() == QStringLiteral("home"));
+  CHECK_FALSE(navigator.routeAvailable(QStringLiteral("group")));
+  for (const QVariant& entry : navigator.sidebarEntries())
+    CHECK(entry.toMap().value(QStringLiteral("route")).toString() != QStringLiteral("group"));
+
+  // Every way in: navigate (sidebar, palette, a command from another start,
+  // the phone's Play in a group), replace and reset.
+  CHECK_FALSE(navigator.navigate(QStringLiteral("group")));
+  CHECK_FALSE(navigator.replace(QStringLiteral("group")));
+  CHECK_FALSE(navigator.reset(QStringLiteral("group")));
+  CHECK(navigator.currentRoute() == QStringLiteral("home"));
+  // Still a route: it opens again once allowed.
+  CHECK(navigator.hasRoute(QStringLiteral("group")));
+  navigator.setRouteClosed(QStringLiteral("group"), false);
+  CHECK(navigator.routeAvailable(QStringLiteral("group")));
+  CHECK(navigator.navigate(QStringLiteral("group")));
+}
+
 TEST_CASE("Commands are listed when available and run by id") {
   CommandRegistry commands;
   bool signedIn = false;

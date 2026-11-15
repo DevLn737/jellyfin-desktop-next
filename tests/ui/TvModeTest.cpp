@@ -421,6 +421,7 @@ Item {
     IconButton { objectName: "IconButton"; iconSource: Icons.play; onClicked: root.answered("IconButton") }
     PosterCard { objectName: "PosterCard"; title: "Title"; onClicked: root.answered("PosterCard") }
     ListItem { objectName: "ListItem"; text: "Entry"; onClicked: root.answered("ListItem") }
+    RoomCard { objectName: "RoomCard"; text: "Room"; onClicked: root.answered("RoomCard") }
     ToggleSwitch { objectName: "ToggleSwitch"; onToggled: root.answered("ToggleSwitch") }
     ChoiceBox {
       objectName: "ChoiceBox"
@@ -439,6 +440,7 @@ Item {
   };
   const QStringList tested = {QStringLiteral("ActionButton"), QStringLiteral("IconButton"),
                               QStringLiteral("PosterCard"),   QStringLiteral("ListItem"),
+                              QStringLiteral("RoomCard"),
                               QStringLiteral("ToggleSwitch"), QStringLiteral("ChoiceBox"),
                               QStringLiteral("ValueSlider"),  QStringLiteral("InputField")};
   for (const QString& name : tested) {

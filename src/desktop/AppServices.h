@@ -42,6 +42,7 @@ namespace jfd::ui {
 
 namespace jfd::session {
   class GroupModel;
+  class RoomsModel;
   class SessionRuntime;
 } // namespace jfd::session
 
@@ -122,8 +123,10 @@ namespace jfd::desktop {
     // The player screen's model (installPlayer), on the session above.
     std::unique_ptr<ui::PlayerModel> playerModel;
     // Watching together (installGroup): the group page's model, on the
-    // session. Declared after it so it goes first.
+    // session. Declared after it so it goes first. The rooms list on the
+    // group model, declared after it so it goes before it.
     std::unique_ptr<session::GroupModel> group;
+    std::unique_ptr<session::RoomsModel> rooms;
 
     // Music (installMusic): the queue and player on the session above, and
     // the screens' lists. Declared after the session so they go first.
@@ -224,10 +227,12 @@ namespace jfd::desktop {
   void installPlayer(AppServices& services, QQmlEngine& engine);
   // The watch-together settings section (speed correction, seek threshold).
   bool registerGroupSettings(settings::SettingsRegistry& registry);
-  // The watch-together page (route "group"), the GroupSession singleton
-  // for it and the player's group indicator, and "Watch together" on item
-  // pages. Needs installSession. uninstallGroup, after the QML engine is
-  // gone, drops the model before the session it reads.
+  // The watch-together page (route "group": the rooms, and the room we are
+  // in), the GroupSession and RoomsSession singletons for it and the
+  // player's group indicator, and "Watch together" on item pages, all
+  // within the user's SyncPlayAccess. Needs installSession. uninstallGroup,
+  // after the QML engine is gone, drops the models before the session they
+  // read.
   void installGroup(AppServices& services, QQmlEngine& engine);
   void uninstallGroup(AppServices& services);
 

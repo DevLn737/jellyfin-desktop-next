@@ -50,6 +50,29 @@
     </message>
 </context>
 <context>
+    <name>RoomCard</name>
+    <message>
+        <source>Playing</source>
+        <translation>Идёт просмотр</translation>
+    </message>
+    <message>
+        <source>Paused</source>
+        <translation>На паузе</translation>
+    </message>
+    <message>
+        <source>Waiting for everyone</source>
+        <translation>Ждём всех</translation>
+    </message>
+    <message>
+        <source>Nothing playing</source>
+        <translation>Ничего не воспроизводится</translation>
+    </message>
+    <message>
+        <source>Nobody here</source>
+        <translation>Никого нет</translation>
+    </message>
+</context>
+<context>
     <name>StateMessage</name>
     <message>
         <source>Something went wrong</source>

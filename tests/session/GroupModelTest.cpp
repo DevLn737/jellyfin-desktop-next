@@ -85,7 +85,7 @@ TEST_CASE("CreateGroupDenied ends the busy state and drops the queued item") {
   CHECK(f.model->busy());
   Q_EMIT f.socket.syncPlayGroupUpdate(json(R"({"GroupId":"","Type":"CreateGroupDenied","Data":""})"));
   CHECK_FALSE(f.model->busy());
-  CHECK(f.model->errorText() == QStringLiteral("You may not create groups on this server."));
+  CHECK(f.model->errorText() == QStringLiteral("You may not create rooms on this server."));
 
   // Joining another group later does not start the refused item there.
   f.joined();

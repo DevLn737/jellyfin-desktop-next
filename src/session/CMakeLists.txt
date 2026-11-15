@@ -14,6 +14,7 @@ if(TARGET jfd_playback)
     src/InputQueue.cpp
     src/PlaybackLauncher.cpp
     src/QtTimers.cpp
+    src/RoomsModel.cpp
     src/SessionRuntime.cpp
     src/SleepDetector.cpp
     include/jfd/session/ApiTransport.h
@@ -22,12 +23,13 @@ if(TARGET jfd_playback)
     include/jfd/session/LocalSource.h
     include/jfd/session/PlaybackLauncher.h
     include/jfd/session/QtTimers.h
+    include/jfd/session/RoomsModel.h
     include/jfd/session/SessionRuntime.h
     include/jfd/session/SleepDetector.h
     include/jfd/session/SteadyClock.h)
   add_library(jfd::session_runtime ALIAS jfd_session_runtime)
   target_link_libraries(jfd_session_runtime PUBLIC jfd::session jfd::syncplay jfd::jellyfin_api jfd::playback Qt6::Core Qt6::Network)
   set_target_properties(jfd_session_runtime PROPERTIES AUTOMOC ON)
-  # Russian strings of the group model in i18n/session_ru.ts.
+  # Russian strings of the group and rooms models in i18n/session_ru.ts.
   jfd_add_translations(jfd_session_runtime)
 endif()
