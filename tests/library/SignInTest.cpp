@@ -221,7 +221,9 @@ TEST_CASE("Saved servers are listed most recent first") {
                          QUrl(QStringLiteral("http://b")),
                          {},
                          {},
-                         QDateTime::currentDateTimeUtc()};
+                         // An hour ago: setActive() below stamps "now", which
+                         // could fall in the same millisecond as b's.
+                         QDateTime::currentDateTimeUtc().addSecs(-3600)};
   store.save(a);
   store.save(b);
   CHECK(store.servers().front().id == QStringLiteral("b"));
