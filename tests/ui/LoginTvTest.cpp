@@ -26,6 +26,7 @@
 #include <QTemporaryDir>
 #include <QtQml/qqmlextensionplugin.h>
 
+#include <algorithm>
 #include <deque>
 #include <functional>
 #include <map>
@@ -210,12 +211,24 @@ namespace {
     // other, the on-screen keyboard that a field opens closes with Back on
     // the field, and the safe area holds them all.
     void checkNoTraps() {
-      const QList<QQuickItem*> items = focusable();
       const QRectF safe(96, 54, 1920 - 2 * 96, 1080 - 2 * 54);
+      const auto sceneRect = [](const QQuickItem* item) {
+        return item->mapRectToScene(QRectF(0, 0, item->width(), item->height()));
+      };
+      // A step that has just loaded is laid out at the next polish (the
+      // Column places its children then): wait for it before measuring.
+      waitFor([&] {
+        const QList<QQuickItem*> now = focusable();
+        return std::all_of(now.begin(), now.end(), [&](const QQuickItem* item) { return safe.contains(sceneRect(item)); });
+      }, 2000);
+      const QList<QQuickItem*> items = focusable();
       QSet<Node> nodes;
       for (QQuickItem* item : items) {
         CAPTURE(item->objectName());
-        CHECK(safe.contains(item->mapRectToScene(QRectF(0, 0, item->width(), item->height()))));
+        CAPTURE(QString::fromLatin1(item->metaObject()->className()));
+        const QRectF rect = sceneRect(item);
+        CAPTURE(QStringLiteral("%1,%2 %3x%4").arg(rect.x()).arg(rect.y()).arg(rect.width()).arg(rect.height()));
+        CHECK(safe.contains(rect));
         SpatialNavigation::focusItem(item);
         if (Node node = nodeOf(items)) nodes.insert(node);
       }
