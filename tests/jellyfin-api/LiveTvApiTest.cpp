@@ -292,3 +292,199 @@ TEST_CASE("A guide page of only undated programmes does not end the list") {
   REQUIRE(all->size() == 1);
   CHECK(all->at(0).id == QStringLiteral("a"));
 }
+
+// Recordings and timers, with answers taken from the extras stand (12.2's
+// own DVR recording from the M3U tuner).
+
+namespace {
+  const char* TimersJson = R"({"Items": [
+    {"Status": "InProgress", "RunTimeTicks": 18000000000, "Id": "t1", "Type": "Timer",
+     "ChannelId": "c1", "ChannelName": "Test Channel 1", "ProgramId": "p1", "Name": "Channel 1 at 00:30",
+     "Overview": "Test programme 3 of channel 1.", "StartDate": "2026-11-15T00:30:00.0000000Z",
+     "EndDate": "2026-11-15T01:00:00.0000000Z", "ServiceName": "Emby", "PrePaddingSeconds": 0,
+     "KeepUntil": "UntilDeleted", "ProgramInfo": {"Name": "Channel 1 at 00:30", "Id": "p1", "TimerId": "t1"}},
+    {"Status": "New", "Id": "t2", "Type": "Timer", "ChannelId": "c50", "ChannelName": "Test Channel 50",
+     "ProgramId": "p2", "Name": "Test Series", "StartDate": "2026-11-15T01:00:00.0000000Z",
+     "EndDate": "2026-11-15T01:30:00.0000000Z", "SeriesTimerId": "s1"}
+  ], "TotalRecordCount": 2, "StartIndex": 0})";
+
+  const char* DefaultsJson = R"({"RecordAnyTime": true, "SkipEpisodesInLibrary": true, "RecordAnyChannel": false,
+    "KeepUpTo": 0, "RecordNewOnly": true, "Days": ["Sunday", "Monday"], "DayPattern": "Daily",
+    "Id": "eb075d6a62e2edc6b764a304633d33c0", "Type": "SeriesTimer", "ChannelId": "c50",
+    "ChannelName": "Test Channel 50", "ProgramId": "p2", "Name": "Test Series",
+    "StartDate": "2026-11-15T01:00:00.0000000Z", "EndDate": "2026-11-15T01:30:00.0000000Z",
+    "ServiceName": "Emby", "PrePaddingSeconds": 0, "PostPaddingSeconds": 0, "KeepUntil": "UntilDeleted"})";
+} // namespace
+
+TEST_CASE("Timers: the scheduled recordings with their programme, status and series") {
+  Signed s([](const HttpRequest&) { return jfd::test::json(TimersJson); });
+  LiveTvTimerQuery query;
+  query.channelId = QStringLiteral("c1");
+  query.isScheduled = true;
+  auto timers = run<QList<LiveTvTimer>>([&](auto done) { s.liveTv.timers(query, nullptr, done); });
+  REQUIRE(timers.ok());
+  CHECK(s.last().method == QByteArray("GET"));
+  CHECK(s.last().path == QStringLiteral("/jf/LiveTv/Timers"));
+  CHECK(s.param("channelId") == QStringLiteral("c1"));
+  CHECK(s.param("isScheduled") == QStringLiteral("true"));
+  CHECK_FALSE(s.last().query.hasQueryItem(QStringLiteral("isActive")));
+  REQUIRE(timers->size() == 2);
+  const LiveTvTimer& now = (*timers)[0];
+  CHECK(now.id == QStringLiteral("t1"));
+  CHECK(now.programId == QStringLiteral("p1"));
+  CHECK(now.channelName == QStringLiteral("Test Channel 1"));
+  CHECK(now.start == utc("2026-11-15T00:30:00Z"));
+  CHECK(now.isRecording());
+  CHECK(now.isScheduled());
+  CHECK(now.seriesTimerId.isEmpty());
+  CHECK_FALSE((*timers)[1].isRecording());
+  CHECK((*timers)[1].seriesTimerId == QStringLiteral("s1"));
+
+  LiveTvTimer done;
+  done.status = QStringLiteral("Completed");
+  CHECK_FALSE(done.isScheduled());
+  done.status = QStringLiteral("Cancelled");
+  CHECK_FALSE(done.isScheduled());
+}
+
+TEST_CASE("A programme in the guide says which timer records it") {
+  Signed s([](const HttpRequest&) {
+    return jfd::test::json(R"({"Items": [
+      {"Id": "p2", "ChannelId": "c50", "Name": "Test Series", "EpisodeTitle": "Episode 5", "IsSeries": true,
+       "TimerId": "t2", "SeriesTimerId": "s1",
+       "StartDate": "2026-11-15T01:00:00.0000000Z", "EndDate": "2026-11-15T01:30:00.0000000Z"},
+      {"Id": "p3", "ChannelId": "c50", "Name": "Test Series", "IsSeries": true,
+       "StartDate": "2026-11-15T01:30:00.0000000Z", "EndDate": "2026-11-15T02:00:00.0000000Z"}
+    ], "TotalRecordCount": 2})");
+  });
+  auto page = run<LiveTvProgramPage>([&](auto done) { s.liveTv.programs({}, nullptr, done); });
+  REQUIRE(page.ok());
+  REQUIRE(page->programs.size() == 2);
+  CHECK(page->programs[0].isSeries);
+  CHECK(page->programs[0].timerId == QStringLiteral("t2"));
+  CHECK(page->programs[0].seriesTimerId == QStringLiteral("s1"));
+  CHECK(page->programs[1].timerId.isEmpty());
+}
+
+TEST_CASE("Recording a programme posts the server's defaults for it back as a timer") {
+  Signed s([](const HttpRequest& r) {
+    if (r.path == QStringLiteral("/jf/LiveTv/Timers/Defaults")) return jfd::test::json(DefaultsJson);
+    return HttpResponse{204, {}, {}, 0};
+  });
+  REQUIRE(run<Empty>([&](auto done) { s.liveTv.recordProgram(QStringLiteral("p2"), nullptr, done); }).ok());
+  REQUIRE(s.server.requests().size() == 2);
+  const HttpRequest& defaults = s.server.requests()[0];
+  CHECK(defaults.method == QByteArray("GET"));
+  CHECK(defaults.query.queryItemValue(QStringLiteral("programId")) == QStringLiteral("p2"));
+  const HttpRequest& create = s.server.requests()[1];
+  CHECK(create.method == QByteArray("POST"));
+  CHECK(create.path == QStringLiteral("/jf/LiveTv/Timers"));
+  CHECK(QJsonDocument::fromJson(create.body).object() == QJsonDocument::fromJson(DefaultsJson).object());
+}
+
+TEST_CASE("Recording a series posts the defaults as a series timer") {
+  Signed s([](const HttpRequest& r) {
+    if (r.path == QStringLiteral("/jf/LiveTv/Timers/Defaults")) return jfd::test::json(DefaultsJson);
+    return HttpResponse{204, {}, {}, 0};
+  });
+  REQUIRE(run<Empty>([&](auto done) { s.liveTv.recordSeries(QStringLiteral("p2"), nullptr, done); }).ok());
+  REQUIRE(s.server.requests().size() == 2);
+  CHECK(s.last().method == QByteArray("POST"));
+  CHECK(s.last().path == QStringLiteral("/jf/LiveTv/SeriesTimers"));
+  const QJsonObject body = QJsonDocument::fromJson(s.last().body).object();
+  CHECK(body.value(QStringLiteral("ProgramId")).toString() == QStringLiteral("p2"));
+  CHECK(body.value(QStringLiteral("RecordNewOnly")).toBool());
+}
+
+TEST_CASE("Recording without the right to: the defaults' refusal is the answer, nothing is posted") {
+  Signed s([](const HttpRequest&) { return HttpResponse{403, {}, {}, 0}; });
+  auto result = run<Empty>([&](auto done) { s.liveTv.recordProgram(QStringLiteral("p2"), nullptr, done); });
+  REQUIRE_FALSE(result.ok());
+  CHECK(result.error().isForbidden());
+  CHECK(s.server.requests().size() == 1);
+}
+
+TEST_CASE("Cancelling a timer and a series timer, and listing series timers") {
+  Signed s([](const HttpRequest& r) {
+    if (r.method == "GET")
+      return jfd::test::json(R"({"Items": [{"Id": "s1", "Type": "SeriesTimer", "Name": "Test Series",
+        "ChannelId": "c50", "ChannelName": "Test Channel 50", "ProgramId": "p2", "RecordAnyTime": true}],
+        "TotalRecordCount": 1})");
+    return HttpResponse{204, {}, {}, 0};
+  });
+  REQUIRE(run<Empty>([&](auto done) { s.liveTv.cancelTimer(QStringLiteral("t 1"), nullptr, done); }).ok());
+  CHECK(s.last().method == QByteArray("DELETE"));
+  // The id is escaped in the path.
+  CHECK(s.last().path == QStringLiteral("/jf/LiveTv/Timers/t%201"));
+  REQUIRE(run<Empty>([&](auto done) { s.liveTv.cancelSeriesTimer(QStringLiteral("s1"), nullptr, done); }).ok());
+  CHECK(s.last().method == QByteArray("DELETE"));
+  CHECK(s.last().path == QStringLiteral("/jf/LiveTv/SeriesTimers/s1"));
+  auto series = run<QList<LiveTvTimer>>([&](auto done) { s.liveTv.seriesTimers(nullptr, done); });
+  REQUIRE(series.ok());
+  CHECK(s.last().path == QStringLiteral("/jf/LiveTv/SeriesTimers"));
+  REQUIRE(series->size() == 1);
+  CHECK(series->front().name == QStringLiteral("Test Series"));
+  CHECK(series->front().status.isEmpty());
+  CHECK(series->front().isScheduled());
+}
+
+TEST_CASE("Recordings: one in progress and finished ones; a finished one is deleted as an item") {
+  Signed s([](const HttpRequest& r) {
+    if (r.method == "DELETE") return HttpResponse{204, {}, {}, 0};
+    return jfd::test::json(R"({"Items": [
+      {"Name": "Channel 1 at 00:30", "Id": "r1", "ChannelName": "Test Channel 1", "Type": "Recording",
+       "Status": "InProgress", "TimerId": "t1", "StartDate": "2026-11-15T00:30:00.0000000Z",
+       "EndDate": "2026-11-15T01:00:00.0000000Z", "UserData": {"PlaybackPositionTicks": 0, "Played": false}},
+      {"Name": "Episode 4", "Id": "r2", "DateCreated": "2026-11-15T00:57:18.0000000Z", "Type": "Episode",
+       "Overview": "Test programme 3 of channel 50.", "RunTimeTicks": 165413330, "SeriesName": "Test Series",
+       "ImageTags": {"Primary": "img2"}, "UserData": {"PlaybackPositionTicks": 50000000, "Played": false}},
+      {"Name": "Channel 2 at 00:30", "Id": "r3", "Type": "Movie", "RunTimeTicks": 241413330,
+       "DateCreated": "2026-11-15T00:53:59.7830576Z", "UserData": {"Played": true}}
+    ], "TotalRecordCount": 3, "StartIndex": 0})");
+  });
+  LiveTvRecordingQuery query;
+  query.limit = 20;
+  auto page = run<LiveTvRecordingPage>([&](auto done) { s.liveTv.recordings(query, nullptr, done); });
+  REQUIRE(page.ok());
+  CHECK(s.last().path == QStringLiteral("/jf/LiveTv/Recordings"));
+  CHECK(s.param("userId") == QStringLiteral("user1"));
+  CHECK(s.param("limit") == QStringLiteral("20"));
+  CHECK(s.param("fields").contains(QStringLiteral("DateCreated")));
+  CHECK_FALSE(s.last().query.hasQueryItem(QStringLiteral("isInProgress")));
+  CHECK(page->totalRecordCount == 3);
+  REQUIRE(page->recordings.size() == 3);
+  const LiveTvRecording& now = page->recordings[0];
+  CHECK(now.isInProgress());
+  CHECK(now.timerId == QStringLiteral("t1"));
+  CHECK(now.channelName == QStringLiteral("Test Channel 1"));
+  CHECK(now.start == utc("2026-11-15T00:30:00Z"));
+  CHECK(now.runTimeTicks == 0);
+  const LiveTvRecording& episode = page->recordings[1];
+  CHECK_FALSE(episode.isInProgress());
+  CHECK(episode.type == QStringLiteral("Episode"));
+  CHECK(episode.seriesName == QStringLiteral("Test Series"));
+  CHECK(episode.runTimeTicks == 165413330);
+  CHECK(episode.playbackPositionTicks == 50000000);
+  CHECK(episode.primaryImageTag == QStringLiteral("img2"));
+  CHECK(episode.dateCreated == utc("2026-11-15T00:57:18Z"));
+  CHECK(page->recordings[2].played);
+
+  REQUIRE(run<Empty>([&](auto done) { s.liveTv.deleteRecording(QStringLiteral("r2"), nullptr, done); }).ok());
+  CHECK(s.last().method == QByteArray("DELETE"));
+  CHECK(s.last().path == QStringLiteral("/jf/Items/r2"));
+}
+
+TEST_CASE("The user's policy says whether they may record") {
+  auto user = json::user(QJsonDocument::fromJson(R"({"Id": "u1", "Name": "alice",
+    "Policy": {"IsAdministrator": false, "EnableLiveTvManagement": true, "EnableLiveTvAccess": true}})")
+                             .object());
+  REQUIRE(user.ok());
+  CHECK(user->enableLiveTvManagement);
+  CHECK_FALSE(user->isAdministrator);
+  auto admin = json::user(QJsonDocument::fromJson(R"({"Id": "u2", "Name": "bob",
+    "Policy": {"IsAdministrator": true, "EnableLiveTvManagement": false}})")
+                              .object());
+  REQUIRE(admin.ok());
+  CHECK(admin->isAdministrator);
+  CHECK_FALSE(admin->enableLiveTvManagement);
+}

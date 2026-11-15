@@ -128,6 +128,7 @@ if(TARGET jfd_jellyfin_api)
     library/ImageCacheTest.cpp
     library/LiveTvChannelsTest.cpp
     library/LiveTvGuideTest.cpp
+    library/LiveTvRecordingsTest.cpp
     library/SignInTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
 
@@ -261,7 +262,7 @@ if(TARGET jfd_jellyfin_api)
     # One live server: these tests do not run at the same time as each other.
     set_tests_properties(jfd_server_tests jfd_session_server_tests jfd_livetv_server_tests
       PROPERTIES RESOURCE_LOCK jellyfin_server)
-    set_tests_properties(jfd_livetv_server_tests PROPERTIES TIMEOUT 120)
+    set_tests_properties(jfd_livetv_server_tests PROPERTIES TIMEOUT 300)
     set_tests_properties(jfd_session_server_tests PROPERTIES TIMEOUT 300)
   endif()
 endif()

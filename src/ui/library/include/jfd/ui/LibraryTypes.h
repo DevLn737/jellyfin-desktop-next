@@ -6,6 +6,8 @@
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LiveTvChannels.h>
 #include <jfd/library/LiveTvGuide.h>
+#include <jfd/library/LiveTvRecorder.h>
+#include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
@@ -79,6 +81,20 @@ namespace jfd::ui {
     QML_FOREIGN(jfd::library::LiveTvSchedule)
     QML_NAMED_ELEMENT(LiveTvSchedule)
     QML_UNCREATABLE("Use Library.createSchedule()")
+  };
+
+  struct LiveTvRecorderForeign {
+    Q_GADGET
+    QML_FOREIGN(jfd::library::LiveTvRecorder)
+    QML_NAMED_ELEMENT(LiveTvRecorder)
+    QML_UNCREATABLE("Use Library.recorder")
+  };
+
+  struct LiveTvRecordingsForeign {
+    Q_GADGET
+    QML_FOREIGN(jfd::library::LiveTvRecordings)
+    QML_NAMED_ELEMENT(LiveTvRecordings)
+    QML_UNCREATABLE("Use Library.createRecordings()")
   };
 
 } // namespace jfd::ui

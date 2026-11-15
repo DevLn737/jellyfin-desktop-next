@@ -49,7 +49,8 @@ namespace jfd::ui {
         m_home(m_client, homeOptions(config.devicePixelRatio)),
         m_search(m_client, searchOptions(config.devicePixelRatio)),
         m_liveTv(m_client, liveTvOptions(config.devicePixelRatio)),
-        m_onNow(m_client, onNowOptions(config.devicePixelRatio)), m_collections(m_client),
+        m_onNow(m_client, onNowOptions(config.devicePixelRatio)), m_recorder(m_client),
+        m_collections(m_client),
         m_readFilters(std::move(config.readFilters)),
         m_writeFilters(std::move(config.writeFilters)),
         m_textures(std::make_shared<TextureBudget>(config.textureBytes)) {
@@ -102,6 +103,7 @@ namespace jfd::ui {
     services.home = &m_home;
     services.search = &m_search;
     services.liveTv = &m_liveTv;
+    services.recorder = &m_recorder;
     services.updates = &m_updates;
     services.collections = &m_collections;
     services.readFilters = m_readFilters;
@@ -153,11 +155,18 @@ namespace jfd::ui {
     channel.takesArgument = true;
     channel.page = page("ChannelPage");
     navigator.registerRoute(channel);
+    // Recordings and the recordings to come, from the Live TV screen and
+    // the guide, while this user may record.
+    RouteSpec recordings;
+    recordings.name = QStringLiteral("recordings");
+    recordings.page = page("RecordingsPage");
+    navigator.registerRoute(recordings);
 
     QObject::connect(&m_signIn, &library::SignIn::signedIn, &navigator, [this, &navigator] {
       m_collections.invalidate();
       m_socket.start();
       m_liveTv.checkAvailable();
+      m_recorder.checkAvailable();
       navigator.reset(QStringLiteral("home"));
     });
     QObject::connect(&m_signIn, &library::SignIn::signedOut, &navigator, [this, &navigator] {
@@ -165,6 +174,7 @@ namespace jfd::ui {
       m_collections.invalidate();
       m_home.resetSession();
       m_liveTv.clear();
+      m_recorder.clear();
       navigator.reset(QStringLiteral("login"));
     });
     return true;

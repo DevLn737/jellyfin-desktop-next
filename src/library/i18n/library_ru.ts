@@ -79,6 +79,48 @@
     </message>
 </context>
 <context>
+    <name>jfd::library::LiveTvRecorder</name>
+    <message>
+        <source>The server does not allow you to record.</source>
+        <translation>Сервер не разрешает вам записывать.</translation>
+    </message>
+    <message>
+        <source>Could not schedule the recording: %1</source>
+        <translation>Не удалось запланировать запись: %1</translation>
+    </message>
+    <message>
+        <source>Could not cancel the recording: %1</source>
+        <translation>Не удалось отменить запись: %1</translation>
+    </message>
+    <message>
+        <source>Recording scheduled.</source>
+        <translation>Запись запланирована.</translation>
+    </message>
+    <message>
+        <source>Series recording scheduled.</source>
+        <translation>Запись сериала запланирована.</translation>
+    </message>
+    <message>
+        <source>Recording cancelled.</source>
+        <translation>Запись отменена.</translation>
+    </message>
+    <message>
+        <source>Series recording cancelled.</source>
+        <translation>Запись сериала отменена.</translation>
+    </message>
+</context>
+<context>
+    <name>jfd::library::LiveTvRecordings</name>
+    <message>
+        <source>The server does not allow you to delete recordings.</source>
+        <translation>Сервер не разрешает вам удалять записи.</translation>
+    </message>
+    <message>
+        <source>Could not delete the recording: %1</source>
+        <translation>Не удалось удалить запись: %1</translation>
+    </message>
+</context>
+<context>
     <name>jfd::library::RecommendationRows</name>
     <message>
         <source>Because you watched this</source>

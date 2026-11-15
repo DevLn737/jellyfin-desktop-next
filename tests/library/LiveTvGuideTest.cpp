@@ -391,3 +391,59 @@ TEST_CASE("Right walks on through programmes that begin partway through a minute
   REQUIRE(model.moveFocus(-1, 0));
   CHECK(focused() == QStringLiteral("c1-101700"));
 }
+
+TEST_CASE("The guide and a channel's page mark what the server's timers record") {
+  GuideFixture t;
+  t.load();
+  // The focused programme (now on channel 1) and one later on channel 2.
+  REQUIRE(t.focusedId() == QStringLiteral("c1-101600"));
+  CHECK(t.model.focusedProgram().value(QStringLiteral("timerId")).toString().isEmpty());
+  api::LiveTvTimer one;
+  one.id = QStringLiteral("t1");
+  one.programId = QStringLiteral("c1-101600");
+  one.status = QStringLiteral("InProgress");
+  api::LiveTvTimer episode;
+  episode.id = QStringLiteral("t2");
+  episode.programId = QStringLiteral("c2-101700");
+  episode.seriesTimerId = QStringLiteral("s1");
+  QSignalSpy rows(&t.model, &LiveTvGuide::dataChanged);
+  QSignalSpy focus(&t.model, &LiveTvGuide::focusChanged);
+  t.model.applyTimers({one, episode});
+  CHECK(rows.count() == 2);
+  CHECK(focus.count() == 1);
+  CHECK(t.model.focusedProgram().value(QStringLiteral("timerId")).toString() == QStringLiteral("t1"));
+  const auto cellOf = [&](int row, const QString& id) {
+    for (const QVariant& cell : t.cells(row))
+      if (cell.toMap().value(QStringLiteral("id")).toString() == id) return cell.toMap();
+    return QVariantMap();
+  };
+  CHECK(cellOf(0, QStringLiteral("c1-101600")).value(QStringLiteral("timerId")).toString() == QStringLiteral("t1"));
+  CHECK(cellOf(0, QStringLiteral("c1-101630")).value(QStringLiteral("timerId")).toString().isEmpty());
+  const QVariantMap later = cellOf(1, QStringLiteral("c2-101700"));
+  CHECK(later.value(QStringLiteral("timerId")).toString() == QStringLiteral("t2"));
+  CHECK(later.value(QStringLiteral("seriesTimerId")).toString() == QStringLiteral("s1"));
+
+  // Cancelled: the marks go; nothing changes a second time.
+  rows.clear();
+  t.model.applyTimers({episode});
+  CHECK(rows.count() == 1);
+  CHECK(t.model.focusedProgram().value(QStringLiteral("timerId")).toString().isEmpty());
+  rows.clear();
+  t.model.applyTimers({episode});
+  CHECK(rows.isEmpty());
+
+  // A channel's page the same way.
+  LiveTvSchedule::Options o;
+  o.hours = 3;
+  o.now = [&t] { return t.clock; };
+  LiveTvSchedule schedule(t.f.client, o);
+  schedule.setChannelId(QStringLiteral("c2"));
+  REQUIRE(waitFor([&] { return !schedule.loading() && schedule.count() > 1; }));
+  CHECK(schedule.data(schedule.index(1), LiveTvSchedule::TimerIdRole).toString().isEmpty());
+  schedule.applyTimers({episode});
+  CHECK(schedule.data(schedule.index(1), LiveTvSchedule::IdRole).toString() == QStringLiteral("c2-101700"));
+  CHECK(schedule.data(schedule.index(1), LiveTvSchedule::TimerIdRole).toString() == QStringLiteral("t2"));
+  CHECK(schedule.data(schedule.index(1), LiveTvSchedule::SeriesTimerIdRole).toString() == QStringLiteral("s1"));
+  CHECK(schedule.data(schedule.index(0), LiveTvSchedule::TimerIdRole).toString().isEmpty());
+  CHECK(schedule.roleNames().value(LiveTvSchedule::TimerIdRole) == QByteArray("timerId"));
+}

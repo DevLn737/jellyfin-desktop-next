@@ -128,6 +128,8 @@ namespace jfd::api::json {
     u.enableContentDownloading = flag(policy, "EnableContentDownloading");
     u.enableVideoPlaybackTranscoding = flag(policy, "EnableVideoPlaybackTranscoding");
     u.enableAudioPlaybackTranscoding = flag(policy, "EnableAudioPlaybackTranscoding");
+    u.isAdministrator = flag(policy, "IsAdministrator");
+    u.enableLiveTvManagement = flag(policy, "EnableLiveTvManagement");
     if (u.id.isEmpty()) return invalid(QStringLiteral("User has no Id"));
     return u;
   }

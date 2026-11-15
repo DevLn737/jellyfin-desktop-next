@@ -6,7 +6,9 @@
 #                 stream-1.ts for odd channels, stream-2.ts for even ones
 #   guide.xml     XMLTV: half-hour programmes for every channel from the
 #                 start of the previous hour for 25 hours, so "now" and
-#                 "next" exist for the whole day the stand runs
+#                 "next" exist for the whole day the stand runs; the last
+#                 channel shows one series ("Test Series", an episode a
+#                 slot) for the series recording tests
 # No external URLs: everything points at the container itself.
 #
 #   make-guide.sh <dir> <port> [count]
@@ -44,8 +46,16 @@ done
   for ((c = 1; c <= count; c++)); do
     for ((s = 0; s < slots; s++)); do
       echo "  <programme start=\"${froms[s]} +0000\" stop=\"${tos[s]} +0000\" channel=\"jfd.$c\">"
-      echo "    <title lang=\"en\">Channel $c at ${hhmms[s]}</title>"
-      echo "    <desc lang=\"en\">Test programme $s of channel $c.</desc>"
+      if (( c == count )); then
+        echo "    <title lang=\"en\">Test Series</title>"
+        echo "    <sub-title lang=\"en\">Episode $(( s + 1 ))</sub-title>"
+        echo "    <desc lang=\"en\">Test programme $s of channel $c.</desc>"
+        echo "    <category lang=\"en\">Series</category>"
+        echo "    <episode-num system=\"xmltv_ns\">0.$s.</episode-num>"
+      else
+        echo "    <title lang=\"en\">Channel $c at ${hhmms[s]}</title>"
+        echo "    <desc lang=\"en\">Test programme $s of channel $c.</desc>"
+      fi
       echo "  </programme>"
     done
   done

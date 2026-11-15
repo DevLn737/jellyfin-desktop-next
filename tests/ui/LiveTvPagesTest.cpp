@@ -4,6 +4,8 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/LiveTvGuide.h>
 #include <jfd/library/LiveTvOnNow.h>
+#include <jfd/library/LiveTvRecorder.h>
+#include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/platform/InputAction.h>
 #include <jfd/ui/InputRouter.h>
@@ -12,7 +14,10 @@
 
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
+#include <QQuickItem>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -22,6 +27,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ControlsPlugin)
@@ -30,8 +36,9 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 
 // The Live TV screens in an offscreen window on a fake server: the guide
 // grid driven by keys and by gamepad actions (InputRouter), making only the
-// rows and programmes in view; a channel's page; and the home screen's
-// "On now" cards, which tune in.
+// rows and programmes in view; a channel's page; the home screen's "On now"
+// cards, which tune in; and recording: the actions on the guide and a
+// channel's page, the marks, and the Recordings screen.
 
 using namespace jfd;
 using jfd::platform::InputAction;
@@ -71,7 +78,7 @@ namespace {
       return "{\"Id\": \"c" + QByteArray::number(n) + "-" + QByteArray::number(i) + "\", \"ChannelId\": \"c" +
              QByteArray::number(n) + "\", \"Name\": \"Show " + QByteArray::number(n) + "." + QByteArray::number(i) +
              "\", \"StartDate\": \"" + stamp(start).toUtf8() + "\", \"EndDate\": \"" +
-             stamp(start.addSecs(slot)).toUtf8() + "\"}";
+             stamp(start.addSecs(slot)).toUtf8() + "\"" + (n == 2 ? ", \"IsSeries\": true" : "") + "}";
     };
     const int slots = 52;
     if (r.path == QStringLiteral("/LiveTv/Channels")) {
@@ -115,9 +122,103 @@ namespace {
     return test::HttpResponse{404, {}, {}, 0};
   }
 
+  // The server's DVR for the recording tests: timers by programme, series
+  // timers that schedule the series' next programmes, recordings.
+  struct Dvr {
+    struct Timer {
+      QString id;
+      QString programId;
+      QString seriesId;
+      QString status = QStringLiteral("New");
+    };
+    bool manage = true;
+    QList<Timer> timers;
+    QStringList series;
+    QList<QByteArray> recordings;
+    QStringList calls;
+
+    std::optional<test::HttpResponse> answer(const test::HttpRequest& r) {
+      const auto json = [](const QByteArray& body) { return test::HttpResponse{200, body, "application/json", 0}; };
+      const test::HttpResponse none{204, {}, {}, 0};
+      if (r.path == QStringLiteral("/LiveTv/Info"))
+        return json(R"({"Services": [{"Name": "Emby", "Status": "Ok"}], "IsEnabled": true, "EnabledUsers": []})");
+      if (r.path == QStringLiteral("/Users/Me"))
+        return json(QByteArray(R"({"Id": "user", "Name": "alice", "Policy": {"IsAdministrator": false, "EnableLiveTvManagement": )") +
+                    (manage ? "true" : "false") + "}}");
+      if (r.path == QStringLiteral("/LiveTv/Timers") && r.method == "GET") {
+        QByteArray items;
+        for (const Timer& t : timers)
+          items += (items.isEmpty() ? "" : ",") + QByteArray(R"({"Id": ")") + t.id.toUtf8() + R"(", "Type": "Timer", "ProgramId": ")" +
+                   t.programId.toUtf8() + R"(", "SeriesTimerId": ")" + t.seriesId.toUtf8() + R"(", "Status": ")" +
+                   t.status.toUtf8() + R"(", "Name": "Show )" + t.programId.toUtf8() + R"(", "ChannelName": "Test Channel"})";
+        return json("{\"Items\": [" + items + "], \"TotalRecordCount\": " + QByteArray::number(timers.size()) + "}");
+      }
+      if (r.path == QStringLiteral("/LiveTv/SeriesTimers") && r.method == "GET") {
+        QByteArray items;
+        for (const QString& id : series)
+          items += (items.isEmpty() ? "" : ",") + QByteArray(R"({"Id": ")") + id.toUtf8() +
+                   R"(", "Type": "SeriesTimer", "Name": "Series )" + id.toUtf8() + R"(", "ChannelName": "Test Channel 2"})";
+        return json("{\"Items\": [" + items + "], \"TotalRecordCount\": " + QByteArray::number(series.size()) + "}");
+      }
+      if (r.path == QStringLiteral("/LiveTv/Timers/Defaults"))
+        return json(R"({"Type": "SeriesTimer", "ProgramId": ")" + r.query.queryItemValue(QStringLiteral("programId")).toUtf8() +
+                    R"(", "RecordNewOnly": true})");
+      const QString programId = QJsonDocument::fromJson(r.body).object().value(QStringLiteral("ProgramId")).toString();
+      if (r.path == QStringLiteral("/LiveTv/Timers") && r.method == "POST") {
+        calls.append(QStringLiteral("record:") + programId);
+        timers.append({QStringLiteral("t-") + programId, programId, {}});
+        return none;
+      }
+      if (r.path == QStringLiteral("/LiveTv/SeriesTimers") && r.method == "POST") {
+        calls.append(QStringLiteral("series:") + programId);
+        series.append(QStringLiteral("s1"));
+        // This programme and the next two of its channel ("c2-3").
+        const QString prefix = programId.section(QLatin1Char('-'), 0, 0);
+        const int at = programId.section(QLatin1Char('-'), 1, 1).toInt();
+        for (int i = at; i < at + 3; ++i) {
+          const QString id = QStringLiteral("%1-%2").arg(prefix).arg(i);
+          timers.append({QStringLiteral("t-") + id, id, QStringLiteral("s1")});
+        }
+        return none;
+      }
+      if (r.method == "DELETE" && r.path.startsWith(QStringLiteral("/LiveTv/Timers/"))) {
+        const QString id = r.path.section(QLatin1Char('/'), -1);
+        calls.append(QStringLiteral("cancel:") + id);
+        timers.erase(std::remove_if(timers.begin(), timers.end(), [&](const Timer& t) { return t.id == id; }), timers.end());
+        return none;
+      }
+      if (r.method == "DELETE" && r.path.startsWith(QStringLiteral("/LiveTv/SeriesTimers/"))) {
+        const QString id = r.path.section(QLatin1Char('/'), -1);
+        calls.append(QStringLiteral("cancelSeries:") + id);
+        series.removeAll(id);
+        timers.erase(std::remove_if(timers.begin(), timers.end(), [&](const Timer& t) { return t.seriesId == id; }), timers.end());
+        return none;
+      }
+      if (r.path == QStringLiteral("/LiveTv/Recordings")) {
+        QByteArray items;
+        for (const QByteArray& one : recordings) items += (items.isEmpty() ? "" : ",") + one;
+        return json("{\"Items\": [" + items + "], \"TotalRecordCount\": " + QByteArray::number(recordings.size()) + "}");
+      }
+      if (r.method == "DELETE" && r.path.startsWith(QStringLiteral("/Items/"))) {
+        const QString id = r.path.section(QLatin1Char('/'), -1);
+        calls.append(QStringLiteral("delete:") + id);
+        recordings.erase(std::remove_if(recordings.begin(), recordings.end(),
+                                        [&](const QByteArray& one) { return one.contains("\"Id\": \"" + id.toUtf8() + "\""); }),
+                         recordings.end());
+        return none;
+      }
+      return std::nullopt;
+    }
+  };
+
   struct Scene {
-    test::FakeServer server{stand};
+    Dvr dvr;
+    test::FakeServer server{[this](const test::HttpRequest& r) {
+      if (auto answer = dvr.answer(r)) return *answer;
+      return stand(r);
+    }};
     api::JellyfinClient client{api::ClientIdentity{}};
+    library::LiveTvRecorder recorder{client};
     QQmlEngine engine;
     QQuickWindow window;
     ui::Navigator* navigator = nullptr;
@@ -125,6 +226,8 @@ namespace {
     std::unique_ptr<QObject> object;
     QQuickItem* root = nullptr;
     QStringList tuned;
+    QStringList played;
+    qint64 playedAt = -1;
 
     Scene() {
       client.setServerUrl(server.url());
@@ -140,10 +243,18 @@ namespace {
       navigator->registerRoute(channel);
       library = engine.singletonInstance<ui::LibraryUi*>("Jfd.Ui.Library", "Library");
       REQUIRE(library != nullptr);
+      ui::RouteSpec recordings;
+      recordings.name = QStringLiteral("recordings");
+      navigator->registerRoute(recordings);
       ui::LibraryUi::Services services;
       services.client = &client;
+      services.recorder = &recorder;
       library->attach(services);
       library->setChannelHandler([this](const QString& id) { tuned.append(id); });
+      library->setPlayHandler([this](const QString& id, qint64 ticks) {
+        played.append(id);
+        playedAt = ticks;
+      });
       window.resize(1280, 800);
     }
 
@@ -166,6 +277,33 @@ namespace {
       QCoreApplication::sendEvent(&window, &press);
       QKeyEvent release(QEvent::KeyRelease, code, Qt::NoModifier);
       QCoreApplication::sendEvent(&window, &release);
+    }
+
+    // Recording allowed (or not) and the schedule read.
+    void checkRecorder() {
+      recorder.checkAvailable();
+      if (dvr.manage) {
+        REQUIRE(waitFor([&] { return recorder.available() && !recorder.loading(); }, 5000));
+      } else {
+        REQUIRE(waitFor([&] {
+          return std::any_of(server.requests().cbegin(), server.requests().cend(),
+                             [](const test::HttpRequest& r) { return r.path == QStringLiteral("/Users/Me"); });
+        }, 5000));
+        waitFor([] { return false; }, 100);
+        REQUIRE_FALSE(recorder.available());
+      }
+    }
+
+    // Visible items named `name` anywhere in the window, popups included.
+    int visibleInWindow(const char* name) { return countNamed(window.contentItem(), name); }
+    QList<QQuickItem*> allNamed(QQuickItem* from, const char* name) {
+      QList<QQuickItem*> out;
+      if (from->objectName() == QLatin1String(name) && from->isVisible()) out.append(from);
+      for (QQuickItem* child : from->childItems()) out += allNamed(child, name);
+      return out;
+    }
+    QString focusedName() const {
+      return window.activeFocusItem() ? window.activeFocusItem()->objectName() : QString();
     }
 
     void screenshot(const char* name) {
@@ -316,4 +454,291 @@ Item {
   QMetaObject::invokeMethod(card, "clicked");
   REQUIRE(s.tuned.size() == 1);
   CHECK(s.tuned.front() == QStringLiteral("c5"));
+}
+
+TEST_CASE("Recording from the guide: the Menu key's actions, R, the marks; a gamepad's View button") {
+  Scene s;
+  s.checkRecorder();
+  s.load(R"(
+import QtQuick
+import Jfd.Ui.Library
+GuidePage { routeName: "guide"; route: "guide" }
+)");
+  auto* guide = s.root->property("guide").value<library::LiveTvGuide*>();
+  REQUIRE(guide != nullptr);
+  s.root->forceActiveFocus();
+  REQUIRE(waitFor([&] { return guide->count() == Channels && !guide->loading(); }, 5000));
+  REQUIRE(waitFor([&] { return countNamed(s.root, "guideProgram") > 0; }, 2000));
+  CHECK(countNamed(s.root, "guideRecordingMark") == 0);
+  QQuickItem* actions = find(s.root, "guideRecordActions");
+  REQUIRE(actions != nullptr);
+  CHECK(actions->isVisible());
+  CHECK(countNamed(s.root, "guideRecordings") == 1);
+
+  // Menu on what is on now (channel 1): Record only, it is not a series.
+  REQUIRE(guide->focusedProgram().value(QStringLiteral("id")).toString() == QStringLiteral("c1-2"));
+  s.key(Qt::Key_Menu);
+  REQUIRE(waitFor([&] { return s.visibleInWindow("popupEntry") == 1; }));
+  REQUIRE(waitFor([&] { return s.focusedName() == QStringLiteral("popupEntry"); }));
+  CHECK(s.window.activeFocusItem()->property("text").toString() == QStringLiteral("Record"));
+  s.key(Qt::Key_Return);
+  REQUIRE(waitFor([&] { return countNamed(s.root, "guideRecordingMark") == 1; }, 3000));
+  CHECK(s.dvr.calls == QStringList{QStringLiteral("record:c1-2")});
+  CHECK(guide->focusedProgram().value(QStringLiteral("timerId")).toString() == QStringLiteral("t-c1-2"));
+  // The focus came back to the guide: its keys work.
+  REQUIRE(waitFor([&] { return s.visibleInWindow("popupEntry") == 0; }));
+  s.screenshot("livetv-guide-recording");
+
+  // R cancels it.
+  s.key(Qt::Key_R);
+  REQUIRE(waitFor([&] { return countNamed(s.root, "guideRecordingMark") == 0; }, 3000));
+  CHECK(s.dvr.calls.last() == QStringLiteral("cancel:t-c1-2"));
+
+  // Channel 2 shows a series: Record and Record series, by a gamepad.
+  s.key(Qt::Key_Down);
+  REQUIRE(guide->focusedProgram().value(QStringLiteral("id")).toString() == QStringLiteral("c2-2"));
+  ui::InputRouter router;
+  router.setWindow(&s.window);
+  router.route(InputAction::Menu, false);
+  REQUIRE(waitFor([&] { return s.visibleInWindow("popupEntry") == 2; }));
+  REQUIRE(waitFor([&] { return s.focusedName() == QStringLiteral("popupEntry"); }));
+  router.route(InputAction::Down, false);
+  CHECK(s.window.activeFocusItem()->property("text").toString() == QStringLiteral("Record series"));
+  router.route(InputAction::Select, false);
+  // The series' programmes in view are marked: now and the next two.
+  REQUIRE(waitFor([&] { return countNamed(s.root, "guideRecordingMark") == 3; }, 3000));
+  CHECK(s.dvr.calls.last() == QStringLiteral("series:c2-2"));
+  CHECK(guide->focusedProgram().value(QStringLiteral("seriesTimerId")).toString() == QStringLiteral("s1"));
+
+  // Back closes the menu without doing anything; the guide keeps its keys.
+  router.route(InputAction::Menu, false);
+  REQUIRE(waitFor([&] { return s.visibleInWindow("popupEntry") == 2; }));
+  router.route(InputAction::Back, false);
+  REQUIRE(waitFor([&] { return s.visibleInWindow("popupEntry") == 0; }));
+  const int calls = int(s.dvr.calls.size());
+  s.key(Qt::Key_Down);
+  CHECK(guide->focusRow() == 2);
+  CHECK(s.dvr.calls.size() == calls);
+
+  // The actions' buttons do the same for the mouse.
+  s.key(Qt::Key_Up);
+  QList<QQuickItem*> buttons = s.allNamed(s.root, "guideRecordAction");
+  REQUIRE(buttons.size() == 2);
+  CHECK(buttons[0]->property("text").toString() == QStringLiteral("Cancel recording"));
+  CHECK(buttons[1]->property("text").toString() == QStringLiteral("Cancel series recording"));
+  QMetaObject::invokeMethod(buttons[1], "clicked");
+  REQUIRE(waitFor([&] { return countNamed(s.root, "guideRecordingMark") == 0; }, 3000));
+  CHECK(s.dvr.calls.last() == QStringLiteral("cancelSeries:s1"));
+}
+
+TEST_CASE("Without the right to record, the guide and a channel's page offer no recording") {
+  Scene s;
+  s.dvr.manage = false;
+  s.checkRecorder();
+  s.load(R"(
+import QtQuick
+import Jfd.Ui.Library
+GuidePage { routeName: "guide"; route: "guide" }
+)");
+  auto* guide = s.root->property("guide").value<library::LiveTvGuide*>();
+  REQUIRE(guide != nullptr);
+  s.root->forceActiveFocus();
+  REQUIRE(waitFor([&] { return guide->count() == Channels && !guide->loading(); }, 5000));
+  QQuickItem* actions = find(s.root, "guideRecordActions");
+  REQUIRE(actions != nullptr);
+  CHECK_FALSE(actions->isVisible());
+  CHECK(countNamed(s.root, "guideRecordings") == 0);
+  s.key(Qt::Key_Menu);
+  s.key(Qt::Key_R);
+  waitFor([] { return false; }, 300);
+  CHECK(s.visibleInWindow("popupEntry") == 0);
+  CHECK(s.dvr.calls.isEmpty());
+
+  Scene c;
+  c.dvr.manage = false;
+  c.checkRecorder();
+  c.load(R"(
+import QtQuick
+import Jfd.Ui.Library
+ChannelPage { routeName: "channel"; routeArgument: "c7"; route: "channel/c7" }
+)");
+  auto* schedule = c.root->property("schedule").value<library::LiveTvSchedule*>();
+  REQUIRE(waitFor([&] { return !schedule->loading() && schedule->count() > 0; }, 5000));
+  waitFor([] { return false; }, 200);
+  CHECK(countNamed(c.root, "channelRecord") == 0);
+}
+
+TEST_CASE("A channel's page: the focused programme's Record button, R, and the mark") {
+  Scene s;
+  s.checkRecorder();
+  s.load(R"(
+import QtQuick
+import Jfd.Ui.Library
+ChannelPage { routeName: "channel"; routeArgument: "c7"; route: "channel/c7" }
+)");
+  auto* schedule = s.root->property("schedule").value<library::LiveTvSchedule*>();
+  REQUIRE(schedule != nullptr);
+  REQUIRE(waitFor([&] { return !schedule->loading() && schedule->count() > 2; }, 5000));
+  s.root->forceActiveFocus();
+  QQuickItem* watch = find(s.root, "channelWatch");
+  REQUIRE(waitFor([&] { return watch->hasActiveFocus(); }, 2000));
+  // Down to the programmes: the current one has a Record button.
+  s.key(Qt::Key_Down);
+  s.key(Qt::Key_Down);
+  QQuickItem* list = find(s.root, "channelProgrammes");
+  REQUIRE(list != nullptr);
+  CHECK(list->property("currentIndex").toInt() == 1);
+  REQUIRE(waitFor([&] { return countNamed(s.root, "channelRecord") == 1; }));
+  CHECK(s.allNamed(s.root, "channelRecord").front()->property("text").toString() == QStringLiteral("Record"));
+
+  s.key(Qt::Key_R);
+  REQUIRE(waitFor([&] { return countNamed(s.root, "channelRecordingMark") == 1; }, 3000));
+  CHECK(s.dvr.calls == QStringList{QStringLiteral("record:c7-3")});
+  CHECK(schedule->data(schedule->index(1), library::LiveTvSchedule::TimerIdRole).toString() == QStringLiteral("t-c7-3"));
+  // The recorded one keeps its button (Cancel recording) when the focus
+  // moves on; the new current one has Record.
+  s.key(Qt::Key_Down);
+  REQUIRE(waitFor([&] { return countNamed(s.root, "channelRecord") == 2; }));
+  QStringList texts;
+  for (QQuickItem* b : s.allNamed(s.root, "channelRecord")) texts.append(b->property("text").toString());
+  texts.sort();
+  CHECK(texts == QStringList{QStringLiteral("Cancel recording"), QStringLiteral("Record")});
+  s.screenshot("livetv-channel-recording");
+
+  // The Menu key on the recorded one: Cancel recording.
+  s.key(Qt::Key_Up);
+  s.key(Qt::Key_Menu);
+  REQUIRE(waitFor([&] { return s.visibleInWindow("popupEntry") == 1; }));
+  REQUIRE(waitFor([&] { return s.focusedName() == QStringLiteral("popupEntry"); }));
+  CHECK(s.window.activeFocusItem()->property("text").toString() == QStringLiteral("Cancel recording"));
+  s.key(Qt::Key_Return);
+  REQUIRE(waitFor([&] { return countNamed(s.root, "channelRecordingMark") == 0; }, 3000));
+  CHECK(s.dvr.calls.last() == QStringLiteral("cancel:t-c7-3"));
+  // The list has the focus again.
+  REQUIRE(waitFor([&] { return list->hasActiveFocus(); }));
+}
+
+TEST_CASE("Recordings: a recording plays as an item, Delete asks first, recordings to come are cancelled") {
+  Scene s;
+  s.dvr.recordings = {
+      R"({"Id": "r1", "Name": "Show 3.2", "Type": "Recording", "Status": "InProgress", "TimerId": "t1",
+          "ChannelName": "Test Channel 3", "StartDate": "2026-11-15T00:30:00Z", "EndDate": "2026-11-15T01:00:00Z"})",
+      R"({"Id": "r2", "Name": "Episode 4", "SeriesName": "Test Series", "Type": "Episode", "RunTimeTicks": 18000000000,
+          "DateCreated": "2026-11-14T20:00:00Z", "UserData": {"PlaybackPositionTicks": 600000000}})",
+      R"({"Id": "r3", "Name": "Show 1.1", "Type": "Movie", "RunTimeTicks": 18000000000,
+          "DateCreated": "2026-11-13T20:00:00Z", "UserData": {"Played": true}})"};
+  s.dvr.timers = {{QStringLiteral("t1"), QStringLiteral("c3-2"), {}, QStringLiteral("InProgress")},
+                  {QStringLiteral("t9"), QStringLiteral("c4-5"), {}}};
+  s.dvr.series = {QStringLiteral("s5")};
+  s.checkRecorder();
+  s.load(R"(
+import QtQuick
+import Jfd.Ui.Library
+RecordingsPage { routeName: "recordings"; route: "recordings" }
+)");
+  auto* recordings = s.root->property("recordings").value<library::LiveTvRecordings*>();
+  REQUIRE(recordings != nullptr);
+  REQUIRE(waitFor([&] { return !recordings->loading() && recordings->count() == 3; }, 5000));
+  REQUIRE(waitFor([&] { return s.recorder.count() == 3; }));
+  s.root->forceActiveFocus();
+  QQuickItem* list = find(s.root, "recordingList");
+  QQuickItem* schedule = find(s.root, "scheduleList");
+  REQUIRE(list != nullptr);
+  REQUIRE(schedule != nullptr);
+  REQUIRE(waitFor([&] { return list->hasActiveFocus(); }));
+  REQUIRE(waitFor([&] { return countNamed(s.root, "recordingTitle") == 3 && countNamed(s.root, "timerTitle") == 3; }));
+  s.screenshot("livetv-recordings");
+
+  // Recording now first. It has no length yet: Enter goes to its Stop
+  // button instead of playing it.
+  CHECK(list->property("currentIndex").toInt() == 0);
+  s.key(Qt::Key_Return);
+  CHECK(s.played.isEmpty());
+  CHECK(s.focusedName() == QStringLiteral("recordingDelete"));
+  s.key(Qt::Key_Left);
+  REQUIRE(waitFor([&] { return list->hasActiveFocus() && s.focusedName() != QStringLiteral("recordingDelete"); }));
+  // The episode under its series.
+  s.key(Qt::Key_Down);
+  CHECK(list->property("currentIndex").toInt() == 1);
+  // Enter plays it as an item, from where it was left.
+  s.key(Qt::Key_Return);
+  REQUIRE(s.played.size() == 1);
+  CHECK(s.played.front() == QStringLiteral("r2"));
+  CHECK(s.playedAt == 600000000);
+  CHECK(s.tuned.isEmpty());
+
+  // Right reaches the row's Delete; Enter asks; Esc keeps it.
+  s.key(Qt::Key_Right);
+  CHECK(s.focusedName() == QStringLiteral("recordingDelete"));
+  s.key(Qt::Key_Return);
+  auto* confirm = s.root->findChild<QObject*>(QStringLiteral("confirmDeleteRecording"));
+  REQUIRE(confirm != nullptr);
+  REQUIRE(waitFor([&] { return confirm->property("opened").toBool(); }));
+  s.key(Qt::Key_Escape);
+  REQUIRE(waitFor([&] { return !confirm->property("visible").toBool(); }));
+  CHECK(s.dvr.calls.isEmpty());
+  CHECK(recordings->count() == 3);
+
+  // The Delete key on the row asks too; Enter deletes it and its file.
+  s.key(Qt::Key_Left);
+  s.key(Qt::Key_Delete);
+  REQUIRE(waitFor([&] { return confirm->property("opened").toBool(); }));
+  s.key(Qt::Key_Return);
+  REQUIRE(waitFor([&] { return recordings->count() == 2; }, 3000));
+  CHECK(s.dvr.calls == QStringList{QStringLiteral("delete:r2")});
+
+  // The one recording now stops after its own question; it is not deleted.
+  REQUIRE(waitFor([&] { return list->hasActiveFocus(); }));
+  list->setProperty("currentIndex", 0);
+  s.key(Qt::Key_Delete);
+  auto* stop = s.root->findChild<QObject*>(QStringLiteral("confirmStopRecording"));
+  REQUIRE(stop != nullptr);
+  REQUIRE(waitFor([&] { return stop->property("opened").toBool(); }));
+  s.key(Qt::Key_Return);
+  REQUIRE(waitFor([&] { return s.dvr.calls.size() == 2; }, 3000));
+  CHECK(s.dvr.calls.last() == QStringLiteral("cancel:t1"));
+
+  // Down past the last recording reaches the schedule: the series first.
+  REQUIRE(waitFor([&] { return s.recorder.count() == 2 && list->hasActiveFocus(); }, 3000));
+  list->setProperty("currentIndex", recordings->count() - 1);
+  s.key(Qt::Key_Down);
+  REQUIRE(waitFor([&] { return schedule->hasActiveFocus(); }));
+  CHECK(schedule->property("currentIndex").toInt() == 0);
+  // Enter goes to its button; Enter again cancels the series.
+  s.key(Qt::Key_Return);
+  CHECK(s.focusedName() == QStringLiteral("timerCancel"));
+  s.key(Qt::Key_Return);
+  REQUIRE(waitFor([&] { return s.recorder.count() == 1; }, 3000));
+  CHECK(s.dvr.calls.last() == QStringLiteral("cancelSeries:s5"));
+  // Up from the schedule goes back to the recordings.
+  REQUIRE(waitFor([&] { return schedule->hasActiveFocus(); }));
+  schedule->setProperty("currentIndex", 0);
+  s.key(Qt::Key_Up);
+  CHECK(list->hasActiveFocus());
+}
+
+TEST_CASE("The Live TV screen links to Recordings only when this user may record") {
+  for (const bool manage : {true, false}) {
+    CAPTURE(manage);
+    Scene s;
+    s.dvr.manage = manage;
+    s.checkRecorder();
+    s.load(R"(
+import QtQuick
+import Jfd.Ui.Library
+LiveTvPage { routeName: "livetv"; route: "livetv" }
+)");
+    QQuickItem* recordings = find(s.root, "liveTvRecordings");
+    QQuickItem* guide = find(s.root, "liveTvGuide");
+    REQUIRE(recordings != nullptr);
+    REQUIRE(guide != nullptr);
+    CHECK(recordings->isVisible() == manage);
+    if (!manage) continue;
+    // Left from Guide, then Enter.
+    guide->forceActiveFocus();
+    s.key(Qt::Key_Left);
+    CHECK(recordings->hasActiveFocus());
+    s.key(Qt::Key_Return);
+    CHECK(s.navigator->currentRoute() == QStringLiteral("recordings"));
+  }
 }

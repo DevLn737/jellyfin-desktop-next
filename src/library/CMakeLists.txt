@@ -17,6 +17,8 @@ add_library(jfd_library STATIC
   src/LiveTvChannels.cpp
   src/LiveTvGuide.cpp
   src/LiveTvOnNow.cpp
+  src/LiveTvRecorder.cpp
+  src/LiveTvRecordings.cpp
   src/LiveTvSchedule.cpp
   src/RecommendationRows.cpp
   src/SearchModel.cpp
@@ -36,6 +38,8 @@ add_library(jfd_library STATIC
   include/jfd/library/LiveTvChannels.h
   include/jfd/library/LiveTvGuide.h
   include/jfd/library/LiveTvOnNow.h
+  include/jfd/library/LiveTvRecorder.h
+  include/jfd/library/LiveTvRecordings.h
   include/jfd/library/LiveTvSchedule.h
   include/jfd/library/RecommendationRows.h
   include/jfd/library/SearchModel.h
