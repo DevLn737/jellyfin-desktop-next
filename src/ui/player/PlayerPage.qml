@@ -15,7 +15,14 @@ import Jfd.Ui.Player
 //
 // Keys: Space or K play/pause, ←/→ ∓10 s, ↑/↓ volume, M mute, F fullscreen,
 // S skip, N next, E episodes, P picture in picture, A audio, C subtitles, J/L subtitle delay ∓0.1 s,
-// Shift+J/L audio delay, Esc back. On a Live TV channel: Page Up / Channel
+// Shift+J/L audio delay, Esc back.
+//
+// TV mode: the display is a focus mode. Hidden, or with nothing on it
+// focused, Left and Right seek (held: faster and faster, one seek when let
+// go), Up and Down show it with the timeline focused and Select plays or
+// pauses; shown, the arrows move between its controls. The menus are one row of named buttons
+// (Episodes, Subtitles, Audio, Settings). Back closes a menu, then the
+// display, then the player. On a Live TV channel: Page Up / Channel
 // Up (and a gamepad's LB) the next channel, Page Down / Channel Down (RB) the
 // one before; N the next channel.
 RoutePage {
@@ -42,8 +49,130 @@ RoutePage {
         focusPolicy: Qt.TabFocus
     }
 
-    // A closed menu gives the keys back to the page.
-    onOpenMenuChanged: if (openMenu.length === 0) page.forceActiveFocus()
+    // A closed menu gives the keys back to the page, in TV mode to the
+    // button that opened it.
+    onOpenMenuChanged: {
+        if (openMenu.length > 0) return
+        if (tvMode && menuOpener && menuOpener.visible) menuOpener.forceActiveFocus(Qt.TabFocusReason)
+        else page.forceActiveFocus()
+        menuOpener = null
+    }
+
+    readonly property bool tvMode: Theme.tvMode
+    // TV mode keeps the controls out of the screen's outer 5 %.
+    readonly property int safeX: Math.round(width * Theme.safeMargin)
+    readonly property int safeY: Math.round(height * Theme.safeMargin)
+    property Item menuOpener: null
+    // A held Left or Right in TV mode: presses so far and where the one
+    // seek goes once it is let go.
+    property int holdCount: 0
+    property real seekTarget: 0
+    property bool seekPending: false
+    // The display hides: the arrows seek again.
+    onOsdShownChanged: if (!osdShown && tvMode && osdFocused()) focusPage()
+
+    // The keys to the page itself: the control inside that had the focus
+    // lets it go (forceActiveFocus alone would give it back, the page being
+    // a focus scope).
+    function focusPage() {
+        const focused = Window.activeFocusItem
+        if (focused && focused !== page) focused.focus = false
+        page.forceActiveFocus()
+    }
+
+    // Something on the display (a button, the timeline, a menu) has the
+    // focus, not the page itself.
+    function osdFocused() {
+        const focused = Window.activeFocusItem
+        if (!focused || focused === page) return false
+        for (let item = focused.parent; item; item = item.parent)
+            if (item === page) return true
+        return false
+    }
+
+    // TV mode's seek: a press goes 10 s at once; held, the steps grow
+    // (10, 30, then 60 s) and the timeline shows where, until let go.
+    function seekStep(direction, repeat) {
+        if (player.live) return
+        // A new press, or a repeat after the last hold ended.
+        if (!repeat || !holdTimer.running) {
+            holdCount = 0
+            seekPending = false
+            seekTarget = Math.max(0, Math.min(player.duration, player.position + 10 * direction))
+            player.seekBy(10 * direction)
+            holdTimer.restart()
+            return
+        }
+        holdCount++
+        const step = holdCount < 10 ? 10 : holdCount < 25 ? 30 : 60
+        seekTarget = Math.max(0, Math.min(player.duration, seekTarget + step * direction))
+        seekPending = true
+        notify(clock(seekTarget) + " / " + clock(player.duration))
+        holdTimer.restart()
+    }
+
+    function commitSeek() {
+        holdTimer.stop()
+        holdCount = 0
+        if (!seekPending) return
+        seekPending = false
+        player.seek(seekTarget)
+    }
+
+    // Up or Down: the display, with the timeline (a channel: play/pause)
+    // focused.
+    function focusOsd() {
+        poke()
+        if (timeline.visible) timeline.forceActiveFocus(Qt.TabFocusReason)
+        else playPauseButton.forceActiveFocus(Qt.TabFocusReason)
+    }
+
+    // The first control of the open menu.
+    function focusMenu() {
+        const menu = menuLoader.item
+        if (!menu) return
+        const first = menu.nextItemInFocusChain(true)
+        for (let item = first; item; item = item.parent) {
+            if (item === menu) {
+                first.forceActiveFocus(Qt.TabFocusReason)
+                return
+            }
+        }
+    }
+
+    // TV mode's keys before the others; true when taken.
+    function tvKey(event) {
+        switch (event.key) {
+        case Qt.Key_Left:
+        case Qt.Key_Right:
+            seekStep(event.key === Qt.Key_Right ? 1 : -1, event.isAutoRepeat)
+            return true
+        case Qt.Key_Up:
+        case Qt.Key_Down:
+            focusOsd()
+            return true
+        // Select with nothing on the display focused: play or pause.
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+        case Qt.Key_Select:
+            player.togglePause()
+            poke()
+            return true
+        case Qt.Key_Escape:
+        case Qt.Key_Back:
+            if (openMenu.length > 0) {
+                openMenu = ""
+            } else if (osdVisible || osdFocused()) {
+                osdVisible = false
+                osdTimer.stop()
+                focusPage()
+            } else {
+                leave()
+            }
+            return true
+        }
+        return false
+    }
 
     function clock(seconds) {
         const total = Math.max(0, Math.floor(seconds))
@@ -88,8 +217,11 @@ RoutePage {
     }
 
     function toggleMenu(name) {
-        openMenu = openMenu === name ? "" : name
+        const opening = openMenu !== name
+        if (opening && tvMode && osdFocused()) menuOpener = Window.activeFocusItem
+        openMenu = opening ? name : ""
         poke()
+        if (opening && tvMode) focusMenu()
     }
 
     // A short line in the middle of the screen for a key's effect.
@@ -236,6 +368,12 @@ RoutePage {
             font.pixelSize: Theme.fontSizeLarge
         }
         Timer {
+            id: holdTimer
+            // Longer than a held key's or a gamepad's repeat.
+            interval: 450
+            onTriggered: page.commitSeek()
+        }
+        Timer {
             id: noticeTimer
             interval: 1200
         }
@@ -267,7 +405,7 @@ RoutePage {
         // bright video. "Ends at" sits about 40 to 55 px down, which is where
         // a letterboxed film's picture starts (16:9 in 1280x800): the shade
         // stays dark down to it and fades out only below.
-        height: Theme.controlHeight + 3 * Theme.spacing
+        height: Theme.controlHeight + 3 * Theme.spacing + page.safeY
         opacity: page.osdShown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
@@ -281,10 +419,10 @@ RoutePage {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.topMargin: Theme.spacing
+            anchors.topMargin: Theme.spacing + page.safeY
             height: Theme.controlHeight + Theme.spacing
-            anchors.leftMargin: Theme.spacing
-            anchors.rightMargin: Theme.spacing
+            anchors.leftMargin: Theme.spacing + page.safeX
+            anchors.rightMargin: Theme.spacing + page.safeX
             spacing: Theme.spacing
 
             OsdButton {
@@ -384,6 +522,7 @@ RoutePage {
         anchors.right: parent.right
         anchors.bottom: bottomBar.top
         anchors.margins: Theme.spacingLarge
+        anchors.rightMargin: Theme.spacingLarge + page.safeX
         // Not under an open menu, which sits in the same corner.
         visible: page.player.segment.length > 0 && page.openMenu.length === 0
         primary: true
@@ -397,9 +536,10 @@ RoutePage {
 
     // Menus open just above the row of buttons, on the right.
     Loader {
+        id: menuLoader
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.rightMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing + page.safeX
         // Above the whole bar, seek line included.
         anchors.bottomMargin: bottomBar.height + Theme.spacingSmall
         active: page.openMenu.length > 0
@@ -458,7 +598,7 @@ RoutePage {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: column.implicitHeight + 2 * Theme.spacing
+        height: column.implicitHeight + 2 * Theme.spacing + page.safeY
         opacity: page.osdShown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
@@ -533,6 +673,9 @@ RoutePage {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             anchors.margins: Theme.spacing
+            anchors.leftMargin: Theme.spacing + page.safeX
+            anchors.rightMargin: Theme.spacing + page.safeX
+            anchors.bottomMargin: Theme.spacing + page.safeY
             spacing: Theme.spacingTiny
 
             ValueSlider {
@@ -545,10 +688,25 @@ RoutePage {
                 visible: !page.player.live
                 stepSize: 10
                 focusPolicy: Qt.TabFocus
-                // Follows playback except while dragged.
+                // Larger in TV mode, read from across the room.
+                trackHeight: page.tvMode ? 10 : 4
+                handleSize: page.tvMode ? 32 : 18
+                // Follows playback except while dragged, or while a held
+                // key in TV mode chooses where to go.
                 Binding on value {
                     when: !timeline.pressed
-                    value: page.player.position
+                    value: page.seekPending ? page.seekTarget : page.player.position
+                }
+                // TV mode: the page's seek, faster when held.
+                Keys.onLeftPressed: (event) => {
+                    if (!page.tvMode) { event.accepted = false; return }
+                    page.seekStep(-1, event.isAutoRepeat)
+                    page.poke()
+                }
+                Keys.onRightPressed: (event) => {
+                    if (!page.tvMode) { event.accepted = false; return }
+                    page.seekStep(1, event.isAutoRepeat)
+                    page.poke()
                 }
                 // A drag seeks once, on release; a key step (Tab focus) at
                 // once.
@@ -592,6 +750,7 @@ RoutePage {
                     spacing: Theme.spacingSmall
 
                     OsdButton {
+                        id: playPauseButton
                         objectName: "playPause"
                         iconSource: page.player.paused ? Icons.play : PlayerIcons.pause
                         toolTipText: page.player.paused ? qsTr("Play") : qsTr("Pause")
@@ -695,22 +854,25 @@ RoutePage {
                     }
                     OsdButton {
                         objectName: "episodes"
-                        visible: page.hasEpisodes
+                        visible: page.hasEpisodes && !page.tvMode
                         iconSource: PlayerIcons.episodes
                         toolTipText: qsTr("Episodes")
                         onClicked: page.toggleMenu("episodes")
                     }
                     OsdButton {
+                        visible: !page.tvMode
                         iconSource: PlayerIcons.audio
                         toolTipText: qsTr("Audio")
                         onClicked: page.toggleMenu("audio")
                     }
                     OsdButton {
+                        visible: !page.tvMode
                         iconSource: PlayerIcons.subtitles
                         toolTipText: qsTr("Subtitles")
                         onClicked: page.toggleMenu("subtitles")
                     }
                     OsdButton {
+                        visible: !page.tvMode
                         iconSource: PlayerIcons.tune
                         toolTipText: qsTr("Playback settings")
                         onClicked: page.toggleMenu("tune")
@@ -729,6 +891,40 @@ RoutePage {
                     }
                 }
             }
+
+            // TV mode: the menus as one row of named buttons.
+            Row {
+                objectName: "tvMenus"
+                visible: page.tvMode
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Theme.spacing
+
+                ActionButton {
+                    objectName: "tvEpisodes"
+                    visible: page.hasEpisodes
+                    focusPolicy: Qt.TabFocus
+                    text: qsTr("Episodes")
+                    onClicked: page.toggleMenu("episodes")
+                }
+                ActionButton {
+                    objectName: "tvSubtitles"
+                    focusPolicy: Qt.TabFocus
+                    text: qsTr("Subtitles")
+                    onClicked: page.toggleMenu("subtitles")
+                }
+                ActionButton {
+                    objectName: "tvAudio"
+                    focusPolicy: Qt.TabFocus
+                    text: qsTr("Audio")
+                    onClicked: page.toggleMenu("audio")
+                }
+                ActionButton {
+                    objectName: "tvSettings"
+                    focusPolicy: Qt.TabFocus
+                    text: qsTr("Settings")
+                    onClicked: page.toggleMenu("tune")
+                }
+            }
         }
     }
 
@@ -737,6 +933,20 @@ RoutePage {
         if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) {
             event.accepted = false
             return
+        }
+        if (page.tvMode) {
+            const arrow = event.key === Qt.Key_Left || event.key === Qt.Key_Right
+                || event.key === Qt.Key_Up || event.key === Qt.Key_Down
+            if (arrow && page.osdFocused()) {
+                // The shell moves the focus between the display's controls.
+                page.poke()
+                event.accepted = false
+                return
+            }
+            if (page.tvKey(event)) {
+                event.accepted = true
+                return
+            }
         }
         switch (event.key) {
         case Qt.Key_Space:
@@ -800,5 +1010,11 @@ RoutePage {
         }
         page.poke()
         event.accepted = true
+    }
+    // A held Left or Right let go: its one seek.
+    Keys.onReleased: (event) => {
+        if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && !event.isAutoRepeat && page.seekPending)
+            page.commitSeek()
+        event.accepted = false
     }
 }
