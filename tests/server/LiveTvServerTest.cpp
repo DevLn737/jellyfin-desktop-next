@@ -8,10 +8,13 @@
 #include <jfd/library/LiveTvChannels.h>
 #include <jfd/library/LiveTvGuide.h>
 #include <jfd/library/LiveTvOnNow.h>
+#include <jfd/library/LiveTvRecorder.h>
+#include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/ItemListModel.h>
 
 #include <QElapsedTimer>
+#include <QSignalSpy>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -25,7 +28,9 @@
 // without it): Info, the channel list with now and next, the guide grid's
 // model, the home screen's "On now" row, a channel's page, a channel's
 // PlaybackInfo, its stream through the server, and the stream closed once
-// Stopped names it.
+// Stopped names it; recording (the server's own DVR, from the M3U tuner): a
+// programme on air recorded, stopped, played as an item and deleted, and a
+// series recording of the stand's "Test Series" scheduled and cancelled.
 
 using namespace jfd;
 using namespace jfd::api;
@@ -278,4 +283,195 @@ TEST_CASE("On now and a channel's page on the stand") {
   REQUIRE(schedule.count() > 1);
   CHECK(schedule.data(schedule.index(0), library::LiveTvSchedule::OnNowRole).toBool());
   for (const LiveTvProgram& p : schedule.programs()) CHECK(p.channelId == channelId);
+}
+
+namespace {
+  // The recordings on the server now.
+  QList<LiveTvRecording> recordingsOn(JellyfinClient& client) {
+    LiveTvApi liveTv(client);
+    auto page = run<LiveTvRecordingPage>([&](auto done) { liveTv.recordings({}, nullptr, done); });
+    REQUIRE(page.ok());
+    return page->recordings;
+  }
+
+  // A channel's programme on now with at least `seconds` left, waiting for
+  // the next one when the current one is about to end.
+  LiveTvProgram onNowWithTime(JellyfinClient& client, const QString& channelId, int seconds) {
+    LiveTvApi liveTv(client);
+    for (int attempt = 0; attempt < 2; ++attempt) {
+      auto channel = run<LiveTvChannel>([&](auto done) { liveTv.channel(channelId, nullptr, done); });
+      REQUIRE(channel.ok());
+      REQUIRE(channel->currentProgram.has_value());
+      const qint64 left = QDateTime::currentDateTimeUtc().secsTo(channel->currentProgram->end);
+      if (left >= seconds) return *channel->currentProgram;
+      MESSAGE("the programme on now ends in " << left << " s; waiting for the next one");
+      waitFor([] { return false; }, int(left + 5) * 1000);
+    }
+    FAIL("no programme on now with time left");
+    return {};
+  }
+} // namespace
+
+TEST_CASE("A programme on air: recorded, stopped, played as an item with its run time, deleted") {
+  if (!hasExtrasStand()) return;
+  Stand s;
+  library::LiveTvRecorder recorder(*s.client);
+  recorder.checkAvailable();
+  // The stand's user is an administrator: the server lets it record.
+  REQUIRE(waitFor([&] { return recorder.available(); }, 30000));
+  REQUIRE(waitFor([&] { return !recorder.loading(); }, 30000));
+
+  LiveTvApi liveTv(*s.client);
+  LiveTvChannelQuery query;
+  query.startIndex = 2;
+  query.limit = 1;
+  auto channels = run<LiveTvChannelPage>([&](auto done) { liveTv.channels(query, nullptr, done); });
+  REQUIRE(channels.ok());
+  REQUIRE(channels->channels.size() == 1);
+  const QString channelId = channels->channels.front().id;
+  const LiveTvProgram program = onNowWithTime(*s.client, channelId, 90);
+
+  QSignalSpy changed(&recorder, &library::LiveTvRecorder::timersChanged);
+  recorder.record(program.id);
+  REQUIRE(waitFor([&] { return changed.count() > 0 && !recorder.busy(); }, 30000));
+  const QString timerId = recorder.timerFor(program.id);
+  REQUIRE_FALSE(timerId.isEmpty());
+
+  // The channel's page marks it, from the server's own programme fields.
+  library::LiveTvSchedule schedule(*s.client);
+  schedule.setChannelId(channelId);
+  REQUIRE(waitFor([&] { return !schedule.loading() && schedule.count() > 0; }, 30000));
+  CHECK(schedule.data(schedule.index(0), library::LiveTvSchedule::IdRole).toString() == program.id);
+  CHECK(schedule.data(schedule.index(0), library::LiveTvSchedule::TimerIdRole).toString() == timerId);
+
+  // It records at once (the programme is on).
+  std::optional<LiveTvRecording> recording;
+  REQUIRE(waitFor([&] {
+    for (const LiveTvRecording& r : recordingsOn(*s.client))
+      if (r.timerId == timerId && r.isInProgress()) recording = r;
+    return recording.has_value();
+  }, 30000));
+  MESSAGE("recording " << recording->id.toStdString() << " (" << recording->type.toStdString() << ")");
+  CHECK(recording->name == program.name);
+  CHECK(recording->channelName == channels->channels.front().name);
+  CHECK(recorder.timers().size() >= 1);
+  const auto it = std::find_if(recorder.timers().cbegin(), recorder.timers().cend(),
+                               [&](const LiveTvTimer& t) { return t.id == timerId; });
+  REQUIRE(it != recorder.timers().cend());
+
+  // A few seconds of it, then stop: what was recorded stays.
+  waitFor([] { return false; }, 6000);
+  changed.clear();
+  recorder.cancel(timerId);
+  REQUIRE(waitFor([&] { return changed.count() > 0 && !recorder.busy(); }, 30000));
+  CHECK(recorder.timerFor(program.id).isEmpty());
+
+  std::optional<LiveTvRecording> finished;
+  REQUIRE(waitFor([&] {
+    for (const LiveTvRecording& r : recordingsOn(*s.client))
+      if (!r.isInProgress() && r.name == program.name && r.runTimeTicks > 0) finished = r;
+    return finished.has_value();
+  }, 60000));
+  MESSAGE("finished recording " << finished->id.toStdString() << " (" << finished->type.toStdString() << ", "
+                                << finished->runTimeTicks / 10'000'000 << " s)");
+  CHECK(finished->runTimeTicks > 10'000'000);
+
+  // It plays as an item: a file with its run time, no live stream.
+  PlaybackInfoRequest request;
+  request.itemId = finished->id;
+  request.deviceProfile = buildDeviceProfile({});
+  auto info = run<PlaybackInfo>([&](auto done) { s.client->playbackInfo(request, nullptr, done); });
+  REQUIRE(info.ok());
+  REQUIRE(info->errorCode.isEmpty());
+  REQUIRE_FALSE(info->mediaSources.isEmpty());
+  const MediaSource& source = info->mediaSources.front();
+  CHECK_FALSE(source.isLive());
+  CHECK(source.liveStreamId.isEmpty());
+  REQUIRE(source.runTimeTicks.has_value());
+  CHECK(*source.runTimeTicks > 0);
+  auto stream = resolvePlaybackStream(s.client->streamContext(), finished->id, *info, source);
+  REQUIRE(stream.ok());
+  CHECK_FALSE(stream->isLive);
+
+  // Deleted from the screen's model, with its file: it does not come back.
+  library::LiveTvRecordings recordings(*s.client);
+  recordings.reload();
+  REQUIRE(waitFor([&] { return !recordings.loading(); }, 30000));
+  QSignalSpy removed(&recordings, &library::LiveTvRecordings::removed);
+  recordings.remove(finished->id);
+  REQUIRE(waitFor([&] { return removed.count() == 1; }, 30000));
+  waitFor([] { return false; }, 3000);
+  for (const LiveTvRecording& r : recordingsOn(*s.client)) CHECK(r.id != finished->id);
+  for (const LiveTvRecording& r : recordingsOn(*s.client)) CHECK(r.name != program.name);
+}
+
+TEST_CASE("A series recording schedules the series' programmes; cancelling it drops them") {
+  if (!hasExtrasStand()) return;
+  Stand s;
+  library::LiveTvRecorder recorder(*s.client);
+  recorder.checkAvailable();
+  REQUIRE(waitFor([&] { return recorder.available() && !recorder.loading(); }, 30000));
+
+  // The last channel shows "Test Series"; one of its later episodes.
+  LiveTvApi liveTv(*s.client);
+  LiveTvChannelQuery query;
+  query.startIndex = expectedChannels() - 1;
+  query.limit = 1;
+  auto channels = run<LiveTvChannelPage>([&](auto done) { liveTv.channels(query, nullptr, done); });
+  REQUIRE(channels.ok());
+  REQUIRE(channels->channels.size() == 1);
+  const QString channelId = channels->channels.front().id;
+  LiveTvProgramQuery window;
+  window.channelIds = {channelId};
+  window.from = QDateTime::currentDateTimeUtc().addSecs(3600);
+  window.to = window.from.addSecs(3 * 3600);
+  auto later = run<QList<LiveTvProgram>>([&](auto done) { liveTv.allPrograms(window, nullptr, done); });
+  REQUIRE(later.ok());
+  REQUIRE(later->size() >= 2);
+  const LiveTvProgram episode = later->at(1);
+  CHECK(episode.name == QStringLiteral("Test Series"));
+  CHECK(episode.isSeries);
+  const QDateTime started = QDateTime::currentDateTimeUtc();
+
+  QSignalSpy changed(&recorder, &library::LiveTvRecorder::timersChanged);
+  recorder.recordSeries(episode.id);
+  REQUIRE(waitFor([&] { return changed.count() > 0 && !recorder.busy(); }, 30000));
+  const auto series = std::find_if(recorder.seriesTimers().cbegin(), recorder.seriesTimers().cend(),
+                                   [](const LiveTvTimer& t) { return t.name == QStringLiteral("Test Series"); });
+  REQUIRE(series != recorder.seriesTimers().cend());
+  const QString seriesId = series->id;
+  int scheduled = 0;
+  for (const LiveTvTimer& t : recorder.timers())
+    if (t.seriesTimerId == seriesId) ++scheduled;
+  MESSAGE(scheduled << " episodes scheduled");
+  CHECK(scheduled >= 2);
+  CHECK_FALSE(recorder.timerFor(episode.id).isEmpty());
+
+  // The guide says so for the episode.
+  auto marked = run<QList<LiveTvProgram>>([&](auto done) { liveTv.allPrograms(window, nullptr, done); });
+  REQUIRE(marked.ok());
+  const auto same = std::find_if(marked->cbegin(), marked->cend(), [&](const LiveTvProgram& p) { return p.id == episode.id; });
+  REQUIRE(same != marked->cend());
+  CHECK(same->seriesTimerId == seriesId);
+  CHECK(same->timerId == recorder.timerFor(episode.id));
+
+  changed.clear();
+  recorder.cancelSeries(seriesId);
+  REQUIRE(waitFor([&] { return changed.count() > 0 && !recorder.busy(); }, 30000));
+  for (const LiveTvTimer& t : recorder.timers()) CHECK(t.seriesTimerId != seriesId);
+  for (const LiveTvTimer& t : recorder.seriesTimers()) CHECK(t.id != seriesId);
+
+  // The episode on now was recorded while the series timer stood: delete
+  // what it left, so the stand stays as it was.
+  waitFor([] { return false; }, 3000);
+  library::LiveTvRecordings recordings(*s.client);
+  recordings.reload();
+  REQUIRE(waitFor([&] { return !recordings.loading(); }, 30000));
+  for (const LiveTvRecording& r : recordings.recordings()) {
+    if (r.seriesName != QStringLiteral("Test Series") || r.isInProgress()) continue;
+    if (r.dateCreated.isValid() && r.dateCreated < started.addSecs(-60)) continue;
+    QSignalSpy removed(&recordings, &library::LiveTvRecordings::removed);
+    recordings.remove(r.id);
+    CHECK(waitFor([&] { return removed.count() == 1; }, 30000));
+  }
 }

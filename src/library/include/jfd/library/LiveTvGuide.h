@@ -52,7 +52,8 @@ namespace jfd::library {
     Q_PROPERTY(int focusRow READ focusRow NOTIFY focusChanged)
     Q_PROPERTY(int focusMinutes READ focusMinutes NOTIFY focusChanged)
     // The focused programme: id, title, episodeTitle, overview, offset,
-    // length (minutes), start, end (local), channelId, channelName. Empty
+    // length (minutes), start, end (local), channelId, channelName,
+    // isSeries, timerId and seriesTimerId (what records it). Empty
     // where the guide has nothing (the channel still has an id).
     Q_PROPERTY(QVariantMap focusedProgram READ focusedProgram NOTIFY focusChanged)
     Q_PROPERTY(QString focusedChannelId READ focusedChannelId NOTIFY focusChanged)
@@ -64,7 +65,8 @@ namespace jfd::library {
       NumberRole,
       ImageUrlRole,
       // The programmes in view (and an hour either side), by start: maps
-      // with id, title, offset and length in minutes.
+      // with id, title, offset and length in minutes, and timerId and
+      // seriesTimerId when the server records it.
       ProgramsRole,
     };
     Q_ENUM(Role)
@@ -125,6 +127,10 @@ namespace jfd::library {
     Q_INVOKABLE bool pageFocus(int direction);
     Q_INVOKABLE void focusAt(int row, int minutes);
     Q_INVOKABLE void focusNow();
+    // Marks the loaded programmes with the server's timers
+    // (LiveTvRecorder::timers()): a programme a timer records gets its
+    // timer and series timer, the others lose theirs.
+    void applyTimers(const QList<api::LiveTvTimer>& timers);
     // Moves now and the cells on with the clock (the timer does it too).
     Q_INVOKABLE void tick();
     void clear();

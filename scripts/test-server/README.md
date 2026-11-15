@@ -39,7 +39,8 @@ stock leg, which starts this server) a missing `JFD_EXTRAS_SERVER_URL` fails
 those cases instead.
 
 The extras server also has Live TV: an M3U tuner of 50 channels and an XMLTV
-guide of half-hour programmes for 24 hours (`livetv/make-guide.sh`), added
+guide of half-hour programmes for 24 hours (`livetv/make-guide.sh`; the last
+channel shows one series, "Test Series", an episode a slot), added
 through `LiveTv/TunerHosts` and `LiveTv/ListingProviders`. The channels are
 two generated ten-minute MPEG-TS streams that `livetv/tuner.pl` (perl-base
 only, which the image has) serves on `127.0.0.1:18080` inside the container,
@@ -49,7 +50,12 @@ container. `JFD_EXTRAS_LIVETV_CHANNELS` gives the channel count;
 `jfd_livetv_server_tests` checks Info, the channel list with now and next, the
 guide grid's model (50 channels and the first hours under a second, later
 hours by chunks), the home screen's "On now" row, a channel's page, a
-channel's stream through the server and the stream closed after Stopped.
+channel's stream through the server and the stream closed after Stopped, and
+recording with the server's own DVR: a programme on air recorded for a few
+seconds, stopped, played as an item (a file with its run time, no live
+stream) and deleted with its file, and a series recording of "Test Series"
+scheduled and cancelled. The recordings go to the container's
+`/config/data/livetv/recordings` and the tests delete what they made.
 
 Never point these tests at a real server: they create groups, change watched
 state and sign sessions out.

@@ -40,6 +40,10 @@ namespace jfd::api {
     bool enableContentDownloading = false;
     bool enableVideoPlaybackTranscoding = false;
     bool enableAudioPlaybackTranscoding = false;
+    // Policy: an administrator, and may this user record Live TV (the
+    // server's LiveTvManagement check passes for either).
+    bool isAdministrator = false;
+    bool enableLiveTvManagement = false;
   };
 
   struct AuthenticationResult {

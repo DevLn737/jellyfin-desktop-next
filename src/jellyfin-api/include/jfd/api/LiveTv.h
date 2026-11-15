@@ -10,9 +10,9 @@
 
 #include <optional>
 
-// Live TV (package 3.7a): the server's tuners and guide as channels and
-// programmes, read through the LiveTv API of Jellyfin 12.2. Recordings and
-// timers (3.7b) are not here yet. Channels play like any item: PlaybackInfo
+// Live TV (package 3.7): the server's tuners and guide as channels and
+// programmes, read through the LiveTv API of Jellyfin 12.2, and its
+// recordings and timers (the server's own DVR). Channels play like any item: PlaybackInfo
 // opens the live stream (AutoOpenLiveStream) and answers its LiveStreamId,
 // which the playback reports carry; the server closes the stream when the
 // Stopped report names it. closeLiveStream() is for a stream that was opened
@@ -55,6 +55,10 @@ namespace jfd::api {
     bool isNews = false;
     bool isMovie = false;
     bool isSeries = false;
+    // The server's timer recording this programme, and the series timer
+    // that made it; empty when nothing records it.
+    QString timerId;
+    QString seriesTimerId;
 
     bool isValid() const { return start.isValid() && end.isValid() && end > start; }
     // On the air at `now`: start <= now < end.
@@ -107,12 +111,85 @@ namespace jfd::api {
     int limit = 500;
   };
 
+  // A scheduled recording (TimerInfoDto, Type "Timer") or a series
+  // recording (SeriesTimerInfoDto, Type "SeriesTimer").
+  struct LiveTvTimer {
+    QString id;
+    QString channelId;
+    QString channelName;
+    QString programId;
+    QString name;
+    QString overview;
+    QDateTime start; // UTC
+    QDateTime end;   // UTC
+    // A timer's RecordingStatus: "New", "InProgress", "Completed",
+    // "Cancelled", "ConflictedOk", "ConflictedNotOk", "Error". Empty for a
+    // series timer.
+    QString status;
+    // The series timer a timer belongs to.
+    QString seriesTimerId;
+
+    bool isRecording() const { return status == QLatin1String("InProgress"); }
+    // Still to record or recording now.
+    bool isScheduled() const;
+  };
+
+  // A recording (LiveTv/Recordings): one in progress is an item of type
+  // "Recording"; a finished one is a library item ("Movie", "Episode",
+  // "Video") in the server's Recordings folder and plays like any item.
+  struct LiveTvRecording {
+    QString id;
+    QString type;
+    QString name;
+    // An episode's series; the name is then the episode's.
+    QString seriesName;
+    QString overview;
+    QString channelName;
+    // "InProgress" while it records; empty once it is done.
+    QString status;
+    QString timerId;
+    // The programme's times while it records, the file's date after.
+    QDateTime start; // UTC
+    QDateTime end;   // UTC
+    QDateTime dateCreated; // UTC
+    qint64 runTimeTicks = 0;
+    qint64 playbackPositionTicks = 0;
+    bool played = false;
+    QString primaryImageTag;
+
+    bool isInProgress() const { return status == QLatin1String("InProgress"); }
+  };
+
+  struct LiveTvRecordingPage {
+    QList<LiveTvRecording> recordings;
+    int totalRecordCount = 0;
+    int startIndex = 0;
+  };
+
+  struct LiveTvRecordingQuery {
+    int startIndex = 0;
+    int limit = 200;
+    std::optional<bool> isInProgress;
+  };
+
+  struct LiveTvTimerQuery {
+    QString channelId;
+    QString seriesTimerId;
+    std::optional<bool> isActive;
+    std::optional<bool> isScheduled;
+  };
+
   namespace json {
     Result<LiveTvInfo> liveTvInfo(const QJsonObject& object);
     Result<LiveTvProgram> liveTvProgram(const QJsonObject& object);
     Result<LiveTvChannel> liveTvChannel(const QJsonObject& object);
     Result<LiveTvChannelPage> liveTvChannelPage(const QJsonObject& object);
     Result<LiveTvProgramPage> liveTvProgramPage(const QJsonObject& object);
+    Result<LiveTvTimer> liveTvTimer(const QJsonObject& object);
+    // A QueryResult of timers or series timers.
+    Result<QList<LiveTvTimer>> liveTvTimerList(const QJsonObject& object);
+    Result<LiveTvRecording> liveTvRecording(const QJsonObject& object);
+    Result<LiveTvRecordingPage> liveTvRecordingPage(const QJsonObject& object);
     // A server date ("2026-11-10T16:00:00.0000000Z") as a UTC QDateTime;
     // invalid when it is missing or has no zone.
     QDateTime serverDate(const QJsonValue& value);
@@ -139,6 +216,45 @@ namespace jfd::api {
                      Callback<QList<LiveTvProgram>> done);
     // POST LiveStreams/Close.
     void closeLiveStream(const QString& liveStreamId, QObject* context, Callback<Empty> done);
+
+    // Recordings and timers. Listing needs Live TV access; creating,
+    // cancelling and deleting need the LiveTvManagement policy
+    // (Policy.EnableLiveTvManagement, or an administrator) and fail with
+    // 403 without it.
+
+    // GET LiveTv/Recordings, newest first as the server sorts them.
+    void recordings(const LiveTvRecordingQuery& query, QObject* context,
+                    Callback<LiveTvRecordingPage> done);
+    // DELETE Items/{id}: a finished recording and its file. (12.2's DELETE
+    // LiveTv/Recordings/{id} only drops the library entry and leaves the
+    // file, so the next scan of the Recordings folder brings it back; seen
+    // on the extras stand.) Needs the user's permission to delete content
+    // (an administrator has it). One in progress is stopped with
+    // cancelTimer() instead.
+    void deleteRecording(const QString& recordingId, QObject* context, Callback<Empty> done);
+    // GET LiveTv/Timers: the recordings to come and those recording now.
+    void timers(const LiveTvTimerQuery& query, QObject* context, Callback<QList<LiveTvTimer>> done);
+    // GET LiveTv/SeriesTimers.
+    void seriesTimers(QObject* context, Callback<QList<LiveTvTimer>> done);
+    // GET LiveTv/Timers/Defaults?programId=: the server's timer for a
+    // programme (a SeriesTimerInfoDto with its padding and keep settings),
+    // as POST LiveTv/Timers and LiveTv/SeriesTimers take it back.
+    void timerDefaults(const QString& programId, QObject* context, Callback<QJsonObject> done);
+    // POST LiveTv/Timers with `timer` (timerDefaults' answer).
+    void createTimer(const QJsonObject& timer, QObject* context, Callback<Empty> done);
+    // POST LiveTv/SeriesTimers with `timer` (timerDefaults' answer).
+    void createSeriesTimer(const QJsonObject& timer, QObject* context, Callback<Empty> done);
+    // timerDefaults, then createTimer: records one programme.
+    void recordProgram(const QString& programId, QObject* context, Callback<Empty> done);
+    // timerDefaults, then createSeriesTimer: records every episode of the
+    // programme's series the server finds in the guide (on its channel,
+    // new episodes, at any time, as the server's defaults say).
+    void recordSeries(const QString& programId, QObject* context, Callback<Empty> done);
+    // DELETE LiveTv/Timers/{id}: a recording to come is dropped, one in
+    // progress stops (what it has recorded stays a recording).
+    void cancelTimer(const QString& timerId, QObject* context, Callback<Empty> done);
+    // DELETE LiveTv/SeriesTimers/{id}: its timers go with it.
+    void cancelSeriesTimer(const QString& seriesTimerId, QObject* context, Callback<Empty> done);
 
     // `2026-11-10T16:00:00.000Z`, as the date filters take it.
     static QString queryDate(const QDateTime& when);

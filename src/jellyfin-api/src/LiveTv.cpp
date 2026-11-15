@@ -3,6 +3,7 @@
 #include <jfd/api/ServerTime.h>
 
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonValue>
 
 #include <algorithm>
@@ -44,6 +45,16 @@ namespace jfd::api {
       };
     }
 
+    qint64 ticks(const QJsonObject& o, const char* key) {
+      const QJsonValue v = o.value(QLatin1String(key));
+      if (!v.isDouble()) return 0;
+      const double d = v.toDouble();
+      if (!std::isfinite(d) || d < 0 || d > 9.0e18) return 0;
+      return static_cast<qint64>(d);
+    }
+
+    QString escaped(const QString& id) { return QString::fromLatin1(QUrl::toPercentEncoding(id)); }
+
     const QString True = QStringLiteral("true");
     const QString False = QStringLiteral("false");
   } // namespace
@@ -67,6 +78,11 @@ namespace jfd::api {
 
   bool LiveTvProgram::isOnAt(const QDateTime& now) const {
     return isValid() && start <= now && now < end;
+  }
+
+  bool LiveTvTimer::isScheduled() const {
+    return status.isEmpty() || status == QLatin1String("New") ||
+           status == QLatin1String("InProgress") || status == QLatin1String("ConflictedOk");
   }
 
   double LiveTvProgram::progressAt(const QDateTime& now) const {
@@ -125,6 +141,8 @@ namespace jfd::api {
       program.isNews = flag(o, "IsNews");
       program.isMovie = flag(o, "IsMovie");
       program.isSeries = flag(o, "IsSeries");
+      program.timerId = text(o, "TimerId");
+      program.seriesTimerId = text(o, "SeriesTimerId");
       return program;
     }
 
@@ -186,6 +204,72 @@ namespace jfd::api {
       return page;
     }
 
+    Result<LiveTvTimer> liveTvTimer(const QJsonObject& o) {
+      LiveTvTimer timer;
+      timer.id = text(o, "Id");
+      if (timer.id.isEmpty()) return invalid(QStringLiteral("Timer has no Id"));
+      timer.channelId = text(o, "ChannelId");
+      timer.channelName = text(o, "ChannelName");
+      timer.programId = text(o, "ProgramId");
+      timer.name = text(o, "Name");
+      timer.overview = text(o, "Overview");
+      timer.start = serverDate(o.value(QLatin1String("StartDate")));
+      timer.end = serverDate(o.value(QLatin1String("EndDate")));
+      timer.status = text(o, "Status");
+      timer.seriesTimerId = text(o, "SeriesTimerId");
+      return timer;
+    }
+
+    Result<QList<LiveTvTimer>> liveTvTimerList(const QJsonObject& o) {
+      const QJsonValue items = o.value(QLatin1String("Items"));
+      if (!items.isArray()) return invalid(QStringLiteral("Timer list has no Items"));
+      QList<LiveTvTimer> timers;
+      for (const QJsonValue& value : items.toArray()) {
+        auto timer = liveTvTimer(value.toObject());
+        if (!timer) return timer.error();
+        timers.append(std::move(timer).value());
+      }
+      return timers;
+    }
+
+    Result<LiveTvRecording> liveTvRecording(const QJsonObject& o) {
+      LiveTvRecording r;
+      r.id = text(o, "Id");
+      if (r.id.isEmpty()) return invalid(QStringLiteral("Recording has no Id"));
+      r.type = text(o, "Type");
+      r.name = text(o, "Name");
+      r.seriesName = text(o, "SeriesName");
+      r.overview = text(o, "Overview");
+      r.channelName = text(o, "ChannelName");
+      r.status = text(o, "Status");
+      r.timerId = text(o, "TimerId");
+      r.start = serverDate(o.value(QLatin1String("StartDate")));
+      r.end = serverDate(o.value(QLatin1String("EndDate")));
+      r.dateCreated = serverDate(o.value(QLatin1String("DateCreated")));
+      r.runTimeTicks = ticks(o, "RunTimeTicks");
+      const QJsonObject userData = o.value(QLatin1String("UserData")).toObject();
+      r.playbackPositionTicks = ticks(userData, "PlaybackPositionTicks");
+      r.played = flag(userData, "Played");
+      r.primaryImageTag =
+          o.value(QLatin1String("ImageTags")).toObject().value(QLatin1String("Primary")).toString();
+      return r;
+    }
+
+    Result<LiveTvRecordingPage> liveTvRecordingPage(const QJsonObject& o) {
+      const QJsonValue items = o.value(QLatin1String("Items"));
+      if (!items.isArray()) return invalid(QStringLiteral("Recording list has no Items"));
+      LiveTvRecordingPage page;
+      for (const QJsonValue& value : items.toArray()) {
+        auto recording = liveTvRecording(value.toObject());
+        if (!recording) return recording.error();
+        page.recordings.append(std::move(recording).value());
+      }
+      page.totalRecordCount =
+          count(o, "TotalRecordCount", static_cast<int>(page.recordings.size()));
+      page.startIndex = count(o, "StartIndex", 0);
+      return page;
+    }
+
   } // namespace json
 
   QString LiveTvApi::queryDate(const QDateTime& when) {
@@ -240,8 +324,7 @@ namespace jfd::api {
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("userId"), m_client.userId());
     m_client.sendJson(JellyfinClient::Method::Get,
-                      QStringLiteral("LiveTv/Channels/") +
-                          QString::fromLatin1(QUrl::toPercentEncoding(channelId)),
+                      QStringLiteral("LiveTv/Channels/") + escaped(channelId),
                       query, std::nullopt, context,
                       parsed<LiveTvChannel>(std::move(done), json::liveTvChannel));
   }
@@ -300,6 +383,102 @@ namespace jfd::api {
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("liveStreamId"), liveStreamId);
     m_client.sendNoContent(JellyfinClient::Method::Post, QStringLiteral("LiveStreams/Close"), query,
+                           std::nullopt, context, std::move(done));
+  }
+
+  void LiveTvApi::recordings(const LiveTvRecordingQuery& q, QObject* context,
+                             Callback<LiveTvRecordingPage> done) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("userId"), m_client.userId());
+    query.addQueryItem(QStringLiteral("startIndex"), QString::number(q.startIndex));
+    query.addQueryItem(QStringLiteral("limit"), QString::number(q.limit));
+    if (q.isInProgress)
+      query.addQueryItem(QStringLiteral("isInProgress"), *q.isInProgress ? True : False);
+    query.addQueryItem(QStringLiteral("fields"), QStringLiteral("DateCreated,Overview"));
+    query.addQueryItem(QStringLiteral("enableImages"), True);
+    query.addQueryItem(QStringLiteral("imageTypeLimit"), QStringLiteral("1"));
+    query.addQueryItem(QStringLiteral("enableImageTypes"), QStringLiteral("Primary"));
+    query.addQueryItem(QStringLiteral("enableUserData"), True);
+    query.addQueryItem(QStringLiteral("enableTotalRecordCount"), True);
+    m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("LiveTv/Recordings"), query,
+                      std::nullopt, context,
+                      parsed<LiveTvRecordingPage>(std::move(done), json::liveTvRecordingPage));
+  }
+
+  void LiveTvApi::deleteRecording(const QString& recordingId, QObject* context,
+                                  Callback<Empty> done) {
+    m_client.sendNoContent(JellyfinClient::Method::Delete,
+                           QStringLiteral("Items/") + escaped(recordingId), {},
+                           std::nullopt, context, std::move(done));
+  }
+
+  void LiveTvApi::timers(const LiveTvTimerQuery& q, QObject* context,
+                         Callback<QList<LiveTvTimer>> done) {
+    QUrlQuery query;
+    if (!q.channelId.isEmpty()) query.addQueryItem(QStringLiteral("channelId"), q.channelId);
+    if (!q.seriesTimerId.isEmpty())
+      query.addQueryItem(QStringLiteral("seriesTimerId"), q.seriesTimerId);
+    if (q.isActive) query.addQueryItem(QStringLiteral("isActive"), *q.isActive ? True : False);
+    if (q.isScheduled)
+      query.addQueryItem(QStringLiteral("isScheduled"), *q.isScheduled ? True : False);
+    m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("LiveTv/Timers"), query,
+                      std::nullopt, context,
+                      parsed<QList<LiveTvTimer>>(std::move(done), json::liveTvTimerList));
+  }
+
+  void LiveTvApi::seriesTimers(QObject* context, Callback<QList<LiveTvTimer>> done) {
+    m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("LiveTv/SeriesTimers"), {},
+                      std::nullopt, context,
+                      parsed<QList<LiveTvTimer>>(std::move(done), json::liveTvTimerList));
+  }
+
+  void LiveTvApi::timerDefaults(const QString& programId, QObject* context,
+                                Callback<QJsonObject> done) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("programId"), programId);
+    m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("LiveTv/Timers/Defaults"), query,
+                      std::nullopt, context, std::move(done));
+  }
+
+  void LiveTvApi::createTimer(const QJsonObject& timer, QObject* context, Callback<Empty> done) {
+    m_client.sendNoContent(JellyfinClient::Method::Post, QStringLiteral("LiveTv/Timers"), {},
+                           QJsonDocument(timer), context, std::move(done));
+  }
+
+  void LiveTvApi::createSeriesTimer(const QJsonObject& timer, QObject* context,
+                                    Callback<Empty> done) {
+    m_client.sendNoContent(JellyfinClient::Method::Post, QStringLiteral("LiveTv/SeriesTimers"), {},
+                           QJsonDocument(timer), context, std::move(done));
+  }
+
+  void LiveTvApi::recordProgram(const QString& programId, QObject* context, Callback<Empty> done) {
+    JellyfinClient* c = &m_client;
+    timerDefaults(programId, context,
+                  [c, context, done = std::move(done)](Result<QJsonObject> defaults) mutable {
+                    if (!defaults) return done(defaults.error());
+                    LiveTvApi(*c).createTimer(*defaults, context, std::move(done));
+                  });
+  }
+
+  void LiveTvApi::recordSeries(const QString& programId, QObject* context, Callback<Empty> done) {
+    JellyfinClient* c = &m_client;
+    timerDefaults(programId, context,
+                  [c, context, done = std::move(done)](Result<QJsonObject> defaults) mutable {
+                    if (!defaults) return done(defaults.error());
+                    LiveTvApi(*c).createSeriesTimer(*defaults, context, std::move(done));
+                  });
+  }
+
+  void LiveTvApi::cancelTimer(const QString& timerId, QObject* context, Callback<Empty> done) {
+    m_client.sendNoContent(JellyfinClient::Method::Delete,
+                           QStringLiteral("LiveTv/Timers/") + escaped(timerId), {}, std::nullopt,
+                           context, std::move(done));
+  }
+
+  void LiveTvApi::cancelSeriesTimer(const QString& seriesTimerId, QObject* context,
+                                    Callback<Empty> done) {
+    m_client.sendNoContent(JellyfinClient::Method::Delete,
+                           QStringLiteral("LiveTv/SeriesTimers/") + escaped(seriesTimerId), {},
                            std::nullopt, context, std::move(done));
   }
 

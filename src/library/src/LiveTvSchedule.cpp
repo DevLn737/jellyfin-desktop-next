@@ -43,6 +43,12 @@ namespace jfd::library {
       return p.isOnAt(now());
     case ProgressRole:
       return p.progressAt(now());
+    case IsSeriesRole:
+      return p.isSeries;
+    case TimerIdRole:
+      return p.timerId;
+    case SeriesTimerIdRole:
+      return p.seriesTimerId;
     default:
       return {};
     }
@@ -51,7 +57,9 @@ namespace jfd::library {
   QHash<int, QByteArray> LiveTvSchedule::roleNames() const {
     return {{IdRole, "programId"},   {TitleRole, "title"},   {EpisodeTitleRole, "episodeTitle"},
             {OverviewRole, "overview"}, {StartRole, "start"}, {EndRole, "end"},
-            {OnNowRole, "onNow"},     {ProgressRole, "progress"}};
+            {OnNowRole, "onNow"},     {ProgressRole, "progress"},
+            {IsSeriesRole, "isSeries"}, {TimerIdRole, "timerId"},
+            {SeriesTimerIdRole, "seriesTimerId"}};
   }
 
   void LiveTvSchedule::setChannelId(const QString& channelId) {
@@ -123,6 +131,22 @@ namespace jfd::library {
     if (countChanges) Q_EMIT countChanged();
     if (m_programs.isEmpty()) m_tick.stop();
     else m_tick.start();
+  }
+
+  void LiveTvSchedule::applyTimers(const QList<api::LiveTvTimer>& timers) {
+    QHash<QString, const api::LiveTvTimer*> byProgram;
+    for (const api::LiveTvTimer& t : timers)
+      if (!t.programId.isEmpty()) byProgram.insert(t.programId, &t);
+    for (int row = 0; row < count(); ++row) {
+      api::LiveTvProgram& p = m_programs[row];
+      const api::LiveTvTimer* t = byProgram.value(p.id, nullptr);
+      const QString timerId = t ? t->id : QString();
+      const QString seriesTimerId = t ? t->seriesTimerId : QString();
+      if (p.timerId == timerId && p.seriesTimerId == seriesTimerId) continue;
+      p.timerId = timerId;
+      p.seriesTimerId = seriesTimerId;
+      Q_EMIT dataChanged(index(row), index(row), {TimerIdRole, SeriesTimerIdRole});
+    }
   }
 
   void LiveTvSchedule::tick() {

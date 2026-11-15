@@ -41,6 +41,10 @@ namespace jfd::library {
       OnNowRole,
       // 0..1; 0 for what has not started.
       ProgressRole,
+      IsSeriesRole,
+      // What records it, if anything.
+      TimerIdRole,
+      SeriesTimerIdRole,
     };
     Q_ENUM(Role)
 
@@ -74,6 +78,9 @@ namespace jfd::library {
     const QList<api::LiveTvProgram>& programs() const { return m_programs; }
 
     Q_INVOKABLE void reload();
+    // Marks the programmes with the server's timers (as
+    // LiveTvGuide::applyTimers).
+    void applyTimers(const QList<api::LiveTvTimer>& timers);
     // Drops what ended and moves the progress on (the timer does it too).
     Q_INVOKABLE void tick();
 

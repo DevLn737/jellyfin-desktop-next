@@ -78,7 +78,9 @@ namespace jfd::library {
         cells.append(QVariantMap{{QStringLiteral("id"), p.id},
                                  {QStringLiteral("title"), p.name},
                                  {QStringLiteral("offset"), start},
-                                 {QStringLiteral("length"), end - start}});
+                                 {QStringLiteral("length"), end - start},
+                                 {QStringLiteral("timerId"), p.timerId},
+                                 {QStringLiteral("seriesTimerId"), p.seriesTimerId}});
       }
       return cells;
     }
@@ -367,11 +369,37 @@ namespace jfd::library {
             {QStringLiteral("start"), p->start.toLocalTime()},
             {QStringLiteral("end"), p->end.toLocalTime()},
             {QStringLiteral("channelId"), r.channel.id},
-            {QStringLiteral("channelName"), r.channel.name}};
+            {QStringLiteral("channelName"), r.channel.name},
+            {QStringLiteral("isSeries"), p->isSeries},
+            {QStringLiteral("timerId"), p->timerId},
+            {QStringLiteral("seriesTimerId"), p->seriesTimerId}};
   }
 
   QString LiveTvGuide::focusedChannelId() const {
     return m_focusRow >= 0 && m_focusRow < count() ? m_rows[m_focusRow].channel.id : QString();
+  }
+
+  void LiveTvGuide::applyTimers(const QList<api::LiveTvTimer>& timers) {
+    QHash<QString, const api::LiveTvTimer*> byProgram;
+    for (const api::LiveTvTimer& t : timers)
+      if (!t.programId.isEmpty()) byProgram.insert(t.programId, &t);
+    bool focusTouched = false;
+    for (int row = 0; row < count(); ++row) {
+      bool changed = false;
+      for (api::LiveTvProgram& p : m_rows[row].programs) {
+        const api::LiveTvTimer* t = byProgram.value(p.id, nullptr);
+        const QString timerId = t ? t->id : QString();
+        const QString seriesTimerId = t ? t->seriesTimerId : QString();
+        if (p.timerId == timerId && p.seriesTimerId == seriesTimerId) continue;
+        p.timerId = timerId;
+        p.seriesTimerId = seriesTimerId;
+        changed = true;
+      }
+      if (!changed) continue;
+      Q_EMIT dataChanged(index(row), index(row), {ProgramsRole});
+      if (row == m_focusRow) focusTouched = true;
+    }
+    if (focusTouched) Q_EMIT focusChanged();
   }
 
   void LiveTvGuide::tick() {
