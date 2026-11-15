@@ -59,6 +59,30 @@
         <source>Off: unfinished downloads wait, paused, until you continue them on the Downloads page.</source>
         <translation>Если выключено, незавершённые загрузки ждут на паузе, пока вы не продолжите их на странице «Загрузки».</translation>
     </message>
+    <message>
+        <source>1080p HEVC, about 4 Mbit/s</source>
+        <translation>1080p HEVC, около 4 Мбит/с</translation>
+    </message>
+    <message>
+        <source>720p HEVC, about 2 Mbit/s</source>
+        <translation>720p HEVC, около 2 Мбит/с</translation>
+    </message>
+    <message>
+        <source>Opus, 128 kbit/s</source>
+        <translation>Opus, 128 кбит/с</translation>
+    </message>
+    <message>
+        <source>Download quality</source>
+        <translation>Качество загрузок</translation>
+    </message>
+    <message>
+        <source>Original: the file as it is on the server. A compressed copy is made by the server, is smaller, has one audio track and the text subtitles; music is then compressed to Opus, 128 kbit/s.</source>
+        <translation>Оригинал — файл в том виде, в каком он лежит на сервере. Сжатую копию делает сервер: она меньше, в ней одна звуковая дорожка и текстовые субтитры; музыка тогда сжимается в Opus, 128 кбит/с.</translation>
+    </message>
+    <message>
+        <source>Original</source>
+        <translation>Оригинал</translation>
+    </message>
 </context>
 <context>
     <name>jfd::offline::DownloadsController</name>
@@ -161,6 +185,14 @@
     <message>
         <source>&quot;%1&quot; could not be deleted. If it is playing, stop it and try again.</source>
         <translation>Не удалось удалить «%1». Если это сейчас играет, остановите и попробуйте снова.</translation>
+    </message>
+    <message>
+        <source>Quality: compressed by the server (%1), one item at a time. So many items keep the server busy for a long time.</source>
+        <translation>Качество: сжатая копия от сервера (%1), по одному элементу. Столько элементов надолго займут сервер.</translation>
+    </message>
+    <message>
+        <source>Quality: compressed by the server (%1), smaller, one audio track.</source>
+        <translation>Качество: сжатая копия от сервера (%1), меньше по размеру, одна звуковая дорожка.</translation>
     </message>
 </context>
 </TS>

@@ -6,8 +6,10 @@
 # measuring gaps), media segments (intro, credits) from a test
 # provider plugin (segments-plugin/), and Live TV: an M3U tuner of 50
 # channels served from inside the container (livetv/tuner.pl) with an XMLTV
-# guide of 24 hours (livetv/make-guide.sh). Prints the environment for the
-# extras tests. Never point this at a real server.
+# guide of 24 hours (livetv/make-guide.sh), and a home videos library
+# "Clips" with one two-minute clip (two audio tracks, an embedded subtitle)
+# for the compressed downloads (jfd_offline_transcode_server_tests). Prints
+# the environment for the extras tests. Never point this at a real server.
 #
 #   scripts/test-server/extras-server.sh up      # start and print env
 #   scripts/test-server/extras-server.sh down    # remove the container
@@ -95,6 +97,31 @@ make_show() {
       $ff -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=24 -f lavfi -i sine=frequency=$((300 + n * 100)) -t 8 \
         -c:v libx264 -preset ultrafast -c:a aac "$dir/Extras Show (2024) S01E0$n.mkv"
     done
+  '
+}
+
+make_clip() {
+  # Two minutes, 640x360 at 24 fps with a key frame every second, H.264 with
+  # two AAC tracks (eng 440 Hz, rus 660 Hz) and an embedded SubRip track,
+  # in a library of its own so the movie and show counts stay as they are.
+  $DOCKER exec "$NAME" bash -euc '
+    ff=/usr/lib/jellyfin-ffmpeg/ffmpeg
+    dir="/media/Clips/Offline Clip"
+    mkdir -p "$dir"
+    cat > /tmp/clip.srt <<SRT
+1
+00:00:05,000 --> 00:00:10,000
+First line
+
+2
+00:01:00,000 --> 00:01:05,000
+Second line
+SRT
+    $ff -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=24 -f lavfi -i sine=frequency=440 \
+      -f lavfi -i sine=frequency=660 -i /tmp/clip.srt -t 120 -map 0:v -map 1:a -map 2:a -map 3:s \
+      -c:v libx264 -preset ultrafast -g 24 -c:a aac -b:a 96k -c:s srt \
+      -metadata:s:a:0 language=eng -metadata:s:a:1 language=rus -metadata:s:s:0 language=eng \
+      "$dir/Offline Clip.mkv"
   '
 }
 
@@ -190,6 +217,7 @@ up() {
   make_media
   make_show
   make_music
+  make_clip
   make_livetv
 
   log "completing the startup wizard"
@@ -214,6 +242,8 @@ up() {
     '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
   api POST "/Library/VirtualFolders?name=Music&collectionType=music&paths=%2Fmedia%2FMusic&refreshLibrary=false" \
     '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
+  api POST "/Library/VirtualFolders?name=Clips&collectionType=homevideos&paths=%2Fmedia%2FClips&refreshLibrary=false" \
+    '{"LibraryOptions":{"EnableRealtimeMonitor":false}}' "$token" >/dev/null
   api POST /Library/Refresh '' "$token" >/dev/null
   local query="$URL/Items?recursive=true&includeItemTypes=Movie"
   wait_for "the library scan" 180 bash -c \
@@ -222,6 +252,8 @@ up() {
     "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Episode' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 2 ]]"
   wait_for "the music" 120 bash -c \
     "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Audio' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 8 ]]"
+  wait_for "the clip" 120 bash -c \
+    "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Video&searchTerm=Offline%20Clip' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 1 ]]"
   local id
   id=$(api GET "/Items?recursive=true&includeItemTypes=Movie" '' "$token" | jq -r '.Items[0].Id')
   # The providers run in their own scheduled task, not in the scan.

@@ -462,3 +462,46 @@ TEST_CASE("A download moves from the queue to the downloaded list, with progress
   CHECK(DownloadsController::formatBytesText(2 * MiB) == QStringLiteral("2 MiB"));
   CHECK(DownloadsController::formatBytesText(3 * GiB / 2).contains(QStringLiteral("GiB")));
 }
+
+TEST_CASE("With the Download quality setting on a compressed preset, Download queues compressed copies") {
+  FakeJellyfin server;
+  server.children.insert(SeriesId, QJsonArray{episode(1, 900'000'000), episode(2, 900'000'000, false, true)});
+  server.items.insert(SeriesId, QJsonObject{{QStringLiteral("Id"), SeriesId},
+                                            {QStringLiteral("Name"), QStringLiteral("Bob and the Tests")},
+                                            {QStringLiteral("Type"), QStringLiteral("Series")}});
+  server.children.insert(AlbumId, QJsonArray{track(1, 30'000'000)});
+  server.items.insert(AlbumId, QJsonObject{{QStringLiteral("Id"), AlbumId},
+                                           {QStringLiteral("Name"), QStringLiteral("Alice Sings")},
+                                           {QStringLiteral("Type"), QStringLiteral("MusicAlbum")}});
+  Harness h;
+  allowDownloads(h, server);
+  h.controller->setQuality(QStringLiteral("video-720p"));
+
+  int requestId = 0;
+  const QVariantMap series = h.prepare(SeriesId, false, &requestId);
+  // A .strm episode has no original, but the server can transcode it.
+  CHECK(series.value(QStringLiteral("count")).toInt() == 2);
+  CHECK(series.value(QStringLiteral("unavailableCount")).toInt() == 0);
+  // Two 30-minute episodes at 2 Mbit/s: 450 MB each, not the 900 MB originals.
+  CHECK(series.value(QStringLiteral("bytes")).toLongLong() == 900'000'000);
+  CHECK(series.value(QStringLiteral("qualityText")).toString().contains(QStringLiteral("720p")));
+  CHECK(h.controller->confirm(requestId) == 2);
+  const auto m = h.catalog.find(ServerId, UserId, itemIdFor(101));
+  REQUIRE(m);
+  CHECK(m->quality == QStringLiteral("compressed"));
+  CHECK(m->transcode.preset == QStringLiteral("video-720p"));
+  CHECK(m->parents == QStringList{SeriesId});
+
+  // Music gets the Opus preset whatever video preset is set.
+  const QVariantMap album = h.prepare(AlbumId, false, &requestId);
+  CHECK(album.value(QStringLiteral("count")).toInt() == 1);
+  CHECK(h.controller->confirm(requestId) == 1);
+  CHECK(h.catalog.find(ServerId, UserId, itemIdFor(201))->transcode.preset == QStringLiteral("audio-opus128"));
+
+  // "Original" (the default) plans originals as before.
+  h.controller->setQuality(QStringLiteral("original"));
+  server.children.insert(SeriesId, QJsonArray{episode(3, 900'000'000)});
+  const QVariantMap original = h.prepare(SeriesId, false, &requestId);
+  CHECK(original.value(QStringLiteral("bytes")).toLongLong() == 900'000'000);
+  CHECK(original.value(QStringLiteral("qualityText")).toString().isEmpty());
+}

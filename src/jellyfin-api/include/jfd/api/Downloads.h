@@ -9,7 +9,9 @@
 #include <QStringList>
 #include <QUrl>
 
+#include <cstdint>
 #include <functional>
+#include <optional>
 
 class QObject;
 
@@ -47,6 +49,48 @@ namespace jfd::api {
   // (Blu-ray and DVD structures), ISO images, remote and .strm sources have
   // no single file to fetch. `item` and `source` are the server's JSON.
   bool originalAvailable(const QJsonObject& item, const QJsonObject& source);
+
+  // --- Compressed copies (stage 3.10b) ------------------------------------
+  //
+  // The server transcodes a copy as an HLS VOD stream of fMP4 segments,
+  // which the downloader fetches one by one and joins into one .mp4 (see
+  // docs/offline.md for why HLS and not the progressive stream).
+
+  // What a compressed copy is encoded to.
+  struct CompressedProfile {
+    // Music: Opus in fMP4; video: HEVC (H.264 when the server will not
+    // encode HEVC) and stereo AAC.
+    bool audio = false;
+    // Video only: the copy is at most this many lines high (never scaled up).
+    int maxHeight = 0;
+    // Bits per second for the whole stream (video and audio).
+    std::int64_t bitrate = 0;
+  };
+
+  // The DeviceProfile for PlaybackInfo: nothing plays directly, one HLS
+  // transcoding profile (Context Streaming: 12.2 ignores Static ones in
+  // PlaybackInfo), text subtitles as separate files (never burnt in).
+  QJsonObject compressedDeviceProfile(const CompressedProfile& profile);
+  // The body of POST Items/{itemId}/PlaybackInfo for a compressed copy of
+  // one media source: transcoding only, no stream copy, no subtitles in the
+  // stream, `audioStreamIndex` when given (the server honours it only
+  // together with MediaSourceId, which this sets).
+  QJsonObject compressedPlaybackInfoBody(const QString& userId, const QString& mediaSourceId,
+                                         const CompressedProfile& profile,
+                                         std::optional<int> audioStreamIndex);
+  // POST Items/{itemId}/PlaybackInfo?userId=..
+  QUrl playbackInfoUrl(const QUrl& serverUrl, const QString& itemId, const QString& userId);
+  // The server's TranscodingUrl ("/videos/{id}/master.m3u8?...") as a URL
+  // on the server (under its base path), without ApiKey / api_key: the
+  // downloader sends the session's Authorization header instead.
+  QUrl transcodingUrlOnServer(const QUrl& serverUrl, const QString& transcodingUrl);
+  // DELETE Videos/ActiveEncodings?deviceId=..&playSessionId=..: stops the
+  // server's transcoding of one play session (only that one).
+  QUrl activeEncodingsUrl(const QUrl& serverUrl, const QString& deviceId,
+                          const QString& playSessionId);
+  // Bytes a compressed copy of this length is expected to take.
+  std::int64_t estimatedCompressedSize(const CompressedProfile& profile,
+                                       std::int64_t runTimeTicks);
 
   // --- What a downloaded item keeps besides its file ---------------------
 

@@ -5,6 +5,8 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+#include <algorithm>
+
 namespace jfd::offline {
 
   namespace {
@@ -85,6 +87,20 @@ namespace jfd::offline {
     o.insert(QStringLiteral("itemId"), m.itemId);
     o.insert(QStringLiteral("state"), stateName(m.state));
     o.insert(QStringLiteral("quality"), m.quality);
+    if (m.quality == QLatin1String("compressed")) {
+      const TranscodeState& t = m.transcode;
+      QJsonObject transcode{{QStringLiteral("preset"), t.preset},
+                            {QStringLiteral("audioStreamIndex"), t.audioStreamIndex}};
+      if (!t.videoCodec.isEmpty()) transcode.insert(QStringLiteral("videoCodec"), t.videoCodec);
+      if (!t.audioCodec.isEmpty()) transcode.insert(QStringLiteral("audioCodec"), t.audioCodec);
+      if (t.segmentCount > 0) transcode.insert(QStringLiteral("segmentCount"), t.segmentCount);
+      if (!t.signature.isEmpty()) transcode.insert(QStringLiteral("signature"), t.signature);
+      if (!t.initHash.isEmpty()) transcode.insert(QStringLiteral("initHash"), t.initHash);
+      if (t.segmentsDone > 0) transcode.insert(QStringLiteral("segmentsDone"), t.segmentsDone);
+      if (t.partBytes > 0)
+        transcode.insert(QStringLiteral("partBytes"), static_cast<double>(t.partBytes));
+      o.insert(QStringLiteral("transcode"), scrubSecrets(transcode));
+    }
     o.insert(QStringLiteral("mediaFile"), m.mediaFile);
     // Whole bytes fit a double exactly up to 2^53 (8 PiB).
     o.insert(QStringLiteral("expectedSize"), static_cast<double>(m.expectedSize));
@@ -130,6 +146,21 @@ namespace jfd::offline {
     if (!state) return std::nullopt;
     m.state = *state;
     m.quality = o.value(QLatin1String("quality")).toString(QStringLiteral("original"));
+    if (m.quality == QLatin1String("compressed")) {
+      const QJsonObject t = o.value(QLatin1String("transcode")).toObject();
+      m.transcode.preset = t.value(QLatin1String("preset")).toString();
+      m.transcode.audioStreamIndex = t.value(QLatin1String("audioStreamIndex")).toInt(-1);
+      m.transcode.videoCodec = t.value(QLatin1String("videoCodec")).toString();
+      m.transcode.audioCodec = t.value(QLatin1String("audioCodec")).toString();
+      m.transcode.segmentCount = std::max(0, t.value(QLatin1String("segmentCount")).toInt());
+      m.transcode.signature = t.value(QLatin1String("signature")).toString();
+      m.transcode.initHash = t.value(QLatin1String("initHash")).toString();
+      m.transcode.segmentsDone = std::clamp(t.value(QLatin1String("segmentsDone")).toInt(), 0,
+                                            m.transcode.segmentCount);
+      const double bytes = t.value(QLatin1String("partBytes")).toDouble();
+      m.transcode.partBytes =
+          bytes > 0 && bytes < 9007199254740992.0 ? static_cast<std::int64_t>(bytes) : 0;
+    }
     m.mediaFile = o.value(QLatin1String("mediaFile")).toString();
     const double size = o.value(QLatin1String("expectedSize")).toDouble();
     m.expectedSize = size > 0 && size < 9007199254740992.0 ? static_cast<std::int64_t>(size) : 0;

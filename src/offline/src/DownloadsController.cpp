@@ -1,7 +1,9 @@
 #include <jfd/offline/DownloadsController.h>
 
 #include <jfd/api/Downloads.h>
+#include <jfd/offline/CompressedDownload.h>
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QLocale>
@@ -433,20 +435,34 @@ namespace jfd::offline {
                                          const QString& type, const QJsonArray& items) {
     Plan plan;
     plan.parentId = parentId;
-    int fresh = 0, already = 0, unavailable = 0;
+    int fresh = 0, already = 0, unavailable = 0, compressed = 0;
+    QString presetLabel;
     qint64 bytes = 0;
     QVariantList versions;
     for (const QJsonValue& value : items) {
       Candidate candidate;
       candidate.item = value.toObject();
+      const bool audio = text(candidate.item, "MediaType") == QLatin1String("Audio");
+      const auto preset = presetForQuality(m_quality, audio);
+      if (preset) candidate.preset = preset->id;
       for (const QJsonValue& source : candidate.item.value(QLatin1String("MediaSources")).toArray())
-        if (api::originalAvailable(candidate.item, source.toObject())) candidate.sources.append(source);
+        if (preset || api::originalAvailable(candidate.item, source.toObject()))
+          candidate.sources.append(source);
       const QString id = text(candidate.item, "Id");
       if (m_members.contains(id)) ++already;
       else if (candidate.sources.isEmpty()) ++unavailable;
       else {
         ++fresh;
-        bytes += number(candidate.sources.first().toObject(), "Size");
+        if (preset) {
+          ++compressed;
+          const QJsonObject source = candidate.sources.first().toObject();
+          std::int64_t ticks = number(source, "RunTimeTicks");
+          if (ticks <= 0) ticks = number(candidate.item, "RunTimeTicks");
+          bytes += api::estimatedCompressedSize(preset->profile, ticks);
+          if (presetLabel.isEmpty()) presetLabel = QCoreApplication::translate("DownloadSettings", preset->label);
+        } else {
+          bytes += number(candidate.sources.first().toObject(), "Size");
+        }
       }
       plan.items.append(candidate);
     }
@@ -492,6 +508,17 @@ namespace jfd::offline {
                                    {QStringLiteral("versions"), versions},
                                    {QStringLiteral("fits"), fits},
                                    {QStringLiteral("spaceText"), spaceText},
+                                   // Empty for originals (the dialog says so).
+                                   {QStringLiteral("qualityText"),
+                                    compressed == 0 ? QString()
+                                                    : compressed > 10
+                                                          ? tr("Quality: compressed by the server (%1), "
+                                                               "one item at a time. So many items keep "
+                                                               "the server busy for a long time.")
+                                                                .arg(presetLabel)
+                                                          : tr("Quality: compressed by the server (%1), "
+                                                               "smaller, one audio track.")
+                                                                .arg(presetLabel)},
                                });
   }
 
@@ -518,9 +545,13 @@ namespace jfd::offline {
       }
       if (candidate.sources.isEmpty()) continue;
       const int index = single ? std::clamp(version, 0, int(candidate.sources.size()) - 1) : 0;
-      const EnqueueResult result = m_queue.enqueueOriginal(
-          candidate.item, candidate.sources.at(index).toObject(),
-          candidate.item.value(QLatin1String("UserData")).toObject(), parents);
+      const QJsonObject userData = candidate.item.value(QLatin1String("UserData")).toObject();
+      const EnqueueResult result =
+          candidate.preset.isEmpty()
+              ? m_queue.enqueueOriginal(candidate.item, candidate.sources.at(index).toObject(), userData,
+                                        parents)
+              : m_queue.enqueueCompressed(candidate.item, candidate.sources.at(index).toObject(),
+                                          candidate.preset, std::nullopt, userData, parents);
       if (result == EnqueueResult::Queued) ++queued;
       else if (result == EnqueueResult::DiskError) failedToWrite = true;
     }

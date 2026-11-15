@@ -57,5 +57,9 @@ stream) and deleted with its file, and a series recording of "Test Series"
 scheduled and cancelled. The recordings go to the container's
 `/config/data/livetv/recordings` and the tests delete what they made.
 
+A library "Clips" (home videos) holds a two-minute clip (640x360 H.264, two
+AAC tracks, an embedded SubRip track) for `jfd_offline_transcode_server_tests`:
+compressed downloads from the server's HLS transcode, played in headless mpv.
+
 Never point these tests at a real server: they create groups, change watched
 state and sign sessions out.

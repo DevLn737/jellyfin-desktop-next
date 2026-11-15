@@ -1,5 +1,7 @@
 #include <jfd/offline/DownloadSettings.h>
 
+#include <jfd/offline/CompressedDownload.h>
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QStandardPaths>
@@ -91,6 +93,20 @@ namespace jfd::offline {
         "DownloadSettings", "A downloaded item plays from its file even when the server can be "
                             "reached. Without the server it always does.");
     section.settings.append(preferLocal);
+
+    settings::SettingDescriptor quality;
+    quality.key = key(keys::Quality);
+    quality.type = settings::SettingType::Choice;
+    quality.defaultValue = QString(OriginalQuality);
+    quality.label = QT_TRANSLATE_NOOP("DownloadSettings", "Download quality");
+    quality.description = QT_TRANSLATE_NOOP(
+        "DownloadSettings", "Original: the file as it is on the server. A compressed copy is made "
+                            "by the server, is smaller, has one audio track and the text subtitles; "
+                            "music is then compressed to Opus, 128 kbit/s.");
+    quality.choices = {{QString(OriginalQuality), QT_TRANSLATE_NOOP("DownloadSettings", "Original")}};
+    for (const CompressedPreset& preset : compressedPresets())
+      if (!preset.profile.audio) quality.choices.append({preset.id, preset.label});
+    section.settings.append(quality);
 
     return registry.registerSection(std::move(section));
   }

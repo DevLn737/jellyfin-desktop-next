@@ -26,6 +26,10 @@ namespace jfd::offline {
     // Unfinished downloads continue when the app starts; off, they start
     // paused. Default on.
     inline constexpr QLatin1String ResumeOnStart{"downloads/resumeOnStart"};
+    // What "Download" makes by default: "original" (the file as it is), or
+    // a compressed copy, "video-1080p" or "video-720p" (music then gets
+    // "audio-opus128"). Default "original". See CompressedDownload.h.
+    inline constexpr QLatin1String Quality{"downloads/quality"};
   } // namespace keys
 
   // <Videos>/Jellyfin (QStandardPaths::MoviesLocation): ~/Videos/Jellyfin

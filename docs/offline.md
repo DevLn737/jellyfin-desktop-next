@@ -12,7 +12,9 @@ launcher's `LocalSource`), the subtitles, images, lyrics and segments of a
 download, the offline watch journal and its sync, and the app's wiring
 (`src/desktop/DownloadsInstall.cpp`). Step 3 adds the screens: "Download"
 buttons, badges on cards, the Downloads page and the offline home (see
-"Screens" below).
+"Screens" below). Package 3.10b adds compressed copies: the server
+transcodes, the downloader joins the HLS segments into one file (see
+"Compressed copies" below).
 
 | Header | What it gives |
 | --- | --- |
@@ -30,7 +32,9 @@ buttons, badges on cards, the Downloads page and the offline home (see
 | `ViewJournal.h` | The offline watch journal (JSON lines), `classifyView` |
 | `JournalReportSink.h` | Playback reports with the journal behind them |
 | `OfflineSync.h` | Sending the journal, refreshing the manifests from the server |
-| `jellyfin-api/Downloads.h` | Original, subtitle, image, lyrics and segment URLs; default quality; which sources have an original; own-server check; UserData get and set; items by id |
+| `CompressedDownload.h` | The compressed presets, the quality setting's values, the media source of a finished compressed copy |
+| `HlsPlaylist.h` | Reading the server's master and VOD media playlists, the playlist signature |
+| `jellyfin-api/Downloads.h` | Original, subtitle, image, lyrics and segment URLs; default quality; which sources have an original; own-server check; UserData get and set; items by id; the compressed download profile, its PlaybackInfo body and URLs |
 | `session/LocalSource.h` | The launcher's hook for local copies (`src/session` does not depend on `src/offline`) |
 
 ## Folder layout
@@ -38,7 +42,7 @@ buttons, badges on cards, the Downloads page and the offline home (see
 ```
 <download folder>/<serverId>/<userId>/<itemId>/item.json
                                               /media.part     while downloading
-                                              /media.<ext>    once complete
+                                              /media.<ext>    once complete (media.mp4 for a compressed copy)
                                               /subs/<index>.<srt|ass|ssa|vtt>
                                               /images/<Primary|Backdrop|Logo|Thumb>
                                               /lyrics.json    a track's lyrics
@@ -58,7 +62,7 @@ Windows: Qt's own file access handles paths past 260 characters.
 ## Manifest (`item.json`, format 1)
 
 `serverId`, `userId`, `itemId`, `state` (`queued`, `paused`, `failed`,
-`complete`), `quality` (`original`), `mediaFile`, `expectedSize`,
+`complete`), `quality` (`original` or `compressed`), `mediaFile`, `expectedSize`,
 `resumeValidator` (the ETag or Last-Modified of the response the `.part`
 came from), `queuedAt` (queue order), `completedAt`, and the server's own
 JSON: `item` (BaseItemDto), `mediaSource` (MediaSourceInfo) and `userData`.
@@ -268,7 +272,10 @@ through the music player and shows the controller's messages as toasts.
   streams), the version when an item has several, "Only unwatched" for a
   series or season, and a warning when it does not fit the limit or the
   disk. Children come from `Items?ParentId=…&Recursive=true` with their
-  media sources. The quality is always the original. "Delete download"
+  media sources. The quality is the "Download quality" setting (see
+  "Compressed copies"): the dialog says "original" or names the preset
+  (more than 10 compressed items: a warning that they keep the server
+  busy). "Delete download"
   removes the files after a question.
 - Cards (posters, episode rows) show a badge: a ring with the progress while
   downloading or paused, a mark when downloaded, an error when failed.
@@ -295,3 +302,107 @@ Not done yet: item pages of downloads when offline (the offline home plays
 them directly), the series and album images of downloads, moving the
 download folder, the trickplay setting, deleting an item while it plays
 (refused with a message), and the TV-mode screens.
+
+## Compressed copies (3.10b)
+
+### What 12.2 does: checked on the stand
+
+Checked on 2026-11-15 against the extras stand
+(`scripts/test-server/extras-server.sh`, image
+`jellyfin/jellyfin:12.2.20261005-225228`), with its two-minute clip
+(`/media/Clips/Offline Clip`, 640x360 H.264, two AAC tracks, an embedded
+SubRip track) and a 240 s FLAC track; files checked with ffprobe and
+libmpv 0.37:
+
+| Question | Answer |
+| --- | --- |
+| `Context: Static` transcoding profile in PlaybackInfo | Ignored: no `TranscodingUrl` (`SupportsTranscoding: false`). Only `Context: Streaming` profiles give one. |
+| `AudioStreamIndex` in the PlaybackInfo body | Honoured only together with `MediaSourceId`; without it the server picks the default track. |
+| HLS (`Protocol: hls`, `Container: mp4`) | `master.m3u8` → `main.m3u8`, written whole at once from the run time: `#EXT-X-PLAYLIST-TYPE:VOD`, `#EXT-X-MAP` (init segment), 6 s `#EXTINF` segments, `#EXT-X-ENDLIST`. The segments joined after the init segment are a valid fragmented MP4: duration 120.0 s (ffprobe and mpv), 2880 frames, a seek to 60 s in under 10 ms. |
+| Progressive (`Protocol: http`, `stream.mkv`) | Chunked, `Accept-Ranges: none` (a `Range` request gets the whole stream again), and the file has no duration (mpv reports 0, so no seeking). Rejected for video. |
+| Progressive Opus (`stream.ogg`) | Duration and seeking work (Ogg), but no resume either. Music uses HLS too, for one code path. |
+| `AllowHevcEncoding: false` (the stand's default) | HEVC was encoded anyway; the profile also lists H.264 as the fallback. |
+| A pause of 75 s between segments, no progress reports | Nothing lost: the job had finished and its segments were served; the last segment restarted ffmpeg at its own start (`-ss`). No progress reports are needed. |
+| The job stopped mid-way (`DELETE Videos/ActiveEncodings`, as after a dropped connection) | Its files are deleted; the next segment request starts a new ffmpeg at that segment. The joined file is whole (2880 frames, no decode errors). |
+| A second play session after a restart | Same playlist, byte-identical init segment; segments 0-9 of one session and 10-20 of another join into a correct file. |
+| Throttling and segment deletion on (`ThrottleDelaySeconds` 20, `SegmentKeepSeconds` 20) | No effect on a sequential download: it asks for each segment as soon as the previous one arrives, so the transcode is never far ahead of it. |
+| Same DeviceId: `Sessions/Playing/Stopped` without a PlaySessionId, or another HLS stream started | The download's job kept running (jobs are stopped per play session). Were it stopped, the next segment would restart it (above). |
+| Embedded text subtitle | `Videos/{id}/{sourceId}/Subtitles/{index}/Stream.srt` (and `.ass`) extracts it. |
+
+So the path is **HLS VOD, segment by segment, joined into one `media.mp4`**:
+it resumes after the last whole segment, and the result has a duration and
+seeks. The worry in the plan's risk table (poor results for long videos)
+did not come true, so compressed copies are offered for every video, not
+only music and short clips.
+
+### How a copy is made
+
+- Presets (`CompressedDownload.h`), until the owner answers question
+  3.10-1: `video-1080p` (HEVC, at most 1080 lines and 1920 wide, about
+  4 Mbit/s), `video-720p` (720 lines, about 2 Mbit/s), `audio-opus128`
+  (Opus, 128 kbit/s). Video audio is stereo AAC.
+- The setting "Download quality" (`downloads/quality`): "Original"
+  (default), "1080p HEVC" or "720p HEVC"; with either compressed choice
+  music gets Opus. "Download" on a page uses it. Not yet: choosing the
+  quality or the audio track in the dialog, and a compressed-only
+  "Download" for users who may transcode but not download files.
+- `POST Items/{id}/PlaybackInfo` with the download profile
+  (`api::compressedDeviceProfile`: no direct play, one HLS transcoding
+  profile, height and width limits, text subtitles `External` so nothing is
+  burnt in), `MediaSourceId`, the chosen `AudioStreamIndex` if any,
+  `SubtitleStreamIndex: -1`, no stream copy (copied video keeps its own key
+  frames, and segments would not match the playlist).
+- The `TranscodingUrl` goes to the server's own address with its `ApiKey`
+  removed; every request carries the session's `Authorization` header
+  instead. Then the master playlist, the media playlist (it must be a
+  complete VOD playlist), the init segment and the segments one by one.
+  Each segment is appended to `media.part` whole; the manifest records the
+  count and the size after it. At the end `media.part` becomes `media.mp4`,
+  and `DELETE Videos/ActiveEncodings?deviceId=…&playSessionId=…` stops the
+  server's job (also after a pause, cancel or error).
+- Resume (after a dropped request, a pause or a restart): a new
+  PlaybackInfo, so a new play session. When the new playlist has the same
+  segment count and durations (`signature`, a hash without URLs) and the
+  same init segment (`initHash`), `media.part` is cut back to the recorded
+  size and the download continues with the next segment; otherwise it
+  starts over. Retries as for originals (5, from 2 to 32 s); a request may
+  take up to 180 s, as the server holds a segment until it is encoded.
+- One compressed copy at a time, whatever "Downloads at the same time"
+  says: each is a transcode on the server.
+- Space: until it is done, a copy counts as bit rate × run time (+10 %).
+
+### The manifest of a compressed copy
+
+`quality: "compressed"` and `transcode`: `preset`, `audioStreamIndex`
+(the track the server put in), `videoCodec`, `audioCodec`, `segmentCount`,
+`signature`, `initHash`, and while downloading `segmentsDone` and
+`partBytes`. No URL, no PlaySessionId, no ApiKey, as for originals.
+
+While downloading, `mediaSource` is the server's source. Once complete it
+describes the copy (`compressedMediaSource`): `Container: mp4`, its `Size`,
+the preset's `Bitrate`, and the streams that are in it: the video, the one
+audio track, and the text subtitles (embedded or not) as external files
+that `ExtrasDownloader` fetches by index (`subs/<index>.<ext>`). Picture
+subtitles and fonts are not in a compressed copy. Stream indexes stay the
+server's, so the track menu, built from `MediaStreams` as for originals,
+maps the audio to mpv's first audio track and adds the subtitle files.
+`LocalCopy::original` is false: a compressed copy does not play from disk
+in a group.
+
+### Tests
+
+- `jfd_offline_tests` (`TranscodeTest.cpp`, a fake HLS server): presets
+  and setting, the profile and the URL without `ApiKey`, the playlist
+  parser, a copy joined and its manifest, subtitles and playing from disk,
+  retries and a restart that continue after the last segment, a different
+  transcode or damaged `.part` that start over, refusals (no
+  `TranscodingUrl`, `ErrorCode`, 401, an event playlist), one transcode at
+  a time, pause, resume and cancel. `ControllerTest.cpp`: "Download" with
+  the setting on a compressed preset.
+- `jfd_offline_transcode_server_tests` (test 15, extras stand and headless
+  mpv, in the Session workflow): the two-minute clip at 720p: duration
+  within 1 s, a seek to 50 % under 2 s (measured locally: 120.001 s against
+  120.02 s, about 2 ms); cut off after a few segments and restarted, it
+  continues in a new play session and is still whole; a FLAC track as Opus
+  keeps its length.
+

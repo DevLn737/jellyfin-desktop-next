@@ -1,17 +1,22 @@
 # Offline downloads (stage 3, package 3.10a): the download folder and its
 # manifests, the catalog built from them, the space limits and the queue
-# with its worker thread; playing copies through the launcher's LocalSource,
+# with its worker thread, compressed copies from the server's HLS transcode
+# (3.10b); playing copies through the launcher's LocalSource,
 # the offline watch journal and its sync with the server; the lists and
 # actions behind the download screens (DownloadsController). Qt Core and
 # Network only; the screens are in src/ui/library.
 add_library(jfd_offline STATIC
+  src/CompressedDownload.cpp
   src/DownloadListModel.cpp
   src/DownloadQueue.cpp
   src/DownloadsController.cpp
   src/DownloadSettings.cpp
   src/DownloadStore.cpp
+  src/DownloadTransfer.h
   src/DownloadWorker.cpp
+  src/DownloadWorkerHls.cpp
   src/ExtrasDownloader.cpp
+  src/HlsPlaylist.cpp
   src/JournalReportSink.cpp
   src/Manifest.cpp
   src/OfflineCatalog.cpp
@@ -19,6 +24,7 @@ add_library(jfd_offline STATIC
   src/OfflineSync.cpp
   src/StorageGuard.cpp
   src/ViewJournal.cpp
+  include/jfd/offline/CompressedDownload.h
   include/jfd/offline/DownloadListModel.h
   include/jfd/offline/DownloadQueue.h
   include/jfd/offline/DownloadsController.h
@@ -26,6 +32,7 @@ add_library(jfd_offline STATIC
   include/jfd/offline/DownloadStore.h
   include/jfd/offline/DownloadWorker.h
   include/jfd/offline/ExtrasDownloader.h
+  include/jfd/offline/HlsPlaylist.h
   include/jfd/offline/JournalReportSink.h
   include/jfd/offline/Manifest.h
   include/jfd/offline/OfflineCatalog.h

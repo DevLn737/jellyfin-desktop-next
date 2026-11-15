@@ -1,5 +1,7 @@
 #include <jfd/offline/DownloadWorker.h>
 
+#include "DownloadTransfer.h"
+
 #include <jfd/api/Downloads.h>
 
 #include <QDir>
@@ -37,23 +39,6 @@ namespace jfd::offline {
     }
   } // namespace
 
-  struct DownloadWorker::Transfer {
-    DownloadJob job;
-    QNetworkReply* reply = nullptr;
-    QFile file;
-    // Bytes in the file before this request.
-    std::int64_t offset = 0;
-    // Bytes this attempt wrote.
-    std::int64_t received = 0;
-    std::int64_t total = 0;
-    std::int64_t nextCheck = 0;
-    int redirects = 0;
-    bool headersSeen = false;
-    bool writing = false;
-    std::optional<TransferOutcome> forced;
-    QElapsedTimer sinceProgress;
-  };
-
   DownloadWorker::DownloadWorker(std::shared_ptr<const StorageGuard> guard, QObject* parent)
       : QObject(parent), m_guard(std::move(guard)) {}
 
@@ -87,6 +72,10 @@ namespace jfd::offline {
 
     if (!QDir().mkpath(QFileInfo(job.partPath).path())) {
       finish(job.key, TransferOutcome::DiskError);
+      return;
+    }
+    if (job.transcode) {
+      hlsRequest(t, job.transcode->playbackInfoUrl, static_cast<int>(Transfer::HlsStep::PlaybackInfo));
       return;
     }
     const QFileInfo part(job.partPath);
@@ -294,10 +283,11 @@ namespace jfd::offline {
     finish(key, TransferOutcome::Complete);
   }
 
-  void DownloadWorker::finish(const QString& key, TransferOutcome outcome) {
+  void DownloadWorker::finish(QString key, TransferOutcome outcome) {
     const auto it = m_transfers.find(key);
     if (it == m_transfers.end()) return;
     const std::int64_t received = it->second->received;
+    if (it->second->job.transcode) stopEncoding(*it->second);
     if (it->second->reply) {
       it->second->reply->disconnect(this);
       it->second->reply->abort();

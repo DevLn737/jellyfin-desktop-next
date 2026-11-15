@@ -1,7 +1,10 @@
 #include <jfd/api/Downloads.h>
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/api/Playback.h>
 
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QStringList>
 #include <QUrlQuery>
 
@@ -29,6 +32,127 @@ namespace jfd::api {
 
   QUrl originalDownloadUrl(const QUrl& serverUrl, const QString& mediaSourceId) {
     return serverPath(serverUrl, QStringLiteral("Items/") + mediaSourceId + QStringLiteral("/Download"));
+  }
+
+  QJsonObject compressedDeviceProfile(const CompressedProfile& profile) {
+    const double bitrate = static_cast<double>(profile.bitrate);
+    QJsonObject transcoding{{QStringLiteral("Context"), QStringLiteral("Streaming")},
+                            {QStringLiteral("Protocol"), QStringLiteral("hls")},
+                            {QStringLiteral("Container"), QStringLiteral("mp4")},
+                            {QStringLiteral("MaxAudioChannels"), QStringLiteral("2")},
+                            {QStringLiteral("SegmentLength"), 6},
+                            {QStringLiteral("BreakOnNonKeyFrames"), false}};
+    QJsonArray codecProfiles;
+    if (profile.audio) {
+      transcoding.insert(QStringLiteral("Type"), QStringLiteral("Audio"));
+      transcoding.insert(QStringLiteral("AudioCodec"), QStringLiteral("opus"));
+    } else {
+      transcoding.insert(QStringLiteral("Type"), QStringLiteral("Video"));
+      transcoding.insert(QStringLiteral("VideoCodec"), QStringLiteral("hevc,h264"));
+      transcoding.insert(QStringLiteral("AudioCodec"), QStringLiteral("aac"));
+      if (profile.maxHeight > 0) {
+        const QString height = QString::number(profile.maxHeight);
+        // 16:9 at that height; wider films are limited by their width.
+        const QString width = QString::number(profile.maxHeight * 16 / 9);
+        for (const char* codec : {"hevc", "h264"}) {
+          codecProfiles.append(QJsonObject{
+              {QStringLiteral("Type"), QStringLiteral("Video")},
+              {QStringLiteral("Codec"), QLatin1String(codec)},
+              {QStringLiteral("Conditions"),
+               QJsonArray{QJsonObject{{QStringLiteral("Condition"), QStringLiteral("LessThanEqual")},
+                                      {QStringLiteral("Property"), QStringLiteral("Height")},
+                                      {QStringLiteral("Value"), height},
+                                      {QStringLiteral("IsRequired"), true}},
+                          QJsonObject{{QStringLiteral("Condition"), QStringLiteral("LessThanEqual")},
+                                      {QStringLiteral("Property"), QStringLiteral("Width")},
+                                      {QStringLiteral("Value"), width},
+                                      {QStringLiteral("IsRequired"), true}}}}});
+        }
+      }
+    }
+    QJsonArray subtitles;
+    for (const char* format : {"srt", "ass", "ssa", "vtt"})
+      subtitles.append(QJsonObject{{QStringLiteral("Format"), QLatin1String(format)},
+                                   {QStringLiteral("Method"), QStringLiteral("External")}});
+    return QJsonObject{{QStringLiteral("Name"), QStringLiteral("Jellyfin Desktop Next download")},
+                       {QStringLiteral("MaxStreamingBitrate"), bitrate},
+                       {QStringLiteral("MaxStaticBitrate"), bitrate},
+                       {QStringLiteral("MusicStreamingTranscodingBitrate"), bitrate},
+                       {QStringLiteral("DirectPlayProfiles"), QJsonArray{}},
+                       {QStringLiteral("TranscodingProfiles"), QJsonArray{transcoding}},
+                       {QStringLiteral("ContainerProfiles"), QJsonArray{}},
+                       {QStringLiteral("CodecProfiles"), codecProfiles},
+                       {QStringLiteral("SubtitleProfiles"), subtitles}};
+  }
+
+  QJsonObject compressedPlaybackInfoBody(const QString& userId, const QString& mediaSourceId,
+                                         const CompressedProfile& profile,
+                                         std::optional<int> audioStreamIndex) {
+    PlaybackInfoRequest request;
+    request.userId = userId;
+    request.mediaSourceId = mediaSourceId;
+    request.audioStreamIndex = audioStreamIndex;
+    request.subtitleStreamIndex = -1;
+    request.maxStreamingBitrate = profile.bitrate;
+    request.enableDirectPlay = false;
+    request.enableDirectStream = false;
+    request.enableTranscoding = true;
+    // Always encoded: copied video keeps its own key frames, and the
+    // segments would not match the playlist's durations.
+    request.allowVideoStreamCopy = false;
+    request.allowAudioStreamCopy = false;
+    request.deviceProfile = compressedDeviceProfile(profile);
+    QJsonObject body = playbackInfoBody(request);
+    // Not a live stream to open; the server's answer is all that is needed.
+    body.insert(QStringLiteral("AutoOpenLiveStream"), false);
+    return body;
+  }
+
+  QUrl playbackInfoUrl(const QUrl& serverUrl, const QString& itemId, const QString& userId) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("userId"), userId);
+    return serverPath(serverUrl, QStringLiteral("Items/") + itemId + QStringLiteral("/PlaybackInfo"),
+                      query);
+  }
+
+  QUrl transcodingUrlOnServer(const QUrl& serverUrl, const QString& transcodingUrl) {
+    const QUrl relative(transcodingUrl);
+    if (!relative.isValid() || transcodingUrl.isEmpty()) return {};
+    QUrl url;
+    if (relative.isRelative()) {
+      QString path = relative.path();
+      while (path.startsWith(QLatin1Char('/')))
+        path.remove(0, 1);
+      url = serverPath(serverUrl, path);
+    } else {
+      // An absolute URL is used only when it is the server's own.
+      if (!isServerUrl(serverUrl, relative)) return {};
+      url = relative;
+      url.setFragment(QString());
+    }
+    QUrlQuery query(relative.query(QUrl::FullyEncoded));
+    for (const auto& [key, value] : query.queryItems(QUrl::FullyEncoded)) {
+      const QString k = key.toLower();
+      if (k == QLatin1String("apikey") || k == QLatin1String("api_key"))
+        query.removeAllQueryItems(key);
+    }
+    url.setQuery(query);
+    return url;
+  }
+
+  QUrl activeEncodingsUrl(const QUrl& serverUrl, const QString& deviceId,
+                          const QString& playSessionId) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("deviceId"), deviceId);
+    query.addQueryItem(QStringLiteral("playSessionId"), playSessionId);
+    return serverPath(serverUrl, QStringLiteral("Videos/ActiveEncodings"), query);
+  }
+
+  std::int64_t estimatedCompressedSize(const CompressedProfile& profile,
+                                       std::int64_t runTimeTicks) {
+    if (runTimeTicks <= 0 || profile.bitrate <= 0) return 0;
+    // bits/s * seconds / 8, in integers (ticks are 100 ns).
+    return profile.bitrate / 8 * runTimeTicks / 10'000'000;
   }
 
   QUrl subtitleDownloadUrl(const QUrl& serverUrl, const QString& itemId,
