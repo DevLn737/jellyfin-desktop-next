@@ -33,6 +33,33 @@ namespace jfd::offline {
   QString stateName(ItemState state);
   std::optional<ItemState> stateFromName(const QString& name);
 
+  // A compressed copy (stage 3.10b): which preset the server transcoded it
+  // with, and how far the download of its HLS segments got. No URL, no
+  // PlaySessionId: a resumed download asks the server again and compares
+  // the new playlist with `signature`.
+  struct TranscodeState {
+    // The preset's id ("video-1080p", "video-720p", "audio-opus128").
+    QString preset;
+    // The audio track the copy has (a MediaStreams index of the original);
+    // -1 until the server chose one.
+    int audioStreamIndex = -1;
+    // What the server encodes to ("hevc" or "h264"; "aac" or "opus"), from
+    // its answer.
+    QString videoCodec;
+    QString audioCodec;
+    // The media playlist: its segment count and the hash of its segment
+    // durations; and the hash of the init segment. A resume continues only
+    // when all three match.
+    int segmentCount = 0;
+    QString signature;
+    QString initHash;
+    // Segments already in media.part, and its size after the last of them.
+    int segmentsDone = 0;
+    std::int64_t partBytes = 0;
+
+    bool operator==(const TranscodeState&) const = default;
+  };
+
   struct ItemManifest {
     static constexpr int FormatVersion = 1;
 
@@ -42,6 +69,11 @@ namespace jfd::offline {
     ItemState state = ItemState::Queued;
     // "original" (stage 3.10a) or "compressed" (3.10b).
     QString quality = QStringLiteral("original");
+    // Only for a compressed copy. Until it is complete, `mediaSource` is the
+    // server's source it is made from; then it describes the copy (one
+    // video and one audio track inside, text subtitles as files: see
+    // compressedMediaSource).
+    TranscodeState transcode;
     // The server's JSON: BaseItemDto, MediaSourceInfo, UserItemDataDto.
     QJsonObject item;
     QJsonObject mediaSource;

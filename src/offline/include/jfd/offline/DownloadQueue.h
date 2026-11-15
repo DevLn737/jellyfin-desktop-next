@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 class QThread;
 class QTimer;
@@ -25,7 +26,8 @@ class QTimer;
 // the state of each item and the retries, writes the manifests and hands the
 // transfers to a DownloadWorker on its own thread.
 //
-// - One download at a time by default (1-3).
+// - One download at a time by default (1-3); compressed copies always one at
+//   a time.
 // - Everything not complete is resumed after a restart, in the order it was
 //   queued (the manifests remember it).
 // - A dropped transfer is retried 5 times, after 2, 4, 8, 16 and 32 s; a
@@ -107,6 +109,8 @@ namespace jfd::offline {
     void setCheckEveryBytes(std::int64_t bytes);
     // A transfer with no data for this long is dropped and retried (60 s).
     void setStallTimeoutMs(int ms);
+    // The same for one request of a compressed copy (180 s).
+    void setTranscodeTimeoutMs(int ms);
 
     // Queues the original of `mediaSource` (one of the item's versions).
     // `item`, `mediaSource` and `userData` are the server's JSON; secrets
@@ -115,6 +119,20 @@ namespace jfd::offline {
     EnqueueResult enqueueOriginal(const QJsonObject& item, const QJsonObject& mediaSource,
                                   const QJsonObject& userData = {},
                                   const QStringList& parents = {});
+
+    // Queues a compressed copy of `mediaSource` made by the server with the
+    // preset `presetId` (compressedPresets(); the music preset only for
+    // audio, a video preset only for video). `audioStreamIndex` is the one
+    // audio track it gets; nullopt leaves the choice to the server (the
+    // user's audio language). The copy's size is estimated from the
+    // preset's bit rate and the run time until it is done. Compressed
+    // copies download one at a time, whatever setMaxParallel says: each is
+    // a transcode on the server.
+    EnqueueResult enqueueCompressed(const QJsonObject& item, const QJsonObject& mediaSource,
+                                    const QString& presetId,
+                                    std::optional<int> audioStreamIndex = std::nullopt,
+                                    const QJsonObject& userData = {},
+                                    const QStringList& parents = {});
 
     void pause(const QString& itemId);
     void resume(const QString& itemId);
@@ -166,6 +184,10 @@ namespace jfd::offline {
     void renumber();
     std::int64_t committedBytes(const Entry& next) const;
 
+    EnqueueResult admit(ItemManifest manifest);
+    bool compressedActive() const;
+    void onTranscodeStarted(const QString& key, const QJsonObject& state);
+    void onSegmentWritten(const QString& key, int segmentsDone, qint64 partBytes);
     void onStarted(const QString& key, qint64 offset, qint64 total, const QString& validator);
     void onProgress(const QString& key, qint64 bytesOnDisk, qint64 total);
     void onFinished(const QString& key, int outcome, qint64 received);

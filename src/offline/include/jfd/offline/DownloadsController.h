@@ -29,9 +29,12 @@
 // space they take, and deleting them. Qt Core only; the QML singleton
 // `Downloads` (src/ui/library) forwards to it.
 //
-// Only originals are downloaded here (Items/{id}/Download); a user without
+// Originals (Items/{id}/Download) by default; with the "Download quality"
+// setting on a compressed preset, compressed copies the server transcodes
+// (stage 3.10b, CompressedDownload.h). A user without
 // EnableContentDownloading gets no "Download" (allowed() is false and the
-// screens say why). Compressed copies are stage 3.10b.
+// screens say why); a compressed-only "Download" for such users, and a
+// quality choice in the dialog, are a later step.
 namespace jfd::offline {
 
   class DownloadsController : public QObject {
@@ -76,6 +79,10 @@ namespace jfd::offline {
     // online, asks the server for the user's download permission.
     void setUser(const QString& serverId, const QString& userId);
     void setOnline(bool online);
+    // The "Download quality" setting ("original" or a video preset id):
+    // what the next prepare() plans.
+    void setQuality(const QString& quality) { m_quality = quality; }
+    QString quality() const { return m_quality; }
     // Set by the permission request; public for tests.
     void setPermission(bool known, bool allowed);
     // Rebuilds the lists from the catalog (after a sync changed manifests).
@@ -168,8 +175,11 @@ namespace jfd::offline {
   private:
     struct Candidate {
       QJsonObject item;
-      // The versions whose original can be downloaded.
+      // The versions whose original can be downloaded; for a compressed
+      // copy every version (the server transcodes any of them).
       QJsonArray sources;
+      // Empty: the original. Otherwise the preset of a compressed copy.
+      QString preset;
     };
     struct Plan {
       QString parentId;
@@ -199,6 +209,7 @@ namespace jfd::offline {
     bool m_online = false;
     bool m_permissionKnown = false;
     bool m_allowed = false;
+    QString m_quality = QStringLiteral("original");
     quint64 m_permissionAttempt = 0;
 
     DownloadListModel m_queueModel;

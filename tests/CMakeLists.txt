@@ -162,7 +162,8 @@ if(TARGET jfd_jellyfin_api)
     # Offline downloads against a file server with byte ranges
     # (offline/FakeFileServer.h); the kill test runs jfd_offline_killee.
     jfd_add_qt_test(jfd_offline_tests offline/StoreTest.cpp offline/DownloadTest.cpp
-      offline/CatalogTest.cpp offline/KillTest.cpp offline/JournalTest.cpp offline/ControllerTest.cpp)
+      offline/CatalogTest.cpp offline/KillTest.cpp offline/JournalTest.cpp offline/ControllerTest.cpp
+      offline/TranscodeTest.cpp)
     target_link_libraries(jfd_offline_tests PRIVATE jfd::offline Qt6::WebSockets)
     add_executable(jfd_offline_killee offline/Killee.cpp)
     target_link_libraries(jfd_offline_killee PRIVATE jfd::offline)
@@ -288,6 +289,15 @@ if(JFD_BUILD_APP)
     target_link_libraries(jfd_session_mpv_server_tests PRIVATE jfd::session_runtime jfd::media_backend)
     target_compile_definitions(jfd_session_mpv_server_tests PRIVATE JFD_SESSION_TEST_MPV)
     set_tests_properties(jfd_session_mpv_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
+  endif()
+
+  if(JFD_SERVER_TESTS AND TARGET jfd_offline)
+    # Test 15 of package 3.10: compressed copies from the extras stand's HLS
+    # transcode, played and sought in headless mpv.
+    jfd_add_qt_test(jfd_offline_transcode_server_tests offline/TranscodeServerTest.cpp)
+    target_link_libraries(jfd_offline_transcode_server_tests PRIVATE jfd::offline jfd::media_backend
+      Qt6::WebSockets)
+    set_tests_properties(jfd_offline_transcode_server_tests PROPERTIES TIMEOUT 600 RESOURCE_LOCK jellyfin_server)
   endif()
 
   if(TARGET jfd_ui_theme)

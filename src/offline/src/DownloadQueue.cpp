@@ -1,6 +1,7 @@
 #include <jfd/offline/DownloadQueue.h>
 
 #include <jfd/api/Downloads.h>
+#include <jfd/offline/CompressedDownload.h>
 
 #include <QDateTime>
 #include <QFileInfo>
@@ -28,6 +29,8 @@ namespace jfd::offline {
     connect(worker, &DownloadWorker::transferStarted, this, &DownloadQueue::onStarted);
     connect(worker, &DownloadWorker::transferProgress, this, &DownloadQueue::onProgress);
     connect(worker, &DownloadWorker::transferFinished, this, &DownloadQueue::onFinished);
+    connect(worker, &DownloadWorker::transcodeStarted, this, &DownloadQueue::onTranscodeStarted);
+    connect(worker, &DownloadWorker::segmentWritten, this, &DownloadQueue::onSegmentWritten);
     m_thread->start();
   }
 
@@ -49,6 +52,13 @@ namespace jfd::offline {
     QPointer<DownloadWorker> worker = m_worker;
     QMetaObject::invokeMethod(worker, [worker, ms]() {
       if (worker) worker->setStallTimeoutMs(ms);
+    });
+  }
+
+  void DownloadQueue::setTranscodeTimeoutMs(int ms) {
+    QPointer<DownloadWorker> worker = m_worker;
+    QMetaObject::invokeMethod(worker, [worker, ms]() {
+      if (worker) worker->setTranscodeTimeoutMs(ms);
     });
   }
 
@@ -88,8 +98,18 @@ namespace jfd::offline {
       // Killed between the rename and the manifest: the file is there and
       // has the expected size, so it is complete.
       const QString media = m_store.mediaPath(m);
-      if (m.expectedSize > 0 && !media.isEmpty() && QFileInfo(media).size() == m.expectedSize &&
-          !QFileInfo::exists(m_store.partPath(m))) {
+      // A compressed copy's size is known only at the end; its .part is
+      // renamed only once every segment is in.
+      const bool compressed = m.quality == QLatin1String("compressed");
+      const qint64 mediaSize = media.isEmpty() ? 0 : QFileInfo(media).size();
+      if (!QFileInfo::exists(m_store.partPath(m)) && mediaSize > 0 &&
+          (compressed || (m.expectedSize > 0 && mediaSize == m.expectedSize))) {
+        if (compressed) {
+          m.mediaSource = compressedMediaSource(m.mediaSource, m.transcode, mediaSize);
+          m.expectedSize = mediaSize;
+          m.transcode.segmentsDone = 0;
+          m.transcode.partBytes = 0;
+        }
         m.state = ItemState::Complete;
         m.completedAt = QDateTime::currentDateTimeUtc();
         m.resumeValidator.clear();
@@ -159,6 +179,73 @@ namespace jfd::offline {
     return EnqueueResult::Queued;
   }
 
+  EnqueueResult DownloadQueue::enqueueCompressed(const QJsonObject& item,
+                                                 const QJsonObject& mediaSource,
+                                                 const QString& presetId,
+                                                 std::optional<int> audioStreamIndex,
+                                                 const QJsonObject& userData,
+                                                 const QStringList& parents) {
+    if (m_serverId.isEmpty() || m_userId.isEmpty()) return EnqueueResult::NotSignedIn;
+    const QString itemId = item.value(QLatin1String("Id")).toString();
+    const QString sourceId = mediaSource.value(QLatin1String("Id")).toString();
+    if (!DownloadStore::isSafeId(itemId) || !DownloadStore::isSafeId(sourceId))
+      return EnqueueResult::InvalidItem;
+    const auto preset = compressedPreset(presetId);
+    const bool audio = item.value(QLatin1String("MediaType")).toString() == QLatin1String("Audio");
+    if (!preset || preset->profile.audio != audio) return EnqueueResult::InvalidItem;
+    if (m_catalog.find(m_serverId, m_userId, itemId)) return EnqueueResult::AlreadyThere;
+
+    ItemManifest m;
+    m.serverId = m_serverId;
+    m.userId = m_userId;
+    m.itemId = itemId;
+    m.state = ItemState::Queued;
+    m.quality = QStringLiteral("compressed");
+    m.transcode.preset = preset->id;
+    m.transcode.audioStreamIndex = audioStreamIndex.value_or(-1);
+    m.item = item;
+    m.mediaSource = mediaSource;
+    m.userData = userData;
+    for (const QString& parent : parents)
+      if (DownloadStore::isSafeId(parent) && !m.parents.contains(parent)) m.parents.append(parent);
+    // fMP4: the init segment and the media segments, joined.
+    m.mediaFile = QStringLiteral("media.mp4");
+    double ticks = mediaSource.value(QLatin1String("RunTimeTicks")).toDouble();
+    if (ticks <= 0) ticks = item.value(QLatin1String("RunTimeTicks")).toDouble();
+    m.expectedSize = api::estimatedCompressedSize(preset->profile, static_cast<std::int64_t>(ticks));
+    return admit(std::move(m));
+  }
+
+  EnqueueResult DownloadQueue::admit(ItemManifest m) {
+    m.queuedAt = QDateTime::currentDateTimeUtc();
+    if (!m_order.isEmpty()) {
+      const QDateTime last = m_entries.value(m_order.last()).manifest.queuedAt;
+      if (last.isValid() && m.queuedAt <= last) m.queuedAt = last.addMSecs(1);
+    }
+    if (!m_store.writeManifest(m)) return EnqueueResult::DiskError;
+    // What was stored, secrets removed, is what the queue keeps.
+    if (const auto stored = m_store.readManifest(m.serverId, m.userId, m.itemId)) m = *stored;
+    m_catalog.update(m);
+
+    const QString itemId = m.itemId;
+    Entry entry;
+    entry.manifest = m;
+    entry.total = m.expectedSize;
+    m_order.append(itemId);
+    m_entries.insert(itemId, std::move(entry));
+    Q_EMIT orderChanged();
+    Q_EMIT itemChanged(itemId);
+    schedule();
+    return EnqueueResult::Queued;
+  }
+
+  bool DownloadQueue::compressedActive() const {
+    for (const Entry& entry : m_entries)
+      if (entry.activity != Activity::Idle && entry.manifest.quality == QLatin1String("compressed"))
+        return true;
+    return false;
+  }
+
   int DownloadQueue::activeCount() const {
     int active = 0;
     for (const Entry& entry : m_entries)
@@ -193,6 +280,8 @@ namespace jfd::offline {
       if (active >= m_maxParallel) break;
       Entry& entry = m_entries[itemId];
       if (entry.manifest.state != ItemState::Queued || entry.activity != Activity::Idle) continue;
+      // One transcode at a time on the server.
+      if (entry.manifest.quality == QLatin1String("compressed") && compressedActive()) continue;
       const std::int64_t remaining =
           std::max<std::int64_t>(0, entry.manifest.expectedSize - entry.bytesOnDisk);
       const StorageVerdict verdict =
@@ -223,6 +312,28 @@ namespace jfd::offline {
     job.finalPath = m_store.mediaPath(m);
     job.expectedSize = m.expectedSize;
     job.resumeValidator = m.resumeValidator;
+    if (m.quality == QLatin1String("compressed")) {
+      const auto preset = compressedPreset(m.transcode.preset);
+      if (!preset) {
+        entry.manifest.state = ItemState::Failed;
+        entry.problem = QueueProblem::Refused;
+        save(entry);
+        Q_EMIT itemChanged(m.itemId);
+        Q_EMIT failed(m.itemId, QueueProblem::Refused);
+        return;
+      }
+      DownloadJob::Transcode transcode;
+      transcode.playbackInfoUrl = api::playbackInfoUrl(m_serverUrl, m.itemId, m.userId);
+      const int audio = m.transcode.audioStreamIndex;
+      transcode.playbackInfoBody = api::compressedPlaybackInfoBody(
+          m.userId, m.mediaSource.value(QLatin1String("Id")).toString(m.itemId), preset->profile,
+          audio >= 0 ? std::optional<int>(audio) : std::nullopt);
+      transcode.resume = m.transcode;
+      transcode.estimatedSize = m.expectedSize;
+      job.transcode = transcode;
+      // The size is checked segment by segment, not against an estimate.
+      job.expectedSize = 0;
+    }
     entry.activity = Activity::Transferring;
     entry.afterStop = Entry::AfterStop::Requeue;
     QPointer<DownloadWorker> worker = m_worker;
@@ -416,6 +527,37 @@ namespace jfd::offline {
     Q_EMIT itemChanged(itemId);
   }
 
+  void DownloadQueue::onTranscodeStarted(const QString& key, const QJsonObject& state) {
+    const QString itemId = itemOf(key, m_serverId, m_userId);
+    const auto it = m_entries.find(itemId);
+    if (itemId.isEmpty() || it == m_entries.end()) return;
+    TranscodeState& t = it->manifest.transcode;
+    const int audio = state.value(QLatin1String("audioStreamIndex")).toInt(-1);
+    // The server's choice of audio is kept, so a resumed copy asks for the
+    // same track.
+    if (audio >= 0) t.audioStreamIndex = audio;
+    t.videoCodec = state.value(QLatin1String("videoCodec")).toString();
+    t.audioCodec = state.value(QLatin1String("audioCodec")).toString();
+    t.segmentCount = state.value(QLatin1String("segmentCount")).toInt();
+    t.signature = state.value(QLatin1String("signature")).toString();
+    t.initHash = state.value(QLatin1String("initHash")).toString();
+    save(*it);
+    Q_EMIT itemChanged(itemId);
+  }
+
+  void DownloadQueue::onSegmentWritten(const QString& key, int segmentsDone, qint64 partBytes) {
+    const QString itemId = itemOf(key, m_serverId, m_userId);
+    const auto it = m_entries.find(itemId);
+    if (itemId.isEmpty() || it == m_entries.end()) return;
+    TranscodeState& t = it->manifest.transcode;
+    if (t.segmentsDone == segmentsDone && t.partBytes == partBytes) return;
+    t.segmentsDone = segmentsDone;
+    t.partBytes = partBytes;
+    it->bytesOnDisk = partBytes;
+    // Every segment: a restart continues after the last one written.
+    save(*it);
+  }
+
   void DownloadQueue::onProgress(const QString& key, qint64 bytesOnDisk, qint64 total) {
     const QString itemId = itemOf(key, m_serverId, m_userId);
     const auto it = m_entries.find(itemId);
@@ -450,6 +592,12 @@ namespace jfd::offline {
       done.resumeValidator.clear();
       const qint64 size = QFileInfo(m_store.mediaPath(done)).size();
       if (size > 0) done.expectedSize = size;
+      if (done.quality == QLatin1String("compressed")) {
+        // From now on the manifest describes the copy, not the server's file.
+        done.mediaSource = compressedMediaSource(done.mediaSource, done.transcode, size);
+        done.transcode.segmentsDone = 0;
+        done.transcode.partBytes = 0;
+      }
       entry.manifest = done;
       save(entry);
       dropEntry(itemId);
@@ -491,6 +639,8 @@ namespace jfd::offline {
       if (outcome == TransferOutcome::SizeMismatch) {
         // Start the file over.
         entry.manifest.resumeValidator.clear();
+        entry.manifest.transcode.segmentsDone = 0;
+        entry.manifest.transcode.partBytes = 0;
         save(entry);
       }
       if (received > 0) entry.attempts = 0;

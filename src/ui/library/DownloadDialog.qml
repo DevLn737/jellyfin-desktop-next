@@ -126,7 +126,9 @@ AppDialog {
                     return ""
                 const parts = []
                 if (dialog.summary.count > 0)
-                    parts.push(qsTr("Quality: original, the file exactly as the server has it."))
+                    parts.push(dialog.summary.qualityText
+                               ? dialog.summary.qualityText
+                               : qsTr("Quality: original, the file exactly as the server has it."))
                 if (dialog.summary.alreadyCount > 0 && dialog.summary.count > 0)
                     parts.push(qsTr("%n already downloaded.", "", dialog.summary.alreadyCount))
                 if (dialog.summary.unavailableCount > 0)

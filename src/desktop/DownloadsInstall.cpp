@@ -134,6 +134,7 @@ namespace jfd::desktop {
     downloads.local.setOnline(online(services));
     downloads.queue.setMaxParallel(settings.value(offline::keys::MaxParallel).toInt());
     downloads.pauseLeftovers = !settings.value(offline::keys::ResumeOnStart).toBool();
+    downloads.controller.setQuality(settings.value(offline::keys::Quality).toString());
     downloads.controller.setClient(services.client);
     downloads.controller.setOnline(online(services));
 
@@ -149,6 +150,8 @@ namespace jfd::desktop {
                          d.local.setPreferLocal(value.toBool());
                        else if (key == offline::keys::MaxParallel)
                          d.queue.setMaxParallel(value.toInt());
+                       else if (key == offline::keys::Quality)
+                         d.controller.setQuality(value.toString());
                        if (key == offline::keys::MaxGiB || key == offline::keys::ReserveGiB)
                          d.controller.refresh();
                      });
