@@ -136,7 +136,7 @@ jobs:
         with:
           name: msi-logs
           path: build/package/msi-logs
-          retention-days: 7
+          retention-days: 5
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4
@@ -144,7 +144,7 @@ jobs:
           name: ${{ env.APP_PACKAGE }}-windows-msi
           path: build/package/*.msi
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 5
 
   appimage:
     name: AppImage (Linux)
@@ -205,7 +205,7 @@ jobs:
           name: ${{ env.APP_PACKAGE }}-linux-appimage
           path: build/package/*.AppImage
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 5
 
   appimage-smoke:
     name: AppImage on ${{ matrix.image }}
@@ -311,7 +311,7 @@ jobs:
           name: ${{ env.APP_PACKAGE }}-signed
           path: packages
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 5
 
   # A tag v<version>[-<pre-release>] publishes the AppImage, its signature and
   # the checksums as a GitHub pre-release. Only with the real key.

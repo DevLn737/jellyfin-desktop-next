@@ -95,6 +95,7 @@ jobs:
           name: themes-and-sizes
           path: themes
           if-no-files-found: ignore
+          retention-days: 3
 
       - name: Test (Windows, software OpenGL and Direct3D 11 WARP)
         if: runner.os == 'Windows'
@@ -149,7 +150,7 @@ jobs:
         with:
           name: jellyfin-desktop-next-windows
           path: build/package/jellyfin-desktop-next
-          retention-days: 30
+          retention-days: 5
 
   flow:
     # Checkpoint 1 on the Docker stand: jellyfin-desktop --flow signs in,
@@ -218,6 +219,7 @@ jobs:
           name: app-flow
           path: flow
           if-no-files-found: ignore
+          retention-days: 3
 
       - name: Server log on failure
         if: failure()

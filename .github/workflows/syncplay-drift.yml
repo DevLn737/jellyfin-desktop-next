@@ -118,6 +118,7 @@ jobs:
         with:
           name: drift-report-${{ matrix.server }}
           path: out/${{ matrix.server }}/
+          retention-days: 3
 
   comment:
     name: Drift report comment

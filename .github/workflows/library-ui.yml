@@ -71,6 +71,7 @@ jobs:
           name: library-screens
           path: screenshots
           if-no-files-found: ignore
+          retention-days: 3
 
       - name: Server log on failure
         if: failure()
