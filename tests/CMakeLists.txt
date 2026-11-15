@@ -234,7 +234,8 @@ if(TARGET jfd_jellyfin_api)
   endif()
 
   if(TARGET jfd_session_runtime)
-    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp)
+    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp
+      session/OpenGateTest.cpp)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
@@ -399,8 +400,9 @@ if(JFD_BUILD_APP)
   endif()
 
   if(TARGET jfd_ui_player)
-    # The player page on the session runtime with a virtual backend.
-    add_executable(jfd_ui_player_tests support/QtGuiTestMain.cpp ui/PlayerPageTest.cpp)
+    # The player page on the session runtime with a virtual backend, and the
+    # refresh rate switch on a fake display.
+    add_executable(jfd_ui_player_tests support/QtGuiTestMain.cpp ui/PlayerPageTest.cpp ui/PlayerRefreshRateTest.cpp)
     target_include_directories(jfd_ui_player_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_player_tests PRIVATE
       jfd_ui_player jfd_ui_playerplugin jfd_ui_group jfd_ui_groupplugin

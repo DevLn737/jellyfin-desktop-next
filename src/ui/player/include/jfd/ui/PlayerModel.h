@@ -27,6 +27,7 @@
 #include <optional>
 
 class QQuickItem;
+class QWindow;
 
 namespace jfd::api {
   class JellyfinClient;
@@ -36,6 +37,9 @@ namespace jfd::media {
 }
 namespace jfd::session {
   class SessionRuntime;
+}
+namespace jfd::platform {
+  class DisplayModeSwitcher;
 }
 
 namespace jfd::ui {
@@ -222,6 +226,23 @@ namespace jfd::ui {
     // Empty without trickplay.
     Q_INVOKABLE QVariantMap trickplayFrame(double seconds) const;
 
+    // The display's refresh rate follows the video (docs/display-refresh-
+    // rate.md): with a switcher set and the switch on, a video opened while
+    // the video window is full screen opens after the display switched to
+    // a rate its RealFrameRate divides. The original rate comes back on
+    // stop, quit, leaving full screen and picture-in-picture. Not owned;
+    // must outlive this model or be cleared first.
+    void setDisplayModeSwitcher(platform::DisplayModeSwitcher* switcher);
+    void setRefreshRateSwitch(bool on);
+    bool refreshRateSwitch() const { return m_refreshRateSwitch; }
+    // The window the video is in, whose screen is switched while it is full
+    // screen; attachVideo sets it.
+    void setVideoWindow(QWindow* window);
+    // The session's open gate (SessionRuntime::setOpenGate): switches the
+    // display if it should, then calls `open`.
+    void beforeOpen(const session::PlaybackLauncher::Request& request, const api::Item& item,
+                    const api::MediaSource& source, std::function<void()> open);
+
     // Creates the video item for this platform's renderer inside `host`,
     // filling it. The page calls it once; the item is the host's child and
     // goes away with `owner` too, when given (a host outside the page).
@@ -271,6 +292,14 @@ namespace jfd::ui {
     // a playing video would end the file).
     void suspendVideo();
     void setPip(bool on);
+    // Puts the display's original mode back; drops an open still waiting
+    // for the display.
+    void restoreDisplay();
+    void setWaitingDisplay(bool waiting);
+    // The screen to switch: the video window's, when it is full screen.
+    std::optional<QString> fullscreenScreen() const;
+    // After a file opened: mpv's container-fps against RealFrameRate.
+    void checkFrameRate();
     void loadEpisodes(const api::Item& item);
     void step(bool forward);
     void loadTrickplay(const QString& itemId);
@@ -345,6 +374,13 @@ namespace jfd::ui {
     QDateTime m_programsTriedAt;
     std::optional<api::LiveTvProgram> m_program;
     QTimer m_liveTick;
+    QPointer<platform::DisplayModeSwitcher> m_displayModes;
+    bool m_refreshRateSwitch = false;
+    // A resolved file waits for the display to settle before it opens.
+    bool m_waitingDisplay = false;
+    QPointer<QWindow> m_videoWindow;
+    QMetaObject::Connection m_windowVisibility;
+    std::optional<core::MediaEpoch> m_frameRateChecked;
   };
 
 } // namespace jfd::ui

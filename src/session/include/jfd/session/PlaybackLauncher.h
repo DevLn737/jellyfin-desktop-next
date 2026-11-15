@@ -52,6 +52,14 @@ namespace jfd::session {
     using TrackChooser =
         std::function<void(const api::Item& item, const api::MediaSource& source, Request& request)>;
 
+    // Runs once an open is resolved, before `resolved` and intent::Open;
+    // the open goes on when the gate calls `open` (at once or later: the
+    // display switching its refresh rate). An open the gate holds is
+    // dropped by a newer open() or cancel(): calling its `open` then does
+    // nothing. Preloads do not pass the gate.
+    using OpenGate = std::function<void(const Request& request, const api::Item& item,
+                                        const api::MediaSource& source, std::function<void()> open)>;
+
     PlaybackLauncher(api::JellyfinClient& client, QJsonObject deviceProfile, Post post,
                      QObject* parent = nullptr);
 
@@ -62,6 +70,7 @@ namespace jfd::session {
     // are the request's own: the track chooser is not asked.
     void preloadNext(const Request& request);
     void setTrackChooser(TrackChooser chooser) { m_chooseTracks = std::move(chooser); }
+    void setOpenGate(OpenGate gate) { m_openGate = std::move(gate); }
     // Used from the next open on (a playback setting changed); a request
     // already resolving keeps the profile it was sent with.
     void setDeviceProfile(QJsonObject deviceProfile) { m_deviceProfile = std::move(deviceProfile); }
@@ -98,18 +107,19 @@ namespace jfd::session {
     void openWithItem(std::uint64_t serial, const Request& request, const api::Item& item,
                       bool chosen = false, bool preload = false);
     // The request with the chooser's indices where the request has none.
-    void openResolved(const Request& request, const api::Item& item, const api::MediaSource& source,
-                      const api::PlaybackStream& stream, bool preload);
+    void openResolved(std::uint64_t serial, const Request& request, const api::Item& item,
+                      const api::MediaSource& source, const api::PlaybackStream& stream, bool preload);
     Request withChosenTracks(const Request& request, const api::Item& item,
                              const api::MediaSource& source) const;
     std::optional<LocalCopy> localCopyFor(const Request& request) const;
-    void openLocal(const Request& request, const LocalCopy& copy, bool preload);
+    void openLocal(std::uint64_t serial, const Request& request, const LocalCopy& copy, bool preload);
 
     api::JellyfinClient& m_client;
     QJsonObject m_deviceProfile;
     Post m_post;
     TrackChooser m_chooseTracks;
     const LocalSource* m_local = nullptr;
+    OpenGate m_openGate;
     std::uint64_t m_serial = 0;
     std::uint64_t m_preloadSerial = 0;
   };

@@ -35,6 +35,34 @@ choice), `DisplayModeSwitcher.h` (switch, wait, restore, journal).
 The next video starts from the original mode: a video the original fits
 goes back to it.
 
+## When (player)
+
+Only with `playback/refreshRateSwitch` on, the window full screen and a
+`RealFrameRate` from the server. The switch happens before the session
+opens the file; the player waits for the system's notice of the new mode or
+`playback/refreshRateSettleMs` (2000 ms, at most 5000), whichever comes
+first. In a SyncPlay group the readiness barrier waits for the slowest member
+as it does for buffering. Going full screen while a video plays does not
+switch (no HDMI resync in the middle of a film).
+
+The original mode comes back when playback stops (from the player, a group
+or a remote), the app quits, the window leaves full screen, the video goes
+to picture-in-picture or the setting is turned off. The next episode keeps
+the switched mode if it fits, or switches from the original one.
+
+The hook is `PlaybackLauncher::OpenGate` (`SessionRuntime::setOpenGate`),
+set by `PlayerModel::beforeOpen`; no change to `core`.
+
+`playback/displayResample` sets mpv's `video-sync=display-resample` (off:
+`audio`, mpv's default): the fallback, and the only option on Wayland.
+2.x settings carry over: `video.refreshrate.auto_switch`,
+`video.refreshrate.delay` (seconds, to milliseconds) and `video.sync_mode`
+(only `display-resample`).
+
+After the file opens, mpv's `container-fps` is compared with `RealFrameRate`;
+a difference over 1 % (interlaced or variable frame rate files) is logged
+and nothing is switched again.
+
 ## Crashes
 
 `SetDisplayConfig` and XRandR are not undone by the system when the process
@@ -49,6 +77,11 @@ screen that is not connected is dropped.
 
 - The choice table, the switcher with a fake backend (order, settle time,
   restore on every path, the journal after a crash).
+- The launcher's gate (`tests/session/OpenGateTest.cpp`) and the player
+  model on a fake display through the real launcher
+  (`tests/ui/PlayerRefreshRateTest.cpp`): switch, wait, open; restore on
+  stop, leaving full screen, picture-in-picture, quitting, a stop from the
+  session, the setting turned off, a stop while settling; crash recovery.
 - On Xvfb (Linux CI), real XRandR switches: modes added to Xvfb's output,
   23.976 Hz and back, and the restore from a journal.
 - On Windows CI, only the listing of the runner's virtual adapter.

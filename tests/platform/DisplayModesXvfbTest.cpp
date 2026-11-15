@@ -87,6 +87,14 @@ TEST_CASE("On Xvfb the XRandR backend switches to 23.976 Hz for a film and back"
     XCloseDisplay(display);
     return;
   }
+  // The added modes are 1920x1080; Xvfb refuses them (BadMatch, which ends
+  // the process) on a screen of another size.
+  const Screen* screen = DefaultScreenOfDisplay(display);
+  if (WidthOfScreen(screen) != 1920 || HeightOfScreen(screen) != 1080) {
+    MESSAGE("Xvfb screen is not 1920x1080: run it with xvfb-run -s \"-screen 0 1920x1080x24\"");
+    XCloseDisplay(display);
+    return;
+  }
   REQUIRE(addMode(display, "jfd_23.976", 74175824, 2750));
   REQUIRE(addMode(display, "jfd_24", 74250000, 2750));
   REQUIRE(addMode(display, "jfd_60", 148500000, 2200));
