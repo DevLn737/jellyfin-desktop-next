@@ -286,6 +286,14 @@ TEST_CASE("On now and a channel's page on the stand") {
 }
 
 namespace {
+  // A recording's name is the programme's, but until the server has read
+  // the recording's metadata it is the file's name, with characters a file
+  // name cannot hold (the ':' of "Channel 3 at 07:00") as spaces.
+  bool sameTitle(const QString& recording, const QString& program) {
+    QString name = program;
+    return recording == program || recording == name.replace(QLatin1Char(':'), QLatin1Char(' '));
+  }
+
   // The recordings on the server now.
   QList<LiveTvRecording> recordingsOn(JellyfinClient& client) {
     LiveTvApi liveTv(client);
@@ -352,7 +360,7 @@ TEST_CASE("A programme on air: recorded, stopped, played as an item with its run
     return recording.has_value();
   }, 30000));
   MESSAGE("recording " << recording->id.toStdString() << " (" << recording->type.toStdString() << ")");
-  CHECK(recording->name == program.name);
+  CHECK(sameTitle(recording->name, program.name));
   CHECK(recording->channelName == channels->channels.front().name);
   CHECK(recorder.timers().size() >= 1);
   const auto it = std::find_if(recorder.timers().cbegin(), recorder.timers().cend(),
@@ -369,7 +377,7 @@ TEST_CASE("A programme on air: recorded, stopped, played as an item with its run
   std::optional<LiveTvRecording> finished;
   REQUIRE(waitFor([&] {
     for (const LiveTvRecording& r : recordingsOn(*s.client))
-      if (!r.isInProgress() && r.name == program.name && r.runTimeTicks > 0) finished = r;
+      if (!r.isInProgress() && sameTitle(r.name, program.name) && r.runTimeTicks > 0) finished = r;
     return finished.has_value();
   }, 60000));
   MESSAGE("finished recording " << finished->id.toStdString() << " (" << finished->type.toStdString() << ", "
@@ -402,7 +410,7 @@ TEST_CASE("A programme on air: recorded, stopped, played as an item with its run
   REQUIRE(waitFor([&] { return removed.count() == 1; }, 30000));
   waitFor([] { return false; }, 3000);
   for (const LiveTvRecording& r : recordingsOn(*s.client)) CHECK(r.id != finished->id);
-  for (const LiveTvRecording& r : recordingsOn(*s.client)) CHECK(r.name != program.name);
+  for (const LiveTvRecording& r : recordingsOn(*s.client)) CHECK_FALSE(sameTitle(r.name, program.name));
 }
 
 TEST_CASE("A series recording schedules the series' programmes; cancelling it drops them") {
@@ -431,7 +439,6 @@ TEST_CASE("A series recording schedules the series' programmes; cancelling it dr
   const LiveTvProgram episode = later->at(1);
   CHECK(episode.name == QStringLiteral("Test Series"));
   CHECK(episode.isSeries);
-  const QDateTime started = QDateTime::currentDateTimeUtc();
 
   QSignalSpy changed(&recorder, &library::LiveTvRecorder::timersChanged);
   recorder.recordSeries(episode.id);
@@ -461,17 +468,47 @@ TEST_CASE("A series recording schedules the series' programmes; cancelling it dr
   for (const LiveTvTimer& t : recorder.timers()) CHECK(t.seriesTimerId != seriesId);
   for (const LiveTvTimer& t : recorder.seriesTimers()) CHECK(t.id != seriesId);
 
-  // The episode on now was recorded while the series timer stood: delete
-  // what it left, so the stand stays as it was.
+  // The episode on now was recorded while the series timer stood, and
+  // cancelling the series does not stop a recording under way: stop it,
+  // then delete what it left, so the stand stays as it was (a recording is
+  // an Episode in the library, which the player tests count).
+  const auto leftovers = [&] {
+    QList<LiveTvRecording> found;
+    for (const LiveTvRecording& r : recordingsOn(*s.client)) {
+      // Only this test records the series. Not by date: the server gives a
+      // recording of the same episode the same item, and its first date.
+      if (r.seriesName != QStringLiteral("Test Series")) continue;
+      found.append(r);
+    }
+    return found;
+  };
   waitFor([] { return false; }, 3000);
-  library::LiveTvRecordings recordings(*s.client);
-  recordings.reload();
-  REQUIRE(waitFor([&] { return !recordings.loading(); }, 30000));
-  for (const LiveTvRecording& r : recordings.recordings()) {
-    if (r.seriesName != QStringLiteral("Test Series") || r.isInProgress()) continue;
-    if (r.dateCreated.isValid() && r.dateCreated < started.addSecs(-60)) continue;
-    QSignalSpy removed(&recordings, &library::LiveTvRecordings::removed);
-    recordings.remove(r.id);
-    CHECK(waitFor([&] { return removed.count() == 1; }, 30000));
+  for (const LiveTvRecording& r : leftovers()) {
+    if (!r.isInProgress() || r.timerId.isEmpty()) continue;
+    changed.clear();
+    recorder.cancel(r.timerId);
+    CHECK(waitFor([&] { return changed.count() > 0 && !recorder.busy(); }, 30000));
   }
+  CHECK(waitFor([&] {
+    const QList<LiveTvRecording> now = leftovers();
+    return std::none_of(now.begin(), now.end(), [](const LiveTvRecording& r) { return r.isInProgress(); });
+  }, 60000));
+  // A stopped recording's writer can flush one more chunk after the file
+  // is deleted (seen on the stand: the file came back 140 ms after a
+  // delete, and the next library refresh listed it again). Wait before
+  // deleting, and delete again whatever comes back.
+  library::LiveTvRecordings recordings(*s.client);
+  for (int round = 0; round < 4; ++round) {
+    waitFor([] { return false; }, 3000);
+    const QList<LiveTvRecording> left = leftovers();
+    if (left.isEmpty()) break;
+    recordings.reload();
+    REQUIRE(waitFor([&] { return !recordings.loading(); }, 30000));
+    for (const LiveTvRecording& r : left) {
+      QSignalSpy removed(&recordings, &library::LiveTvRecordings::removed);
+      recordings.remove(r.id);
+      CHECK(waitFor([&] { return removed.count() == 1; }, 30000));
+    }
+  }
+  CHECK(leftovers().isEmpty());
 }
