@@ -189,7 +189,8 @@ AppShell {
       shell = qobject_cast<QQuickItem*>(object.get());
       shell->setParentItem(window.contentItem());
       shell->setSize(QSizeF(size));
-      entry = window.findChild<ui::TextEntry*>(QStringLiteral("textEntry"));
+      // The shell is the window's item, not its QObject child: look in it.
+      entry = object->findChild<ui::TextEntry*>(QStringLiteral("textEntry"));
       REQUIRE(entry != nullptr);
       window.show();
       window.requestActivate();
