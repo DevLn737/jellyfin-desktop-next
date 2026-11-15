@@ -58,9 +58,10 @@ namespace jfd::ui {
   } // namespace
 
   PlayerModel::PlayerModel(session::SessionRuntime& runtime, api::JellyfinClient& client,
-                           media::MpvPlayer* player, QObject* parent)
+                           media::MpvPlayer* player, QObject* parent,
+                           std::unique_ptr<playback::ReportSink> sink)
       : QObject(parent), m_runtime(runtime), m_client(client), m_player(player),
-        m_sink(playback::clientReportSink(client)), m_reporter(*m_sink),
+        m_sink(sink ? std::move(sink) : playback::clientReportSink(client)), m_reporter(*m_sink),
         m_tracks({
             [&runtime](core::SessionInput input) { runtime.post(std::move(input)); },
             [this](const playback::command::Reopen& command) { reopen(command); },
@@ -399,6 +400,16 @@ namespace jfd::ui {
       m_segments.clear();
       Q_EMIT segmentsChanged();
       const QString itemId = request.itemId;
+      // A downloaded copy keeps its segments: skipping works without the
+      // server.
+      if (const session::LocalSource* local = m_runtime.launcher().localSource();
+          local && stream.url.isLocalFile()) {
+        if (const auto copy = local->find(itemId)) {
+          m_segments = copy->segments;
+          Q_EMIT segmentsChanged();
+        }
+        return;
+      }
       m_client.mediaSegments(itemId, this, [this, itemId](api::Result<QList<api::MediaSegment>> result) {
         if (itemId != m_segmentsItem) return;
         if (!result) {

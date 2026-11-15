@@ -59,6 +59,7 @@ namespace jfd::ui {
 
   MusicLyrics* MusicUi::createLyrics(QObject* owner) {
     auto* lyrics = new MusicLyrics(*m_config.client, owner);
+    lyrics->setLocalLyrics(m_config.localLyrics);
     QQmlEngine::setObjectOwnership(lyrics, QQmlEngine::CppOwnership);
     return lyrics;
   }

@@ -35,5 +35,13 @@
         <source>A download waits instead of filling the disk past this much free space.</source>
         <translation>Загрузка ждёт, а не занимает диск, когда свободного места остаётся меньше этого.</translation>
     </message>
+    <message>
+        <source>Play downloads from disk</source>
+        <translation>Воспроизводить загрузки с диска</translation>
+    </message>
+    <message>
+        <source>A downloaded item plays from its file even when the server can be reached. Without the server it always does.</source>
+        <translation>Скачанное воспроизводится из файла, даже когда сервер доступен. Без связи с сервером — всегда.</translation>
+    </message>
 </context>
 </TS>

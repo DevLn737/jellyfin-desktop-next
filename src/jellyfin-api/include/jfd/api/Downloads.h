@@ -1,15 +1,24 @@
 #pragma once
 
 #include <jfd/api/Models.h>
+#include <jfd/api/Result.h>
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
+#include <QStringList>
 #include <QUrl>
+
+#include <functional>
+
+class QObject;
 
 // What the offline downloads (jfd::offline) need from the server: where an
 // original file comes from, which kind of download a user may make, and the
 // rule that the session's token goes only to its own server.
 namespace jfd::api {
+
+  class JellyfinClient;
 
   // GET Items/{id}/Download: the original file of one version of an item.
   // An item with several versions has one media source per version, and
@@ -38,5 +47,43 @@ namespace jfd::api {
   // (Blu-ray and DVD structures), ISO images, remote and .strm sources have
   // no single file to fetch. `item` and `source` are the server's JSON.
   bool originalAvailable(const QJsonObject& item, const QJsonObject& source);
+
+  // --- What a downloaded item keeps besides its file ---------------------
+
+  // GET Videos/{itemId}/{mediaSourceId}/Subtitles/{index}/Stream.{format}:
+  // an external subtitle file, as the server keeps it.
+  QUrl subtitleDownloadUrl(const QUrl& serverUrl, const QString& itemId,
+                           const QString& mediaSourceId, int streamIndex, const QString& format);
+  // The file format to ask for a text subtitle codec ("subrip" -> "srt",
+  // "ass", "ssa", "webvtt" -> "vtt"); empty for picture subtitles (PGS,
+  // VobSub) and unknown codecs, which are not downloaded.
+  QString textSubtitleFormat(const QString& codec);
+  // GET Items/{itemId}/Images/{type}[/{index}]?tag=..&maxWidth=..: an image
+  // no wider than `maxWidth`.
+  QUrl imageDownloadUrl(const QUrl& serverUrl, const QString& itemId, const QString& type,
+                        std::optional<int> index, const QString& tag, int maxWidth);
+  // GET Audio/{itemId}/Lyrics (404: the track has none).
+  QUrl lyricsDownloadUrl(const QUrl& serverUrl, const QString& itemId);
+  // GET MediaSegments/{itemId} (intros and credits, for skipping offline).
+  QUrl mediaSegmentsDownloadUrl(const QUrl& serverUrl, const QString& itemId);
+
+  // --- Watched state, for the offline journal ----------------------------
+
+  // GET UserItems/{itemId}/UserData: the signed-in user's UserItemDataDto
+  // (PlaybackPositionTicks, PlayCount, Played, LastPlayedDate, ...).
+  void fetchUserItemData(JellyfinClient& client, const QString& itemId, QObject* context,
+                         std::function<void(Result<QJsonObject>)> done);
+  // POST UserItems/{itemId}/UserData with an UpdateUserItemDataDto. The
+  // server stores what it is sent: LastPlayedDate as given (checked on
+  // 12.2) and PlayCount as a value, so sending the same body twice changes
+  // nothing. (POST UserPlayedItems would add one to PlayCount each time.)
+  // Answers the stored UserItemDataDto.
+  void updateUserItemData(JellyfinClient& client, const QString& itemId, const QJsonObject& body,
+                          QObject* context, std::function<void(Result<QJsonObject>)> done);
+  // GET Items?ids=..: the signed-in user's view of these items (UserData,
+  // RunTimeTicks, MediaType, MediaSources with their ETag). Items the
+  // server no longer has are missing from the answer.
+  void fetchItemsById(JellyfinClient& client, const QStringList& ids, QObject* context,
+                      std::function<void(Result<QJsonArray>)> done);
 
 } // namespace jfd::api

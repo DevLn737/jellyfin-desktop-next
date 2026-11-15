@@ -3,7 +3,11 @@
 #include <jfd/api/Playback.h>
 #include <jfd/core/SessionInput.h>
 
+#include <QString>
+#include <QUrl>
+
 #include <optional>
+#include <string>
 
 // Turns a resolved stream into what the playback session opens, and asks for
 // the stream again when it has to be restarted (a seek before a progressive
@@ -18,6 +22,14 @@ namespace jfd::playback {
   //   PreservedVideo, or PreservedMusic for audio, whose clock mpv rebases.
   core::StreamTimeline timelineFor(const api::PlaybackStream& stream, bool audioOnly,
                                    core::MediaTicks start);
+
+  // What mpv is given for a URL: network URLs fully encoded; a local file
+  // (a download) as a file system path, never a percent-encoded file:// URL.
+  // On Windows the path has native separators and, at MAX_PATH (260)
+  // characters or more, the "\\?\" prefix ("\\?\UNC\" for a share).
+  std::string playerAddress(const QUrl& url);
+  // The path rule above for any system, for tests and DownloadStore.
+  QString windowsPlayerPath(const QString& path);
 
   // The session's request for one resolved stream.
   core::MediaRequest mediaRequest(const api::PlaybackStream& stream, bool audioOnly,

@@ -1,5 +1,7 @@
 #include <jfd/playback/TrackTable.h>
 
+#include <jfd/playback/StreamPlan.h>
+
 namespace jfd::playback {
 
   namespace {
@@ -131,7 +133,7 @@ namespace jfd::playback {
     entry->pendingKey = m_nextKey++;
     m_pending[entry->pendingKey] = {kind, entry->info.streamIndex};
     return {command::Add{entry->pendingKey,
-                         {kind, entry->url->toString(QUrl::FullyEncoded).toStdString(),
+                         {kind, playerAddress(*entry->url),
                           entry->info.title.toStdString(), entry->info.language.toStdString()}}};
   }
 
