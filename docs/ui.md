@@ -152,6 +152,9 @@ fails when a new one does not.
 
 ## TV mode and arrow navigation
 
+For users: keys, gamepad buttons, the phone and the HDMI-CEC decision are
+in [tv-mode.md](tv-mode.md).
+
 `Theme.tvMode` (Settings > Interface > TV mode, the "TV mode" command of
 Ctrl+K, or `--tv` for one run) changes at once, without a restart: body text
 24 px (at 1920 by 1080 logical pixels), `controlHeight` and `minHitSize`
