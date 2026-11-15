@@ -1,13 +1,17 @@
 // TV mode (stage 3, package 3.3): SpatialNavigation on synthetic screens
 // and on the real shell, every focusable control answering Enter, the TV
-// sizes and safe area, switching TV mode on a screen of 1000 cards, and the
-// gamepad check's state. Only arrows, Enter, Back and Menu: no mouse.
+// sizes and safe area, switching TV mode on a screen of 1000 cards, the
+// gamepad check's state, and the on-screen keyboard with text from the
+// phone. Only arrows, Enter, Back and Menu (and a physical keyboard where
+// the test says so).
 #include "../support/DoctestQt.h"
 
 #include <jfd/platform/InputAction.h>
 #include <jfd/ui/GamepadStatus.h>
+#include <jfd/ui/InputRouter.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/SpatialNavigation.h>
+#include <jfd/ui/TextEntry.h>
 
 #include <QDir>
 #include <QElapsedTimer>
@@ -19,6 +23,7 @@
 #include <QQuickWindow>
 #include <QSet>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QtQml/qqmlextensionplugin.h>
 
 #include <algorithm>
@@ -792,14 +797,8 @@ Item {
 
 namespace {
 
-  // The real shell on a test page of buttons, at 1920x1080.
-  struct ShellScene {
-    ShellScene() {
-      REQUIRE(pages.isValid());
-      const QString page = pages.filePath(QStringLiteral("TestPage.qml"));
-      QFile file(page);
-      REQUIRE(file.open(QIODevice::WriteOnly));
-      file.write(R"(
+  // A test page of twelve buttons.
+  constexpr auto ButtonsPageQml = R"(
 import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
@@ -815,7 +814,16 @@ RoutePage {
     }
   }
 }
-)");
+)";
+
+  // The real shell on a test page (the buttons by default), at 1920x1080.
+  struct ShellScene {
+    explicit ShellScene(const char* pageQml = ButtonsPageQml) {
+      REQUIRE(pages.isValid());
+      const QString page = pages.filePath(QStringLiteral("TestPage.qml"));
+      QFile file(page);
+      REQUIRE(file.open(QIODevice::WriteOnly));
+      file.write(pageQml);
       file.close();
       navigator = singleton<ui::Navigator>(engine, "Navigator");
       REQUIRE(navigator != nullptr);
@@ -981,4 +989,300 @@ TEST_CASE("The gamepad check shows each press instead of acting, and Back twice 
 
   status.setControllers({});
   CHECK_FALSE(status.connected());
+}
+
+namespace {
+
+  // Two fields between two buttons: Enter in the name goes on to the
+  // secret, Enter in the secret submits.
+  constexpr auto FieldsPageQml = R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Controls
+import Jfd.Ui.Shell
+RoutePage {
+  id: page
+  objectName: "fieldsPage"
+  property int submitted: 0
+  Column {
+    x: Theme.pageMargin; y: Theme.spacingHuge
+    width: 600
+    spacing: Theme.spacing
+    ActionButton { objectName: "before"; text: "Before"; focus: true }
+    InputField { id: name; objectName: "nameField"; width: parent.width; label: "Name"; onAccepted: secret.forceActiveFocus() }
+    InputField { id: secret; objectName: "secretField"; width: parent.width; label: "Secret"; password: true; onAccepted: page.submitted++ }
+    ActionButton { objectName: "after"; text: "After" }
+  }
+}
+)";
+
+  struct KeyboardScene : ShellScene {
+    KeyboardScene() : ShellScene(FieldsPageQml) {
+      entry = qobject_cast<ui::TextEntry*>(item(QStringLiteral("textEntry")));
+      REQUIRE(entry != nullptr);
+      setTvMode(true);
+      pump(300);
+    }
+
+    // The TextInput inside an InputField.
+    QQuickItem* input(const char* name) const {
+      QQuickItem* field = item(QString::fromLatin1(name));
+      return field ? field->property("field").value<QQuickItem*>() : nullptr;
+    }
+    QString text(const char* name) const { return input(name)->property("text").toString(); }
+    QQuickItem* keyboard() const { return item(QStringLiteral("onScreenKeyboard")); }
+    // The highlighted key's name.
+    QString highlighted() const {
+      QQuickItem* board = keyboard();
+      const int row = board->property("row").toInt();
+      const int column = board->property("column").toInt();
+      const QVariantList rows = board->property("rows").toList();
+      const QVariantMap key = rows.at(row).toList().at(column).toMap();
+      return key.contains(QStringLiteral("action")) ? key.value(QStringLiteral("action")).toString()
+                                                     : key.value(QStringLiteral("text")).toString();
+    }
+    int submitted() const { return item(QStringLiteral("fieldsPage"))->property("submitted").toInt(); }
+    // Presses the arrows until the key is highlighted (from the bottom row
+    // up, never past the top: Up there closes the keyboard); false if it is
+    // not on the keyboard.
+    bool highlight(const QString& name) {
+      if (!entry->isOpen()) return false;
+      for (int i = 0; i < 6; ++i) tap(window, Qt::Key_Down);
+      while (true) {
+        for (int i = 0; i < 14; ++i) tap(window, Qt::Key_Left);
+        for (int i = 0; i < 14; ++i) {
+          if (highlighted() == name) return true;
+          tap(window, Qt::Key_Right);
+        }
+        if (keyboard()->property("row").toInt() == 0) return false;
+        tap(window, Qt::Key_Up);
+      }
+    }
+    void typeKey(const QString& name) {
+      REQUIRE(highlight(name));
+      tap(window, Qt::Key_Return);
+    }
+
+    ui::TextEntry* entry = nullptr;
+  };
+
+} // namespace
+
+TEST_CASE("In TV mode a field reached by arrows opens the on-screen keyboard, which arrows, Select and Back drive") {
+  KeyboardScene scene;
+  QQuickWindow& window = scene.window;
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("before")));
+  CHECK_FALSE(scene.entry->isOpen());
+
+  tap(window, Qt::Key_Down);
+  REQUIRE(window.activeFocusItem() == scene.input("nameField"));
+  CHECK(scene.entry->isOpen());
+  CHECK(scene.entry->field() == scene.input("nameField"));
+  REQUIRE(scene.keyboard() != nullptr);
+  CHECK(scene.keyboard()->isVisible());
+  // Above the dialogs and the command palette.
+  CHECK(scene.keyboard()->parentItem()->inherits("QQuickOverlay"));
+  CHECK(scene.highlighted() == QStringLiteral("q"));
+  // Its keys are TV-sized and inside the safe area.
+  const QRectF safe(96, 54, 1920 - 2 * 96, 1080 - 2 * 54);
+  int keys = 0;
+  std::function<void(QQuickItem*)> walk = [&](QQuickItem* node) {
+    if (node->objectName().startsWith(QLatin1String("key_"))) {
+      ++keys;
+      CAPTURE(node->objectName());
+      CHECK(node->height() >= 64);
+      CHECK(safe.contains(node->mapRectToScene(QRectF(0, 0, node->width(), node->height()))));
+    }
+    const QList<QQuickItem*> children = node->childItems();
+    for (QQuickItem* child : children) walk(child);
+  };
+  walk(scene.keyboard());
+  CHECK(keys == 10 + 10 + 9 + 10 + 8);
+
+  // Right twice, Select: "e"; Up to the digits, Select: "3". The focus
+  // never leaves the field.
+  tap(window, Qt::Key_Right);
+  tap(window, Qt::Key_Right);
+  tap(window, Qt::Key_Return);
+  tap(window, Qt::Key_Up);
+  CHECK(scene.highlighted() == QStringLiteral("3"));
+  tap(window, Qt::Key_Return);
+  CHECK(scene.text("nameField") == QStringLiteral("e3"));
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+
+  // Shift gives one capital; the other language; the symbols.
+  scene.typeKey(QStringLiteral("shift"));
+  scene.typeKey(QStringLiteral("z"));
+  scene.typeKey(QStringLiteral("z"));
+  CHECK(scene.text("nameField") == QStringLiteral("e3Zz"));
+  scene.typeKey(QStringLiteral("language"));
+  scene.typeKey(QString::fromUtf8("й"));
+  scene.typeKey(QStringLiteral("mode"));
+  scene.typeKey(QStringLiteral("@"));
+  scene.typeKey(QStringLiteral("mode"));
+  scene.typeKey(QString::fromUtf8("ё"));
+  CHECK(scene.text("nameField") == QString::fromUtf8("e3Zzй@ё"));
+
+  // The cursor, erase and space; the gamepad's shoulders erase and space.
+  scene.typeKey(QStringLiteral("left"));
+  scene.typeKey(QStringLiteral("erase"));
+  CHECK(scene.text("nameField") == QString::fromUtf8("e3Zzйё"));
+  scene.typeKey(QStringLiteral("right"));
+  scene.typeKey(QStringLiteral("space"));
+  tap(window, Qt::Key_PageDown);
+  tap(window, Qt::Key_PageUp);
+  CHECK(scene.text("nameField") == QString::fromUtf8("e3Zzйё "));
+
+  // Up from the digits closes it, back on the field; Select opens it.
+  for (int i = 0; i < 6 && scene.entry->isOpen(); ++i) tap(window, Qt::Key_Up);
+  CHECK_FALSE(scene.entry->isOpen());
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+  tap(window, Qt::Key_Return);
+  CHECK(scene.entry->isOpen());
+  // On the first letter, of the language last used.
+  CHECK(scene.highlighted() == QString::fromUtf8("й"));
+
+  // Back closes it and stays on the page; then the arrows move on.
+  const int depth = scene.navigator->depth();
+  tap(window, Qt::Key_Escape);
+  CHECK_FALSE(scene.entry->isOpen());
+  CHECK(scene.navigator->depth() == depth);
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+  tap(window, Qt::Key_Down);
+  CHECK(window.activeFocusItem() == scene.input("secretField"));
+  CHECK(scene.entry->isOpen());
+  tap(window, Qt::Key_Escape);
+  tap(window, Qt::Key_Down);
+  CHECK(focusName(window) == QStringLiteral("after"));
+  CHECK_FALSE(scene.entry->isOpen());
+}
+
+TEST_CASE("Done is Enter in the field: the keyboard follows to the next field, then the form is sent") {
+  KeyboardScene scene;
+  QQuickWindow& window = scene.window;
+  // A field the page focuses itself does not open the keyboard; Select does.
+  scene.input("nameField")->forceActiveFocus();
+  CHECK_FALSE(scene.entry->isOpen());
+  tap(window, Qt::Key_Return);
+  REQUIRE(scene.entry->isOpen());
+  scene.typeKey(QStringLiteral("a"));
+  scene.typeKey(QStringLiteral("done"));
+  CHECK(scene.text("nameField") == QStringLiteral("a"));
+  CHECK(window.activeFocusItem() == scene.input("secretField"));
+  CHECK(scene.entry->isOpen());
+  CHECK(scene.highlighted() == QStringLiteral("q"));
+  // A hidden field shows its mask above the keys.
+  scene.typeKey(QStringLiteral("b"));
+  QQuickItem* preview = scene.item(QStringLiteral("keyboardPreview"));
+  REQUIRE(preview != nullptr);
+  CHECK_FALSE(preview->property("text").toString().contains(QLatin1Char('b')));
+  scene.typeKey(QStringLiteral("done"));
+  CHECK(scene.text("secretField") == QStringLiteral("b"));
+  CHECK(scene.submitted() == 1);
+  CHECK_FALSE(scene.entry->isOpen());
+
+  // A click on a key types as well, and the field keeps the focus.
+  tap(window, Qt::Key_Return);
+  REQUIRE(scene.entry->isOpen());
+  QQuickItem* key = scene.item(QStringLiteral("key_c"));
+  REQUIRE(key != nullptr);
+  QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier,
+                    key->mapToScene(QPointF(key->width() / 2, key->height() / 2)).toPoint());
+  CHECK(scene.text("secretField") == QStringLiteral("bc"));
+  CHECK(window.activeFocusItem() == scene.input("secretField"));
+  CHECK(scene.entry->isOpen());
+
+  // A field that keeps Select for itself (the command palette on a chosen
+  // result): Enter is Enter.
+  tap(window, Qt::Key_Escape);
+  scene.item(QStringLiteral("nameField"))->setProperty("keyboardOnSelect", false);
+  scene.input("nameField")->forceActiveFocus();
+  tap(window, Qt::Key_Return);
+  CHECK_FALSE(scene.entry->isOpen());
+  CHECK(window.activeFocusItem() == scene.input("secretField"));
+}
+
+TEST_CASE("A physical keyboard that types keeps the on-screen keyboard away until the gamepad is used again") {
+  KeyboardScene scene;
+  QQuickWindow& window = scene.window;
+  window.requestActivate();
+  REQUIRE(QTest::qWaitForWindowActive(&window));
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("before")));
+  tap(window, Qt::Key_Down);
+  REQUIRE(scene.entry->isOpen());
+
+  // Typing on the keyboard: it closes, the letter is in the field.
+  QTest::keyClick(&window, Qt::Key_A, Qt::NoModifier);
+  CHECK_FALSE(scene.entry->isOpen());
+  CHECK(scene.entry->keyboardTyping());
+  CHECK(scene.text("nameField") == QStringLiteral("a"));
+  // Its arrows and Enter are a keyboard's again: no on-screen keyboard.
+  QTest::keyClick(&window, Qt::Key_Up);
+  CHECK(focusName(window) == QStringLiteral("before"));
+  QTest::keyClick(&window, Qt::Key_Down);
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+  CHECK_FALSE(scene.entry->isOpen());
+  QTest::keyClick(&window, Qt::Key_Return);
+  CHECK(window.activeFocusItem() == scene.input("secretField"));
+  CHECK_FALSE(scene.entry->isOpen());
+
+  // A remote that sends only arrows and Enter (no text) is not typing.
+  scene.entry->setActive(false);
+  scene.entry->setActive(true);
+  QTest::keyClick(&window, Qt::Key_Up);
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+  CHECK(scene.entry->isOpen());
+  QTest::keyClick(&window, Qt::Key_Escape);
+  CHECK_FALSE(scene.entry->isOpen());
+
+  // Typed again, then the gamepad (keys the application sends): the
+  // on-screen keyboard is back.
+  QTest::keyClick(&window, Qt::Key_B);
+  CHECK(scene.entry->keyboardTyping());
+  tap(window, Qt::Key_Up);
+  CHECK_FALSE(scene.entry->keyboardTyping());
+  tap(window, Qt::Key_Down);
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+  CHECK(scene.entry->isOpen());
+}
+
+TEST_CASE("Outside TV mode a field is an ordinary field") {
+  KeyboardScene scene;
+  QQuickWindow& window = scene.window;
+  scene.setTvMode(false);
+  pump(100);
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("before")));
+  tap(window, Qt::Key_Down);
+  CHECK(window.activeFocusItem() == scene.input("nameField"));
+  CHECK_FALSE(scene.entry->isOpen());
+  tap(window, Qt::Key_Return);
+  CHECK(window.activeFocusItem() == scene.input("secretField"));
+  CHECK_FALSE(scene.entry->isOpen());
+  scene.entry->show();
+  CHECK_FALSE(scene.entry->isOpen());
+}
+
+TEST_CASE("Text and navigation from the phone go through the input router, keyboard open or not") {
+  KeyboardScene scene;
+  QQuickWindow& window = scene.window;
+  ui::InputRouter router;
+  router.setWindow(&window);
+
+  SpatialNavigation::focusItem(scene.item(QStringLiteral("before")));
+  // No field focused: nothing typed.
+  CHECK_FALSE(router.sendText(QStringLiteral("dune")));
+  router.route(platform::InputAction::Down, false);
+  REQUIRE(window.activeFocusItem() == scene.input("nameField"));
+  CHECK(scene.entry->isOpen());
+  CHECK(router.sendText(QStringLiteral("dune")));
+  CHECK(scene.text("nameField") == QStringLiteral("dune"));
+  CHECK(scene.entry->isOpen());
+  router.route(platform::InputAction::Back, false);
+  CHECK_FALSE(scene.entry->isOpen());
+  CHECK(router.sendText(QString::fromUtf8(" дюна")));
+  CHECK(scene.text("nameField") == QString::fromUtf8("dune дюна"));
+  // A read-only field takes nothing.
+  scene.input("nameField")->setProperty("readOnly", true);
+  CHECK_FALSE(router.sendText(QStringLiteral("x")));
+  CHECK(scene.text("nameField") == QString::fromUtf8("dune дюна"));
 }

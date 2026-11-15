@@ -169,6 +169,10 @@
         <source>Next channel</source>
         <translation>Следующий канал</translation>
     </message>
+    <message>
+        <source>Settings</source>
+        <translation>Настройки</translation>
+    </message>
 </context>
 <context>
     <name>SegmentsMenu</name>

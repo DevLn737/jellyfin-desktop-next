@@ -11,6 +11,10 @@ T.Slider {
     readonly property var colors: Theme.colorsFor(control)
 
     signal accepted()
+    // The line's thickness and the handle's size (the player's timeline is
+    // larger in TV mode).
+    property int trackHeight: 4
+    property int handleSize: 18
     Keys.onReturnPressed: control.accepted()
     Keys.onEnterPressed: control.accepted()
 
@@ -23,14 +27,14 @@ T.Slider {
         x: control.leftPadding
         y: control.topPadding + control.availableHeight / 2 - height / 2
         width: control.availableWidth
-        height: 4
-        radius: 2
+        height: control.trackHeight
+        radius: height / 2
         color: colors.surfaceHover
 
         Rectangle {
             width: control.visualPosition * parent.width
             height: parent.height
-            radius: 2
+            radius: parent.radius
             color: colors.accent
         }
     }
@@ -38,10 +42,10 @@ T.Slider {
     handle: Rectangle {
         x: control.leftPadding + control.visualPosition * (control.availableWidth - width)
         y: control.topPadding + control.availableHeight / 2 - height / 2
-        width: 18
-        height: 18
-        radius: 9
+        width: control.handleSize
+        height: control.handleSize
+        radius: control.handleSize / 2
         color: control.pressed ? colors.accentHover : colors.text
-        FocusFrame { shown: control.visualFocus; radius: 9 + Theme.focusRingWidth }
+        FocusFrame { shown: control.visualFocus; radius: control.handleSize / 2 + Theme.focusRingWidth }
     }
 }

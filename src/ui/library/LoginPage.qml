@@ -8,7 +8,10 @@ import Jfd.Ui.Library
 
 // Sign-in: pick a server (found on the network, saved, or typed), then a
 // password or Quick Connect. The application opens the home page once
-// signed in.
+// signed in. Back goes a step back (from the code to the password, from the
+// password to the servers). In TV mode Quick Connect, which needs no
+// typing, comes first and has the focus; the fields open the on-screen
+// keyboard.
 RoutePage {
     id: page
 
@@ -16,6 +19,24 @@ RoutePage {
     readonly property int step: signIn ? signIn.step : SignIn.ChooseServer
 
     title: qsTr("Sign in")
+
+    // TV mode: Quick Connect leads the password form.
+    readonly property bool quickConnectFirst: Theme.tvMode && signIn !== null && signIn.quickConnectAvailable
+
+    // Back: one step back; on the first step the shell's Back.
+    function stepBack() {
+        if (!signIn)
+            return false
+        if (step === SignIn.QuickConnect)
+            signIn.cancelQuickConnect()
+        else if (step === SignIn.Credentials)
+            signIn.back()
+        else
+            return false
+        return true
+    }
+    Keys.onEscapePressed: (event) => { event.accepted = page.stepBack() }
+    Keys.onBackPressed: (event) => { event.accepted = page.stepBack() }
 
     Component.onCompleted: {
         if (signIn && step === SignIn.ChooseServer)
@@ -32,12 +53,12 @@ RoutePage {
         Column {
             id: column
             objectName: "loginColumn"
-            width: Math.min(parent.width - 2 * Theme.spacingHuge, 420)
+            width: Math.min(parent.width - 2 * Theme.spacingHuge, Theme.tvMode ? 760 : 420)
             x: (parent.width - width) / 2
             // The error line does not count: the form stays where it was
-            // when a message appears above it.
-            y: Math.max(Theme.spacingHuge, (page.height - implicitHeight
-                                            + (loginError.visible ? loginError.height + spacing : 0)) / 3)
+            // when a message appears above it. Never in a TV's outer 5 %.
+            y: Math.max(Theme.spacingHuge, Math.round(page.height * Theme.safeMargin),
+                        (page.height - implicitHeight + (loginError.visible ? loginError.height + spacing : 0)) / 3)
             spacing: Theme.spacingLarge
 
             Text {
@@ -89,6 +110,8 @@ RoutePage {
         FocusScope {
             id: chooser
             implicitHeight: serverColumn.implicitHeight
+            // The Loader passes its focus on only to an item that asks.
+            focus: true
 
             function connect() {
                 if (address.text.trim().length > 0)
@@ -180,6 +203,7 @@ RoutePage {
         FocusScope {
             id: form
             implicitHeight: credentialColumn.implicitHeight
+            focus: true
 
             // Always sent: an empty name gets "Enter a user name." back.
             function submit() {
@@ -188,13 +212,42 @@ RoutePage {
 
             // Focus goes to the password only when the name is already known
             // (a saved server); it is decided once, never from the text, so
-            // typing a name keeps the cursor in the name field.
-            Component.onCompleted: (user.text.length > 0 ? password : user).forceActiveFocus()
+            // typing a name keeps the cursor in the name field. In TV mode
+            // Quick Connect has it.
+            Component.onCompleted: (page.quickConnectFirst ? quickConnectFirstButton
+                                    : user.text.length > 0 ? password : user).forceActiveFocus()
 
             Column {
                 id: credentialColumn
                 width: parent.width
                 spacing: Theme.spacing
+
+                // TV mode: the recommended way, before the fields.
+                Column {
+                    width: parent.width
+                    visible: page.quickConnectFirst
+                    spacing: Theme.spacing
+                    bottomPadding: Theme.spacingLarge
+
+                    Text {
+                        width: parent.width
+                        text: qsTr("Recommended on a TV: sign in with Quick Connect, no typing needed. You get a code to enter in Jellyfin on your phone or computer.")
+                        color: Theme.text
+                        font.pixelSize: Theme.fontSizeBody
+                        wrapMode: Text.Wrap
+                    }
+                    ActionButton {
+                        id: quickConnectFirstButton
+                        objectName: "quickConnectTvButton"
+                        primary: true
+                        text: qsTr("Sign in with Quick Connect")
+                        onClicked: page.signIn.startQuickConnect()
+                    }
+                    SectionHeader {
+                        width: parent.width
+                        text: qsTr("Or with a password")
+                    }
+                }
 
                 Text {
                     width: parent.width
@@ -224,13 +277,13 @@ RoutePage {
                     spacing: Theme.spacing
                     ActionButton {
                         objectName: "signInButton"
-                        primary: true
+                        primary: !page.quickConnectFirst
                         text: qsTr("Sign in")
                         onClicked: form.submit()
                     }
                     ActionButton {
                         objectName: "quickConnectButton"
-                        visible: page.signIn && page.signIn.quickConnectAvailable
+                        visible: page.signIn && page.signIn.quickConnectAvailable && !page.quickConnectFirst
                         text: qsTr("Quick Connect")
                         onClicked: page.signIn.startQuickConnect()
                     }
@@ -247,6 +300,7 @@ RoutePage {
         id: quickConnect
         FocusScope {
             implicitHeight: codeColumn.implicitHeight
+            focus: true
 
             Column {
                 id: codeColumn

@@ -127,10 +127,10 @@ first next time. While it is open the player's keys do not reach the player.
 | `ActionButton` | `text`, `iconSource`, `primary`, `clicked()` |
 | `IconButton` | `iconSource`, `toolTipText`, `clicked()` |
 | `Icon`, `Icons` | `Icon { source: Icons.play; size: 22 }`; icons: home, search, group, settings, back, close, play, check, error, library, menu, up, down, gamepad |
-| `InputField` | `label`, `text`, `placeholderText`, `errorText`, `password`, `accepted()` |
+| `InputField` | `label`, `text`, `placeholderText`, `errorText`, `password`, `accepted()`; `keyboardOnSelect` (default on: Select opens the on-screen keyboard in TV mode) |
 | `ToggleSwitch` | `checked`, `toggled()` (Space or Enter) |
 | `ChoiceBox` | `model: [{ value, label }]`, `currentValue`, `indexOfValue()`, `activated()`; Enter opens the list; in TV mode Up and Down move the focus, not the value (`navigationKeys`) |
-| `ValueSlider` | `from`, `to`, `stepSize`, `value`, `moved()`, `accepted()` (Enter) |
+| `ValueSlider` | `from`, `to`, `stepSize`, `value`, `moved()`, `accepted()` (Enter), `trackHeight`, `handleSize` |
 | `PosterCard` | `title`, `subtitle`, `imageSource`, `shape` ("poster", "thumb", "square"), `progress` (0..1), `played`, `unplayedCount`, `cardWidth`, `clicked()` |
 | `CardRow` | `title`, `model`, `delegate`, `cardHeight`, `currentIndex`, `view` |
 | `CardGrid` | `model`, `delegate`, `cardWidth`, `cardHeight`, `currentIndex`, `view` |
@@ -151,6 +151,9 @@ keyboard. Every focusable control answers Enter (a gamepad's Select): a test
 fails when a new one does not.
 
 ## TV mode and arrow navigation
+
+For users: keys, gamepad buttons, the phone and the HDMI-CEC decision are
+in [tv-mode.md](tv-mode.md).
 
 `Theme.tvMode` (Settings > Interface > TV mode, the "TV mode" command of
 Ctrl+K, or `--tv` for one run) changes at once, without a restart: body text
@@ -183,6 +186,36 @@ The Menu key (a gamepad's View) opens the focused item's own menu where it
 has one (`Keys.onMenuPressed`), otherwise it goes to the sidebar's entry of
 the current page, and back. A new screen gets keyboard focus on its first
 item and needs no `KeyNavigation` of its own.
+
+On-screen keyboard: in TV mode a text field reached by an arrow, Tab or a
+page key, or Select on a field, opens `OnScreenKeyboard` along the bottom
+of the window, over dialogs and the command palette (`TextEntry`, in
+`AppShell`). The field keeps the focus; the keyboard shows its label and
+text (masked for a password) and takes the arrows, Select and Back while
+open. English and Russian letters, symbols, digits, Shift, the cursor,
+space, erase and Done (Enter in the field: the keyboard follows when that
+moves the focus to the next field). A physical keyboard that types keeps it
+away until the gamepad or the phone is used again. Text from the phone
+(`SendString`) goes through `InputRouter::sendText` into the focused field.
+Own implementation: Qt Virtual Keyboard is GPL-3.0. Keys, buttons and the
+CEC decision: [tv-mode.md](tv-mode.md).
+
+Sign-in in TV mode: on the password step Quick Connect, which needs no
+typing, is the main button and has the focus, above the fields; Back goes
+a step back (from the code to the password form, from there to the
+servers). The address, name and password come from the on-screen keyboard
+or the phone.
+
+The player in TV mode: its display is a focus mode. Hidden, or with nothing
+on it focused, Left and Right seek (held: 10, then 30, then 60 s steps
+shown on the timeline, one seek when let go or when a gamepad's repeats
+stop), Up and Down show it with the larger timeline focused (on a channel:
+play/pause), Select plays or pauses; shown, the arrows move between its
+controls. The menus are one row of named buttons, Episodes, Subtitles,
+Audio, Settings; a menu opens with its first row focused and gives the
+focus back to its button. Back closes the menu, then the display, then the
+player. Page Up and Down (a gamepad's shoulders) stay the channel keys of
+Live TV. The display keeps out of the outer 5 %.
 
 Gamepads: `GamepadStatus` (a `Jfd.Ui.Shell` singleton) says whether one is
 connected (the sidebar shows its sign and name, as does Settings > Gamepad)
@@ -349,7 +382,13 @@ different length, a list, a scrolled pane, a grid of 200 mostly uncreated
 delegates; every item reaches every other, Back always gets out) and on the
 shell at 1920 by 1080 in TV mode (safe area, Menu, Back), Enter on every
 focusable control, the TV sizes, and switching TV mode 20 times on 1000
-cards (each switch at most 100 ms, memory at most 5 MiB more).
+cards (each switch at most 100 ms, memory at most 5 MiB more), and the
+on-screen keyboard (opening, every layout, Done to the next field, a
+physical keyboard keeping it away, text from the phone).
+`jfd_ui_login_tv_tests` signs in on a fake server in TV mode with arrows,
+Select and Back alone: every control of each step reached, none trapping
+the focus, the address and the password typed on the on-screen keyboard,
+Quick Connect first, and Back between the steps.
 `jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
 gamepad alone.
 

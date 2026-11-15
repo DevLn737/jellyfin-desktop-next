@@ -184,7 +184,8 @@ namespace jfd::desktop {
   void applyRemoteCapabilities(const AppServices& services, api::SessionCapabilities& capabilities);
   // remote/allowServerControl changed.
   void setRemoteEnabled(AppServices& services, bool enabled);
-  // After the window loads: DisplayMessage's toasts and ToggleFullscreen.
+  // After the window loads: DisplayMessage's toasts, ToggleFullscreen, and
+  // MoveUp ... Back and SendString through a ui::InputRouter on the window.
   void startRemote(AppServices& services, QQuickWindow& window);
   // A second start's arguments: runs its --command and returns true, or
   // returns false when it has none (the window is raised instead).

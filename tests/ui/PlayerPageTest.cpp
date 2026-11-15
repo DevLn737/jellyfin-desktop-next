@@ -9,6 +9,7 @@
 #include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/GroupSession.h>
+#include <jfd/ui/Navigator.h>
 #include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/PlayerSession.h>
 
@@ -22,6 +23,7 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QRegularExpression>
+#include <QSet>
 #include <QQuickWindow>
 #include <QtQml/qqmlextensionplugin.h>
 
@@ -476,4 +478,213 @@ TEST_CASE("Page Up and Down do nothing to a file that is not live") {
   QCoreApplication::sendEvent(&f.window, &press);
   CHECK(f.player->active());
   CHECK_FALSE(find(f.page, "channelUp")->isVisible());
+}
+
+namespace {
+
+  // A key as the gamepad sends it (InputRouter): press and release, both
+  // marked when held.
+  void tap(QQuickWindow& window, int key, bool repeat = false) {
+    QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier, QString(), repeat);
+    QCoreApplication::sendEvent(&window, &press);
+    QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier, QString(), repeat);
+    QCoreApplication::sendEvent(&window, &release);
+  }
+
+  // Inside `ancestor`, or it.
+  bool within(const QQuickItem* item, const QQuickItem* ancestor) {
+    for (; item; item = item->parentItem())
+      if (item == ancestor) return true;
+    return false;
+  }
+
+  // The player in TV mode, under the shell's arrow navigation, with two
+  // pages on the navigator for Back to leave.
+  struct TvFixture : Fixture {
+    TvFixture() {
+      QQmlComponent component(&engine);
+      component.setData(R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Shell
+Item {
+  SpatialNavigation.enabled: true
+  Component.onCompleted: Theme.tvMode = true
+  Component.onDestruction: Theme.tvMode = false
+}
+)",
+                        QUrl(QStringLiteral("qrc:/tv-player.qml")));
+      shell.reset(qobject_cast<QQuickItem*>(component.create()));
+      REQUIRE_MESSAGE(shell != nullptr, component.errorString().toStdString());
+      shell->setParentItem(window.contentItem());
+      shell->setSize(QSizeF(1280, 720));
+      page->setParentItem(shell.get());
+      navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
+      REQUIRE(navigator != nullptr);
+      const QUrl placeholder(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml"));
+      navigator->setPlaceholderPage(placeholder);
+      navigator->registerPage(QStringLiteral("home"), placeholder);
+      navigator->registerPage(QStringLiteral("player"), placeholder);
+      navigator->reset(QStringLiteral("home"));
+      navigator->navigate(QStringLiteral("player"));
+    }
+    ~TvFixture() {
+      page->setParentItem(window.contentItem());
+      shell.reset();
+    }
+
+    std::unique_ptr<QQuickItem> shell;
+    ui::Navigator* navigator = nullptr;
+  };
+
+} // namespace
+
+TEST_CASE("TV mode: a held arrow seeks faster with one seek, Up shows the display, Back closes menu, display, player") {
+  TvFixture f;
+  QQuickWindow& window = f.window;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  f.player->togglePause();
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+  REQUIRE(f.navigator->depth() == 2);
+  f.page->forceActiveFocus();
+
+  // Nothing focused on the display: Right seeks 10 s at once.
+  const double start = f.player->position();
+  tap(window, Qt::Key_Right);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (start + 10)) < 0.5; }, 2000));
+
+  // Held: 10 s steps, then 30 s; the timeline shows the target, and the one
+  // seek comes when the key is let go.
+  const double held = f.player->position();
+  QQuickItem* timeline = find(f.page, "timeline");
+  REQUIRE(timeline != nullptr);
+  tap(window, Qt::Key_Right);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (held + 10)) < 0.5; }, 2000));
+  for (int i = 0; i < 12; ++i) tap(window, Qt::Key_Right, true);
+  CHECK(timeline->property("value").toDouble() == doctest::Approx(held + 10 + 9 * 10 + 3 * 30).epsilon(0.01));
+  CHECK(f.player->position() == doctest::Approx(held + 10).epsilon(0.01));
+  QKeyEvent letGo(QEvent::KeyRelease, Qt::Key_Right, Qt::NoModifier);
+  QCoreApplication::sendEvent(&window, &letGo);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (held + 190)) < 0.5; }, 2000));
+
+  // A gamepad's hold sends no release of its own: the seek comes once the
+  // repeats stop.
+  const double back = f.player->position();
+  tap(window, Qt::Key_Left);
+  for (int i = 0; i < 3; ++i) tap(window, Qt::Key_Left, true);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (back - 40)) < 0.5; }, 3000));
+
+  // Up: the display with the timeline focused; its Left and Right seek too.
+  f.page->setProperty("osdVisible", false);
+  tap(window, Qt::Key_Up);
+  CHECK(f.page->property("osdVisible").toBool());
+  CHECK(window.activeFocusItem() == timeline);
+  const double onTimeline = f.player->position();
+  tap(window, Qt::Key_Left);
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (onTimeline - 10)) < 0.5; }, 2000));
+  CHECK(window.activeFocusItem() == timeline);
+
+  // Down: the arrows now move between the display's controls.
+  tap(window, Qt::Key_Down);
+  QQuickItem* focused = window.activeFocusItem();
+  CHECK(focused != timeline);
+  CHECK(focused != f.page);
+  CHECK(within(focused, f.page));
+  CHECK(f.player->volume() == 100);
+
+  // The menus are one row of named buttons; the icon buttons are gone.
+  QQuickItem* row = find(f.page, "tvMenus");
+  REQUIRE(row != nullptr);
+  CHECK(row->isVisible());
+  QQuickItem* subtitles = find(f.page, "tvSubtitles");
+  QQuickItem* audio = find(f.page, "tvAudio");
+  QQuickItem* settings = find(f.page, "tvSettings");
+  REQUIRE(subtitles != nullptr);
+  REQUIRE(audio != nullptr);
+  REQUIRE(settings != nullptr);
+  CHECK(subtitles->isVisible());
+  CHECK(audio->isVisible());
+  CHECK(settings->isVisible());
+  CHECK_FALSE(find(f.page, "tvEpisodes")->isVisible());
+  CHECK(subtitles->mapToScene(QPointF()).y() == doctest::Approx(settings->mapToScene(QPointF()).y()));
+  CHECK_FALSE(find(f.page, "episodes")->isVisible());
+  // Every control of the display inside the safe area, reachable.
+  const QRectF safe(64, 36, 1280 - 2 * 64, 720 - 2 * 36);
+  for (QQuickItem* item : {subtitles, audio, settings, timeline, find(f.page, "playPause")}) {
+    CAPTURE(item->objectName());
+    CHECK(safe.contains(item->mapRectToScene(QRectF(0, 0, item->width(), item->height()))));
+    CHECK(item->activeFocusOnTab());
+  }
+  // From the timeline every button of the row is reached by arrows.
+  QSet<QQuickItem*> reached;
+  for (QQuickItem* from : {timeline, find(f.page, "playPause"), subtitles, audio, settings}) {
+    for (int key : {Qt::Key_Left, Qt::Key_Right, Qt::Key_Up, Qt::Key_Down}) {
+      from->forceActiveFocus(Qt::TabFocusReason);
+      tap(window, key);
+      reached.insert(window.activeFocusItem());
+    }
+  }
+  CHECK(reached.contains(subtitles));
+  CHECK(reached.contains(audio));
+  CHECK(reached.contains(settings));
+  CHECK(reached.contains(timeline));
+
+  // Select on Subtitles: its menu, focused inside; Back closes it and goes
+  // back to the button.
+  subtitles->forceActiveFocus(Qt::TabFocusReason);
+  tap(window, Qt::Key_Return);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("subtitles"));
+  CHECK(window.activeFocusItem() != subtitles);
+  CHECK(within(window.activeFocusItem(), f.page));
+  tap(window, Qt::Key_Escape);
+  CHECK(f.page->property("openMenu").toString().isEmpty());
+  CHECK(window.activeFocusItem() == subtitles);
+  CHECK(f.navigator->depth() == 2);
+
+  // Back: the display; Back again: the player.
+  tap(window, Qt::Key_Escape);
+  CHECK_FALSE(f.page->property("osdVisible").toBool());
+  CHECK(window.activeFocusItem() == f.page);
+  CHECK(f.navigator->depth() == 2);
+  tap(window, Qt::Key_Escape);
+  CHECK(f.navigator->depth() == 1);
+}
+
+TEST_CASE("TV mode: Select plays and pauses; on a channel the display focuses play and Page Up still changes the channel") {
+  test::FakeServer server([](const test::HttpRequest& r) {
+    if (r.path == QStringLiteral("/LiveTv/Channels"))
+      return test::HttpResponse{200, QByteArray(R"({"Items": [
+        {"Id": "ch1", "Name": "Test Channel 1", "ChannelNumber": "1"},
+        {"Id": "ch2", "Name": "Test Channel 2", "ChannelNumber": "2"},
+        {"Id": "ch3", "Name": "Test Channel 3", "ChannelNumber": "3"}], "TotalRecordCount": 3, "StartIndex": 0})"),
+                                "application/json", 0};
+    if (r.path == QStringLiteral("/LiveTv/Programs"))
+      return test::HttpResponse{200, QByteArray(R"({"Items": [], "TotalRecordCount": 0})"), "application/json", 0};
+    if (r.path.startsWith(QStringLiteral("/Items/ch"))) return test::HttpResponse{200, "{}", "application/json", 60000};
+    return test::HttpResponse{404, {}, {}, 0};
+  });
+  TvFixture f;
+  QQuickWindow& window = f.window;
+  f.client.setServerUrl(server.url());
+  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
+  f.open(true, QStringLiteral("ch2"));
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
+  REQUIRE(waitFor([&] { return f.player->canChangeChannel(); }, 5000));
+  f.page->forceActiveFocus();
+
+  tap(window, Qt::Key_Return);
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+  tap(window, Qt::Key_Return);
+  REQUIRE(waitFor([&] { return !f.player->paused(); }, 2000));
+
+  // No timeline on a channel: Up focuses play/pause.
+  tap(window, Qt::Key_Up);
+  CHECK(window.activeFocusItem() == find(f.page, "playPause"));
+  // The gamepad's shoulders (Page Up and Down) change the channel from the
+  // display too.
+  tap(window, Qt::Key_PageUp);
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 3"));
+  tap(window, Qt::Key_PageDown);
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 2"));
 }

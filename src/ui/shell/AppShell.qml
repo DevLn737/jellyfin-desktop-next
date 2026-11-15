@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls.Basic as Basic
+import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 // Its own module, for the attached SpatialNavigation.
@@ -12,7 +13,8 @@ import Jfd.Ui.Shell
 // direction, PageUp and PageDown by a page (SpatialNavigation); the Menu
 // key, when the focused item has no menu of its own, goes to the sidebar
 // and back. In TV mode the pages keep 5 % away from the screen's edges
-// (Theme.safeMargin).
+// (Theme.safeMargin). In TV mode a text field reached by keys, or Select on
+// it, opens the on-screen keyboard over everything (TextEntry).
 FocusScope {
     id: shell
 
@@ -170,6 +172,10 @@ FocusScope {
             anchors.left: sidebar.visible ? rail.right : parent.left
             focus: true
             clip: true
+            // Set here, or the sidebar's KeyNavigation.right would make the
+            // sidebar the stack's Left even while it is hidden (the sign-in
+            // page), and Left from the page would go nowhere.
+            KeyNavigation.left: sidebar.visible ? sidebar : null
 
             pushEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
             pushExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }
@@ -246,4 +252,16 @@ FocusScope {
 
     // Settings > Gamepad > Check the buttons.
     GamepadCheck {}
+
+    // TV mode: the on-screen keyboard, above the pages, dialogs and the
+    // command palette while it shows.
+    TextEntry {
+        id: textEntry
+        objectName: "textEntry"
+        active: Theme.tvMode
+    }
+    OnScreenKeyboard {
+        entry: textEntry
+        parent: textEntry.open ? T.Overlay.overlay : shell
+    }
 }

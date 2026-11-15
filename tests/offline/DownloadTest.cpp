@@ -183,7 +183,8 @@ TEST_CASE("Five retries with growing delays, then the item fails; Retry starts i
   REQUIRE(waitFor([&] { return !h.failures.isEmpty(); }, 10000));
   // One attempt and five retries.
   CHECK(server.requests().size() == 6);
-  CHECK(clock.elapsed() >= 20 + 40 + 80 + 160 + 320);
+  // A coarse QTimer (the default) may fire up to 5 % early.
+  CHECK(clock.elapsed() >= (20 + 40 + 80 + 160 + 320) * 95 / 100);
   CHECK(h.failures.front() == qMakePair(id, QueueProblem::Network));
   CHECK(h.queue->status(id)->state == ItemState::Failed);
   CHECK(h.catalog.find(ServerId, UserId, id)->state == ItemState::Failed);

@@ -76,6 +76,49 @@
     </message>
 </context>
 <context>
+    <name>OnScreenKeyboard</name>
+    <message>
+        <source>Cursor left</source>
+        <translation>Курсор влево</translation>
+    </message>
+    <message>
+        <source>Cursor right</source>
+        <translation>Курсор вправо</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>Готово</translation>
+    </message>
+    <message>
+        <source>English</source>
+        <translation>Английский</translation>
+    </message>
+    <message>
+        <source>Erase</source>
+        <translation>Стереть</translation>
+    </message>
+    <message>
+        <source>Letters</source>
+        <translation>Буквы</translation>
+    </message>
+    <message>
+        <source>Russian</source>
+        <translation>Русский</translation>
+    </message>
+    <message>
+        <source>Shift</source>
+        <translation>Заглавная</translation>
+    </message>
+    <message>
+        <source>Space</source>
+        <translation>Пробел</translation>
+    </message>
+    <message>
+        <source>Symbols</source>
+        <translation>Символы</translation>
+    </message>
+</context>
+<context>
     <name>PlaceholderPage</name>
     <message>
         <source>This screen is not ready yet.</source>

@@ -8,6 +8,7 @@
 #include <jfd/remote/RemoteSettings.h>
 #include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
+#include <jfd/ui/InputRouter.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/PlayerModel.h>
 
@@ -20,10 +21,13 @@
 
 namespace jfd::desktop {
 
-  // The remote control and the window its toasts and fullscreen act on.
+  // The remote control, the window its toasts and fullscreen act on, and
+  // the input router its navigation and text go through (the gamepad's
+  // path: keys to the window).
   struct RemoteServices {
     std::unique_ptr<remote::RemoteControl> control;
     QPointer<QQuickWindow> window;
+    QPointer<ui::InputRouter> router;
   };
 
   namespace {
@@ -130,6 +134,20 @@ namespace jfd::desktop {
       if (services.navigator != nullptr) services.navigator->navigate(QStringLiteral("group"));
     }
 
+    platform::InputAction inputAction(remote::NavigationKey key) {
+      switch (key) {
+      case remote::NavigationKey::Up: return platform::InputAction::Up;
+      case remote::NavigationKey::Down: return platform::InputAction::Down;
+      case remote::NavigationKey::Left: return platform::InputAction::Left;
+      case remote::NavigationKey::Right: return platform::InputAction::Right;
+      case remote::NavigationKey::PageUp: return platform::InputAction::PageLeft;
+      case remote::NavigationKey::PageDown: return platform::InputAction::PageRight;
+      case remote::NavigationKey::Select: return platform::InputAction::Select;
+      case remote::NavigationKey::Back: return platform::InputAction::Back;
+      }
+      return platform::InputAction::Back;
+    }
+
     remote::RemoteActions actions(AppServices& services, RemoteServices& remote) {
       remote::RemoteActions a;
       a.play = [&services](const PlayRequest& request) { play(services, request); };
@@ -183,8 +201,14 @@ namespace jfd::desktop {
       a.setMaxBitrate = [&services](qint64 bitrate) {
         if (services.playerModel) services.playerModel->setMaxBitrate(bitrate);
       };
-      // Navigation (MoveUp ... Back, SendString) waits for the shell's input
-      // router (stage 3, package 3.3): until then it is not offered.
+      // MoveUp ... Back as the gamepad's keys; SendString into the focused
+      // field (with TV mode's on-screen keyboard open too).
+      a.navigate = [&remote](remote::NavigationKey key) {
+        if (remote.router) remote.router->route(inputAction(key), false);
+      };
+      a.sendText = [&remote](const QString& text) {
+        if (remote.router && !remote.router->sendText(text)) qCInfo(lcRemote) << "SendString without a text field";
+      };
       return a;
     }
   } // namespace
@@ -213,7 +237,13 @@ namespace jfd::desktop {
   }
 
   void startRemote(AppServices& services, QQuickWindow& window) {
-    if (services.remote) services.remote->window = &window;
+    if (!services.remote) return;
+    services.remote->window = &window;
+    // Lives as long as the window; no media handler: the server's
+    // Playstate commands take their own path.
+    auto* router = new ui::InputRouter(&window);
+    router->setWindow(&window);
+    services.remote->router = router;
   }
 
   bool runCommand(AppServices& services, const QStringList& arguments) {

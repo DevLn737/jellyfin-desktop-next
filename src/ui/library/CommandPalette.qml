@@ -147,6 +147,9 @@ FocusScope {
                 focus: true
                 placeholderText: qsTr("Type a command or search your media")
                 inputMethodHints: Qt.ImhNoPredictiveText
+                // TV mode: Select opens the on-screen keyboard on the first
+                // result; on one chosen with the arrows it runs it.
+                keyboardOnSelect: palette.current <= 0
                 Accessible.name: qsTr("Commands and search")
                 onTextChanged: { palette.refresh(); palette.current = 0 }
                 onAccepted: palette.activate(palette.current)

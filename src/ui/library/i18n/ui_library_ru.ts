@@ -699,6 +699,18 @@
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
+    <message>
+        <source>Recommended on a TV: sign in with Quick Connect, no typing needed. You get a code to enter in Jellyfin on your phone or computer.</source>
+        <translation>На телевизоре удобнее всего вход через Quick Connect, печатать ничего не нужно. Вы получите код, который нужно ввести в Jellyfin на телефоне или компьютере.</translation>
+    </message>
+    <message>
+        <source>Sign in with Quick Connect</source>
+        <translation>Войти через Quick Connect</translation>
+    </message>
+    <message>
+        <source>Or with a password</source>
+        <translation>Или с паролем</translation>
+    </message>
 </context>
 <context>
     <name>PersonPage</name>
