@@ -17,11 +17,13 @@ qt_add_qml_module(jfd_ui_library
   URI Jfd.Ui.Library
   VERSION 1.0
   QML_FILES
+    ChannelPage.qml
     CollectionPage.qml
     CommandPalette.qml
     CustomizeHomePage.qml
     EpisodeRow.qml
     GenrePicker.qml
+    GuidePage.qml
     HomePage.qml
     ItemCard.qml
     ItemPage.qml

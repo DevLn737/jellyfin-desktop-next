@@ -46,7 +46,9 @@ only, which the image has) serves on `127.0.0.1:18080` inside the container,
 at about their own bit rate and over and over, so a channel behaves like an
 IPTV source and never ends during a test. Nothing points outside the
 container. `JFD_EXTRAS_LIVETV_CHANNELS` gives the channel count;
-`jfd_livetv_server_tests` checks Info, the channel list with now and next, a
+`jfd_livetv_server_tests` checks Info, the channel list with now and next, the
+guide grid's model (50 channels and the first hours under a second, later
+hours by chunks), the home screen's "On now" row, a channel's page, a
 channel's stream through the server and the stream closed after Stopped.
 
 Never point these tests at a real server: they create groups, change watched

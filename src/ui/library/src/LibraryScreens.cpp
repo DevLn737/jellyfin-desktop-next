@@ -3,6 +3,7 @@
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
 
+#include <QCoreApplication>
 #include <QQmlEngine>
 
 namespace jfd::ui {
@@ -26,6 +27,14 @@ namespace jfd::ui {
       return options;
     }
 
+    library::LiveTvOnNow::Options onNowOptions(qreal ratio) {
+      library::LiveTvOnNow::Options options;
+      options.devicePixelRatio = ratio;
+      return options;
+    }
+
+    const QString OnNowId = QStringLiteral("livetv.onNow");
+
     QUrl page(const char* name) {
       return QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Library/%1.qml").arg(QLatin1String(name)));
     }
@@ -39,7 +48,8 @@ namespace jfd::ui {
         m_images(m_client, config.imageDirectory), m_signIn(m_client, m_servers, *m_tokens),
         m_home(m_client, homeOptions(config.devicePixelRatio)),
         m_search(m_client, searchOptions(config.devicePixelRatio)),
-        m_liveTv(m_client, liveTvOptions(config.devicePixelRatio)), m_collections(m_client),
+        m_liveTv(m_client, liveTvOptions(config.devicePixelRatio)),
+        m_onNow(m_client, onNowOptions(config.devicePixelRatio)), m_collections(m_client),
         m_readFilters(std::move(config.readFilters)),
         m_writeFilters(std::move(config.writeFilters)),
         m_textures(std::make_shared<TextureBudget>(config.textureBytes)) {
@@ -56,6 +66,26 @@ namespace jfd::ui {
     // thread the image cache through the provider.
     if (m_ui) m_ui->attach({});
     if (m_engine) m_engine->removeImageProvider(QLatin1String(LibraryImageProvider::Id));
+  }
+
+  void LibraryScreens::syncOnNow() {
+    library::HomeSections* sections = m_home.sections();
+    if (!m_liveTv.available()) {
+      sections->remove(OnNowId);
+      m_onNow.clear();
+      return;
+    }
+    if (sections->contains(OnNowId)) return;
+    library::HomeSection row;
+    row.id = OnNowId;
+    row.title = QCoreApplication::translate("LiveTvSection", "On now");
+    row.cardShape = QStringLiteral("thumb");
+    // After Continue watching and Next up.
+    row.defaultOrder = 30;
+    row.model = &m_onNow;
+    row.reload = [this] { m_onNow.reload(); };
+    sections->add(std::move(row));
+    m_onNow.reload();
   }
 
   bool LibraryScreens::install(QQmlEngine& engine, Navigator& navigator) {
@@ -111,7 +141,18 @@ namespace jfd::ui {
     QObject::connect(&m_liveTv, &library::LiveTvChannels::availableChanged, &navigator,
                      [this, &navigator] {
                        navigator.setRouteAvailable(QStringLiteral("livetv"), m_liveTv.available());
+                       syncOnNow();
                      });
+    // The programme guide, from the Live TV screen; and one channel's page.
+    RouteSpec guide;
+    guide.name = QStringLiteral("guide");
+    guide.page = page("GuidePage");
+    navigator.registerRoute(guide);
+    RouteSpec channel;
+    channel.name = QStringLiteral("channel");
+    channel.takesArgument = true;
+    channel.page = page("ChannelPage");
+    navigator.registerRoute(channel);
 
     QObject::connect(&m_signIn, &library::SignIn::signedIn, &navigator, [this, &navigator] {
       m_collections.invalidate();

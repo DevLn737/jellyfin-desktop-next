@@ -182,6 +182,7 @@ namespace jfd::api {
       page.totalRecordCount =
           count(o, "TotalRecordCount", static_cast<int>(items.toArray().size()));
       page.startIndex = count(o, "StartIndex", 0);
+      page.itemCount = static_cast<int>(items.toArray().size());
       return page;
     }
 
@@ -210,6 +211,69 @@ namespace jfd::api {
     m_client.sendJson(JellyfinClient::Method::Get, QStringLiteral("LiveTv/Channels"), query,
                       std::nullopt, context,
                       parsed<LiveTvChannelPage>(std::move(done), json::liveTvChannelPage));
+  }
+
+  void LiveTvApi::allChannels(const LiveTvChannelQuery& query, QObject* context,
+                              Callback<QList<LiveTvChannel>> done) {
+    allChannelPages(m_client, query, {}, context, std::move(done));
+  }
+
+  void LiveTvApi::allChannelPages(JellyfinClient& client, LiveTvChannelQuery query,
+                                  QList<LiveTvChannel> got, QObject* context,
+                                  Callback<QList<LiveTvChannel>> done) {
+    JellyfinClient* c = &client;
+    LiveTvApi(client).channels(
+        query, context,
+        [c, query, got = std::move(got), context, done = std::move(done)](
+            Result<LiveTvChannelPage> page) mutable {
+          if (!page) return done(page.error());
+          got.append(page->channels);
+          const int next = page->startIndex + static_cast<int>(page->channels.size());
+          if (page->channels.isEmpty() || next >= page->totalRecordCount)
+            return done(std::move(got));
+          query.startIndex = next;
+          allChannelPages(*c, query, std::move(got), context, std::move(done));
+        });
+  }
+
+  void LiveTvApi::channel(const QString& channelId, QObject* context, Callback<LiveTvChannel> done) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("userId"), m_client.userId());
+    m_client.sendJson(JellyfinClient::Method::Get,
+                      QStringLiteral("LiveTv/Channels/") +
+                          QString::fromLatin1(QUrl::toPercentEncoding(channelId)),
+                      query, std::nullopt, context,
+                      parsed<LiveTvChannel>(std::move(done), json::liveTvChannel));
+  }
+
+  void LiveTvApi::allPrograms(const LiveTvProgramQuery& query, QObject* context,
+                              Callback<QList<LiveTvProgram>> done) {
+    allProgramPages(m_client, query, {}, context, std::move(done));
+  }
+
+  void LiveTvApi::allProgramPages(JellyfinClient& client, LiveTvProgramQuery query,
+                                  QList<LiveTvProgram> got, QObject* context,
+                                  Callback<QList<LiveTvProgram>> done) {
+    JellyfinClient* c = &client;
+    LiveTvApi(client).programs(
+        query, context,
+        [c, query, got = std::move(got), context, done = std::move(done)](
+            Result<LiveTvProgramPage> page) mutable {
+          if (!page) return done(page.error());
+          // A page of only undated programmes still moves on to the next.
+          const int read = page->itemCount;
+          got.append(page->programs);
+          // Pages count every programme, dated or not.
+          const int next = page->startIndex + query.limit;
+          if (read == 0 || query.limit <= 0 || next >= page->totalRecordCount) {
+            std::stable_sort(got.begin(), got.end(), [](const LiveTvProgram& a, const LiveTvProgram& b) {
+              return a.start < b.start;
+            });
+            return done(std::move(got));
+          }
+          query.startIndex = next;
+          allProgramPages(*c, query, std::move(got), context, std::move(done));
+        });
   }
 
   void LiveTvApi::programs(const LiveTvProgramQuery& q, QObject* context,

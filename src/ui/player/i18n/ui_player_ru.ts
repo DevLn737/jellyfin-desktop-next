@@ -157,6 +157,18 @@
         <source>Live</source>
         <translation>Прямой эфир</translation>
     </message>
+    <message>
+        <source>%1–%2  %3</source>
+        <translation>%1–%2  %3</translation>
+    </message>
+    <message>
+        <source>Previous channel</source>
+        <translation>Предыдущий канал</translation>
+    </message>
+    <message>
+        <source>Next channel</source>
+        <translation>Следующий канал</translation>
+    </message>
 </context>
 <context>
     <name>SegmentsMenu</name>

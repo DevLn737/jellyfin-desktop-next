@@ -69,7 +69,11 @@ namespace jfd::ui {
               Q_EMIT tracksChanged();
             },
         }),
-        m_skipper([&runtime](core::SessionInput input) { runtime.post(std::move(input)); }) {
+        m_skipper([&runtime](core::SessionInput input) { runtime.post(std::move(input)); }),
+        m_liveTv(client) {
+    // The programme on a channel moves on while it plays.
+    m_liveTick.setInterval(30'000);
+    connect(&m_liveTick, &QTimer::timeout, this, &PlayerModel::updateProgram);
     connect(&runtime.launcher(), &session::PlaybackLauncher::resolved, this, &PlayerModel::onResolved);
     // Every file opens with the viewer's own tracks, in a group too.
     runtime.setTrackChooser([this](const api::Item& item, const api::MediaSource& source,
@@ -78,7 +82,14 @@ namespace jfd::ui {
       m_trackPreference.choose(source, request.audioStreamIndex, request.subtitleStreamIndex);
     });
     connect(&runtime.launcher(), &session::PlaybackLauncher::failed, this,
-            [this](const QString&, const QString& message) { Q_EMIT failed(message); });
+            [this](const QString&, const QString& message) {
+              // A channel switch that failed before it opened: the old channel
+              // still plays, so the header and channel up/down go back to it.
+              if (m_current && m_current->stream.isLive && !m_liveChannel.isEmpty() &&
+                  m_current->request.itemId != m_liveChannel)
+                beginLive(m_current->request.itemId);
+              Q_EMIT failed(message);
+            });
     // Next and Previous outside a group; in a group the server's queue moves.
     connect(&runtime, &session::SessionRuntime::queueStepRequested, this, &PlayerModel::step);
     m_subscription = runtime.hub().subscribe(
@@ -304,6 +315,12 @@ namespace jfd::ui {
     m_runtime.launcher().cancel();
     if (m_current) m_runtime.post(core::intent::Stop{});
     if (m_pip) setPip(false);
+    // The channel list belongs to the signed-in user: read it again next time.
+    m_channels.clear();
+    m_channelsAge.invalidate();
+    m_channelsLoading = false;
+    ++m_channelsGeneration;
+    endLive();
     Q_EMIT stateChanged();
   }
 
@@ -482,6 +499,135 @@ namespace jfd::ui {
     };
   }
 
+  QDateTime PlayerModel::now() const {
+    return m_clock ? m_clock().toUTC() : QDateTime::currentDateTimeUtc();
+  }
+
+  const api::LiveTvChannel* PlayerModel::liveChannel() const {
+    for (const api::LiveTvChannel& c : m_channels)
+      if (c.id == m_liveChannel) return &c;
+    return nullptr;
+  }
+
+  QString PlayerModel::channelName() const {
+    if (const api::LiveTvChannel* c = liveChannel()) return c->name;
+    return m_liveChannel.isEmpty() ? QString() : title();
+  }
+
+  QString PlayerModel::channelNumber() const {
+    const api::LiveTvChannel* c = liveChannel();
+    return c ? c->number : QString();
+  }
+
+  double PlayerModel::programProgress() const { return m_program ? m_program->progressAt(now()) : 0.0; }
+
+  void PlayerModel::beginLive(const QString& channelId) {
+    const bool sameChannel = channelId == m_liveChannel;
+    m_liveChannel = channelId;
+    if (!sameChannel) {
+      m_livePrograms.clear();
+      m_programsTriedAt = {};
+      m_program.reset();
+    }
+    m_liveTick.start();
+    // The list is read again when it is old or does not have this channel.
+    const bool stale = !m_channelsAge.isValid() || m_channelsAge.elapsed() > 10 * 60 * 1000;
+    if ((stale || !liveChannel()) && !m_channelsLoading) {
+      m_channelsLoading = true;
+      api::LiveTvChannelQuery query;
+      query.addCurrentProgram = true;
+      m_liveTv.allChannels(query, this, [this, generation = m_channelsGeneration](
+                                            api::Result<QList<api::LiveTvChannel>> channels) {
+        if (generation != m_channelsGeneration) return;
+        m_channelsLoading = false;
+        if (!channels) {
+          qCInfo(lcPlayer) << "no channel list:" << channels.error().message;
+          return;
+        }
+        m_channels = *channels;
+        m_channelsAge.start();
+        updateProgram();
+      });
+    }
+    if (!sameChannel || m_livePrograms.isEmpty()) loadLivePrograms();
+    updateProgram();
+  }
+
+  void PlayerModel::endLive() {
+    m_liveTick.stop();
+    if (m_liveChannel.isEmpty() && !m_program) return;
+    m_liveChannel.clear();
+    m_livePrograms.clear();
+    m_program.reset();
+    Q_EMIT liveInfoChanged();
+  }
+
+  void PlayerModel::loadLivePrograms() {
+    if (m_liveChannel.isEmpty() || m_programsLoading) return;
+    m_programsLoading = true;
+    const QString channelId = m_liveChannel;
+    const QDateTime from = now();
+    api::LiveTvProgramQuery query;
+    query.channelIds = {channelId};
+    query.from = from;
+    query.to = from.addSecs(4 * 3600);
+    query.limit = 100;
+    m_liveTv.allPrograms(query, this, [this, channelId](api::Result<QList<api::LiveTvProgram>> programs) {
+      m_programsLoading = false;
+      m_programsTriedAt = now();
+      if (channelId != m_liveChannel) {
+        // Switched while it loaded: the new channel's guide.
+        loadLivePrograms();
+        return;
+      }
+      if (!programs) {
+        qCInfo(lcPlayer) << "no guide for the channel:" << programs.error().message;
+        return;
+      }
+      m_livePrograms = *programs;
+      updateProgram();
+    });
+  }
+
+  void PlayerModel::updateProgram() {
+    if (m_liveChannel.isEmpty()) return;
+    const QDateTime at = now();
+    std::optional<api::LiveTvProgram> on;
+    for (const api::LiveTvProgram& p : std::as_const(m_livePrograms))
+      if (p.isOnAt(at)) on = p;
+    if (!on) {
+      if (const api::LiveTvChannel* c = liveChannel(); c && c->currentProgram && c->currentProgram->isOnAt(at))
+        on = c->currentProgram;
+    }
+    // The guide ran out: the next hours.
+    const bool ranOut = std::none_of(m_livePrograms.cbegin(), m_livePrograms.cend(),
+                                     [&](const api::LiveTvProgram& p) { return p.end > at; });
+    // The guide ran out, or the last request failed or came back empty: ask
+    // again, at most once a minute.
+    if (ranOut && (!m_programsTriedAt.isValid() || m_programsTriedAt.secsTo(at) >= 60)) loadLivePrograms();
+    m_program = on;
+    Q_EMIT liveInfoChanged();
+  }
+
+  void PlayerModel::changeChannel(int step) {
+    if (step == 0 || !canChangeChannel()) return;
+    qsizetype at = -1;
+    for (qsizetype i = 0; i < m_channels.size(); ++i)
+      if (m_channels[i].id == m_liveChannel) at = i;
+    if (at < 0) return;
+    const qsizetype n = m_channels.size();
+    const qsizetype next = ((at + step) % n + n) % n;
+    const QString target = m_channels[next].id;
+    // The header shows the new channel at once, while it tunes in.
+    m_liveChannel = target;
+    m_livePrograms.clear();
+    m_programsTriedAt = {};
+    m_program.reset();
+    updateProgram();
+    loadLivePrograms();
+    play(target, 0);
+  }
+
   void PlayerModel::playEpisode(const QString& itemId) {
     if (itemId.isEmpty() || inGroup()) return;
     play(itemId, 0);
@@ -511,6 +657,8 @@ namespace jfd::ui {
     setSubtitleDelay(0);
     setAudioDelay(0);
     chooseTrickplay();
+    if (m_current->stream.isLive) beginLive(request.itemId);
+    else endLive();
     Q_EMIT tracksChanged();
   }
 
@@ -541,6 +689,8 @@ namespace jfd::ui {
     m_reporter.snapshotChanged(snapshot);
     m_epoch.reset();
     m_current.reset();
+    // Switching channels keeps the list; the next channel begins its own.
+    if (!m_pending || !m_pending->stream.isLive) endLive();
     const bool hadQueue = hasNext() || hasPrevious() || !m_episodes.isEmpty();
     m_nextId.clear();
     m_previousId.clear();
@@ -578,6 +728,10 @@ namespace jfd::ui {
     const bool justEnded = snapshot.phase == PlaybackPhase::Ended &&
                            (newFile || m_snapshot.phase != PlaybackPhase::Ended);
     m_snapshot = snapshot;
+
+    // Stopped or ended: no more guide polling, unless a channel is opening.
+    const bool terminal = snapshot.phase == PlaybackPhase::Idle || snapshot.phase == PlaybackPhase::Ended;
+    if (terminal && !(m_pending && m_pending->stream.isLive)) endLive();
 
     if (newFile && m_pending &&
         snapshot.item.value() == m_pending->request.itemId.toStdString())

@@ -6,6 +6,7 @@
 
 #include <QJsonDocument>
 
+#include <algorithm>
 #include <optional>
 
 // The LiveTv API on fake answers shaped like Jellyfin 12.2's (taken from the
@@ -208,4 +209,86 @@ TEST_CASE("A channel list without Items is an invalid answer") {
   auto page = run<LiveTvChannelPage>([&](auto done) { s.liveTv.channels({}, nullptr, done); });
   REQUIRE_FALSE(page.ok());
   CHECK(page.error().kind == ApiError::Kind::InvalidResponse);
+}
+
+TEST_CASE("Every channel, page after page") {
+  Signed s([](const HttpRequest& r) {
+    const int start = r.query.queryItemValue(QStringLiteral("startIndex")).toInt();
+    QByteArray items;
+    const int limit = r.query.queryItemValue(QStringLiteral("limit")).toInt();
+    for (int i = start; i < std::min(5, start + limit); ++i) {
+      if (!items.isEmpty()) items += ",";
+      items += "{\"Id\": \"c" + QByteArray::number(i) + "\", \"Name\": \"Channel\"}";
+    }
+    return HttpResponse{200, "{\"Items\": [" + items + "], \"TotalRecordCount\": 5, \"StartIndex\": " +
+                                 QByteArray::number(start) + "}",
+                        "application/json", 0};
+  });
+  LiveTvChannelQuery query;
+  query.limit = 2;
+  auto all = run<QList<LiveTvChannel>>([&](auto done) { s.liveTv.allChannels(query, nullptr, done); });
+  REQUIRE(all.ok());
+  REQUIRE(all->size() == 5);
+  CHECK(all->at(4).id == QStringLiteral("c4"));
+  CHECK(s.server.requests().size() == 3);
+}
+
+TEST_CASE("One channel by id, and a whole guide window over pages, by start") {
+  Signed s([](const HttpRequest& r) {
+    if (r.path == QStringLiteral("/jf/LiveTv/Channels/c1"))
+      return HttpResponse{200, R"({"Id": "c1", "Name": "Test Channel 1", "ChannelNumber": "1"})",
+                          "application/json", 0};
+    if (r.path == QStringLiteral("/jf/LiveTv/Programs")) {
+      const int start = r.query.queryItemValue(QStringLiteral("startIndex")).toInt();
+      if (start == 0)
+        return HttpResponse{200, R"({"Items": [
+          {"Id": "b", "ChannelId": "c1", "Name": "B", "StartDate": "2026-11-10T17:00:00Z", "EndDate": "2026-11-10T17:30:00Z"},
+          {"Id": "x", "ChannelId": "c1", "Name": "No dates"}], "TotalRecordCount": 3, "StartIndex": 0})",
+                            "application/json", 0};
+      return HttpResponse{200, R"({"Items": [
+          {"Id": "a", "ChannelId": "c1", "Name": "A", "StartDate": "2026-11-10T16:30:00Z", "EndDate": "2026-11-10T17:00:00Z"}],
+          "TotalRecordCount": 3, "StartIndex": 2})",
+                          "application/json", 0};
+    }
+    return HttpResponse{404, {}, {}, 0};
+  });
+  auto channel = run<LiveTvChannel>([&](auto done) { s.liveTv.channel(QStringLiteral("c1"), nullptr, done); });
+  REQUIRE(channel.ok());
+  CHECK(channel->name == QStringLiteral("Test Channel 1"));
+  CHECK(s.param("userId") == QStringLiteral("user1"));
+
+  LiveTvProgramQuery query;
+  query.channelIds = {QStringLiteral("c1")};
+  query.from = utc("2026-11-10T16:00:00Z");
+  query.to = utc("2026-11-10T22:00:00Z");
+  query.limit = 2;
+  auto all = run<QList<LiveTvProgram>>([&](auto done) { s.liveTv.allPrograms(query, nullptr, done); });
+  REQUIRE(all.ok());
+  REQUIRE(all->size() == 2);
+  CHECK(all->at(0).id == QStringLiteral("a"));
+  CHECK(all->at(1).id == QStringLiteral("b"));
+  CHECK(s.param("startIndex") == QStringLiteral("2"));
+  CHECK(s.param("channelIds") == QStringLiteral("c1"));
+}
+
+TEST_CASE("A guide page of only undated programmes does not end the list") {
+  Signed s([](const HttpRequest& r) {
+    if (r.path != QStringLiteral("/jf/LiveTv/Programs")) return HttpResponse{404, {}, {}, 0};
+    const int start = r.query.queryItemValue(QStringLiteral("startIndex")).toInt();
+    if (start == 0)
+      return HttpResponse{200, R"({"Items": [
+        {"Id": "x", "ChannelId": "c1", "Name": "No dates"},
+        {"Id": "y", "ChannelId": "c1", "Name": "No dates either"}], "TotalRecordCount": 3, "StartIndex": 0})",
+                          "application/json", 0};
+    return HttpResponse{200, R"({"Items": [
+        {"Id": "a", "ChannelId": "c1", "Name": "A", "StartDate": "2026-11-10T16:30:00Z", "EndDate": "2026-11-10T17:00:00Z"}],
+        "TotalRecordCount": 3, "StartIndex": 2})",
+                        "application/json", 0};
+  });
+  LiveTvProgramQuery query;
+  query.limit = 2;
+  auto all = run<QList<LiveTvProgram>>([&](auto done) { s.liveTv.allPrograms(query, nullptr, done); });
+  REQUIRE(all.ok());
+  REQUIRE(all->size() == 1);
+  CHECK(all->at(0).id == QStringLiteral("a"));
 }

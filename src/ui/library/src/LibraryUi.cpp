@@ -116,6 +116,25 @@ namespace jfd::ui {
     return model;
   }
 
+  library::LiveTvGuide* LibraryUi::createGuide(QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::LiveTvGuide::Options options;
+    options.devicePixelRatio = m_services.devicePixelRatio;
+    auto* guide = new library::LiveTvGuide(*m_services.client, options, owner);
+    QQmlEngine::setObjectOwnership(guide, QQmlEngine::CppOwnership);
+    return guide;
+  }
+
+  library::LiveTvSchedule* LibraryUi::createSchedule(const QString& channelId, QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::LiveTvSchedule::Options options;
+    options.devicePixelRatio = m_services.devicePixelRatio;
+    auto* schedule = new library::LiveTvSchedule(*m_services.client, options, owner);
+    QQmlEngine::setObjectOwnership(schedule, QQmlEngine::CppOwnership);
+    schedule->setChannelId(channelId);
+    return schedule;
+  }
+
   library::ItemDetails* LibraryUi::createDetails(const QString& itemId, QObject* owner) {
     if (m_services.client == nullptr) return nullptr;
     library::ItemDetails::Options options;
@@ -148,7 +167,7 @@ namespace jfd::ui {
     if (type == QLatin1String("Playlist")) return QStringLiteral("playlist/") + itemId;
     if (type == QLatin1String("Person")) return QStringLiteral("person/") + itemId;
     if (type == QLatin1String("TvChannel") || type == QLatin1String("LiveTvChannel"))
-      return QStringLiteral("livetv");
+      return QStringLiteral("channel/") + itemId;
     if (type == QLatin1String("CollectionFolder") || type == QLatin1String("UserView") ||
         type == QLatin1String("Folder")) {
       // Music libraries have screens of their own (src/ui/music).

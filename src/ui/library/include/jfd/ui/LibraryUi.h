@@ -4,6 +4,8 @@
 #include <jfd/library/ItemDetails.h>
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LiveTvChannels.h>
+#include <jfd/library/LiveTvGuide.h>
+#include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
 
@@ -116,12 +118,16 @@ namespace jfd::ui {
     // A search of its own (the command palette's), owned by `owner`; the
     // search page keeps using `search`. Null before attach.
     Q_INVOKABLE jfd::library::SearchModel* createSearch(QObject* owner);
+    // The programme guide (route "guide") and one channel's programmes
+    // (route "channel/<id>"), owned by `owner`.
+    Q_INVOKABLE jfd::library::LiveTvGuide* createGuide(QObject* owner);
+    Q_INVOKABLE jfd::library::LiveTvSchedule* createSchedule(const QString& channelId, QObject* owner);
     // The image provider's source for a server image URL.
     Q_INVOKABLE QString image(const QUrl& url) const;
     // Where a card leads: "library/<id>" for a library, "collection/<id>"
     // for a collection, "person/<id>" for a person, the music pages for
-    // albums, artists and playlists, "livetv" for the Live TV library and
-    // its channels, "item/<id>" for anything else. A track has no page: it
+    // albums, artists and playlists, "livetv" for the Live TV library,
+    // "channel/<id>" for a channel, "item/<id>" for anything else. A track has no page: it
     // plays (playTrack).
     Q_INVOKABLE QString routeFor(const QString& itemId, const QString& type) const;
     // A library's title from the home page's list, for the grid's heading.

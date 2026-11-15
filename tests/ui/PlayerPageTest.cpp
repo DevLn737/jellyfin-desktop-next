@@ -12,6 +12,7 @@
 #include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/PlayerSession.h>
 
+#include <QDateTime>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QQmlComponent>
@@ -100,9 +101,9 @@ namespace {
 
     // What the launcher emits once the server resolved the item, then the
     // intent it posts.
-    void open(bool live = false) {
+    void open(bool live = false, const QString& itemId = QStringLiteral("episode")) {
       session::PlaybackLauncher::Request request;
-      request.itemId = QStringLiteral("episode");
+      request.itemId = itemId;
       api::MediaSource source;
       source.id = QStringLiteral("source");
       source.defaultAudioStreamIndex = 2;
@@ -378,4 +379,101 @@ TEST_CASE("A live channel shows no timeline, no end time and cannot be sought") 
   CHECK(f.player->position() < before + 60);
   f.player->stop();
   REQUIRE(waitFor([&] { return !f.player->active() || f.player->ended(); }, 2000));
+}
+
+TEST_CASE("A live channel names its programme, and Page Up and Down change the channel") {
+  // Three channels; the guide has the second one's programmes.
+  test::FakeServer server([](const test::HttpRequest& r) {
+    const auto json = [](const char* body) { return test::HttpResponse{200, QByteArray(body), "application/json", 0}; };
+    if (r.path == QStringLiteral("/LiveTv/Channels"))
+      return json(R"({"Items": [
+        {"Id": "ch1", "Name": "Test Channel 1", "ChannelNumber": "1"},
+        {"Id": "ch2", "Name": "Test Channel 2", "ChannelNumber": "2",
+         "CurrentProgram": {"Id": "p0", "Name": "From the list", "StartDate": "2026-11-10T16:00:00Z",
+                            "EndDate": "2026-11-10T16:30:00Z"}},
+        {"Id": "ch3", "Name": "Test Channel 3", "ChannelNumber": "3"}], "TotalRecordCount": 3, "StartIndex": 0})");
+    if (r.path == QStringLiteral("/LiveTv/Programs") &&
+        r.query.queryItemValue(QStringLiteral("channelIds")) == QStringLiteral("ch2"))
+      return json(R"({"Items": [
+        {"Id": "p1", "ChannelId": "ch2", "Name": "Evening news", "StartDate": "2026-11-10T16:00:00Z",
+         "EndDate": "2026-11-10T16:30:00Z"},
+        {"Id": "p2", "ChannelId": "ch2", "Name": "Weather", "StartDate": "2026-11-10T16:30:00Z",
+         "EndDate": "2026-11-10T16:40:00Z"}], "TotalRecordCount": 2, "StartIndex": 0})");
+    if (r.path == QStringLiteral("/LiveTv/Programs")) return json(R"({"Items": [], "TotalRecordCount": 0})");
+    // The channel the player tunes to: the lookup stays open, so the switch
+    // is still under way when the test looks (a failed one goes back).
+    if (r.path.startsWith(QStringLiteral("/Items/ch"))) return test::HttpResponse{200, "{}", "application/json", 60000};
+    return test::HttpResponse{404, {}, {}, 0};
+  });
+  Fixture f;
+  f.client.setServerUrl(server.url());
+  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
+  QDateTime clock = QDateTime::fromString(QStringLiteral("2026-11-10T16:15:00Z"), Qt::ISODate);
+  f.player->setClock([&clock] { return clock; });
+
+  f.open(true, QStringLiteral("ch2"));
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
+  REQUIRE(waitFor([&] { return f.player->programTitle() == QStringLiteral("Evening news"); }, 5000));
+  REQUIRE(waitFor([&] { return f.player->canChangeChannel(); }, 5000));
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 2"));
+  CHECK(f.player->channelNumber() == QStringLiteral("2"));
+  CHECK(f.player->programProgress() == doctest::Approx(0.5));
+  CHECK(f.player->programEnd() == QDateTime::fromString(QStringLiteral("2026-11-10T16:30:00Z"), Qt::ISODate));
+
+  QQuickItem* program = find(f.page, "programTitle");
+  REQUIRE(program != nullptr);
+  REQUIRE(waitFor([&] { return program->isVisible(); }, 2000));
+  CHECK(program->property("text").toString().endsWith(QStringLiteral("Evening news")));
+  QQuickItem* up = find(f.page, "channelUp");
+  QQuickItem* down = find(f.page, "channelDown");
+  REQUIRE(up != nullptr);
+  REQUIRE(down != nullptr);
+  CHECK(up->isVisible());
+  CHECK(down->isVisible());
+  CHECK_FALSE(find(f.page, "next")->isVisible());
+
+  // The programme moves on with the clock, from the guide already loaded.
+  clock = clock.addSecs(20 * 60);
+  f.player->updateProgram();
+  CHECK(f.player->programTitle() == QStringLiteral("Weather"));
+
+  f.page->forceActiveFocus();
+  const auto press = [&](int key) {
+    QKeyEvent pressEvent(QEvent::KeyPress, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&f.window, &pressEvent);
+    QKeyEvent releaseEvent(QEvent::KeyRelease, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&f.window, &releaseEvent);
+  };
+  const auto asked = [&](const char* id) {
+    for (const test::HttpRequest& r : server.requests())
+      if (r.path == QStringLiteral("/Items/%1").arg(QLatin1String(id))) return true;
+    return false;
+  };
+  // Channel up: the next in the list, named at once while it tunes in.
+  press(Qt::Key_PageUp);
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 3"));
+  CHECK(f.player->programTitle().isEmpty());
+  REQUIRE(waitFor([&] { return asked("ch3"); }, 5000));
+  // Channel down twice: round the list back past the first.
+  press(Qt::Key_PageDown);
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 2"));
+  press(Qt::Key_ChannelDown);
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 1"));
+  REQUIRE(waitFor([&] { return asked("ch1"); }, 5000));
+  press(Qt::Key_ChannelDown);
+  CHECK(f.player->channelName() == QStringLiteral("Test Channel 3"));
+}
+
+TEST_CASE("Page Up and Down do nothing to a file that is not live") {
+  Fixture f;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  CHECK_FALSE(f.player->canChangeChannel());
+  CHECK(f.player->channelName().isEmpty());
+  CHECK(f.player->programTitle().isEmpty());
+  f.page->forceActiveFocus();
+  QKeyEvent press(QEvent::KeyPress, Qt::Key_PageUp, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &press);
+  CHECK(f.player->active());
+  CHECK_FALSE(find(f.page, "channelUp")->isVisible());
 }

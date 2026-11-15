@@ -8,6 +8,7 @@
 #include <jfd/library/ImageCache.h>
 #include <jfd/library/LibraryUpdates.h>
 #include <jfd/library/LiveTvChannels.h>
+#include <jfd/library/LiveTvOnNow.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/ServerStore.h>
 #include <jfd/library/SignIn.h>
@@ -67,6 +68,9 @@ namespace jfd::ui {
     library::SignIn& signIn() { return m_signIn; }
     library::HomeModel& home() { return m_home; }
     library::LiveTvChannels& liveTv() { return m_liveTv; }
+    // The home screen's "On now" row (section "livetv.onNow"), there while
+    // Live TV is.
+    library::LiveTvOnNow& onNow() { return m_onNow; }
     library::CollectionIndex& collections() { return m_collections; }
     library::ImageCache& images() { return m_images; }
     const TextureBudget& textures() const { return *m_textures; }
@@ -74,6 +78,8 @@ namespace jfd::ui {
     LibraryUi* ui() const { return m_ui.data(); }
 
   private:
+    void syncOnNow();
+
     qreal m_devicePixelRatio;
     std::unique_ptr<platform::CredentialStore> m_tokens;
     library::ServerStore m_servers;
@@ -85,6 +91,7 @@ namespace jfd::ui {
     library::HomeModel m_home;
     library::SearchModel m_search;
     library::LiveTvChannels m_liveTv;
+    library::LiveTvOnNow m_onNow;
     library::CollectionIndex m_collections;
     std::function<QJsonObject()> m_readFilters;
     std::function<void(const QJsonObject&)> m_writeFilters;

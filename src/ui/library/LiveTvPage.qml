@@ -9,7 +9,7 @@ import Jfd.Ui.Library
 
 // Live TV (route "livetv"): every channel with what is on now, how far it
 // is, and what comes next. Enter or a click tunes in; the channel plays on
-// this device only. The programme guide grid comes later (3.7a, part 2).
+// this device only. Guide opens the programme guide grid.
 RoutePage {
     id: page
 
@@ -52,6 +52,13 @@ RoutePage {
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSmall
             }
+            ActionButton {
+                id: guideButton
+                objectName: "liveTvGuide"
+                text: qsTr("Guide")
+                onClicked: Navigator.navigate("guide")
+                KeyNavigation.down: list
+            }
         }
 
         ListView {
@@ -65,6 +72,11 @@ RoutePage {
             model: page.channels
             keyNavigationEnabled: true
             boundsBehavior: Flickable.StopAtBounds
+            // Up from the first channel reaches the Guide button.
+            Keys.onUpPressed: (event) => {
+                if (list.currentIndex <= 0) guideButton.forceActiveFocus()
+                else event.accepted = false
+            }
 
             delegate: ChannelRow {
                 width: ListView.view.width

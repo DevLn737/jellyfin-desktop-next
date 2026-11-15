@@ -6,18 +6,24 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/LiveTv.h>
 #include <jfd/library/LiveTvChannels.h>
+#include <jfd/library/LiveTvGuide.h>
+#include <jfd/library/LiveTvOnNow.h>
+#include <jfd/library/LiveTvSchedule.h>
+#include <jfd/library/ItemListModel.h>
 
 #include <QElapsedTimer>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
 // Live TV on the extras stand (scripts/test-server/extras-server.sh: an M3U
 // tuner of 50 channels and a 24-hour XMLTV guide; JFD_EXTRAS_*, skipped
-// without it): Info, the channel list with now and next, a channel's
+// without it): Info, the channel list with now and next, the guide grid's
+// model, the home screen's "On now" row, a channel's page, a channel's
 // PlaybackInfo, its stream through the server, and the stream closed once
 // Stopped names it.
 
@@ -206,4 +212,70 @@ TEST_CASE("A channel plays through the server and its stream closes on Stopped")
 
   // Closing again is harmless.
   CHECK(run<Empty>([&](auto done) { liveTv.closeLiveStream(stream->liveStreamId, nullptr, done); }).ok());
+}
+
+TEST_CASE("The guide grid: every channel and the guide in view within a second, the rest by chunks") {
+  if (!hasExtrasStand()) return;
+  Stand s;
+  library::LiveTvGuide guide(*s.client);
+  guide.setViewMinutes(180);
+  QElapsedTimer clock;
+  clock.start();
+  guide.reload();
+  REQUIRE(waitFor([&] { return !guide.loading(); }, 30000));
+  const qint64 elapsed = clock.elapsed();
+  MESSAGE("guide grid (channels and the first chunk) loaded in " << elapsed << " ms");
+  CHECK(guide.errorText().isEmpty());
+  REQUIRE(guide.count() == expectedChannels());
+  // Threshold "Live TV: data" (< 1 s on screen).
+  CHECK(elapsed < 1000);
+  for (int row = 0; row < guide.count(); ++row) {
+    INFO("row " << row);
+    CHECK_FALSE(guide.data(guide.index(row), library::LiveTvGuide::ProgramsRole).toList().isEmpty());
+  }
+  // The focus is on what is on now on the first channel.
+  CHECK(guide.focusRow() == 0);
+  CHECK(guide.focusedProgram().value(QStringLiteral("title")).toString().startsWith(QStringLiteral("Channel 1 at ")));
+
+  // Across the rows and along one: the guide's programmes follow each other.
+  CHECK(guide.moveFocus(0, 1));
+  CHECK(guide.focusedProgram().value(QStringLiteral("title")).toString().startsWith(QStringLiteral("Channel 2 at ")));
+  const QString before = guide.focusedProgram().value(QStringLiteral("id")).toString();
+  CHECK(guide.moveFocus(1, 0));
+  CHECK(guide.focusedProgram().value(QStringLiteral("id")).toString() != before);
+
+  // Paging through the next hours loads the chunks the view reaches.
+  clock.restart();
+  for (int i = 0; i < 4; ++i) guide.pageFocus(1);
+  REQUIRE(waitFor([&] { return !guide.loading(); }, 30000));
+  MESSAGE("12 hours on: " << guide.chunksRequested() << " chunks, " << clock.elapsed() << " ms");
+  CHECK(guide.chunksRequested() >= 2);
+  CHECK(guide.viewStartMinutes() >= 600);
+  CHECK_FALSE(guide.data(guide.index(1), library::LiveTvGuide::ProgramsRole).toList().isEmpty());
+}
+
+TEST_CASE("On now and a channel's page on the stand") {
+  if (!hasExtrasStand()) return;
+  Stand s;
+  library::LiveTvOnNow onNow(*s.client);
+  onNow.reload();
+  REQUIRE(waitFor([&] { return onNow.count() > 0; }, 30000));
+  CHECK(onNow.count() == std::min(24, expectedChannels()));
+  CHECK(onNow.data(onNow.index(0), library::ItemListModel::NameRole).toString().startsWith(QStringLiteral("Channel 1 at ")));
+  CHECK(onNow.data(onNow.index(0), library::ItemListModel::TypeRole).toString() == QStringLiteral("TvChannel"));
+  const QString channelId = onNow.data(onNow.index(0), library::ItemListModel::IdRole).toString();
+
+  LiveTvApi liveTv(*s.client);
+  auto channel = run<LiveTvChannel>([&](auto done) { liveTv.channel(channelId, nullptr, done); });
+  REQUIRE(channel.ok());
+  CHECK(channel->name == QStringLiteral("Test Channel 1"));
+
+  library::LiveTvSchedule schedule(*s.client);
+  schedule.setChannelId(channelId);
+  REQUIRE(waitFor([&] { return !schedule.loading(); }, 30000));
+  CHECK(schedule.errorText().isEmpty());
+  CHECK(schedule.name() == QStringLiteral("Test Channel 1"));
+  REQUIRE(schedule.count() > 1);
+  CHECK(schedule.data(schedule.index(0), library::LiveTvSchedule::OnNowRole).toBool());
+  for (const LiveTvProgram& p : schedule.programs()) CHECK(p.channelId == channelId);
 }
