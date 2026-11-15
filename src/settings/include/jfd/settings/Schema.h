@@ -28,6 +28,10 @@ namespace jfd::settings {
     // A button on the settings screen (for example "Open log folder"); has no
     // stored value. The owner connects to Settings::actionTriggered.
     Action,
+    // A folder on this computer: an absolute path, stored as a string with
+    // native separators. The settings screen offers the system's folder
+    // picker beside the path.
+    Folder,
   };
 
   struct Choice {

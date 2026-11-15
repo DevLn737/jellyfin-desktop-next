@@ -3,6 +3,7 @@
 #include <jfd/settings/Settings.h>
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QLoggingCategory>
 
 namespace jfd::ui {
@@ -61,6 +62,8 @@ namespace jfd::ui {
       return QStringLiteral("choice");
     case SettingType::Action:
       return QStringLiteral("action");
+    case SettingType::Folder:
+      return QStringLiteral("folder");
     }
     return {};
   }
@@ -189,6 +192,14 @@ namespace jfd::ui {
     if (m_settings != nullptr) {
       m_settings->trigger(key);
     }
+  }
+
+  QString AppSettings::localPath(const QUrl& url) const {
+    return url.isLocalFile() ? QDir::toNativeSeparators(url.toLocalFile()) : QString();
+  }
+
+  QUrl AppSettings::folderUrl(const QString& path) const {
+    return path.isEmpty() ? QUrl() : QUrl::fromLocalFile(QDir::fromNativeSeparators(path));
   }
 
 } // namespace jfd::ui

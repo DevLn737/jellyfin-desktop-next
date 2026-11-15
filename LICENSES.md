@@ -37,28 +37,38 @@ only reformatted.
 | `src/ui/controls/icons/back.svg` | Material Icons `arrow_back` | Apache-2.0 |
 | `src/ui/controls/icons/check.svg` | Material Icons `check` | Apache-2.0 |
 | `src/ui/controls/icons/close.svg` | Material Icons `close` | Apache-2.0 |
+| `src/ui/controls/icons/delete.svg` | Material Icons `delete` | Apache-2.0 |
 | `src/ui/controls/icons/down.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
+| `src/ui/controls/icons/download.svg` | Material Icons `download` | Apache-2.0 |
+| `src/ui/controls/icons/downloaded.svg` | Material Icons `download_done` | Apache-2.0 |
 | `src/ui/controls/icons/error.svg` | Material Icons `error` | Apache-2.0 |
 | `src/ui/controls/icons/gamepad.svg` | Material Icons `sports_esports` | Apache-2.0 |
 | `src/ui/controls/icons/group.svg` | Material Icons `people` | Apache-2.0 |
 | `src/ui/controls/icons/home.svg` | Material Icons `home` | Apache-2.0 |
 | `src/ui/controls/icons/library.svg` | Material Icons `video_library` | Apache-2.0 |
 | `src/ui/controls/icons/menu.svg` | Material Icons `menu` | Apache-2.0 |
+| `src/ui/controls/icons/pause.svg` | Material Icons `pause` | Apache-2.0 |
 | `src/ui/controls/icons/play.svg` | Material Icons `play_arrow` | Apache-2.0 |
+| `src/ui/controls/icons/retry.svg` | Material Icons `refresh` | Apache-2.0 |
 | `src/ui/controls/icons/search.svg` | Material Icons `search` | Apache-2.0 |
 | `src/ui/controls/icons/settings.svg` | Material Icons `settings` | Apache-2.0 |
 | `src/ui/controls/icons/up.svg` | Material Icons `keyboard_arrow_up` | Apache-2.0 |
 | `src/ui/controls/icons-dark/back.svg` | Material Icons `arrow_back` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/check.svg` | Material Icons `check` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/close.svg` | Material Icons `close` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/delete.svg` | Material Icons `delete` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/down.svg` | Material Icons `keyboard_arrow_down` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/download.svg` | Material Icons `download` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/downloaded.svg` | Material Icons `download_done` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/error.svg` | Material Icons `error` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/gamepad.svg` | Material Icons `sports_esports` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/group.svg` | Material Icons `people` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/home.svg` | Material Icons `home` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/library.svg` | Material Icons `video_library` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/menu.svg` | Material Icons `menu` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/pause.svg` | Material Icons `pause` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/play.svg` | Material Icons `play_arrow` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/retry.svg` | Material Icons `refresh` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/search.svg` | Material Icons `search` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/settings.svg` | Material Icons `settings` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/up.svg` | Material Icons `keyboard_arrow_up` (dark fill) | Apache-2.0 |

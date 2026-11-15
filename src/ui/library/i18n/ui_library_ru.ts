@@ -106,6 +106,262 @@
     </message>
 </context>
 <context>
+    <name>DownloadActions</name>
+    <message>
+        <source>Download</source>
+        <translation>Скачать</translation>
+    </message>
+    <message>
+        <source>Download more</source>
+        <translation>Скачать ещё</translation>
+    </message>
+    <message>
+        <source>Download failed</source>
+        <translation>Ошибка загрузки</translation>
+    </message>
+    <message>
+        <source>Downloading, %1 %</source>
+        <translation>Скачивается, %1 %</translation>
+    </message>
+    <message>
+        <source>Downloaded</source>
+        <translation>Скачано</translation>
+    </message>
+    <message>
+        <source>Waiting to download</source>
+        <translation>Ждёт загрузки</translation>
+    </message>
+    <message>
+        <source>Download paused</source>
+        <translation>Загрузка на паузе</translation>
+    </message>
+    <message>
+        <source>Delete downloads</source>
+        <translation>Удалить загрузки</translation>
+    </message>
+    <message>
+        <source>Delete download</source>
+        <translation>Удалить загрузку</translation>
+    </message>
+    <message>
+        <source>Downloading is turned off for your account on this server.</source>
+        <translation>Скачивание выключено для вашей учётной записи на этом сервере.</translation>
+    </message>
+    <message>
+        <source>Delete the downloaded files of &quot;%1&quot;? This frees %2. It stays on the server.</source>
+        <translation>Удалить скачанные файлы «%1»? Освободится %2. На сервере всё останется.</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Удалить</translation>
+    </message>
+</context>
+<context>
+    <name>DownloadDialog</name>
+    <message>
+        <source>Download</source>
+        <translation>Скачать</translation>
+    </message>
+    <message>
+        <source>Download anyway</source>
+        <translation>Всё равно скачать</translation>
+    </message>
+    <message>
+        <source>Everything here is already downloaded.</source>
+        <translation>Здесь всё уже скачано.</translation>
+    </message>
+    <message>
+        <source>Nothing here can be downloaded as a file.</source>
+        <translation>Здесь нечего скачать файлом.</translation>
+    </message>
+    <message>
+        <source>There is nothing here to download.</source>
+        <translation>Здесь нечего скачивать.</translation>
+    </message>
+    <message>
+        <source>One file, %1</source>
+        <translation>Один файл, %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s), about %1</source>
+        <translation>
+            <numerusform>%n элемент, около %1</numerusform>
+            <numerusform>%n элемента, около %1</numerusform>
+            <numerusform>%n элементов, около %1</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Quality: original, the file exactly as the server has it.</source>
+        <translation>Качество: оригинал, файл в точности как на сервере.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n already downloaded.</source>
+        <translation>
+            <numerusform>%n уже скачан.</numerusform>
+            <numerusform>%n уже скачано.</numerusform>
+            <numerusform>%n уже скачано.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n cannot be downloaded: a folder, a disc image or a stream.</source>
+        <translation>
+            <numerusform>%n нельзя скачать: это папка, образ диска или поток.</numerusform>
+            <numerusform>%n нельзя скачать: это папки, образы дисков или потоки.</numerusform>
+            <numerusform>%n нельзя скачать: это папки, образы дисков или потоки.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Version</source>
+        <translation>Версия</translation>
+    </message>
+    <message>
+        <source>Only unwatched episodes</source>
+        <translation>Только непросмотренные серии</translation>
+    </message>
+    <message>
+        <source>The download will wait until there is room.</source>
+        <translation>Загрузка подождёт, пока не появится место.</translation>
+    </message>
+</context>
+<context>
+    <name>DownloadRow</name>
+    <message>
+        <source>Pause</source>
+        <translation>Пауза</translation>
+    </message>
+    <message>
+        <source>Continue</source>
+        <translation>Продолжить</translation>
+    </message>
+    <message>
+        <source>Try again</source>
+        <translation>Повторить</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Выше</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Ниже</translation>
+    </message>
+    <message>
+        <source>Cancel download</source>
+        <translation>Отменить загрузку</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Воспроизвести</translation>
+    </message>
+    <message>
+        <source>Delete download</source>
+        <translation>Удалить загрузку</translation>
+    </message>
+</context>
+<context>
+    <name>DownloadsPage</name>
+    <message>
+        <source>Downloads</source>
+        <translation>Загрузки</translation>
+    </message>
+    <message>
+        <source>Delete download</source>
+        <translation>Удалить загрузку</translation>
+    </message>
+    <message>
+        <source>Delete the downloaded file of &quot;%1&quot;? This frees %2. It stays on the server.</source>
+        <translation>Удалить скачанный файл «%1»? Освободится %2. На сервере он останется.</translation>
+    </message>
+    <message>
+        <source>Downloads are not available</source>
+        <translation>Загрузки недоступны</translation>
+    </message>
+    <message>
+        <source>Sign in to a server to download.</source>
+        <translation>Войдите на сервер, чтобы скачивать.</translation>
+    </message>
+    <message>
+        <source>Downloads use %1 of %2</source>
+        <translation>Загрузки занимают %1 из %2</translation>
+    </message>
+    <message>
+        <source>Downloads use %1</source>
+        <translation>Загрузки занимают %1</translation>
+    </message>
+    <message>
+        <source>%1 free on the disk</source>
+        <translation>на диске свободно %1</translation>
+    </message>
+    <message>
+        <source>The download folder&apos;s disk is not available</source>
+        <translation>Диск папки загрузок недоступен</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Очередь (%1)</translation>
+    </message>
+    <message>
+        <source>Downloaded (%1)</source>
+        <translation>Загружено (%1)</translation>
+    </message>
+    <message>
+        <source>Continue</source>
+        <translation>Продолжить</translation>
+    </message>
+    <message>
+        <source>Pause all</source>
+        <translation>Приостановить все</translation>
+    </message>
+    <message>
+        <source>Filter by name</source>
+        <translation>Фильтр по названию</translation>
+    </message>
+    <message>
+        <source>Delete watched</source>
+        <translation>Удалить просмотренное</translation>
+    </message>
+    <message>
+        <source>Delete watched downloads</source>
+        <translation>Удалить просмотренные загрузки</translation>
+    </message>
+    <message>
+        <source>Delete every watched download? This frees %1.</source>
+        <translation>Удалить все просмотренные загрузки? Освободится %1.</translation>
+    </message>
+    <message>
+        <source>Delete all</source>
+        <translation>Удалить всё</translation>
+    </message>
+    <message>
+        <source>Delete all downloads</source>
+        <translation>Удалить все загрузки</translation>
+    </message>
+    <message>
+        <source>Delete every download, the queue included? This frees %1. Everything stays on the server.</source>
+        <translation>Удалить все загрузки вместе с очередью? Освободится %1. На сервере всё останется.</translation>
+    </message>
+    <message>
+        <source>Nothing is downloading</source>
+        <translation>Ничего не скачивается</translation>
+    </message>
+    <message>
+        <source>No download matches</source>
+        <translation>Нет подходящих загрузок</translation>
+    </message>
+    <message>
+        <source>Nothing downloaded yet</source>
+        <translation>Пока ничего не скачано</translation>
+    </message>
+    <message>
+        <source>Use Download on a film, series, album or playlist to keep it for watching without the server.</source>
+        <translation>Нажмите «Скачать» на фильме, сериале, альбоме или плейлисте, чтобы смотреть и слушать без сервера.</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Удалить</translation>
+    </message>
+</context>
+<context>
     <name>EpisodeRow</name>
     <message>
         <source>Play</source>
@@ -179,6 +435,38 @@
     <message>
         <source>Nothing here yet. Add media to a library on the server.</source>
         <translation>Здесь пока пусто. Добавьте медиа в библиотеку на сервере.</translation>
+    </message>
+    <message>
+        <source>Continue watching</source>
+        <translation>Продолжить просмотр</translation>
+    </message>
+    <message>
+        <source>Downloaded films</source>
+        <translation>Скачанные фильмы</translation>
+    </message>
+    <message>
+        <source>Downloaded episodes</source>
+        <translation>Скачанные серии</translation>
+    </message>
+    <message>
+        <source>Downloaded music</source>
+        <translation>Скачанная музыка</translation>
+    </message>
+    <message>
+        <source>Other downloads</source>
+        <translation>Другие загрузки</translation>
+    </message>
+    <message>
+        <source>No connection to the server</source>
+        <translation>Нет связи с сервером</translation>
+    </message>
+    <message>
+        <source>Your downloads play from this computer. What you watch now reaches the server when the connection is back.</source>
+        <translation>Скачанное воспроизводится с этого компьютера. Что вы посмотрите сейчас, попадёт на сервер, когда связь вернётся.</translation>
+    </message>
+    <message>
+        <source>Downloads</source>
+        <translation>Загрузки</translation>
     </message>
 </context>
 <context>
@@ -459,6 +747,21 @@
     <message>
         <source>Live TV</source>
         <translation>Эфир</translation>
+    </message>
+    <message>
+        <source>Downloads</source>
+        <translation>Загрузки</translation>
+    </message>
+</context>
+<context>
+    <name>jfd::ui::DownloadsUi</name>
+    <message numerus="yes">
+        <source>%n item(s) added to downloads</source>
+        <translation>
+            <numerusform>%n элемент добавлен в загрузки</numerusform>
+            <numerusform>%n элемента добавлено в загрузки</numerusform>
+            <numerusform>%n элементов добавлено в загрузки</numerusform>
+        </translation>
     </message>
 </context>
 <context>

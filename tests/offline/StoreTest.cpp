@@ -187,6 +187,23 @@ TEST_CASE("Downloads go to Videos/Jellyfin with 100 GiB and 5 GiB free by defaul
   CHECK(defaultDownloadFolder().endsWith(QStringLiteral("/Jellyfin")));
   CHECK(settings.setValue(keys::MaxGiB, 0));
   CHECK_FALSE(settings.setValue(keys::MaxGiB, -1));
+
+  // The folder is a folder setting: a full path, kept with native
+  // separators; a relative one or nothing is refused.
+  CHECK(registry.setting(keys::Folder)->type == jfd::settings::SettingType::Folder);
+  CHECK_FALSE(settings.setValue(keys::Folder, QStringLiteral("relative/downloads")));
+  CHECK_FALSE(settings.setValue(keys::Folder, QString()));
+  const QString chosen = dir.filePath(QStringLiteral("Загрузки alice"));
+  CHECK(settings.setValue(keys::Folder, chosen + QStringLiteral("/")));
+  CHECK(QDir::fromNativeSeparators(settings.value(keys::Folder).toString()) == chosen);
+
+  // One download at a time by default, at most three; unfinished ones
+  // continue at start.
+  CHECK(settings.value(keys::MaxParallel) == QVariant(1));
+  CHECK(settings.setValue(keys::MaxParallel, 3));
+  CHECK_FALSE(settings.setValue(keys::MaxParallel, 4));
+  CHECK_FALSE(settings.setValue(keys::MaxParallel, 0));
+  CHECK(settings.value(keys::ResumeOnStart) == QVariant(true));
 }
 
 TEST_CASE("The original is the default download when the user may download files") {

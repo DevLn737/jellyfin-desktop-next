@@ -13,10 +13,40 @@
     </message>
 </context>
 <context>
+    <name>DownloadBadge</name>
+    <message>
+        <source>Downloaded</source>
+        <translation>Скачано</translation>
+    </message>
+    <message>
+        <source>Downloading, %1 %</source>
+        <translation>Скачивается, %1 %</translation>
+    </message>
+    <message>
+        <source>Waiting to download</source>
+        <translation>Ждёт загрузки</translation>
+    </message>
+    <message>
+        <source>Download paused</source>
+        <translation>Загрузка на паузе</translation>
+    </message>
+    <message>
+        <source>Download failed</source>
+        <translation>Ошибка загрузки</translation>
+    </message>
+</context>
+<context>
     <name>LoadingIndicator</name>
     <message>
         <source>Loading</source>
         <translation>Загрузка</translation>
+    </message>
+</context>
+<context>
+    <name>PosterCard</name>
+    <message>
+        <source>downloaded</source>
+        <translation>скачано</translation>
     </message>
 </context>
 <context>

@@ -201,6 +201,10 @@ namespace jfd::desktop {
   // uninstallDownloads, after the player models are gone and before the
   // session, unsets the launcher's local source.
   void installDownloads(AppServices& services);
+  // The download screens (the `Downloads` singleton, the "downloads"
+  // route and its sidebar entry, downloaded tracks to the music player).
+  // After installMusic.
+  void installDownloadScreens(AppServices& services, QQmlEngine& engine);
   void uninstallDownloads(AppServices& services);
   // The playback reports of a player model, with the offline journal
   // behind them; empty before installDownloads (straight to the server).

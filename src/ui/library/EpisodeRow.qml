@@ -8,7 +8,8 @@ import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
 // An episode in a season list: still image with progress, "1. Name",
-// run time and overview. Clicking or the play button starts it.
+// run time and overview, and its download state. Clicking or the play
+// button starts it.
 T.ItemDelegate {
     id: row
 
@@ -56,6 +57,16 @@ T.ItemDelegate {
                 width: parent.width * (row.model.progress || 0)
                 height: 4
                 color: Theme.progress
+            }
+            DownloadBadge {
+                objectName: "episodeDownloadBadge"
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.margins: Theme.spacingSmall
+                size: 22
+                downloadState: Downloads.revision >= 0 ? Downloads.stateOf(row.model.itemId || "") : ""
+                progress: downloadState === "downloading"
+                    ? (Downloads.progressRevision >= 0 ? Downloads.progressOf(row.model.itemId || "") : 0) : 0
             }
             Icon {
                 visible: row.model.played === true

@@ -86,4 +86,13 @@ namespace jfd::api {
   void fetchItemsById(JellyfinClient& client, const QStringList& ids, QObject* context,
                       std::function<void(Result<QJsonArray>)> done);
 
+  // GET Items?ParentId=..&Recursive=true: what a "Download" on a series,
+  // season, album, playlist or collection takes: its playable items (films,
+  // episodes, videos, tracks) with their MediaSources and UserData. Series
+  // and albums come in their order (season, number); a playlist keeps its
+  // own. `unplayedOnly` leaves out what the user has watched.
+  void fetchDownloadableChildren(JellyfinClient& client, const QString& parentId, bool keepOrder,
+                                 bool unplayedOnly, QObject* context,
+                                 std::function<void(Result<QJsonArray>)> done);
+
 } // namespace jfd::api

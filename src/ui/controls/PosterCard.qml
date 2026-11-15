@@ -6,7 +6,8 @@ import Jfd.Ui.Theme
 // image's aspect ratio: "poster" (2:3, films and series), "thumb" (16:9,
 // episodes and "continue watching"), "square" (album covers) or "circle"
 // (artists: a square image cut round). `progress` (0..1)
-// draws a watched bar; `played` a check mark; `unplayedCount` a badge.
+// draws a watched bar; `played` a check mark; `unplayedCount` a badge;
+// `downloadState` and `downloadProgress` a DownloadBadge in the top left.
 T.AbstractButton {
     id: card
     // Colours of the nearest colour scope (the video player has its own).
@@ -19,6 +20,8 @@ T.AbstractButton {
     property real progress: 0
     property bool played: false
     property int unplayedCount: 0
+    property string downloadState
+    property real downloadProgress: 0
     // The page colour a circle card's corners are cut out to.
     property color cutoutColor: colors.background
 
@@ -30,7 +33,8 @@ T.AbstractButton {
     implicitHeight: frame.height + captions.implicitHeight + Theme.spacingSmall
     focusPolicy: Qt.StrongFocus
     hoverEnabled: true
-    Accessible.name: subtitle.length > 0 ? title + ", " + subtitle : title
+    Accessible.name: (subtitle.length > 0 ? title + ", " + subtitle : title)
+                     + (downloadState === "complete" ? ", " + qsTr("downloaded") : "")
 
     Keys.onReturnPressed: card.clicked()
     Keys.onEnterPressed: card.clicked()
@@ -122,6 +126,15 @@ T.AbstractButton {
                 color: colors.accentText
                 size: 16
             }
+        }
+
+        DownloadBadge {
+            objectName: "downloadBadge"
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.margins: Theme.spacingSmall
+            downloadState: card.downloadState
+            progress: card.downloadProgress
         }
 
         FocusFrame { shown: card.visualFocus }

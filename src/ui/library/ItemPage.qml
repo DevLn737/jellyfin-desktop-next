@@ -8,7 +8,7 @@ import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
 // A movie, series, season or episode: backdrop, poster, details, Play /
-// Resume / Watch together, favorite and watched toggles, then seasons and
+// Resume / Watch together, favorite and watched toggles, Download, then seasons and
 // episodes for a series, episodes for a season, and similar items.
 RoutePage {
     id: page
@@ -233,6 +233,12 @@ RoutePage {
                             iconSource: Icons.check
                             text: page.details && page.details.played ? qsTr("Watched") : qsTr("Mark watched")
                             onClicked: page.details.togglePlayed()
+                        }
+                        DownloadActions {
+                            objectName: "downloadActions"
+                            itemId: page.details ? page.details.itemId : ""
+                            itemType: page.details && page.details.loaded ? page.details.type : ""
+                            itemName: page.title
                         }
                         ActionButton {
                             objectName: "favoriteButton"

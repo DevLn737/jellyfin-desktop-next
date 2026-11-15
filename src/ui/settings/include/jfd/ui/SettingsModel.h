@@ -2,6 +2,7 @@
 
 #include <QAbstractListModel>
 #include <QList>
+#include <QUrl>
 #include <qqmlintegration.h>
 
 namespace jfd::settings {
@@ -91,6 +92,10 @@ namespace jfd::ui {
     Q_INVOKABLE bool setValue(const QString& key, const QVariant& value);
     Q_INVOKABLE void reset(const QString& key);
     Q_INVOKABLE void trigger(const QString& key);
+    // For a "folder" setting: the folder picker's answer as a native path,
+    // and a path as the URL the picker starts in.
+    Q_INVOKABLE QString localPath(const QUrl& url) const;
+    Q_INVOKABLE QUrl folderUrl(const QString& path) const;
 
   Q_SIGNALS:
     void revisionChanged();

@@ -21,6 +21,11 @@ namespace jfd::offline {
     // Play a downloaded copy from disk even while the server can be reached
     // (without the server it always is). Default on.
     inline constexpr QLatin1String PreferLocal{"downloads/preferLocal"};
+    // How many downloads run at once, 1-3. Default 1.
+    inline constexpr QLatin1String MaxParallel{"downloads/maxParallel"};
+    // Unfinished downloads continue when the app starts; off, they start
+    // paused. Default on.
+    inline constexpr QLatin1String ResumeOnStart{"downloads/resumeOnStart"};
   } // namespace keys
 
   // <Videos>/Jellyfin (QStandardPaths::MoviesLocation): ~/Videos/Jellyfin

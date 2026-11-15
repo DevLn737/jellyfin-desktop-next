@@ -1,5 +1,6 @@
 #include "jfd/settings/Schema.h"
 
+#include <QDir>
 #include <QMetaType>
 
 #include <climits>
@@ -73,6 +74,16 @@ namespace jfd::settings {
     }
     case SettingType::Action:
       return {};
+    case SettingType::Folder: {
+      if (!value.canConvert<QString>()) {
+        return {};
+      }
+      const QString path = value.toString().trimmed();
+      if (path.isEmpty() || !QDir::isAbsolutePath(QDir::fromNativeSeparators(path))) {
+        return {};
+      }
+      return QVariant(QDir::toNativeSeparators(QDir::cleanPath(QDir::fromNativeSeparators(path))));
+    }
     }
     return {};
   }

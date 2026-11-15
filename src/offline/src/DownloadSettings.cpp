@@ -23,12 +23,13 @@ namespace jfd::offline {
 
     settings::SettingDescriptor folder;
     folder.key = key(keys::Folder);
-    folder.type = settings::SettingType::String;
+    folder.type = settings::SettingType::Folder;
     folder.defaultValue = QDir::toNativeSeparators(defaultDownloadFolder());
     folder.label = QT_TRANSLATE_NOOP("DownloadSettings", "Download folder");
     folder.description = QT_TRANSLATE_NOOP("DownloadSettings",
                                            "Where downloaded movies, episodes and music are kept. "
-                                           "Files already downloaded stay where they are.");
+                                           "Downloads already made stay in the old folder and are "
+                                           "shown again when you choose it again.");
     folder.requiresRestart = true;
     section.settings.append(folder);
 
@@ -57,6 +58,29 @@ namespace jfd::offline {
         "DownloadSettings", "A download waits instead of filling the disk past this "
                             "much free space.");
     section.settings.append(reserve);
+
+    settings::SettingDescriptor parallel;
+    parallel.key = key(keys::MaxParallel);
+    parallel.type = settings::SettingType::Int;
+    parallel.defaultValue = 1;
+    parallel.minimum = 1;
+    parallel.maximum = 3;
+    parallel.step = 1;
+    parallel.label = QT_TRANSLATE_NOOP("DownloadSettings", "Downloads at the same time");
+    parallel.description = QT_TRANSLATE_NOOP(
+        "DownloadSettings", "More than one at a time can be faster on a fast server, and is "
+                            "harder on it.");
+    section.settings.append(parallel);
+
+    settings::SettingDescriptor resume;
+    resume.key = key(keys::ResumeOnStart);
+    resume.type = settings::SettingType::Bool;
+    resume.defaultValue = true;
+    resume.label = QT_TRANSLATE_NOOP("DownloadSettings", "Continue downloads when the app starts");
+    resume.description = QT_TRANSLATE_NOOP(
+        "DownloadSettings", "Off: unfinished downloads wait, paused, until you continue them on "
+                            "the Downloads page.");
+    section.settings.append(resume);
 
     settings::SettingDescriptor preferLocal;
     preferLocal.key = key(keys::PreferLocal);

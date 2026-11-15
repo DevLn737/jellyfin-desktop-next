@@ -1,5 +1,6 @@
 # Jfd.Ui.Settings: AppSettings (the settings store for QML) and the
-# settings screen, generated from the registered sections.
+# settings screen, generated from the registered sections. FolderPicker.qml
+# uses QtQuick.Dialogs (the system's folder picker), loaded on first use.
 qt_add_library(jfd_ui_settings STATIC
   src/SettingsModel.cpp
   include/jfd/ui/SettingsModel.h)
@@ -10,6 +11,7 @@ qt_add_qml_module(jfd_ui_settings
   URI Jfd.Ui.Settings
   VERSION 1.0
   QML_FILES
+    FolderPicker.qml
     SettingRow.qml
     SettingsPage.qml
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell)

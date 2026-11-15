@@ -250,6 +250,7 @@ int main(int argc, char* argv[]) {
         *services.client);
     desktop::installGroup(services, engine);
     desktop::installMusic(services, engine);
+    desktop::installDownloadScreens(services, engine);
     desktop::installSeerr(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 

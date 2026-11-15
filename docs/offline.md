@@ -1,6 +1,7 @@
 # Offline downloads
 
-Module `offline` (`jfd::offline`, Qt Core and Network, no screens), stage 3
+Module `offline` (`jfd::offline`, Qt Core and Network; the screens are in
+`src/ui`), stage 3
 package 3.10a. Plan: `stage3-briefs-3.9-3.10.md`, section 3.10, with the
 changes of its review (3.10 split into 3.10a, originals, and 3.10b,
 compressed copies).
@@ -9,8 +10,9 @@ Step 1 gave the download folder, manifests, the catalog, the space limits
 and the queue. Step 2 adds playing downloads without the server (the
 launcher's `LocalSource`), the subtitles, images, lyrics and segments of a
 download, the offline watch journal and its sync, and the app's wiring
-(`src/desktop/DownloadsInstall.cpp`). The screens ("Download" buttons, the
-downloads page, the offline home) follow in a later step.
+(`src/desktop/DownloadsInstall.cpp`). Step 3 adds the screens: "Download"
+buttons, badges on cards, the Downloads page and the offline home (see
+"Screens" below).
 
 | Header | What it gives |
 | --- | --- |
@@ -21,6 +23,8 @@ downloads page, the offline home) follow in a later step.
 | `DownloadWorker.h` | One thread with its own `QNetworkAccessManager`: Range / If-Range, writing `.part`, size check, rename |
 | `DownloadQueue.h` | Order, pause, resume, cancel, retry, reorder, retries with backoff, restart |
 | `DownloadSettings.h` | The "Downloads" settings section |
+| `DownloadsController.h` | What the screens use: permission, the queue and downloaded lists, per-item and per-group state, the "Download" summary, queue actions, deletion, space |
+| `DownloadListModel.h` | A list model of downloads, updated with moves, inserts and removes (never a reset, so the keyboard focus stays) |
 | `ExtrasDownloader.h` | Subtitles, images, lyrics and segments of a finished item |
 | `OfflineLocalSource.h` | `session::LocalSource` on the catalog: what the launcher plays from disk |
 | `ViewJournal.h` | The offline watch journal (JSON lines), `classifyView` |
@@ -66,6 +70,10 @@ Step 2 adds, all optional (older manifests read as before):
 `changedOnServer` and `refreshedAt`. File names must stay inside the item
 folder (no `..`, no absolute paths); others are ignored.
 
+Step 3 adds `parents` (optional): the ids of the season, series, album,
+playlist or collection the item was downloaded with, so a playlist or
+collection page knows its downloads. Only safe ids are kept.
+
 Never stored: `TranscodingUrl`, `DirectStreamUrl`, `ApiKey`, `AccessToken`
 keys, and `ApiKey` / `api_key` / `X-Emby-Token` query parameters inside any
 string. `toJson` removes them whatever the caller passes.
@@ -89,11 +97,13 @@ not needed.
 - Retries: 5, after 2, 4, 8, 16 and 32 s; an attempt that received data
   resets the count. 401 stops the queue until the next sign-in; other 4xx
   fail the item at once.
-- One transfer at a time by default (1 to 3). Progress reaches the GUI
-  thread at most four times a second.
+- One transfer at a time by default (setting "Downloads at the same time",
+  1 to 3). Progress reaches the GUI thread at most four times a second.
 - Restart: unfinished items of the signed-in user continue in their queue
-  order. Other users' downloads stay on disk, hidden, and continue when that
-  user signs in again. Signing out keeps downloads (default; deleting them is
+  order (setting "Continue downloads when the app starts", on by default;
+  off pauses them at the first sign-in). Other users' downloads stay on
+  disk, hidden, and continue when that user signs in again. Signing out
+  keeps downloads (default; deleting them is
   a choice in the sign-out dialog, a later step).
 
 ## Space
@@ -240,5 +250,48 @@ catalog, sets the launcher's local source, and follows the sign-in (the
 signed-in user's queue, extras and copies; signing out keeps the downloads,
 hidden), the session socket (online state; on `Ready`: sync, missing
 extras) and the settings (limit, reserve, "Play downloads from disk"). The
-settings section "Downloads" is registered. Nothing in the interface
-enqueues downloads yet: the buttons and pages come with the screens.
+settings section "Downloads" is registered. `installDownloadScreens` (after
+the music screens) gives the screens the `DownloadsController`, registers
+the "downloads" route and its sidebar entry, plays downloaded tracks
+through the music player and shows the controller's messages as toasts.
+
+## Screens
+
+- Permission: the controller asks the server for the user's
+  `EnableContentDownloading` at sign-in (when online). Off: no "Download"
+  button, a line says why; what is already downloaded still plays and can
+  be deleted. Unknown (offline): downloads stay as they are.
+- "Download" (`DownloadActions.qml`) on item, season, series, album and
+  playlist pages. Groups and items not yet downloaded open
+  `DownloadDialog.qml`: how many items, about how much space, how many are
+  already downloaded or cannot be downloaded (folders, disc images,
+  streams), the version when an item has several, "Only unwatched" for a
+  series or season, and a warning when it does not fit the limit or the
+  disk. Children come from `Items?ParentId=…&Recursive=true` with their
+  media sources. The quality is always the original. "Delete download"
+  removes the files after a question.
+- Cards (posters, episode rows) show a badge: a ring with the progress while
+  downloading or paused, a mark when downloaded, an error when failed.
+- Downloads page (route `downloads`, in the sidebar): a space bar (use,
+  limit, free space), then two tabs. "Queue": pause, continue, try again,
+  move up and down, cancel per row; pause or continue all; why the queue is
+  stopped (disk full, sign-in needed). "Downloaded": a name filter, play,
+  delete, "Delete watched", "Delete all", and what changed or was removed
+  on the server.
+- Offline home: when the server cannot be reached and something is
+  downloaded, the home page shows a "No connection to the server" banner
+  and rows of downloads (continue watching, films, episodes, music, other)
+  that play from disk.
+- Keyboard and gamepad: Up and Down between the tabs, the toolbar and the
+  rows; Enter runs the row's main action (pause or continue in the queue,
+  play when downloaded); Left and Right walk the row's buttons. Lists are
+  updated in place, so the focus stays on its row while progress changes.
+- Settings: the download folder is a folder setting (a text field and
+  "Choose…", the system folder dialog); only an absolute path is taken.
+  Changing it does not move existing downloads: they stay hidden until that
+  folder is chosen again.
+
+Not done yet: item pages of downloads when offline (the offline home plays
+them directly), the series and album images of downloads, moving the
+download folder, the trickplay setting, deleting an item while it plays
+(refused with a message), and the TV-mode screens.

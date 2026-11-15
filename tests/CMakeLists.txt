@@ -161,7 +161,7 @@ if(TARGET jfd_jellyfin_api)
     # Offline downloads against a file server with byte ranges
     # (offline/FakeFileServer.h); the kill test runs jfd_offline_killee.
     jfd_add_qt_test(jfd_offline_tests offline/StoreTest.cpp offline/DownloadTest.cpp
-      offline/CatalogTest.cpp offline/KillTest.cpp offline/JournalTest.cpp)
+      offline/CatalogTest.cpp offline/KillTest.cpp offline/JournalTest.cpp offline/ControllerTest.cpp)
     target_link_libraries(jfd_offline_tests PRIVATE jfd::offline Qt6::WebSockets)
     add_executable(jfd_offline_killee offline/Killee.cpp)
     target_link_libraries(jfd_offline_killee PRIVATE jfd::offline)
@@ -352,6 +352,16 @@ if(JFD_BUILD_APP)
     target_compile_options(jfd_ui_livetv_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_livetv_tests COMMAND jfd_ui_livetv_tests)
     set_tests_properties(jfd_ui_livetv_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+    # The download screens (3.10a) in an offscreen window, keyboard only:
+    # the Downloads page, the Download dialog, the offline home.
+    add_executable(jfd_ui_downloads_tests support/QtGuiTestMain.cpp ui/DownloadsPageTest.cpp)
+    target_link_libraries(jfd_ui_downloads_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      jfd::offline Qt6::Quick doctest Qt6::Test)
+    target_compile_options(jfd_ui_downloads_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_downloads_tests COMMAND jfd_ui_downloads_tests)
+    set_tests_properties(jfd_ui_downloads_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
   endif()
 
   if(TARGET jfd_ui_library)

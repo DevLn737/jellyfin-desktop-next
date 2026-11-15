@@ -115,6 +115,7 @@ FocusScope {
             case "bool": return boolEditor
             case "choice": return choiceEditor
             case "action": return actionEditor
+            case "folder": return folderEditor
             case "int":
             case "double": return row.ranged ? sliderEditor : textEditor
             default: return textEditor
@@ -213,6 +214,54 @@ FocusScope {
                 errorText = AppSettings.setValue(row.key, value) ? "" : qsTr("This value is not allowed.")
             }
             onActiveFocusChanged: if (!activeFocus) accepted()
+        }
+    }
+
+    // A folder: the path (typed, kept when it is absolute) and "Choose..."
+    // with the system's folder picker. The picker is loaded on first use,
+    // so the page works without the dialogs module.
+    Component {
+        id: folderEditor
+        Row {
+            spacing: Theme.spacingSmall
+            InputField {
+                id: folderField
+                objectName: "editor"
+                focus: true
+                width: 320
+                text: row.value === undefined ? "" : String(row.value)
+                Accessible.name: row.label
+                onAccepted: errorText = AppSettings.setValue(row.key, text) ? "" : qsTr("Enter the full path of a folder.")
+                onActiveFocusChanged: if (!activeFocus && text !== String(row.value)) accepted()
+                KeyNavigation.right: chooseButton
+            }
+            ActionButton {
+                id: chooseButton
+                objectName: "chooseFolder"
+                anchors.verticalCenter: folderField.verticalCenter
+                text: qsTr("Choose…")
+                Accessible.name: qsTr("Choose a folder for %1").arg(row.label)
+                onClicked: {
+                    if (picker.status === Loader.Null)
+                        picker.source = "FolderPicker.qml"
+                    if (picker.item) {
+                        picker.item.currentFolder = AppSettings.folderUrl(String(row.value))
+                        picker.item.open()
+                    }
+                }
+            }
+            Loader {
+                id: picker
+                Connections {
+                    target: picker.item
+                    ignoreUnknownSignals: true
+                    function onChosen(url) {
+                        const path = AppSettings.localPath(url)
+                        if (path.length > 0 && AppSettings.setValue(row.key, path))
+                            folderField.text = path
+                    }
+                }
+            }
         }
     }
 }

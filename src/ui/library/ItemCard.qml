@@ -19,6 +19,10 @@ PosterCard {
     required property var model
     required property int index
 
+    // The offline home's cards: a film plays too (there is no item page
+    // without the server).
+    property bool playOnClick: false
+
     readonly property string itemId: model.itemId || ""
     readonly property bool isEpisode: model.type === "Episode" && (model.seriesName || "").length > 0
 
@@ -26,18 +30,25 @@ PosterCard {
     subtitle: isEpisode
         ? ((model.subtitle || "").length > 0 ? model.subtitle + " · " + model.name : model.name)
         : (model.subtitle || "")
-    imageSource: Library.image(model.imageUrl)
+    // A downloaded item's own image is a file; others come from the server.
+    imageSource: String(model.imageUrl || "").startsWith("file:") ? model.imageUrl : Library.image(model.imageUrl)
     played: model.played === true
     progress: model.progress || 0
     unplayedCount: model.unplayedCount || 0
+    // Downloaded, or downloading (the series or album for its items).
+    downloadState: Downloads.revision >= 0 && itemId.length > 0 ? Downloads.stateOf(itemId) : ""
+    downloadProgress: downloadState === "downloading" || downloadState === "paused"
+        ? (Downloads.progressRevision >= 0 ? Downloads.progressOf(itemId) : 0) : 0
 
     onClicked: {
         if (itemId.length === 0)
             return
         // An episode has no page of its own: it plays (resuming where it
         // stopped). Its series page lists the others.
-        if (model.type === "Episode")
+        if (model.type === "Episode" || (card.playOnClick && model.type !== "Audio"))
             Library.play(itemId, model.playbackPositionTicks || 0)
+        else if (model.type === "Audio" && (card.playOnClick || !Library.online) && Downloads.stateOf(itemId) === "complete")
+            Downloads.playTrack(itemId)
         else if (model.type === "Audio")
             Library.playTrack(itemId, model.albumId || "")
         // A Live TV channel ("On now") tunes in, on this device only.

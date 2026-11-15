@@ -13,6 +13,8 @@ T.Dialog {
     property string acceptText: qsTr("OK")
     property string rejectText: qsTr("Cancel")
     property bool destructive: false
+    // False greys out the primary button (nothing to accept yet).
+    property bool acceptEnabled: true
 
     parent: T.Overlay.overlay
     anchors.centerIn: parent
@@ -59,6 +61,7 @@ T.Dialog {
             spacing: Theme.spacingSmall
 
             ActionButton {
+                objectName: "dialogReject"
                 visible: dialog.rejectText.length > 0
                 text: dialog.rejectText
                 onClicked: dialog.reject()
@@ -66,12 +69,20 @@ T.Dialog {
             ActionButton {
                 id: acceptButton
                 text: dialog.acceptText
+                objectName: "dialogAccept"
                 primary: true
                 focus: true
+                enabled: dialog.acceptEnabled
                 onClicked: dialog.accept()
             }
         }
     }
 
     onOpened: acceptButton.forceActiveFocus(Qt.TabFocusReason)
+    // Ready to accept after all (an answer came): the primary button takes
+    // the focus, unless the user is in the dialog's own controls.
+    onAcceptEnabledChanged: {
+        if (acceptEnabled && opened && !(contentItem && contentItem.activeFocus))
+            acceptButton.forceActiveFocus(Qt.TabFocusReason)
+    }
 }

@@ -2,6 +2,13 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>FolderPicker</name>
+    <message>
+        <source>Choose a folder</source>
+        <translation>Выбор папки</translation>
+    </message>
+</context>
+<context>
     <name>SettingRow</name>
     <message>
         <source>Takes effect after restarting the app.</source>
@@ -18,6 +25,18 @@
     <message>
         <source>No gamepad is connected.</source>
         <translation>Геймпад не подключён.</translation>
+    </message>
+    <message>
+        <source>Enter the full path of a folder.</source>
+        <translation>Введите полный путь к папке.</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Выбрать…</translation>
+    </message>
+    <message>
+        <source>Choose a folder for %1</source>
+        <translation>Выбрать папку: %1</translation>
     </message>
 </context>
 <context>
