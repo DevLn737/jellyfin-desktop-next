@@ -132,6 +132,7 @@ jobs:
           name: mixed-group
           path: out/mixed/
           if-no-files-found: ignore
+          retention-days: 3
 
       - name: Server log on failure
         if: failure()
