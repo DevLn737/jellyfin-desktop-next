@@ -326,9 +326,13 @@ AppShell {
       }
     }
 
+    // The on-screen keyboard: in the shell, which is the window's item, not
+    // its QObject child (as the text entry above).
+    QQuickItem* keyboard() const { return object->findChild<QQuickItem*>(QStringLiteral("onScreenKeyboard")); }
+
     // The on-screen keyboard's highlighted key.
     QString highlighted() const {
-      QQuickItem* board = window.findChild<QQuickItem*>(QStringLiteral("onScreenKeyboard"));
+      QQuickItem* board = keyboard();
       REQUIRE(board != nullptr);
       const QVariantList rows = board->property("rows").toList();
       const QVariantMap key =
@@ -337,7 +341,7 @@ AppShell {
                                                      : key.value(QStringLiteral("text")).toString();
     }
     int keyboardRow() const {
-      QQuickItem* board = window.findChild<QQuickItem*>(QStringLiteral("onScreenKeyboard"));
+      QQuickItem* board = keyboard();
       return board->property("row").toInt();
     }
     // Arrows to the key (from the bottom row up), then Select.
