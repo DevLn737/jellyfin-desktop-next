@@ -77,6 +77,9 @@ namespace jfd::session {
     void setTrackChooser(PlaybackLauncher::TrackChooser chooser) {
       m_launcher->setTrackChooser(std::move(chooser));
     }
+    // Runs before every file the session opens (see
+    // PlaybackLauncher::OpenGate): the display's refresh rate switch.
+    void setOpenGate(PlaybackLauncher::OpenGate gate) { m_launcher->setOpenGate(std::move(gate)); }
     // The user's SyncPlay correction settings (speed correction on or off,
     // the drift that makes a member seek), from the next decision on.
     void setSyncCorrection(const core::ReconcilerSettings& reconciler) {

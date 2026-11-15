@@ -1,19 +1,23 @@
 # Operating system services: credential store, sleep inhibition, single
-# instance, system media controls (SMTC on Windows, MPRIS on Linux) and
-# gamepad input (SDL3).
+# instance, system media controls (SMTC on Windows, MPRIS on Linux), gamepad
+# input (SDL3) and display modes (refresh rate switching).
 add_library(jfd_platform STATIC
   src/CredentialStore.cpp
   src/SleepInhibitor.cpp
   src/SingleInstance.cpp
   src/MediaControls.cpp
   src/GamepadMapper.cpp
+  src/DisplayModes.cpp
+  src/DisplayModeSwitcher.cpp
   include/jfd/platform/CredentialStore.h
   include/jfd/platform/SleepInhibitor.h
   include/jfd/platform/SingleInstance.h
   include/jfd/platform/MediaControls.h
   include/jfd/platform/InputAction.h
   include/jfd/platform/GamepadMapper.h
-  include/jfd/platform/GamepadInput.h)
+  include/jfd/platform/GamepadInput.h
+  include/jfd/platform/DisplayModes.h
+  include/jfd/platform/DisplayModeSwitcher.h)
 add_library(jfd::platform ALIAS jfd_platform)
 target_include_directories(jfd_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(jfd_platform PUBLIC Qt6::Core Qt6::Network)
@@ -36,9 +40,11 @@ if(WIN32)
   target_sources(jfd_platform PRIVATE
     src/CredentialStoreWindows.cpp
     src/SleepInhibitorWindows.cpp
-    src/MediaControlsWindows.cpp)
-  # C++/WinRT for SMTC; WindowsApp provides the Windows Runtime activation.
-  target_link_libraries(jfd_platform PRIVATE advapi32 WindowsApp Qt6::Gui)
+    src/MediaControlsWindows.cpp
+    src/DisplayModesWindows.cpp)
+  # C++/WinRT for SMTC; WindowsApp provides the Windows Runtime activation;
+  # user32 has the display configuration calls.
+  target_link_libraries(jfd_platform PRIVATE advapi32 user32 WindowsApp Qt6::Gui)
   target_compile_options(jfd_platform PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 else()
   find_package(PkgConfig QUIET)
@@ -51,6 +57,25 @@ else()
   else()
     message(STATUS "No credential store for this platform: tokens are kept in memory only")
     target_sources(jfd_platform PRIVATE src/CredentialStoreNone.cpp)
+  endif()
+
+  # Display modes on X11 through Xlib and XRandR (libx11-dev, libxrandr-dev,
+  # in packaging/linux/build-deps.txt; libmpv links them too, so the
+  # AppImage already carries libXrandr). Without them the build still works
+  # and the refresh rate is never switched.
+  if(PkgConfig_FOUND)
+    pkg_check_modules(JFD_XRANDR IMPORTED_TARGET GLOBAL x11 xrandr)
+  endif()
+  if(NOT APPLE AND JFD_XRANDR_FOUND)
+    target_sources(jfd_platform PRIVATE src/DisplayModesX11.cpp)
+    target_link_libraries(jfd_platform PRIVATE PkgConfig::JFD_XRANDR)
+    target_compile_definitions(jfd_platform PUBLIC JFD_PLATFORM_XRANDR=1)
+  elseif(NOT APPLE AND JFD_ENFORCE_PINS)
+    # The packaged build switches the refresh rate on X11.
+    message(FATAL_ERROR "Display modes need Xlib and XRandR (libx11-dev, libxrandr-dev)")
+  else()
+    message(STATUS "Xlib or XRandR not found: the display refresh rate is not switched")
+    target_sources(jfd_platform PRIVATE src/DisplayModesNone.cpp)
   endif()
 
   find_package(Qt6 QUIET COMPONENTS DBus)

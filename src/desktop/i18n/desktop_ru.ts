@@ -548,6 +548,34 @@
         <source>1.5 Mbit/s</source>
         <translation>1,5 Мбит/с</translation>
     </message>
+    <message>
+        <source>Match the display to the video&apos;s frame rate</source>
+        <translation>Подстраивать частоту дисплея под видео</translation>
+    </message>
+    <message>
+        <source>In full screen, the display switches to a refresh rate the video divides (a film at 23.976 fps plays at 23.976 or 119.88 Hz) before the video starts, and back when it ends. The screen may go dark for a moment.</source>
+        <translation>В полноэкранном режиме перед началом видео дисплей переключается на частоту, кратную частоте кадров (фильм с 23,976 к/с идёт на 23,976 или 119,88 Гц), а после окончания возвращается обратно. Экран может ненадолго погаснуть.</translation>
+    </message>
+    <message>
+        <source>ms</source>
+        <translation>мс</translation>
+    </message>
+    <message>
+        <source>Wait for the display after switching</source>
+        <translation>Ждать дисплей после переключения</translation>
+    </message>
+    <message>
+        <source>The longest wait before the video starts, if the system does not report the new rate sooner. Longer helps TVs that take a while to show a picture again.</source>
+        <translation>Наибольшее ожидание перед началом видео, если система не сообщит о новой частоте раньше. Больше — для телевизоров, которым нужно время, чтобы снова показать изображение.</translation>
+    </message>
+    <message>
+        <source>Fit the video to the display&apos;s refresh rate</source>
+        <translation>Подгонять видео под частоту дисплея</translation>
+    </message>
+    <message>
+        <source>The player speeds the video up or slows it down very slightly so every frame shows for the same time, and adjusts the sound to match. Smoother motion where the display&apos;s rate cannot change (Wayland); uses more of the graphics card.</source>
+        <translation>Плеер чуть ускоряет или замедляет видео, чтобы каждый кадр показывался одинаковое время, и подстраивает звук. Движение плавнее там, где частоту дисплея сменить нельзя (Wayland); видеокарта нагружается сильнее.</translation>
+    </message>
 </context>
 <context>
     <name>SeerrSettings</name>

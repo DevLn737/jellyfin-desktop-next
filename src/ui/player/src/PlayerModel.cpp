@@ -10,13 +10,25 @@
 #include <MpvD3D11VideoItem.h>
 #endif
 
+#include <jfd/platform/DisplayModeSwitcher.h>
+
 #include <QLoggingCategory>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QVariantMap>
 
 #include <algorithm>
 #include <cmath>
+
+#if defined(Q_OS_WIN) && QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#include <QtGui/qscreen_platform.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#define JFD_WINDOWS_SCREEN_HANDLE 1
+#endif
 
 namespace jfd::ui {
 
@@ -39,6 +51,28 @@ namespace jfd::ui {
       QObject::connect(host, &QQuickItem::heightChanged, video,
                        [video, host] { video->setHeight(host->height()); });
       return video;
+    }
+
+    // The name DisplayModes knows the screen by: the GDI device name
+    // ("\\.\DISPLAY1") on Windows, where QScreen::name() is the monitor's
+    // own name; the RandR output elsewhere.
+    QString displayName(QScreen* screen) {
+#ifdef JFD_WINDOWS_SCREEN_HANDLE
+      if (auto* native = screen->nativeInterface<QNativeInterface::QWindowsScreen>()) {
+        MONITORINFOEXW info = {};
+        info.cbSize = sizeof(info);
+        if (GetMonitorInfoW(native->handle(), &info)) return QString::fromWCharArray(info.szDevice);
+      }
+#endif
+      return screen->name();
+    }
+
+    // The video's frame rate as the server measured it (RealFrameRate).
+    std::optional<double> videoFrameRate(const api::MediaSource& source) {
+      for (const api::MediaStream& stream : source.mediaStreams)
+        if (stream.type == QLatin1String("Video") && stream.realFrameRate && *stream.realFrameRate > 0)
+          return stream.realFrameRate;
+      return std::nullopt;
     }
 
     template <class Video> void watchVideo(Video* video, PlayerModel* model,
@@ -82,6 +116,11 @@ namespace jfd::ui {
       if (item.mediaType == QLatin1String("Audio")) return;
       m_trackPreference.choose(source, request.audioStreamIndex, request.subtitleStreamIndex);
     });
+    // The display's refresh rate, before the session opens the file.
+    runtime.setOpenGate([this](const session::PlaybackLauncher::Request& request, const api::Item& item,
+                               const api::MediaSource& source, std::function<void()> open) {
+      beforeOpen(request, item, source, std::move(open));
+    });
     connect(&runtime.launcher(), &session::PlaybackLauncher::failed, this,
             [this](const QString&, const QString& message) {
               // A channel switch that failed before it opened: the old channel
@@ -98,19 +137,22 @@ namespace jfd::ui {
   }
 
   PlayerModel::~PlayerModel() {
+    // Quitting: the display goes back to its own mode.
+    restoreDisplay();
+    m_runtime.setOpenGate({});
     m_runtime.setTrackChooser({});
     m_subscription.reset();
     m_reporter.end();
   }
 
   bool PlayerModel::active() const {
-    return m_snapshot.phase != PlaybackPhase::Idle || m_waitingPlay.has_value();
+    return m_snapshot.phase != PlaybackPhase::Idle || m_waitingPlay.has_value() || m_waitingDisplay;
   }
 
   bool PlayerModel::paused() const { return m_snapshot.phase == PlaybackPhase::Paused; }
 
   bool PlayerModel::loading() const {
-    return m_waitingPlay || m_snapshot.phase == PlaybackPhase::Loading ||
+    return m_waitingPlay || m_waitingDisplay || m_snapshot.phase == PlaybackPhase::Loading ||
            m_snapshot.phase == PlaybackPhase::Buffering;
   }
 
@@ -314,6 +356,7 @@ namespace jfd::ui {
   void PlayerModel::stop() {
     m_waitingPlay.reset();
     m_runtime.launcher().cancel();
+    restoreDisplay();
     if (m_current) m_runtime.post(core::intent::Stop{});
     if (m_pip) setPip(false);
     // The channel list belongs to the signed-in user: read it again next time.
@@ -325,6 +368,77 @@ namespace jfd::ui {
     Q_EMIT stateChanged();
   }
 
+  void PlayerModel::setDisplayModeSwitcher(platform::DisplayModeSwitcher* switcher) {
+    if (m_displayModes == switcher) return;
+    restoreDisplay();
+    m_displayModes = switcher;
+  }
+
+  void PlayerModel::setRefreshRateSwitch(bool on) {
+    if (on == m_refreshRateSwitch) return;
+    m_refreshRateSwitch = on;
+    // Turned off while switched: back at once.
+    if (!on) restoreDisplay();
+  }
+
+  void PlayerModel::setVideoWindow(QWindow* window) {
+    if (m_videoWindow == window) return;
+    disconnect(m_windowVisibility);
+    m_videoWindow = window;
+    if (!window) return;
+    m_windowVisibility = connect(window, &QWindow::visibilityChanged, this, [this](QWindow::Visibility visibility) {
+      // Back to a window (or minimised): the desktop gets its own rate. Going
+      // full screen during a video switches nothing (no HDMI resync mid-film).
+      if (visibility != QWindow::FullScreen) restoreDisplay();
+    });
+  }
+
+  std::optional<QString> PlayerModel::fullscreenScreen() const {
+    if (!m_videoWindow || m_videoWindow->visibility() != QWindow::FullScreen) return std::nullopt;
+    QScreen* screen = m_videoWindow->screen();
+    if (!screen) return std::nullopt;
+    return displayName(screen);
+  }
+
+  void PlayerModel::setWaitingDisplay(bool waiting) {
+    if (waiting == m_waitingDisplay) return;
+    m_waitingDisplay = waiting;
+    Q_EMIT stateChanged();
+  }
+
+  void PlayerModel::restoreDisplay() {
+    if (m_displayModes) m_displayModes->restore();
+    setWaitingDisplay(false);
+  }
+
+  void PlayerModel::beforeOpen(const session::PlaybackLauncher::Request&, const api::Item& item,
+                               const api::MediaSource& source, std::function<void()> open) {
+    const std::optional<double> frameRate = videoFrameRate(source);
+    const std::optional<QString> screen = fullscreenScreen();
+    if (!m_displayModes || !m_refreshRateSwitch || item.mediaType == QLatin1String("Audio") || !frameRate ||
+        !screen || m_pip) {
+      open();
+      return;
+    }
+    setWaitingDisplay(true);
+    // Runs at once when nothing changes; dropped (by restoreDisplay or a
+    // newer file) when the viewer stops or picks another file meanwhile.
+    m_displayModes->prepare(*screen, *frameRate, [this, open = std::move(open)] {
+      setWaitingDisplay(false);
+      open();
+    });
+  }
+
+  void PlayerModel::checkFrameRate() {
+    if (!m_player || !m_current || !m_epoch || m_frameRateChecked == m_epoch) return;
+    m_frameRateChecked = m_epoch;
+    const std::optional<double> server = videoFrameRate(m_current->source);
+    const double file = m_player->property("container-fps").toDouble();
+    if (server && platform::frameRatesDisagree(*server, file))
+      qCInfo(lcPlayer) << "frame rate: the server says" << *server << "fps, the file" << file
+                       << "(interlaced or variable); the display mode is not changed again";
+  }
+
   void PlayerModel::setPip(bool on) {
     if (m_pip == on) return;
     m_pip = on;
@@ -333,6 +447,8 @@ namespace jfd::ui {
 
   void PlayerModel::enterPip() {
     if (m_pip || !m_current) return;
+    // The small window plays on the desktop's own rate.
+    restoreDisplay();
     suspendVideo();
     setPip(true);
   }
@@ -353,6 +469,7 @@ namespace jfd::ui {
 
   void PlayerModel::attachVideo(QQuickItem* host, QQuickItem* owner) {
     if (!host || !host->window()) return;
+    setVideoWindow(host->window());
     // Only one item at a time can hold mpv's render context.
     if (m_video) suspendVideo();
     const auto ready = [this] { videoReady(); };
@@ -729,6 +846,10 @@ namespace jfd::ui {
       releaseFile(snapshot);
       return;
     }
+    // Stopped from elsewhere (a group, a remote, an error): the desktop's
+    // rate comes back, unless the next file is waiting for the display.
+    if ((snapshot.phase == PlaybackPhase::Idle || snapshot.phase == PlaybackPhase::Failed) && !m_waitingDisplay)
+      restoreDisplay();
     const bool positionOnly = [&] {
       core::SessionSnapshot copy = snapshot;
       copy.position = m_snapshot.position;
@@ -747,6 +868,7 @@ namespace jfd::ui {
     if (newFile && m_pending &&
         snapshot.item.value() == m_pending->request.itemId.toStdString())
       beginFile(snapshot.media);
+    if (snapshot.phase == PlaybackPhase::Playing || snapshot.phase == PlaybackPhase::Paused) checkFrameRate();
 
     m_reporter.snapshotChanged(snapshot);
     m_tracks.snapshotChanged(snapshot);

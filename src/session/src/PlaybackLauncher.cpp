@@ -4,6 +4,7 @@
 #include <jfd/playback/StreamPlan.h>
 
 #include <QTimer>
+#include <QPointer>
 
 #include <utility>
 
@@ -29,7 +30,8 @@ namespace jfd::session {
     return copy;
   }
 
-  void PlaybackLauncher::openLocal(const Request& request, const LocalCopy& copy, bool preload) {
+  void PlaybackLauncher::openLocal(std::uint64_t serial, const Request& request, const LocalCopy& copy,
+                                   bool preload) {
     api::PlaybackStream stream;
     stream.url = QUrl::fromLocalFile(copy.path);
     stream.method = api::PlayMethod::DirectPlay;
@@ -38,7 +40,7 @@ namespace jfd::session {
     stream.externalSubtitles = copy.externalSubtitles;
     // A file plays all its tracks: the player selects, nothing is reopened.
     const Request withTracks = preload ? request : withChosenTracks(request, copy.item, copy.source);
-    openResolved(withTracks, copy.item, copy.source, stream, preload);
+    openResolved(serial, withTracks, copy.item, copy.source, stream, preload);
   }
 
   void PlaybackLauncher::open(const Request& request) {
@@ -49,7 +51,7 @@ namespace jfd::session {
       // Later, as an answer from the server would be: callers set up their
       // state after open() returns.
       QTimer::singleShot(0, this, [this, serial, request, copy = std::move(*copy)] {
-        if (serial == m_serial) openLocal(request, copy, false);
+        if (serial == m_serial) openLocal(serial, request, copy, false);
       });
       return;
     }
@@ -67,7 +69,7 @@ namespace jfd::session {
     const std::uint64_t serial = ++m_preloadSerial;
     if (std::optional<LocalCopy> copy = localCopyFor(request)) {
       QTimer::singleShot(0, this, [this, serial, request, copy = std::move(*copy)] {
-        if (serial == m_preloadSerial) openLocal(request, copy, true);
+        if (serial == m_preloadSerial) openLocal(serial, request, copy, true);
       });
       return;
     }
@@ -137,10 +139,10 @@ namespace jfd::session {
           openWithItem(serial, withTracks, item, true, preload);
           return;
         }
-        openResolved(withTracks, item, *source, *stream, preload);
+        openResolved(serial, withTracks, item, *source, *stream, preload);
         return;
       }
-      openResolved(request, item, *source, *stream, preload);
+      openResolved(serial, request, item, *source, *stream, preload);
     });
   }
 
@@ -149,7 +151,7 @@ namespace jfd::session {
     if (!preload) Q_EMIT openFailed(request, message);
   }
 
-  void PlaybackLauncher::openResolved(const Request& request, const api::Item& item,
+  void PlaybackLauncher::openResolved(std::uint64_t serial, const Request& request, const api::Item& item,
                                       const api::MediaSource& source, const api::PlaybackStream& stream,
                                       bool preload) {
     const auto start = core::MediaTicks::fromTicks(request.startTicks).value_or(core::MediaTicks{});
@@ -166,8 +168,20 @@ namespace jfd::session {
       m_post(core::intent::PreloadNext{std::move(media)});
       return;
     }
-    Q_EMIT resolved(request, item, source, stream);
-    m_post(core::intent::Open{std::move(media)});
+    auto open = [this, serial, request, item, source, stream, media = std::move(media)]() mutable {
+      if (serial != m_serial) return;
+      Q_EMIT resolved(request, item, source, stream);
+      m_post(core::intent::Open{std::move(media)});
+    };
+    if (!m_openGate) {
+      open();
+      return;
+    }
+    // The gate may hold the open past this launcher's lifetime: the
+    // continuation checks that the launcher still exists.
+    m_openGate(request, item, source, [guard = QPointer<PlaybackLauncher>(this), open = std::move(open)]() mutable {
+      if (guard) open();
+    });
   }
 
 } // namespace jfd::session

@@ -209,9 +209,16 @@ if(TARGET jfd_jellyfin_api)
   endif()
   endif()
 
+  # DisplayModesTest also lists the system's display modes (never switches).
   jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp
-    platform/GamepadMapperTest.cpp)
+    platform/GamepadMapperTest.cpp platform/DisplayModesTest.cpp platform/DisplayModeSwitcherTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
+  if(TARGET PkgConfig::JFD_XRANDR)
+    # The XRandR backend switching modes on Xvfb (CI runs ctest under
+    # xvfb-run); on other X servers it switches nothing.
+    jfd_add_qt_test(jfd_platform_xrandr_tests platform/DisplayModesXvfbTest.cpp)
+    target_link_libraries(jfd_platform_xrandr_tests PRIVATE jfd::platform PkgConfig::JFD_XRANDR)
+  endif()
   if(JFD_GAMEPAD)
     # GamepadInput on SDL's virtual joystick: layouts (Xbox, 8BitDo in
     # XInput, Switch and DirectInput modes), repeat, dead zone, unplugging.
@@ -227,7 +234,8 @@ if(TARGET jfd_jellyfin_api)
   endif()
 
   if(TARGET jfd_session_runtime)
-    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp)
+    jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp
+      session/OpenGateTest.cpp)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
@@ -392,8 +400,9 @@ if(JFD_BUILD_APP)
   endif()
 
   if(TARGET jfd_ui_player)
-    # The player page on the session runtime with a virtual backend.
-    add_executable(jfd_ui_player_tests support/QtGuiTestMain.cpp ui/PlayerPageTest.cpp)
+    # The player page on the session runtime with a virtual backend, and the
+    # refresh rate switch on a fake display.
+    add_executable(jfd_ui_player_tests support/QtGuiTestMain.cpp ui/PlayerPageTest.cpp ui/PlayerRefreshRateTest.cpp)
     target_include_directories(jfd_ui_player_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_player_tests PRIVATE
       jfd_ui_player jfd_ui_playerplugin jfd_ui_group jfd_ui_groupplugin

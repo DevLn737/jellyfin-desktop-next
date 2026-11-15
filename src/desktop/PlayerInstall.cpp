@@ -2,6 +2,8 @@
 #include <jfd/session/GroupModel.h>
 
 #include <jfd/library/SignIn.h>
+#include <jfd/platform/DisplayModeSwitcher.h>
+#include <jfd/platform/DisplayModes.h>
 #include <jfd/playback/PlayerOptions.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/HdrOutput.h>
@@ -13,9 +15,12 @@
 #include <MpvPlayer.h>
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QStringList>
 #include <QUrl>
 
+#include <algorithm>
 #include <deque>
 #include <iterator>
 
@@ -28,6 +33,14 @@ namespace jfd::desktop {
     const QString AutoNextKey = QStringLiteral("playback/autoNextEpisode");
     const QString ShowClockKey = QStringLiteral("playback/showClock");
     const QString HwdecKey = QStringLiteral("playback/hardwareDecoding");
+    const QString RefreshRateSwitchKey = QStringLiteral("playback/refreshRateSwitch");
+    const QString RefreshRateSettleKey = QStringLiteral("playback/refreshRateSettleMs");
+    const QString DisplayResampleKey = QStringLiteral("playback/displayResample");
+
+    // mpv's video-sync: its default follows the audio clock.
+    QByteArray videoSync(bool displayResample) {
+      return displayResample ? QByteArrayLiteral("display-resample") : QByteArrayLiteral("audio");
+    }
     const QString AudioLanguageKey = QStringLiteral("audio/language");
     const QString SubtitleLanguageKey = QStringLiteral("subtitles/language");
     const QString SubtitleModeKey = QStringLiteral("subtitles/mode");
@@ -466,6 +479,62 @@ namespace jfd::desktop {
     hdr.hidden = !ui::HdrOutput::supported();
     section.settings.append(hdr);
 
+    // Stage 3, package 3.5 (docs/display-refresh-rate.md). Shown where the
+    // mode can change: Windows and X11, not Wayland.
+    settings::SettingDescriptor refreshRate;
+    refreshRate.key = QStringLiteral("refreshRateSwitch");
+    refreshRate.type = settings::SettingType::Bool;
+    refreshRate.defaultValue = false;
+    refreshRate.label = QT_TRANSLATE_NOOP("PlayerSettings", "Match the display to the video's frame rate");
+    refreshRate.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings",
+        "In full screen, the display switches to a refresh rate the video divides (a film at 23.976 fps plays at "
+        "23.976 or 119.88 Hz) before the video starts, and back when it ends. The screen may go dark for a moment.");
+    refreshRate.hidden = !platform::displayModesAvailable();
+    refreshRate.legacyKey = QStringLiteral("video.refreshrate.auto_switch");
+    section.settings.append(refreshRate);
+
+    settings::SettingDescriptor settle;
+    settle.key = QStringLiteral("refreshRateSettleMs");
+    settle.type = settings::SettingType::Int;
+    settle.defaultValue = platform::DisplayModeSwitcher::DefaultSettleMs;
+    settle.minimum = 0;
+    settle.maximum = platform::DisplayModeSwitcher::MaxSettleMs;
+    settle.step = 500;
+    settle.unit = QT_TRANSLATE_NOOP("PlayerSettings", "ms");
+    settle.label = QT_TRANSLATE_NOOP("PlayerSettings", "Wait for the display after switching");
+    settle.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings",
+        "The longest wait before the video starts, if the system does not report the new rate sooner. Longer helps "
+        "TVs that take a while to show a picture again.");
+    settle.hidden = !platform::displayModesAvailable();
+    // 2.x kept seconds (3 by default).
+    settle.legacyKey = QStringLiteral("video.refreshrate.delay");
+    settle.fromLegacy = [](const QVariant& seconds) -> QVariant {
+      bool ok = false;
+      const double value = seconds.toDouble(&ok);
+      if (!ok || value < 0) return {};
+      return std::min(platform::DisplayModeSwitcher::MaxSettleMs, static_cast<int>(value * 1000));
+    };
+    section.settings.append(settle);
+
+    settings::SettingDescriptor resample;
+    resample.key = QStringLiteral("displayResample");
+    resample.type = settings::SettingType::Bool;
+    resample.defaultValue = false;
+    resample.label = QT_TRANSLATE_NOOP("PlayerSettings", "Fit the video to the display's refresh rate");
+    resample.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings",
+        "The player speeds the video up or slows it down very slightly so every frame shows for the same time, and "
+        "adjusts the sound to match. Smoother motion where the display's rate cannot change (Wayland); uses more of "
+        "the graphics card.");
+    // 2.x's AV sync mode; only its display-resample is kept.
+    resample.legacyKey = QStringLiteral("video.sync_mode");
+    resample.fromLegacy = [](const QVariant& mode) -> QVariant {
+      return mode.toString() == QLatin1String("display-resample");
+    };
+    section.settings.append(resample);
+
     // Bits per second; "0" for no limit.
     settings::SettingDescriptor maxBitrate;
     maxBitrate.key = QStringLiteral("maxBitrate");
@@ -520,8 +589,26 @@ namespace jfd::desktop {
     media::MpvPlayer* player = services.player.get();
     if (player != nullptr) {
       player->setStringProperty("hwdec", settings.value(HwdecKey).toString().toUtf8());
+      player->setStringProperty("video-sync", videoSync(settings.value(DisplayResampleKey).toBool()));
       applyAudio(*player, settings);
       applySubtitles(*player, settings);
+    }
+    // The display's refresh rate. The switcher (a child of the model) owns
+    // the backend; its journal sits next to the settings file. A mode a
+    // crashed run left switched comes back now.
+    {
+      std::unique_ptr<platform::DisplayModes> modes = platform::createSystemDisplayModes();
+      auto* switcher = new platform::DisplayModeSwitcher(
+          *modes, QFileInfo(settings.filePath()).absoluteDir().filePath(QStringLiteral("display-mode.json")), &model);
+      modes.release()->setParent(switcher);
+      switcher->restorePending();
+      switcher->setSettleMs(settings.value(RefreshRateSettleKey).toInt());
+      model.setDisplayModeSwitcher(switcher);
+      model.setRefreshRateSwitch(settings.value(RefreshRateSwitchKey).toBool());
+      QObject::connect(&settings, &settings::Settings::valueChanged, switcher,
+                       [switcher](const QString& key, const QVariant& value) {
+                         if (key == RefreshRateSettleKey) switcher->setSettleMs(value.toInt());
+                       });
     }
     model.setTrackDefaults(trackDefaults(settings));
     model.setProfileOptions(profileOptions(settings));
@@ -537,8 +624,11 @@ namespace jfd::desktop {
                          model.setTrackDefaults(trackDefaults(settings));
                        else if (key == AutoNextKey) model.setAutoNext(value.toBool());
                        else if (key == ShowClockKey) model.setShowClock(value.toBool());
+                       else if (key == RefreshRateSwitchKey) model.setRefreshRateSwitch(value.toBool());
                        else if (player == nullptr) return;
                        else if (key == HwdecKey) player->setStringProperty("hwdec", value.toString().toUtf8());
+                       else if (key == DisplayResampleKey)
+                         player->setStringProperty("video-sync", videoSync(value.toBool()));
                        else if (key.startsWith(AudioSection)) applyAudio(*player, settings);
                        else if (key.startsWith(SubtitleSection)) applySubtitles(*player, settings);
                      });
