@@ -19,9 +19,12 @@ Row {
     property string itemType
     property string itemName
 
-    readonly property bool isGroup: ["Series", "Season", "MusicAlbum", "Playlist", "BoxSet"].indexOf(itemType) >= 0
-    readonly property bool downloadable: isGroup
-        || ["Movie", "Episode", "Video", "MusicVideo", "Audio", "AudioBook"].indexOf(itemType) >= 0
+    // `var` lists: a literal string list compiles to a QStringList, whose
+    // indexOf (qsizetype) does not convert to int under -Wconversion.
+    readonly property var groupTypes: ["Series", "Season", "MusicAlbum", "Playlist", "BoxSet"]
+    readonly property var fileTypes: ["Movie", "Episode", "Video", "MusicVideo", "Audio", "AudioBook"]
+    readonly property bool isGroup: groupTypes.indexOf(itemType) >= 0
+    readonly property bool downloadable: isGroup || fileTypes.indexOf(itemType) >= 0
     readonly property string downloadState: Downloads.revision >= 0 && itemId.length > 0 ? Downloads.stateOf(itemId) : ""
     readonly property real progress: downloadState === "downloading" || downloadState === "paused"
         ? (Downloads.progressRevision >= 0 ? Downloads.progressOf(itemId) : 0) : 0
