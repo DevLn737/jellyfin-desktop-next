@@ -172,6 +172,10 @@ FocusScope {
             anchors.left: sidebar.visible ? rail.right : parent.left
             focus: true
             clip: true
+            // Set here, or the sidebar's KeyNavigation.right would make the
+            // sidebar the stack's Left even while it is hidden (the sign-in
+            // page), and Left from the page would go nowhere.
+            KeyNavigation.left: sidebar.visible ? sidebar : null
 
             pushEnter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal } }
             pushExit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durationFast } }

@@ -379,6 +379,20 @@ if(JFD_BUILD_APP)
     add_test(NAME jfd_ui_library_tests COMMAND jfd_ui_library_tests)
   endif()
 
+  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+    # The sign-in screens in TV mode on a fake server: arrows, Select and
+    # Back only, the on-screen keyboard and Quick Connect first.
+    add_executable(jfd_ui_login_tv_tests support/QtGuiTestMain.cpp ui/LoginTvTest.cpp)
+    target_include_directories(jfd_ui_login_tv_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_login_tv_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
+    target_compile_options(jfd_ui_login_tv_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_login_tv_tests COMMAND jfd_ui_login_tv_tests)
+    set_tests_properties(jfd_ui_login_tv_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
+  endif()
+
   if(TARGET jfd_ui_requests AND TARGET jfd_ui_shell AND TARGET jfd_ui_library)
     # The requests screens on a fake Seerr, in an offscreen window.
     add_executable(jfd_ui_requests_tests support/QtGuiTestMain.cpp ui/RequestsPageTest.cpp)

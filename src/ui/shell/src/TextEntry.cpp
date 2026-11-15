@@ -179,7 +179,8 @@ namespace jfd::ui {
       return true;
     }
     if (isNavigation(key)) {
-      // Until this key is delivered: a field it focuses opens the keyboard.
+      // Until this key is delivered (its release, or the event loop's next
+      // turn): a field it focuses opens the keyboard.
       m_navigating = true;
       QTimer::singleShot(0, this, [this] { m_navigating = false; });
     }
@@ -187,7 +188,11 @@ namespace jfd::ui {
   }
 
   bool TextEntry::eventFilter(QObject* watched, QEvent* event) {
-    if (watched != m_window || event->type() != QEvent::KeyPress) return false;
+    if (watched != m_window) return false;
+    // Delivered (or the next turn of the event loop, whichever comes
+    // first): a later focus change is not this key's.
+    if (event->type() == QEvent::KeyRelease) m_navigating = false;
+    if (event->type() != QEvent::KeyPress) return false;
     return handleKey(static_cast<QKeyEvent*>(event));
   }
 

@@ -197,6 +197,12 @@ away until the gamepad or the phone is used again. Text from the phone
 Own implementation: Qt Virtual Keyboard is GPL-3.0. Keys, buttons and the
 CEC decision: [tv-mode.md](tv-mode.md).
 
+Sign-in in TV mode: on the password step Quick Connect, which needs no
+typing, is the main button and has the focus, above the fields; Back goes
+a step back (from the code to the password form, from there to the
+servers). The address, name and password come from the on-screen keyboard
+or the phone.
+
 Gamepads: `GamepadStatus` (a `Jfd.Ui.Shell` singleton) says whether one is
 connected (the sidebar shows its sign and name, as does Settings > Gamepad)
 and runs Settings > Gamepad > Check the buttons, where each press shows its
@@ -365,6 +371,10 @@ focusable control, the TV sizes, and switching TV mode 20 times on 1000
 cards (each switch at most 100 ms, memory at most 5 MiB more), and the
 on-screen keyboard (opening, every layout, Done to the next field, a
 physical keyboard keeping it away, text from the phone).
+`jfd_ui_login_tv_tests` signs in on a fake server in TV mode with arrows,
+Select and Back alone: every control of each step reached, none trapping
+the focus, the address and the password typed on the on-screen keyboard,
+Quick Connect first, and Back between the steps.
 `jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
 gamepad alone.
 
