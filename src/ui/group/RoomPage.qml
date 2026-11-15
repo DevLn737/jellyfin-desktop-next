@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls.Basic as Basic
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Group
@@ -35,11 +34,17 @@ FocusScope {
         return qsTr("In sync (%1 ms)").arg(ms)
     }
 
-    Basic.ScrollView {
+    // A Flickable, not a ScrollView: ScrollView takes the arrow keys to
+    // scroll, so they would never reach the shell's SpatialNavigation.
+    Flickable {
+        SmoothWheel {}
         anchors.fill: parent
-        contentWidth: availableWidth
+        contentHeight: content.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
 
         Column {
+            id: content
             x: Theme.pageMargin
             width: Math.min(parent.width - 2 * Theme.pageMargin, 720)
             topPadding: Theme.spacingHuge

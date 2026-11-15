@@ -1,7 +1,7 @@
 import QtQuick
-import QtQuick.Controls.Basic as Basic
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
+import Jfd.Ui.Shell
 import Jfd.Ui.Group
 
 // The rooms on the server, outside a room (GroupPage shows it while not in
@@ -20,6 +20,7 @@ FocusScope {
     readonly property var group: GroupSession
     readonly property bool cardOpen: rooms.selectedId.length > 0
     readonly property bool online: rooms.online
+    readonly property bool inGroup: group.inGroup
 
     function stateText(state) {
         switch (state) {
@@ -62,7 +63,19 @@ FocusScope {
     }
 
     Keys.onEscapePressed: (event) => { event.accepted = root.closeCard() }
+    // Left to the page's own nearest control first (the room to the left,
+    // Join from Back to rooms): the page stack's KeyNavigation.left would
+    // otherwise take every Left to the sidebar. Nothing to the left: on to
+    // the sidebar as on every page.
+    Keys.onLeftPressed: (event) => { event.accepted = root.SpatialNavigation.move(SpatialNavigation.Left) }
     Keys.onBackPressed: (event) => { event.accepted = root.closeCard() }
+
+    // Joined: the card that led there is done with. Leaving the room shows
+    // the list, not that room's card again.
+    onInGroupChanged: {
+        if (root.inGroup)
+            root.rooms.select("")
+    }
 
     // Poll only while the page shows and the window is the active one.
     Binding {
@@ -72,9 +85,14 @@ FocusScope {
     }
     Component.onDestruction: root.rooms.active = false
 
-    Basic.ScrollView {
+    // A Flickable, not a ScrollView: ScrollView takes the arrow keys to
+    // scroll, so they would never reach the shell's SpatialNavigation.
+    Flickable {
+        SmoothWheel {}
         anchors.fill: parent
-        contentWidth: availableWidth
+        contentHeight: content.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
 
         Column {
             id: content
@@ -161,7 +179,9 @@ FocusScope {
                     id: refreshButton
                     objectName: "refreshButton"
                     text: qsTr("Refresh")
-                    enabled: !root.rooms.loading
+                    // Not disabled while a poll is in flight (refresh() then
+                    // does nothing): a disabled button would drop the focus
+                    // and leave the Tab chain every few seconds.
                     onClicked: root.rooms.refresh()
                 }
             }
