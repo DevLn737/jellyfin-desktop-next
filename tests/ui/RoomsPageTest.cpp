@@ -2,7 +2,9 @@
 // shell and a fake server: the live list with the keyboard alone (Tab,
 // arrows, Enter, Esc), a room's card, joining and leaving; cards that are
 // kept when their room did not change; the empty, offline and access
-// states; and the room card's contrast and focus ring in both themes.
+// states; the room card's contrast and focus ring in both themes; and the
+// whole tab in TV mode with arrows, Select and Back only, the room's name
+// typed on the on-screen keyboard.
 //
 // JFD_UI_SCREENSHOTS=<dir> saves the tab in both themes at four window sizes.
 #include "../support/DoctestQt.h"
@@ -31,11 +33,15 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSet>
 #include <QTest>
 #include <QtQml/qqmlextensionplugin.h>
 
 #include <algorithm>
 #include <chrono>
+#include <deque>
+#include <functional>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -83,6 +89,25 @@ namespace {
   }
 
   bool shown(QQuickItem* item) { return item != nullptr && item->isVisible(); }
+
+  using Node = QQuickItem*;
+
+  QSet<Node> reach(const std::map<Node, QSet<Node>>& edges, Node start) {
+    QSet<Node> seen{start};
+    std::deque<Node> queue{start};
+    while (!queue.empty()) {
+      const Node node = queue.front();
+      queue.pop_front();
+      const auto it = edges.find(node);
+      if (it == edges.end()) continue;
+      for (const Node next : it->second) {
+        if (seen.contains(next)) continue;
+        seen.insert(next);
+        queue.push_back(next);
+      }
+    }
+    return seen;
+  }
 
   struct Scene {
     // What SyncPlay/List and Users/Me answer.
@@ -180,6 +205,11 @@ AppShell {
       ui::GroupSession::setInstance(nullptr);
     }
 
+    void setTvMode(bool on) {
+      QMetaObject::invokeMethod(object.get(), "setTvMode", Q_ARG(QVariant, on));
+      pump(300);
+    }
+
     QQuickItem* page() const {
       QQuickItem* stack = find(window.contentItem(), QStringLiteral("pageStack"));
       return stack == nullptr ? nullptr : stack->property("currentItem").value<QQuickItem*>();
@@ -225,6 +255,107 @@ AppShell {
       REQUIRE(waitFor([&] { return !group->inGroup(); }, Timeout));
     }
 
+    // The visible, enabled items of the page that take the focus by keys.
+    QList<QQuickItem*> focusable() const {
+      QList<QQuickItem*> found;
+      std::function<void(QQuickItem*)> walk = [&](QQuickItem* node) {
+        if (!node->isVisible() || !node->isEnabled()) return;
+        if (node->activeFocusOnTab() && node->width() > 0 && node->height() > 0) found.append(node);
+        const QList<QQuickItem*> children = node->childItems();
+        for (QQuickItem* child : children) walk(child);
+      };
+      walk(page());
+      return found;
+    }
+
+    // The innermost of `items` that holds the focus.
+    Node nodeOf(const QList<QQuickItem*>& items) const {
+      QQuickItem* focus = window.activeFocusItem();
+      Node best = nullptr;
+      for (QQuickItem* candidate : items)
+        if ((candidate == focus || candidate->isAncestorOf(focus)) && (!best || best->isAncestorOf(candidate)))
+          best = candidate;
+      return best;
+    }
+
+    // TV mode: every focusable item of the page reaches every other by
+    // arrows, a field's keyboard closes with Back on the field, and all are
+    // inside the safe area.
+    void checkNoTraps(int atLeast) {
+      const QSizeF size = window.size();
+      const QRectF safe(size.width() * 0.05, size.height() * 0.05, size.width() * 0.9, size.height() * 0.9);
+      const QList<QQuickItem*> items = focusable();
+      QSet<Node> nodes;
+      for (QQuickItem* candidate : items) {
+        CAPTURE(candidate->objectName());
+        const QRectF rect = candidate->mapRectToScene(QRectF(0, 0, candidate->width(), candidate->height()));
+        CHECK(safe.adjusted(-0.5, -0.5, 0.5, 0.5).contains(rect));
+        SpatialNavigation::focusItem(candidate);
+        if (entry->isOpen()) tap(window, Qt::Key_Escape);
+        if (Node node = nodeOf(items)) nodes.insert(node);
+      }
+      REQUIRE(nodes.size() >= atLeast);
+      std::map<Node, QSet<Node>> edges;
+      std::map<Node, QSet<Node>> reverse;
+      for (const Node from : std::as_const(nodes)) {
+        for (const int key : {Qt::Key_Left, Qt::Key_Right, Qt::Key_Up, Qt::Key_Down}) {
+          SpatialNavigation::focusItem(from);
+          if (entry->isOpen()) tap(window, Qt::Key_Escape);
+          REQUIRE(nodeOf(items) == from);
+          tap(window, key);
+          const Node to = nodeOf(items);
+          if (entry->isOpen()) {
+            tap(window, Qt::Key_Escape);
+            CHECK_FALSE(entry->isOpen());
+            CHECK(nodeOf(items) == to);
+          }
+          if (to && to != from && nodes.contains(to)) {
+            edges[from].insert(to);
+            reverse[to].insert(from);
+          }
+        }
+      }
+      const Node start = *nodes.begin();
+      const QSet<Node> forward = reach(edges, start);
+      const QSet<Node> backward = reach(reverse, start);
+      for (const Node node : std::as_const(nodes)) {
+        CAPTURE(node->objectName());
+        CHECK(forward.contains(node));
+        CHECK(backward.contains(node));
+      }
+    }
+
+    // The on-screen keyboard's highlighted key.
+    QString highlighted() const {
+      QQuickItem* board = window.findChild<QQuickItem*>(QStringLiteral("onScreenKeyboard"));
+      REQUIRE(board != nullptr);
+      const QVariantList rows = board->property("rows").toList();
+      const QVariantMap key =
+          rows.at(board->property("row").toInt()).toList().at(board->property("column").toInt()).toMap();
+      return key.contains(QStringLiteral("action")) ? key.value(QStringLiteral("action")).toString()
+                                                     : key.value(QStringLiteral("text")).toString();
+    }
+    int keyboardRow() const {
+      QQuickItem* board = window.findChild<QQuickItem*>(QStringLiteral("onScreenKeyboard"));
+      return board->property("row").toInt();
+    }
+    // Arrows to the key (from the bottom row up), then Select.
+    void typeKey(const QString& name) {
+      REQUIRE(entry->isOpen());
+      for (int i = 0; i < 6; ++i) tap(window, Qt::Key_Down);
+      bool found = false;
+      while (!found) {
+        for (int i = 0; i < 14; ++i) tap(window, Qt::Key_Left);
+        for (int i = 0; i < 14 && !found; ++i) {
+          found = highlighted() == name;
+          if (!found) tap(window, Qt::Key_Right);
+        }
+        if (found) break;
+        REQUIRE(keyboardRow() > 0);
+        tap(window, Qt::Key_Up);
+      }
+      tap(window, Qt::Key_Return);
+    }
   };
 
   double contrast(const QQuickItem* text, const QColor& background) {
@@ -470,4 +601,60 @@ TEST_CASE("The room card reads well and shows the focus ring in the dark and the
   }
   scene.rooms->select(QString());
   scene.theme->setProperty("colors", ui::depthPalette());
+}
+
+TEST_CASE("The rooms tab in TV mode: arrows, Select and Back only, the name from the on-screen keyboard") {
+  Scene scene(QSize(1920, 1080));
+  QQuickWindow& window = scene.window;
+  scene.setTvMode(true);
+  REQUIRE(waitFor([&] { return shown(scene.card("a")) && shown(scene.card("b")); }, Timeout));
+  pump(200);
+
+  // Every control reaches every other, none traps, all in the safe area.
+  scene.checkNoTraps(5);
+
+  // Down from the field to a room, Select: its card; Back: the list again,
+  // on the room, without leaving the page.
+  SpatialNavigation::focusItem(scene.item("refreshButton"));
+  tap(window, Qt::Key_Down);
+  CHECK(scene.focusName().startsWith(QLatin1String("room_")));
+  const QString room = scene.focusName();
+  tap(window, Qt::Key_Return);
+  REQUIRE(shown(scene.item("roomDetails")));
+  CHECK(scene.focusName() == QStringLiteral("joinButton"));
+  scene.checkNoTraps(2);
+  SpatialNavigation::focusItem(scene.item("joinButton"));
+  const int depth = scene.navigator->depth();
+  tap(window, Qt::Key_Escape);
+  CHECK(scene.rooms->selectedId().isEmpty());
+  CHECK(scene.navigator->depth() == depth);
+  CHECK(scene.focusName() == room);
+
+  // Up to the name field: the keyboard opens; "film" on it, Done creates.
+  for (int i = 0; i < 6 && scene.focusName() != QStringLiteral("roomNameField"); ++i)
+    tap(window, scene.focusName() == QStringLiteral("createButton") ? Qt::Key_Left : Qt::Key_Up);
+  REQUIRE(scene.focusName() == QStringLiteral("roomNameField"));
+  // Reached by an arrow: the keyboard is open (Select opens it otherwise).
+  if (!scene.entry->isOpen()) tap(window, Qt::Key_Return);
+  REQUIRE(scene.entry->isOpen());
+  for (const QChar c : QStringLiteral("film")) scene.typeKey(QString(c));
+  CHECK(scene.input("roomNameField")->property("text").toString() == QStringLiteral("film"));
+  scene.typeKey(QStringLiteral("done"));
+  REQUIRE(waitFor([&] { return scene.count("/SyncPlay/New") == 1; }, Timeout));
+  CHECK(scene.lastBody("/SyncPlay/New").value(QStringLiteral("GroupName")).toString() == QStringLiteral("film"));
+  CHECK_FALSE(scene.entry->isOpen());
+
+  // In the room: arrows and Select leave it.
+  scene.joined("n1", "film");
+  REQUIRE(waitFor([&] { return shown(scene.item("roomPage")); }, Timeout));
+  CHECK(scene.focusName() == QStringLiteral("leaveButton"));
+  tap(window, Qt::Key_Return);
+  REQUIRE(waitFor([&] { return scene.count("/SyncPlay/Leave") == 1; }, Timeout));
+  scene.left("n1");
+  REQUIRE(waitFor([&] { return shown(scene.item("roomsPage")); }, Timeout));
+
+  // Back on the list leaves the tab.
+  SpatialNavigation::focusItem(scene.card("a"));
+  tap(window, Qt::Key_Escape);
+  CHECK(scene.navigator->depth() == depth - 1);
 }

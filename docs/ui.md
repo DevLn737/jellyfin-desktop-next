@@ -393,7 +393,8 @@ Quick Connect first, and Back between the steps.
 `jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
 gamepad alone.
 `jfd_ui_rooms_tests` drives the rooms tab on a fake server with the keyboard
-alone, checks that a poll keeps the cards of unchanged rooms, the empty,
+alone and in TV mode (arrows, Select, Back, the room's name on the on-screen
+keyboard), checks that a poll keeps the cards of unchanged rooms, the empty,
 offline and access states, and the room card's contrast and focus ring in
 both themes; with `JFD_UI_SCREENSHOTS` it saves the tab in both themes at
 four window sizes.
