@@ -9,7 +9,8 @@ import Jfd.Ui.Library
 
 // Live TV (route "livetv"): every channel with what is on now, how far it
 // is, and what comes next. Enter or a click tunes in; the channel plays on
-// this device only. Guide opens the programme guide grid.
+// this device only. Guide opens the programme guide grid; Recordings the
+// recordings and what is to be recorded, when this user may record.
 RoutePage {
     id: page
 
@@ -53,11 +54,21 @@ RoutePage {
                 font.pixelSize: Theme.fontSizeSmall
             }
             ActionButton {
+                id: recordingsButton
+                objectName: "liveTvRecordings"
+                visible: Library.recorder !== null && Library.recorder.available
+                text: qsTr("Recordings")
+                onClicked: Navigator.navigate("recordings")
+                KeyNavigation.down: list
+                KeyNavigation.right: guideButton
+            }
+            ActionButton {
                 id: guideButton
                 objectName: "liveTvGuide"
                 text: qsTr("Guide")
                 onClicked: Navigator.navigate("guide")
                 KeyNavigation.down: list
+                KeyNavigation.left: recordingsButton.visible ? recordingsButton : null
             }
         }
 

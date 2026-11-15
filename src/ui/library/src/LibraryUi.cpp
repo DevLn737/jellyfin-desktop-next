@@ -19,7 +19,10 @@ namespace jfd::ui {
   LibraryUi::LibraryUi(QObject* parent) : QObject(parent) {}
 
   void LibraryUi::attach(const Services& services) {
+    if (m_services.recorder != nullptr) disconnect(m_services.recorder, nullptr, this, nullptr);
     m_services = services;
+    if (m_services.recorder != nullptr)
+      connect(m_services.recorder, &library::LiveTvRecorder::message, this, &LibraryUi::message);
     Q_EMIT attached();
   }
 
@@ -122,6 +125,10 @@ namespace jfd::ui {
     options.devicePixelRatio = m_services.devicePixelRatio;
     auto* guide = new library::LiveTvGuide(*m_services.client, options, owner);
     QQmlEngine::setObjectOwnership(guide, QQmlEngine::CppOwnership);
+    if (library::LiveTvRecorder* recorder = m_services.recorder) {
+      connect(recorder, &library::LiveTvRecorder::timersChanged, guide,
+              [guide, recorder] { guide->applyTimers(recorder->timers()); });
+    }
     return guide;
   }
 
@@ -131,8 +138,28 @@ namespace jfd::ui {
     options.devicePixelRatio = m_services.devicePixelRatio;
     auto* schedule = new library::LiveTvSchedule(*m_services.client, options, owner);
     QQmlEngine::setObjectOwnership(schedule, QQmlEngine::CppOwnership);
+    if (library::LiveTvRecorder* recorder = m_services.recorder) {
+      connect(recorder, &library::LiveTvRecorder::timersChanged, schedule,
+              [schedule, recorder] { schedule->applyTimers(recorder->timers()); });
+    }
     schedule->setChannelId(channelId);
     return schedule;
+  }
+
+  library::LiveTvRecordings* LibraryUi::createRecordings(QObject* owner) {
+    if (m_services.client == nullptr) return nullptr;
+    library::LiveTvRecordings::Options options;
+    options.devicePixelRatio = m_services.devicePixelRatio;
+    auto* recordings = new library::LiveTvRecordings(*m_services.client, options, owner);
+    QQmlEngine::setObjectOwnership(recordings, QQmlEngine::CppOwnership);
+    connect(recordings, &library::LiveTvRecordings::failed, this,
+            [this](const QString& text) { Q_EMIT message(text, true); });
+    connect(recordings, &library::LiveTvRecordings::removed, this,
+            [this] { Q_EMIT message(tr("Recording deleted."), false); });
+    if (library::LiveTvRecorder* recorder = m_services.recorder)
+      connect(recorder, &library::LiveTvRecorder::timersChanged, recordings,
+              &library::LiveTvRecordings::reload);
+    return recordings;
   }
 
   library::ItemDetails* LibraryUi::createDetails(const QString& itemId, QObject* owner) {

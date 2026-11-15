@@ -14,7 +14,10 @@ import Jfd.Ui.Library
 // Keys (and a gamepad's d-pad, A, B, LB and RB): arrows move between
 // programmes and channels, Page Up and Page Down a screen of time earlier
 // and later, Home back to now, Enter watches what is on now or opens the
-// channel's page for a programme to come.
+// channel's page for a programme to come. When this user may record, the
+// Menu key (a gamepad's View button) opens the focused programme's
+// recording actions and R records it or cancels its recording; a dot marks
+// what the server will record.
 RoutePage {
     id: page
 
@@ -69,6 +72,15 @@ RoutePage {
     readonly property var focused: guide ? guide.focusedProgram : ({})
     readonly property bool focusedOnNow: guide !== null && focused.id !== undefined
         && focused.offset <= guide.nowMinutes && guide.nowMinutes < focused.offset + focused.length
+    // Recording actions for the focused programme: not one that has ended.
+    readonly property bool canRecordFocused: Library.recorder !== null && Library.recorder.available
+        && guide !== null && focused.id !== undefined && focused.offset + focused.length > guide.nowMinutes
+
+    RecordMenu {
+        id: recordMenu
+        program: page.canRecordFocused ? page.focused : ({})
+        returnFocusTo: page
+    }
 
     // Enter: what is on the air plays; anything else opens the channel.
     function activate() {
@@ -92,6 +104,16 @@ RoutePage {
         case Qt.Key_PageUp: guide.pageFocus(-1); break
         case Qt.Key_PageDown: guide.pageFocus(1); break
         case Qt.Key_Home: guide.focusNow(); break
+        case Qt.Key_Menu:
+            event.accepted = page.canRecordFocused && recordMenu.openFor(details)
+            return
+        case Qt.Key_R:
+            if (!page.canRecordFocused) {
+                event.accepted = false
+                return
+            }
+            recordMenu.toggle()
+            break
         case Qt.Key_Return:
         case Qt.Key_Enter:
         case Qt.Key_Select:
@@ -119,6 +141,13 @@ RoutePage {
                 text: qsTr("Guide")
             }
             ActionButton {
+                objectName: "guideRecordings"
+                visible: Library.recorder !== null && Library.recorder.available
+                text: qsTr("Recordings")
+                focusPolicy: Qt.NoFocus
+                onClicked: Navigator.navigate("recordings")
+            }
+            ActionButton {
                 objectName: "guideNow"
                 text: qsTr("Now")
                 focusPolicy: Qt.NoFocus
@@ -138,6 +167,7 @@ RoutePage {
 
         // The focused programme.
         Column {
+            id: details
             objectName: "guideDetails"
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.fontSizeLarge * 2 + Theme.fontSizeBody * 3
@@ -158,6 +188,9 @@ RoutePage {
                 text: qsTr("%1–%2 · %3").arg(page.clock(page.focused.start)).arg(page.clock(page.focused.end))
                       .arg(page.focused.channelName || "")
                       + (page.focusedOnNow ? "  ·  " + qsTr("On now") : "")
+                      + (page.focused.timerId ? "  ·  " + (page.focused.seriesTimerId ? qsTr("Series recording")
+                                                                                     : qsTr("Recording"))
+                                              : "")
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeBody
                 elide: Text.ElideRight
@@ -171,6 +204,36 @@ RoutePage {
                 wrapMode: Text.Wrap
                 maximumLineCount: 2
                 elide: Text.ElideRight
+            }
+        }
+
+        // The focused programme's recording actions, for the mouse (the
+        // Menu key and R do the same from the keys).
+        Row {
+            objectName: "guideRecordActions"
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.controlHeight
+            spacing: Theme.spacingSmall
+            // Its room stays while recording is there, so the grid does not
+            // move as the focus passes programmes that have ended.
+            visible: Library.recorder !== null && Library.recorder.available
+            Repeater {
+                model: recordMenu.actions
+                delegate: ActionButton {
+                    required property var modelData
+                    objectName: "guideRecordAction"
+                    text: modelData.text
+                    focusPolicy: Qt.NoFocus
+                    enabled: !(Library.recorder && Library.recorder.busy)
+                    onClicked: recordMenu.run(modelData.name)
+                }
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: page.canRecordFocused
+                text: qsTr("Menu: recording options")
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSmall
             }
         }
 
@@ -374,10 +437,27 @@ RoutePage {
                     border.color: isFocused ? Theme.accent : "transparent"
                     border.width: isFocused ? Theme.focusRingWidth : 0
 
+                    // The server will record it (a ring for a series).
+                    Rectangle {
+                        id: mark
+                        objectName: "guideRecordingMark"
+                        visible: (cell.modelData.timerId || "").length > 0
+                        x: Math.max(Theme.spacingSmall, -cell.x + Theme.spacingSmall)
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: (cell.modelData.seriesTimerId || "").length > 0 ? "transparent" : Theme.error
+                        border.color: Theme.error
+                        border.width: 2
+                        Accessible.role: Accessible.Indicator
+                        Accessible.name: (cell.modelData.seriesTimerId || "").length > 0 ? qsTr("Series recording")
+                                                                                        : qsTr("Recording")
+                    }
                     Text {
                         // The title stays readable when the programme began
                         // before the left edge.
-                        x: Math.max(Theme.spacingSmall, -cell.x + Theme.spacingSmall)
+                        x: Math.max(Theme.spacingSmall, -cell.x + Theme.spacingSmall) + (mark.visible ? mark.width + Theme.spacingTiny : 0)
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, cell.width - x - Theme.spacingSmall)
                         text: cell.modelData.title

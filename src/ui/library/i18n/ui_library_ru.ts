@@ -27,6 +27,14 @@
         <source>No programme information</source>
         <translation>Нет данных о передаче</translation>
     </message>
+    <message>
+        <source>Series recording</source>
+        <translation>Запись сериала</translation>
+    </message>
+    <message>
+        <source>Recording</source>
+        <translation>Запись</translation>
+    </message>
 </context>
 <context>
     <name>CollectionPage</name>
@@ -417,6 +425,22 @@
         <source>The server has no Live TV channels for you.</source>
         <translation>На сервере нет телеканалов, доступных вам.</translation>
     </message>
+    <message>
+        <source>Recordings</source>
+        <translation>Записи</translation>
+    </message>
+    <message>
+        <source>Series recording</source>
+        <translation>Запись сериала</translation>
+    </message>
+    <message>
+        <source>Recording</source>
+        <translation>Запись</translation>
+    </message>
+    <message>
+        <source>Menu: recording options</source>
+        <translation>Меню: запись</translation>
+    </message>
 </context>
 <context>
     <name>HomePage</name>
@@ -633,6 +657,10 @@
         <source>Guide</source>
         <translation>Телепрограмма</translation>
     </message>
+    <message>
+        <source>Recordings</source>
+        <translation>Записи</translation>
+    </message>
 </context>
 <context>
     <name>LiveTvSection</name>
@@ -740,6 +768,100 @@
     </message>
 </context>
 <context>
+    <name>RecordMenu</name>
+    <message>
+        <source>Cancel recording</source>
+        <translation>Отменить запись</translation>
+    </message>
+    <message>
+        <source>Record</source>
+        <translation>Записать</translation>
+    </message>
+    <message>
+        <source>Record series</source>
+        <translation>Записывать сериал</translation>
+    </message>
+    <message>
+        <source>Cancel series recording</source>
+        <translation>Отменить запись сериала</translation>
+    </message>
+</context>
+<context>
+    <name>RecordingsPage</name>
+    <message>
+        <source>Recordings</source>
+        <translation>Записи</translation>
+    </message>
+    <message>
+        <source>Nothing has been recorded yet. Record a programme from the guide or a channel&apos;s page.</source>
+        <translation>Записей пока нет. Запишите передачу из программы передач или со страницы канала.</translation>
+    </message>
+    <message>
+        <source>Scheduled</source>
+        <translation>Запланировано</translation>
+    </message>
+    <message>
+        <source>No recordings are scheduled.</source>
+        <translation>Записи не запланированы.</translation>
+    </message>
+    <message>
+        <source>Delete this recording?</source>
+        <translation>Удалить запись?</translation>
+    </message>
+    <message>
+        <source>%1 and its file are deleted from the server. This cannot be undone.</source>
+        <translation>«%1» и её файл будут удалены с сервера. Это нельзя отменить.</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Удалить</translation>
+    </message>
+    <message>
+        <source>Stop this recording?</source>
+        <translation>Остановить запись?</translation>
+    </message>
+    <message>
+        <source>%1 stops recording now. What has been recorded is kept.</source>
+        <translation>Запись «%1» остановится сейчас. Уже записанное сохранится.</translation>
+    </message>
+    <message>
+        <source>Stop recording</source>
+        <translation>Остановить запись</translation>
+    </message>
+    <message>
+        <source>Keep recording</source>
+        <translation>Продолжить запись</translation>
+    </message>
+    <message>
+        <source>%1, %2</source>
+        <translation>%1, %2</translation>
+    </message>
+    <message>
+        <source>%1 — %2</source>
+        <translation>%1 — %2</translation>
+    </message>
+    <message>
+        <source>Recording now</source>
+        <translation>Идёт запись</translation>
+    </message>
+    <message>
+        <source>Every new episode</source>
+        <translation>Каждая новая серия</translation>
+    </message>
+    <message>
+        <source>%1–%2</source>
+        <translation>%1–%2</translation>
+    </message>
+    <message>
+        <source>Cancel series recording</source>
+        <translation>Отменить запись сериала</translation>
+    </message>
+    <message>
+        <source>Cancel recording</source>
+        <translation>Отменить запись</translation>
+    </message>
+</context>
+<context>
     <name>SearchPage</name>
     <message>
         <source>Search</source>
@@ -813,6 +935,10 @@
     <message>
         <source>Leave the group to play music.</source>
         <translation>Выйдите из группы, чтобы слушать музыку.</translation>
+    </message>
+    <message>
+        <source>Recording deleted.</source>
+        <translation>Запись удалена.</translation>
     </message>
 </context>
 </TS>

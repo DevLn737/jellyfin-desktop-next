@@ -5,6 +5,8 @@
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LiveTvChannels.h>
 #include <jfd/library/LiveTvGuide.h>
+#include <jfd/library/LiveTvRecorder.h>
+#include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/library/SignIn.h>
@@ -45,6 +47,9 @@ namespace jfd::ui {
     Q_PROPERTY(jfd::library::SearchModel* search READ search NOTIFY attached)
     // The Live TV channel list (route "livetv").
     Q_PROPERTY(jfd::library::LiveTvChannels* liveTv READ liveTv NOTIFY attached)
+    // The server's DVR: whether this user may record, recording and
+    // cancelling, the recordings to come (route "recordings").
+    Q_PROPERTY(jfd::library::LiveTvRecorder* recorder READ recorder NOTIFY attached)
     Q_PROPERTY(bool canPlay READ canPlay NOTIFY handlersChanged)
     Q_PROPERTY(bool canWatchTogether READ canWatchTogether NOTIFY handlersChanged)
     Q_PROPERTY(bool canPlayTracks READ canPlayTracks NOTIFY handlersChanged)
@@ -61,6 +66,7 @@ namespace jfd::ui {
       library::HomeModel* home = nullptr;
       library::SearchModel* search = nullptr;
       library::LiveTvChannels* liveTv = nullptr;
+      library::LiveTvRecorder* recorder = nullptr;
       library::LibraryUpdates* updates = nullptr;
       library::CollectionIndex* collections = nullptr;
       qreal devicePixelRatio = 1.0;
@@ -94,6 +100,7 @@ namespace jfd::ui {
     library::HomeModel* home() const { return m_services.home; }
     library::SearchModel* search() const { return m_services.search; }
     library::LiveTvChannels* liveTv() const { return m_services.liveTv; }
+    library::LiveTvRecorder* recorder() const { return m_services.recorder; }
     bool canPlay() const { return bool(m_play); }
     bool canWatchTogether() const { return bool(m_watchTogether); }
     bool canPlayTracks() const { return bool(m_track.play); }
@@ -119,9 +126,13 @@ namespace jfd::ui {
     // search page keeps using `search`. Null before attach.
     Q_INVOKABLE jfd::library::SearchModel* createSearch(QObject* owner);
     // The programme guide (route "guide") and one channel's programmes
-    // (route "channel/<id>"), owned by `owner`.
+    // (route "channel/<id>"), owned by `owner`. Both mark what the
+    // recorder records, and follow it as that changes.
     Q_INVOKABLE jfd::library::LiveTvGuide* createGuide(QObject* owner);
     Q_INVOKABLE jfd::library::LiveTvSchedule* createSchedule(const QString& channelId, QObject* owner);
+    // The recordings (route "recordings"), owned by `owner`; read again
+    // when the recorder's timers change (a recording starts or stops).
+    Q_INVOKABLE jfd::library::LiveTvRecordings* createRecordings(QObject* owner);
     // The image provider's source for a server image URL.
     Q_INVOKABLE QString image(const QUrl& url) const;
     // Where a card leads: "library/<id>" for a library, "collection/<id>"

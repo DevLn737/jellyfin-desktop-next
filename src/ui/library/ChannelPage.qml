@@ -9,7 +9,10 @@ import Jfd.Ui.Library
 
 // One channel (route "channel/<id>"): its logo, Watch, and what is on now
 // and later today. Watch has the focus, so Enter tunes in; Down goes to the
-// programmes.
+// programmes. When this user may record, the focused programme has a
+// Record (or Cancel recording) button, Right reaches it; the Menu key (a
+// gamepad's View button) opens all its recording actions and R records it
+// or cancels its recording. A dot marks what the server will record.
 RoutePage {
     id: page
 
@@ -22,6 +25,13 @@ RoutePage {
         function onReconnected() {
             if (page.schedule && page.schedule.errorText.length > 0) page.schedule.reload()
         }
+    }
+
+    readonly property bool canRecord: Library.recorder !== null && Library.recorder.available
+
+    RecordMenu {
+        id: recordMenu
+        returnFocusTo: programmes
     }
 
     // Hours and minutes in the system's style, never seconds.
@@ -85,6 +95,9 @@ RoutePage {
             keyNavigationEnabled: true
             boundsBehavior: Flickable.StopAtBounds
             KeyNavigation.up: watch
+            // What is on now is current once the list fills, so Down from
+            // Watch lands on it.
+            onCountChanged: if (currentIndex < 0 && count > 0) currentIndex = 0
 
             delegate: Rectangle {
                 id: entry
@@ -96,9 +109,17 @@ RoutePage {
                 required property var end
                 required property bool onNow
                 required property real progress
+                required property string programId
+                required property bool isSeries
+                required property string timerId
+                required property string seriesTimerId
+                readonly property var program: ({ id: entry.programId, timerId: entry.timerId,
+                                                   seriesTimerId: entry.seriesTimerId, isSeries: entry.isSeries })
+                readonly property var recordActions: page.canRecord ? recordMenu.actionsFor(entry.program) : []
 
                 width: ListView.view.width
-                implicitHeight: body.implicitHeight + 2 * Theme.spacingSmall
+                implicitHeight: Math.max(body.implicitHeight, recordButton.visible ? recordButton.implicitHeight : 0)
+                                + 2 * Theme.spacingSmall
                 radius: Theme.radius
                 color: ListView.isCurrentItem && ListView.view.activeFocus ? Theme.surfaceHover : Theme.surface
                 Accessible.role: Accessible.ListItem
@@ -107,15 +128,48 @@ RoutePage {
                 // What is on now plays on Enter.
                 Keys.onReturnPressed: if (entry.onNow) Library.playChannel(page.routeArgument)
                 Keys.onEnterPressed: if (entry.onNow) Library.playChannel(page.routeArgument)
+                Keys.onPressed: (event) => {
+                    event.accepted = false
+                    if (event.modifiers !== Qt.NoModifier || entry.recordActions.length === 0) return
+                    if (event.key === Qt.Key_Menu) {
+                        event.accepted = recordMenu.openFor(recordButton, entry.program)
+                    } else if (event.key === Qt.Key_R) {
+                        recordMenu.runFor(entry.program, entry.recordActions[0].name)
+                        event.accepted = true
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        entry.ListView.view.currentIndex = entry.index
+                        entry.ListView.view.forceActiveFocus()
+                    }
+                }
 
                 FocusFrame {
                     shown: entry.ListView.isCurrentItem && entry.ListView.view.activeFocus
                 }
 
+                // Record or Cancel recording: on the current programme and on
+                // any the server records.
+                ActionButton {
+                    id: recordButton
+                    objectName: "channelRecord"
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.spacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: entry.recordActions.length > 0
+                             && (entry.ListView.isCurrentItem || entry.timerId.length > 0)
+                    text: entry.recordActions.length > 0 ? entry.recordActions[0].text : ""
+                    enabled: !(Library.recorder && Library.recorder.busy)
+                    onClicked: recordMenu.runFor(entry.program, entry.recordActions[0].name)
+                }
+
                 ColumnLayout {
                     id: body
                     anchors.left: parent.left
-                    anchors.right: parent.right
+                    anchors.right: recordButton.visible ? recordButton.left : parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: Theme.spacing
                     anchors.rightMargin: Theme.spacing
@@ -142,6 +196,22 @@ RoutePage {
                             visible: entry.onNow
                             text: qsTr("On now")
                             color: Theme.accent
+                            font.pixelSize: Theme.fontSizeSmall
+                        }
+                        Rectangle {
+                            objectName: "channelRecordingMark"
+                            visible: entry.timerId.length > 0
+                            Layout.preferredWidth: 10
+                            Layout.preferredHeight: 10
+                            radius: 5
+                            color: entry.seriesTimerId.length > 0 ? "transparent" : Theme.error
+                            border.color: Theme.error
+                            border.width: 2
+                        }
+                        Text {
+                            visible: entry.timerId.length > 0
+                            text: entry.seriesTimerId.length > 0 ? qsTr("Series recording") : qsTr("Recording")
+                            color: Theme.error
                             font.pixelSize: Theme.fontSizeSmall
                         }
                     }

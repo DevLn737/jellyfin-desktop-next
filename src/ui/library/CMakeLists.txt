@@ -39,6 +39,8 @@ qt_add_qml_module(jfd_ui_library
     LiveTvPage.qml
     LoginPage.qml
     PersonPage.qml
+    RecordingsPage.qml
+    RecordMenu.qml
     SearchPage.qml
   RESOURCES
     icons/livetv.svg

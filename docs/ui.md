@@ -468,3 +468,25 @@ the view. Every page's main scrolling view has one; add it to a new page's.
   progress. Page Up / Channel Up / N (and LB) go to the next channel, Page
   Down / Channel Down (RB) to the one before, round the server's list. A
   channel always plays on this device, also in a group.
+- Recording (the server's own DVR; `Library.recorder`, model
+  `LiveTvRecorder`) is offered only when `LiveTv/Info` has Live TV for the
+  user and the user may manage it (`Policy.EnableLiveTvManagement`, or an
+  administrator; the server refuses timers to anyone else). Then, on the
+  guide, the Menu key (a gamepad's View button) opens the focused
+  programme's actions (Record, Record series for a series, Cancel recording,
+  Cancel series recording), R records it or cancels its recording, and the
+  same actions are buttons under the programme's details; on a channel's
+  page the focused programme has a Record (or Cancel recording) button,
+  reached with Right, and the Menu key and R work the same. A red dot marks
+  a programme the server will record, a ring one of a series recording.
+- `recordings` (`RecordingsPage`, models `LiveTvRecordings` and the
+  recorder), from the Live TV screen and the guide: the recordings, the
+  one recording now first, then the schedule (series recordings, then the
+  recordings to come by start). A finished recording plays as an item, with
+  its time line, from where it was left; Delete (its button or the Delete
+  key) removes it and its file after a question (`DELETE Items/{id}`: 12.2's
+  `DELETE LiveTv/Recordings/{id}` leaves the file, which the next scan of the
+  Recordings folder brings back). One recording now has no length yet (the
+  server streams it as a live source): its button stops it, after a
+  question, and what it recorded stays. A schedule row's button (Enter on
+  the row reaches it) cancels it.
