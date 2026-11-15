@@ -132,6 +132,7 @@ first next time. While it is open the player's keys do not reach the player.
 | `ChoiceBox` | `model: [{ value, label }]`, `currentValue`, `indexOfValue()`, `activated()`; Enter opens the list; in TV mode Up and Down move the focus, not the value (`navigationKeys`) |
 | `ValueSlider` | `from`, `to`, `stepSize`, `value`, `moved()`, `accepted()` (Enter), `trackHeight`, `handleSize` |
 | `PosterCard` | `title`, `subtitle`, `imageSource`, `shape` ("poster", "thumb", "square"), `progress` (0..1), `played`, `unplayedCount`, `cardWidth`, `clicked()` |
+| `RoomCard` | a room of watching together: `text` (its name), `roomState` ("idle", "waiting", "paused", "playing"), `participants` (names), `selected` (its card is open), `clicked()` (Enter, Select) |
 | `CardRow` | `title`, `model`, `delegate`, `cardHeight`, `currentIndex`, `view` |
 | `CardGrid` | `model`, `delegate`, `cardWidth`, `cardHeight`, `currentIndex`, `view` |
 | `ListItem` | `text`, `subtitle`, `trailingText`, `iconSource`, `highlighted`, `clicked()` |
