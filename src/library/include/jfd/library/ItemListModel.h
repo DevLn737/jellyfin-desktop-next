@@ -50,6 +50,10 @@ namespace jfd::library {
       // items); empty otherwise.
       BackdropUrlRole,
       LogoUrlRole,
+      // A library's or folder's number of items, when the server gave it.
+      ChildCountRole,
+      // Models that add roles of their own start after this one.
+      LastRole = ChildCountRole,
     };
     Q_ENUM(Role)
 

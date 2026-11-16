@@ -121,6 +121,12 @@ namespace jfd::api {
     QString primaryImageTag;
   };
 
+  // A chapter of a video (the Chapters field): where it starts and its name.
+  struct ItemChapter {
+    std::int64_t startTicks = 0;
+    QString name;
+  };
+
   // A stream of an item's default version, as an item listing describes it
   // (the MediaStreams field); enough for a details table.
   struct ItemStream {
@@ -197,6 +203,7 @@ namespace jfd::api {
     QStringList studios;
     QList<ItemStream> streams;
     std::optional<int> recursiveItemCount;
+    QList<ItemChapter> chapters;
     UserItemData userData;
   };
 

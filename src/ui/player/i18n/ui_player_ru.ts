@@ -98,6 +98,26 @@
         <translation>Субтитры</translation>
     </message>
     <message>
+        <source>Intro</source>
+        <translation>Заставка</translation>
+    </message>
+    <message>
+        <source>Credits</source>
+        <translation>Титры</translation>
+    </message>
+    <message>
+        <source>Recap</source>
+        <translation>Краткое содержание</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation>Анонс</translation>
+    </message>
+    <message>
+        <source>Commercial</source>
+        <translation>Реклама</translation>
+    </message>
+    <message>
         <source>Play</source>
         <translation>Воспроизвести</translation>
     </message>
@@ -136,6 +156,10 @@
     <message>
         <source>Episodes</source>
         <translation>Серии</translation>
+    </message>
+    <message>
+        <source>Audio and subtitles</source>
+        <translation>Аудио и субтитры</translation>
     </message>
     <message>
         <source>Playback settings</source>
@@ -210,7 +234,7 @@
     </message>
 </context>
 <context>
-    <name>TrackMenu</name>
+    <name>TracksMenu</name>
     <message>
         <source>Off</source>
         <translation>Выключены</translation>
@@ -225,11 +249,23 @@
     </message>
     <message>
         <source>external</source>
-        <translation>внешняя</translation>
+        <translation>внешние</translation>
+    </message>
+    <message>
+        <source>Audio</source>
+        <translation>Аудио</translation>
     </message>
     <message>
         <source>No tracks</source>
         <translation>Нет дорожек</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Субтитры</translation>
+    </message>
+    <message>
+        <source>Subtitle style and delay</source>
+        <translation>Стиль и задержка субтитров</translation>
     </message>
 </context>
 <context>

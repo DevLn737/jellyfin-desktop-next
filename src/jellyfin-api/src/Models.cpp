@@ -227,6 +227,11 @@ namespace jfd::api::json {
                         smallInteger(m, "Width"), smallInteger(m, "Height"), smallInteger(m, "Channels")});
     }
     i.recursiveItemCount = smallInteger(o, "RecursiveItemCount");
+    for (const auto& value : o.value(QLatin1String("Chapters")).toArray()) {
+      const QJsonObject c = value.toObject();
+      if (const auto start = integer(c, "StartPositionTicks"))
+        i.chapters.append({*start, text(c, "Name")});
+    }
     readUserData(o.value(QLatin1String("UserData")).toObject(), i.userData);
     if (i.id.isEmpty()) return invalid(QStringLiteral("Item has no Id"));
     return i;

@@ -56,7 +56,7 @@ namespace jfd::library {
     enum class PlayedFilter { All, Played, Unplayed };
     Q_ENUM(PlayedFilter)
 
-    enum Role { LoadedRole = ItemListModel::AlbumIdRole + 1 };
+    enum Role { LoadedRole = ItemListModel::LastRole + 1 };
 
     struct Options {
       int pageSize = 100;

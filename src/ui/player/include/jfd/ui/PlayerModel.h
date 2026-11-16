@@ -115,6 +115,9 @@ namespace jfd::ui {
     Q_PROPERTY(bool pip READ pip NOTIFY pipChanged)
     // The server has thumbnails for the seek bar (trickplayFrame).
     Q_PROPERTY(bool hasTrickplay READ hasTrickplay NOTIFY trickplayChanged)
+    // The item's chapters, [{start (seconds), name}] in order; empty when it
+    // has none or one only.
+    Q_PROPERTY(QVariantList chapters READ chapters NOTIFY chaptersChanged)
 
   public:
     // `sink` takes the playback reports (the app's sends them through the
@@ -170,6 +173,9 @@ namespace jfd::ui {
     }
     QString segment() const;
     QVariantList segments() const;
+    QVariantList chapters() const;
+    // The name of the chapter playing at `seconds`, or "".
+    Q_INVOKABLE QString chapterAt(double seconds) const;
     bool autoSkip() const { return m_skipper.autoSkip(); }
     void setAutoSkip(bool on);
     bool autoNext() const { return m_autoNext; }
@@ -264,6 +270,7 @@ namespace jfd::ui {
     void pipChanged();
     void leftPip();
     void trickplayChanged();
+    void chaptersChanged();
     void liveInfoChanged();
     // A play request could not be resolved, or the renderer failed.
     void failed(const QString& message);
@@ -352,6 +359,7 @@ namespace jfd::ui {
     // the seek bar uses for the file playing now.
     QString m_trickplayItem;
     QHash<QString, QList<api::TrickplayInfo>> m_trickplay;
+    QList<api::ItemChapter> m_chapters;
     std::optional<api::TrickplayInfo> m_trickplayInfo;
     bool m_videoReady = false;
     bool m_pip = false;

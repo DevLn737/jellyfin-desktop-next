@@ -24,4 +24,4 @@ target_link_libraries(jfd_ui_group
   PRIVATE Qt6::Quick jfd_ui_theme jfd_ui_controls jfd_ui_shell)
 target_compile_definitions(jfd_ui_group PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 target_compile_options(jfd_ui_group PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
-jfd_add_translations(jfd_ui_group)
+jfd_add_translations(jfd_ui_group PLURALS)

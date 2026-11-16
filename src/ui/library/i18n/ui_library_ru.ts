@@ -638,6 +638,14 @@
         <translation>Композитор</translation>
     </message>
     <message>
+        <source>Refresh</source>
+        <translation>Обновить</translation>
+    </message>
+    <message>
+        <source>Go to series</source>
+        <translation>Перейти к сериалу</translation>
+    </message>
+    <message>
         <source>Watched %1 of %2</source>
         <translation>Просмотрено %1 из %2</translation>
     </message>

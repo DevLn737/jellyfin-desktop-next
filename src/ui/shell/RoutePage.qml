@@ -9,4 +9,5 @@ FocusScope {
     property string routeName
     property string routeArgument
     property string title
+    property bool hasTopBar: false
 }

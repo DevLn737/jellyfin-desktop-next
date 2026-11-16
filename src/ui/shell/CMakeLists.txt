@@ -35,6 +35,7 @@ qt_add_qml_module(jfd_ui_shell
     AppShell.qml
     GamepadCheck.qml
     OnScreenKeyboard.qml
+    PageTopBar.qml
     PlaceholderPage.qml
     RoutePage.qml
     Sidebar.qml

@@ -98,6 +98,8 @@ namespace jfd::library {
       return item.officialRating;
     case BackdropUrlRole:
       return e->backdropUrl;
+    case ChildCountRole:
+      return item.childCount ? QVariant(*item.childCount) : QVariant();
     case LogoUrlRole:
       return e->logoUrl;
     default:
@@ -131,7 +133,8 @@ namespace jfd::library {
             {GenresRole, "genres"},
             {OfficialRatingRole, "officialRating"},
             {BackdropUrlRole, "backdropUrl"},
-            {LogoUrlRole, "logoUrl"}};
+            {LogoUrlRole, "logoUrl"},
+            {ChildCountRole, "childCount"}};
   }
 
   const ItemListModel::Entry* ItemListModel::entry(int row) const {

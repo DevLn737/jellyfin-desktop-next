@@ -22,6 +22,7 @@ RoutePage {
     }
 
     title: details && details.loaded ? details.name : qsTr("Collection")
+    hasTopBar: true
 
     // Back from a lost connection: what failed loads again.
     Connections {
@@ -59,6 +60,11 @@ RoutePage {
         anchors.rightMargin: Theme.pageMargin
         anchors.topMargin: Theme.spacingLarge
         spacing: Theme.spacingLarge
+
+        PageTopBar {
+            objectName: "collectionTopBar"
+            Layout.fillWidth: true
+        }
 
         RowLayout {
             Layout.fillWidth: true

@@ -119,6 +119,21 @@
     </message>
 </context>
 <context>
+    <name>PageTopBar</name>
+    <message>
+        <source>Back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Search the library</source>
+        <translation>Поиск по медиатеке</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>Ещё</translation>
+    </message>
+</context>
+<context>
     <name>PlaceholderPage</name>
     <message>
         <source>This screen is not ready yet.</source>
@@ -146,6 +161,10 @@
     <message>
         <source>Back</source>
         <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Media library</source>
+        <translation>Медиатека</translation>
     </message>
     <message>
         <source>Menu</source>

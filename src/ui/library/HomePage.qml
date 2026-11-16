@@ -25,6 +25,7 @@ RoutePage {
         && (!Library.online || (home !== null && home.errorText.length > 0 && home.count === 0))
 
     title: qsTr("Home")
+    hasTopBar: true
 
     readonly property Item heroBanner: rows.headerItem ? rows.headerItem.heroBanner : null
 

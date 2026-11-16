@@ -28,6 +28,7 @@
 #include <QtQml/qqmlextensionplugin.h>
 
 #include <cmath>
+#include <functional>
 #include <memory>
 
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
@@ -170,6 +171,70 @@ TEST_CASE("The player page plays, pauses, seeks and lists the file's tracks") {
 
   f.player->stop();
   REQUIRE(waitFor([&] { return !f.player->active() || f.player->ended(); }, 2000));
+}
+
+TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio and subtitles") {
+  // The item's chapters and an intro from 0 to 60 s.
+  test::FakeServer server([](const test::HttpRequest& r) {
+    const auto json = [](const char* body) { return test::HttpResponse{200, QByteArray(body), "application/json", 0}; };
+    if (r.path == QStringLiteral("/Items/episode"))
+      return json(R"({"Id": "episode", "Name": "Episode", "Chapters": [
+        {"StartPositionTicks": 0, "Name": "Opening"},
+        {"StartPositionTicks": 3000000000, "Name": "Part 1"},
+        {"StartPositionTicks": 1800000000, "Name": "Middle"}]})");
+    if (r.path == QStringLiteral("/MediaSegments/episode"))
+      return json(R"({"Items": [{"Id": "s1", "ItemId": "episode", "Type": "Intro",
+        "StartTicks": 0, "EndTicks": 600000000}]})");
+    return test::HttpResponse{404, {}, {}, 0};
+  });
+  Fixture f;
+  f.client.setServerUrl(server.url());
+  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
+  REQUIRE(waitFor([&] { return f.player->chapters().size() == 3; }, 5000));
+  // In order of their start, whatever the server's order.
+  CHECK(f.player->chapters()[1].toMap().value(QStringLiteral("name")).toString() == QStringLiteral("Middle"));
+  CHECK(f.player->chapterAt(200) == QStringLiteral("Middle"));
+  CHECK(f.player->chapterAt(400) == QStringLiteral("Part 1"));
+  CHECK(f.player->chapterAt(10) == QStringLiteral("Opening"));
+
+  // The marks: one per chapter after the first.
+  int marks = 0;
+  const std::function<void(QQuickItem*)> count = [&](QQuickItem* item) {
+    if (item->objectName() == QLatin1String("chapterMark") && item->isVisible()) ++marks;
+    for (QQuickItem* child : item->childItems()) count(child);
+  };
+  f.page->setProperty("osdVisible", true);
+  REQUIRE(waitFor([&] { marks = 0; count(f.page); return marks == 2; }, 3000));
+
+  // In the intro the line beside the time names it, and Skip shows.
+  REQUIRE(waitFor([&] { return f.player->segment() == QStringLiteral("Intro"); }, 5000));
+  QQuickItem* part = find(f.page, "partText");
+  REQUIRE(part != nullptr);
+  CHECK(part->property("text").toString() == QStringLiteral("Intro"));
+  CHECK(find(f.page, "skipSegment")->isVisible());
+  // JFD_UI_SCREENSHOTS=<dir> keeps a picture of the controls for review.
+  const QString shots = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
+  const auto shoot = [&](const char* name) {
+    if (shots.isEmpty()) return;
+    QTest::qWait(300);
+    f.window.grabWindow().save(shots + QLatin1Char('/') + QLatin1String(name) + QStringLiteral(".png"));
+  };
+  shoot("player-1280-intro");
+  // Past it, the chapter.
+  f.player->seek(400);
+  REQUIRE(waitFor([&] { return part->property("text").toString() == QStringLiteral("Part 1"); }, 3000));
+
+  // Audio and subtitles in one menu: two audio tracks, Off and two subtitles.
+  QMetaObject::invokeMethod(f.page, "toggleMenu", Q_ARG(QVariant, QStringLiteral("subtitles")));
+  QQuickItem* menu = nullptr;
+  REQUIRE(waitFor([&] { return (menu = find(f.page, "tracksMenu")) != nullptr; }, 2000));
+  CHECK(find(menu, "audioTrack_1") != nullptr);
+  CHECK(find(menu, "audioTrack_2") == nullptr);
+  CHECK(find(menu, "subtitleTrack_2") != nullptr);
+  CHECK(find(menu, "subtitleTune") != nullptr);
+  shoot("player-1280-tracks");
 }
 
 TEST_CASE("Delays are rounded to tenths and reset for the next file") {

@@ -24,7 +24,7 @@ qt_add_qml_module(jfd_ui_player
     PlayerPage.qml
     SegmentsMenu.qml
     SpeedButton.qml
-    TrackMenu.qml
+    TracksMenu.qml
     TuneMenu.qml
   RESOURCES
     icons/audio.svg
