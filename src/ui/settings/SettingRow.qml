@@ -24,6 +24,34 @@ FocusScope {
     required property string confirmation
 
     readonly property bool ranged: maximum > minimum
+    // The search's words, marked where they are in the label and description.
+    property string highlight
+
+    function escaped(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    }
+    function marked(text) {
+        const words = row.highlight.trim().toLowerCase().split(/\s+/).filter((w) => w.length > 0)
+        if (words.length === 0)
+            return escaped(text)
+        const lower = text.toLowerCase()
+        // Where each character is inside a match.
+        const hit = new Array(text.length).fill(false)
+        for (const word of words) {
+            for (let at = lower.indexOf(word); at >= 0; at = lower.indexOf(word, at + word.length))
+                for (let i = at; i < at + word.length; ++i)
+                    hit[i] = true
+        }
+        let out = ""
+        for (let i = 0; i < text.length; ++i) {
+            if (hit[i] && (i === 0 || !hit[i - 1]))
+                out += "<font color=\"" + Theme.accent + "\"><b>"
+            out += escaped(text.charAt(i))
+            if (hit[i] && (i === text.length - 1 || !hit[i + 1]))
+                out += "</b></font>"
+        }
+        return out
+    }
 
     implicitHeight: Math.max(texts.implicitHeight, editor.implicitHeight) + 2 * Theme.spacingSmall
     objectName: "setting_" + key
@@ -60,15 +88,17 @@ FocusScope {
 
         Text {
             width: parent.width
-            text: row.label
+            text: row.marked(row.label)
+            textFormat: Text.StyledText
             color: Theme.text
             font.pixelSize: Theme.fontSizeBody
             wrapMode: Text.Wrap
         }
         Text {
             width: parent.width
-            visible: text.length > 0
-            text: row.description
+            visible: row.description.length > 0
+            text: row.marked(row.description)
+            textFormat: Text.StyledText
             color: Theme.textSecondary
             font.pixelSize: Theme.fontSizeSmall
             wrapMode: Text.Wrap

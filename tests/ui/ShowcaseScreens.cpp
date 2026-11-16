@@ -18,7 +18,10 @@
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
+#include <jfd/settings/CommonSections.h>
+#include <jfd/settings/Settings.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/SettingsModel.h>
 #include <jfd/ui/ThemePalette.h>
 
 #include <QBuffer>
@@ -49,6 +52,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ControlsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
 
 using namespace jfd;
 using jfd::test::waitFor;
@@ -553,6 +557,14 @@ namespace {
       navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
       REQUIRE(navigator != nullptr);
       navigator->setPlaceholderPage(QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
+      // The settings screen, on the common sections.
+      REQUIRE(settings::registerCommonSections(m_registry));
+      m_settings = std::make_unique<settings::Settings>(m_registry, m_dir.filePath(QStringLiteral("settings.ini")));
+      auto* appSettings = engine.singletonInstance<ui::AppSettings*>("Jfd.Ui.Settings", "AppSettings");
+      REQUIRE(appSettings != nullptr);
+      appSettings->attach(m_settings.get());
+      navigator->registerPage(QStringLiteral("settings"),
+                              QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Settings/SettingsPage.qml")));
       // Russian unless JFD_UI_LANG says otherwise (en: the source strings).
       const QString language = qEnvironmentVariable("JFD_UI_LANG", QStringLiteral("ru"));
       if (language != QLatin1String("en")) {
@@ -642,6 +654,8 @@ namespace {
 
     QObject m_translations;
     QTemporaryDir m_dir;
+    settings::SettingsRegistry m_registry;
+    std::unique_ptr<settings::Settings> m_settings;
     test::FakeServer server;
     std::unique_ptr<ui::LibraryScreens> screens;
     QQmlApplicationEngine engine;
@@ -760,4 +774,21 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   CHECK(findItem(bar, QStringLiteral("letter_Я")) != nullptr);
   show.screenshot(QStringLiteral("library-1280-large"));
   library->setProperty("density", QStringLiteral("medium"));
+}
+
+TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
+  Showcase show;
+  show.navigator->navigate(QStringLiteral("settings"));
+  REQUIRE(waitFor([&] { return show.find("settingsSearch") != nullptr; }, Timeout));
+  QObject* list = show.find("settingsList");
+  REQUIRE(list != nullptr);
+  const int all = list->property("count").toInt();
+  CHECK(all > 10);
+  show.find("settingsSearch")->setProperty("text", QStringLiteral("цвет"));
+  CHECK(waitFor([&] { return list->property("count").toInt() > 0 && list->property("count").toInt() < all; }, Timeout));
+  show.resize(1600, 900);
+  show.screenshot(QStringLiteral("settings-1600-search"));
+  show.find("settingsSearch")->setProperty("text", QStringLiteral("zzzz"));
+  CHECK(waitFor([&] { return list->property("count").toInt() == 0; }, Timeout));
+  CHECK(show.find("settingsNothingFound")->property("visible").toBool());
 }

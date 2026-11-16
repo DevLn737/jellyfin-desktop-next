@@ -307,6 +307,13 @@ if(JFD_BUILD_APP)
     add_test(NAME jfd_ui_theme_tests COMMAND jfd_ui_theme_tests)
   endif()
 
+  if(TARGET jfd_ui_settings)
+    # The settings screen's search.
+    add_executable(jfd_ui_settings_tests support/QtTestMain.cpp ui/SettingsSearchTest.cpp)
+    target_link_libraries(jfd_ui_settings_tests PRIVATE jfd_ui_settings jfd::settings doctest Qt6::Test)
+    add_test(NAME jfd_ui_settings_tests COMMAND jfd_ui_settings_tests)
+  endif()
+
   if(TARGET jfd_ui_shell)
     add_executable(jfd_ui_tests support/QtTestMain.cpp ui/ShellTest.cpp)
     target_link_libraries(jfd_ui_tests PRIVATE jfd_ui_shell doctest Qt6::Test)
@@ -479,7 +486,7 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_ui_library_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
   endif()
 
-  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell AND TARGET jfd_ui_settings)
     # The key screens on a demo catalogue with drawn pictures: checks of the
     # banner and logos, and screenshots with JFD_UI_SCREENSHOTS.
     add_executable(jfd_ui_showcase_tests support/QtGuiTestMain.cpp ui/ShowcaseScreens.cpp)
@@ -487,6 +494,7 @@ if(JFD_BUILD_APP)
     target_link_libraries(jfd_ui_showcase_tests PRIVATE
       jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
       jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      jfd_ui_settings jfd_ui_settingsplugin jfd::settings
       Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
     target_compile_options(jfd_ui_showcase_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_showcase_tests COMMAND jfd_ui_showcase_tests)
