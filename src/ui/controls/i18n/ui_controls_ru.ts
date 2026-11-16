@@ -48,6 +48,26 @@
         <source>downloaded</source>
         <translation>скачано</translation>
     </message>
+    <message>
+        <source>Play</source>
+        <translation>Смотреть</translation>
+    </message>
+    <message>
+        <source>Mark as not watched</source>
+        <translation>Снять отметку просмотра</translation>
+    </message>
+    <message>
+        <source>Mark as watched</source>
+        <translation>Отметить просмотренным</translation>
+    </message>
+    <message>
+        <source>Remove from favorites</source>
+        <translation>Убрать из избранного</translation>
+    </message>
+    <message>
+        <source>Add to favorites</source>
+        <translation>В избранное</translation>
+    </message>
 </context>
 <context>
     <name>RoomCard</name>

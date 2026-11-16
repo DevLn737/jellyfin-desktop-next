@@ -553,6 +553,45 @@
     </message>
 </context>
 <context>
+    <name>ItemCard</name>
+    <message>
+        <source>Resume</source>
+        <translation>Продолжить</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Смотреть</translation>
+    </message>
+    <message>
+        <source>Play from the start</source>
+        <translation>Смотреть с начала</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Открыть</translation>
+    </message>
+    <message>
+        <source>Mark as not watched</source>
+        <translation>Снять отметку просмотра</translation>
+    </message>
+    <message>
+        <source>Mark as watched</source>
+        <translation>Отметить просмотренным</translation>
+    </message>
+    <message>
+        <source>Remove from favorites</source>
+        <translation>Убрать из избранного</translation>
+    </message>
+    <message>
+        <source>Add to favorites</source>
+        <translation>В избранное</translation>
+    </message>
+    <message>
+        <source>Go to series</source>
+        <translation>Перейти к сериалу</translation>
+    </message>
+</context>
+<context>
     <name>ItemPage</name>
     <message>
         <source>Film</source>

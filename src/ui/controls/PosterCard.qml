@@ -8,6 +8,13 @@ import Jfd.Ui.Theme
 // (artists: a square image cut round). `progress` (0..1)
 // draws a watched bar; `played` a check mark; `unplayedCount` a badge;
 // `downloadState` and `downloadProgress` a DownloadBadge in the top left.
+//
+// With `quickActions` on, pointing at the card or focusing it shows a
+// round Play in the middle (when `canPlay`) and Watched and Favorite
+// buttons in the bottom right; `favorite` is the state that last one shows.
+// They are for the pointer only (not focusable): from the keyboard or a
+// gamepad, Enter plays or opens and the Menu key asks for the card's menu
+// (`menuRequested`, also by a right click), which has the same actions.
 T.AbstractButton {
     id: card
     // Colours of the nearest colour scope (the video player has its own).
@@ -22,6 +29,17 @@ T.AbstractButton {
     property int unplayedCount: 0
     property string downloadState
     property real downloadProgress: 0
+    property bool quickActions: false
+    property bool canPlay: true
+    property bool favorite: false
+    readonly property bool quickShown: quickActions && (hovered || visualFocus)
+
+    signal playRequested()
+    signal playedToggled()
+    signal favoriteToggled()
+    // A right click or the Menu key; `at` is the point in the card.
+    signal menuRequested(point at)
+
     // The page colour a circle card's corners are cut out to.
     property color cutoutColor: colors.background
 
@@ -38,6 +56,17 @@ T.AbstractButton {
 
     Keys.onReturnPressed: card.clicked()
     Keys.onEnterPressed: card.clicked()
+    Keys.onMenuPressed: (event) => {
+        event.accepted = card.quickActions
+        if (card.quickActions)
+            card.menuRequested(Qt.point(card.width / 2, frame.height / 2))
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        enabled: card.quickActions
+        onTapped: (eventPoint) => card.menuRequested(eventPoint.position)
+    }
 
     Rectangle {
         id: frame
@@ -137,7 +166,95 @@ T.AbstractButton {
             progress: card.downloadProgress
         }
 
+        // The quick actions: a shade, Play, Watched and Favorite.
+        Item {
+            id: quick
+            objectName: "quickActions"
+            anchors.fill: parent
+            visible: opacity > 0
+            opacity: card.quickShown ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
+
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.15) }
+                    GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.6) }
+                }
+            }
+
+            QuickButton {
+                objectName: "quickPlay"
+                anchors.centerIn: parent
+                visible: card.canPlay
+                diameter: Math.min(56, Math.round(frame.width * 0.32))
+                iconSource: Icons.play
+                filled: true
+                toolTipText: qsTr("Play")
+                onClicked: card.playRequested()
+            }
+
+            Row {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.spacingSmall
+                anchors.bottomMargin: Theme.spacingSmall + (card.progress > 0 && card.progress < 1 ? 4 : 0)
+                spacing: Theme.spacingTiny
+                QuickButton {
+                    objectName: "quickPlayed"
+                    iconSource: Icons.check
+                    on: card.played
+                    toolTipText: card.played ? qsTr("Mark as not watched") : qsTr("Mark as watched")
+                    onClicked: card.playedToggled()
+                }
+                QuickButton {
+                    objectName: "quickFavorite"
+                    iconSource: card.favorite ? Icons.favorite : Icons.favoriteBorder
+                    on: card.favorite
+                    toolTipText: card.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+                    onClicked: card.favoriteToggled()
+                }
+            }
+        }
+
         FocusFrame { shown: card.visualFocus }
+    }
+
+    // A round button on the image: dark glass, or the accent when `filled`
+    // or `on`.
+    component QuickButton: T.AbstractButton {
+        id: quickButton
+        readonly property var colors: Theme.colorsFor(quickButton)
+        property url iconSource
+        property string toolTipText
+        property bool filled: false
+        property bool on: false
+        property int diameter: 32
+        width: diameter
+        height: diameter
+        focusPolicy: Qt.NoFocus
+        hoverEnabled: true
+        Accessible.name: toolTipText
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: quickButton.filled || quickButton.on
+                ? Qt.lighter(quickButton.colors.accent, quickButton.hovered ? 1.15 : 1)
+                : Qt.rgba(0, 0, 0, quickButton.hovered ? 0.75 : 0.55)
+            border.width: quickButton.filled || quickButton.on ? 0 : 1
+            border.color: Qt.rgba(1, 1, 1, 0.25)
+            scale: quickButton.down ? 0.94 : 1
+        }
+        Icon {
+            anchors.centerIn: parent
+            source: quickButton.iconSource
+            size: Math.round(quickButton.diameter * 0.5)
+            color: quickButton.filled || quickButton.on ? quickButton.colors.accentText : "white"
+        }
+        ToolTipLabel {
+            text: quickButton.toolTipText
+            shown: quickButton.hovered && !quickButton.down
+        }
     }
 
     Column {

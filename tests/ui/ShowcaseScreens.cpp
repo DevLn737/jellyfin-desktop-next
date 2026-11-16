@@ -6,8 +6,9 @@
 // The pictures are drawn here (gradients, shapes and the title), so the
 // screens look like a real library without any third-party artwork.
 //
-// JFD_UI_SCREENSHOTS=<dir> saves a screenshot of each screen at 1280x800
-// and 1920x1080 (and 860x700 for the narrow layout).
+// JFD_UI_SCREENSHOTS=<dir> saves a screenshot of each screen at 1280x800,
+// 1600x900 (the mockups' size) and 1920x1080 (and 860x700 for the narrow
+// layout).
 
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
@@ -27,6 +28,7 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QJsonArray>
+#include <QKeyEvent>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLinearGradient>
@@ -526,6 +528,15 @@ namespace {
     return nullptr;
   }
 
+  // The first card with quick actions under `root`.
+  QQuickItem* findQuickCard(QQuickItem* root) {
+    if (root == nullptr) return nullptr;
+    if (root->property("quickActions").toBool() && root->isVisible()) return root;
+    for (QQuickItem* child : root->childItems())
+      if (QQuickItem* found = findQuickCard(child)) return found;
+    return nullptr;
+  }
+
   // --- The window -------------------------------------------------------------
 
   class Showcase {
@@ -670,6 +681,8 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   CHECK(play->property("text").toString().contains(QStringLiteral("12:40")));
 
   show.screenshot(QStringLiteral("home-1280"));
+  show.resize(1600, 900);
+  show.screenshot(QStringLiteral("home-1600"));
   show.resize(1920, 1080);
   show.screenshot(QStringLiteral("home-1920"));
   hero->setProperty("current", 1);
@@ -678,6 +691,32 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   show.screenshot(QStringLiteral("home-860"));
   show.resize(1280, 800);
   hero->setProperty("current", 0);
+
+  // A card's quick actions show on focus; the Menu key opens its menu.
+  show.resize(1600, 900);
+  QQuickItem* resume = findItem(show.page(), QStringLiteral("homeRow_resume"));
+  REQUIRE(resume != nullptr);
+  QQuickItem* card = nullptr;
+  REQUIRE(waitFor([&] { return (card = findQuickCard(resume)) != nullptr; }, Timeout));
+  show.find("homeRows")->setProperty("contentY", resume->y() - 120);
+  Showcase::settle(300);
+  card->forceActiveFocus(Qt::TabFocusReason);
+  card->setProperty("focusReason", int(Qt::TabFocusReason));
+  QQuickItem* quick = findItem(card, QStringLiteral("quickActions"));
+  REQUIRE(quick != nullptr);
+  CHECK(waitFor([&] { return quick->opacity() > 0.99; }, Timeout));
+  CHECK(findItem(card, QStringLiteral("quickPlay"))->isVisible());
+  show.screenshot(QStringLiteral("home-1600-card-focus"));
+  QKeyEvent menuKey(QEvent::KeyPress, Qt::Key_Menu, Qt::NoModifier);
+  QGuiApplication::sendEvent(show.window, &menuKey);
+  QObject* menu = card->findChild<QObject*>(QStringLiteral("cardMenu"));
+  REQUIRE(menu != nullptr);
+  CHECK(waitFor([&] { return menu->property("opened").toBool(); }, Timeout));
+  const QStringList entries = menu->property("entries").toStringList();
+  CHECK(entries.contains(QStringLiteral("Перейти к сериалу")));
+  CHECK(entries.contains(QStringLiteral("Смотреть с начала")));
+  show.screenshot(QStringLiteral("home-1600-card-menu"));
+  QMetaObject::invokeMethod(menu, "close");
 }
 
 TEST_CASE("Series, film and library pages on the demo catalogue") {
@@ -691,6 +730,8 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
     return list != nullptr && list->property("count").toInt() == 8;
   }, Timeout));
   show.screenshot(QStringLiteral("series-1280"));
+  show.resize(1600, 900);
+  show.screenshot(QStringLiteral("series-1600"));
   show.resize(1920, 1080);
   show.screenshot(QStringLiteral("series-1920"));
 
