@@ -3,9 +3,21 @@
 <TS version="2.1" language="ru">
 <context>
     <name>GroupOsd</name>
+    <message numerus="yes">
+        <source>Together: %n viewer(s)</source>
+        <translation>
+            <numerusform>Вместе: %n зритель</numerusform>
+            <numerusform>Вместе: %n зрителя</numerusform>
+            <numerusform>Вместе: %n зрителей</numerusform>
+        </translation>
+    </message>
     <message>
-        <source>In a group of %1</source>
-        <translation>В группе: %1</translation>
+        <source>reconnecting</source>
+        <translation>переподключение</translation>
+    </message>
+    <message>
+        <source>%1 ms apart</source>
+        <translation>разница %1 мс</translation>
     </message>
 </context>
 <context>

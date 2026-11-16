@@ -315,6 +315,25 @@ namespace jfd::ui {
     return out;
   }
 
+  QVariantList PlayerModel::chapters() const {
+    QVariantList out;
+    if (m_chapters.size() < 2) return out;
+    for (const api::ItemChapter& chapter : m_chapters)
+      out.append(QVariantMap{{QStringLiteral("start"), double(chapter.startTicks) / TicksPerSecond},
+                             {QStringLiteral("name"), chapter.name}});
+    return out;
+  }
+
+  QString PlayerModel::chapterAt(double seconds) const {
+    if (m_chapters.size() < 2) return {};
+    QString name;
+    for (const api::ItemChapter& chapter : m_chapters) {
+      if (double(chapter.startTicks) / TicksPerSecond > seconds) break;
+      name = chapter.name;
+    }
+    return name;
+  }
+
   void PlayerModel::jumpToSegment(int direction) {
     if (!m_current || direction == 0) return;
     const double now = position();
@@ -581,6 +600,10 @@ namespace jfd::ui {
     if (itemId == m_trickplayItem) return;
     m_trickplayItem = itemId;
     m_trickplay.clear();
+    if (!m_chapters.isEmpty()) {
+      m_chapters.clear();
+      Q_EMIT chaptersChanged();
+    }
     // The launcher's item has no trickplay field; the detail request has.
     m_client.itemDetails(itemId, this, [this, itemId](api::Result<api::Item> item) {
       if (itemId != m_trickplayItem) return;
@@ -590,6 +613,11 @@ namespace jfd::ui {
       }
       m_trickplay = item->trickplay;
       chooseTrickplay();
+      // Chapters come with the same answer, in order of their start.
+      m_chapters = item->chapters;
+      std::sort(m_chapters.begin(), m_chapters.end(),
+                [](const api::ItemChapter& a, const api::ItemChapter& b) { return a.startTicks < b.startTicks; });
+      if (!m_chapters.isEmpty()) Q_EMIT chaptersChanged();
     });
   }
 

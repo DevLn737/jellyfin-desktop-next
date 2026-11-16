@@ -17,10 +17,10 @@ namespace jfd::api {
     // Fields every item list asks for; Jellyfin omits most of them otherwise.
     const QString ItemFields = QStringLiteral(
         "Overview,MediaSourceCount,ProductionYear,Genres,PrimaryImageAspectRatio,ChildCount");
-    // A detail page also needs trickplay for the seek bar,
+    // A detail page also needs trickplay and chapters for the seek bar,
     // and the people, studios, streams and episode count of its tables.
     const QString DetailFields =
-        ItemFields + QStringLiteral(",Trickplay,People,Studios,MediaStreams,RecursiveItemCount");
+        ItemFields + QStringLiteral(",Trickplay,Chapters,People,Studios,MediaStreams,RecursiveItemCount");
     const QString Fields = QStringLiteral("fields");
 
     QString joinNumbers(const QList<int>& numbers) {

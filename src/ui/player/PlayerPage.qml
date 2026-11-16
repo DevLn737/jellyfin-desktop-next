@@ -131,6 +131,10 @@ RoutePage {
     function focusMenu() {
         const menu = menuLoader.item
         if (!menu) return
+        if (menu.focusFirst !== undefined) {
+            menu.focusFirst()
+            return
+        }
         const first = menu.nextItemInFocusChain(true)
         for (let item = first; item; item = item.parent) {
             if (item === menu) {
@@ -214,6 +218,16 @@ RoutePage {
         const window = Window.window
         if (!window) return
         window.visibility = fullscreen ? Window.Windowed : Window.FullScreen
+    }
+
+    // A media segment's name, as the seek bar's line says it.
+    function segmentName(type) {
+        return type === "Intro" ? qsTr("Intro")
+            : type === "Outro" ? qsTr("Credits")
+            : type === "Recap" ? qsTr("Recap")
+            : type === "Preview" ? qsTr("Preview")
+            : type === "Commercial" ? qsTr("Commercial")
+            : ""
     }
 
     function toggleMenu(name) {
@@ -480,6 +494,14 @@ RoutePage {
                     }
                 }
             }
+            // Only in a group: GroupSession exists once the group module
+            // is installed.
+            Loader {
+                id: groupOsd
+                anchors.verticalCenter: parent.verticalCenter
+                active: page.player.inGroup
+                sourceComponent: GroupOsd {}
+            }
             // Time now and when the file ends, at the playback speed.
             Column {
                 id: timeInfo
@@ -506,32 +528,54 @@ RoutePage {
                     styleColor: "#c0000000"
                 }
             }
-            // Only in a group: GroupSession exists once the group module
-            // is installed.
-            Loader {
-                id: groupOsd
-                anchors.verticalCenter: parent.verticalCenter
-                active: page.player.inGroup
-                sourceComponent: GroupOsd {}
-            }
         }
     }
 
+    // Skip the intro or the like: on the left over the bar, with a line
+    // showing how much of the part has played.
     ActionButton {
+        id: skipButton
         objectName: "skipSegment"
-        anchors.right: parent.right
+        anchors.left: parent.left
         anchors.bottom: bottomBar.top
         anchors.margins: Theme.spacingLarge
-        anchors.rightMargin: Theme.spacingLarge + page.safeX
-        // Not under an open menu, which sits in the same corner.
-        visible: page.player.segment.length > 0 && page.openMenu.length === 0
-        primary: true
+        anchors.leftMargin: Theme.spacingLarge + page.safeX
+        visible: page.player.segment.length > 0
+        iconSource: PlayerIcons.forward
         text: page.player.segment === "Intro" ? qsTr("Skip intro")
             : page.player.segment === "Outro" ? qsTr("Skip credits")
             : page.player.segment === "Recap" ? qsTr("Skip recap")
             : page.player.segment === "Preview" ? qsTr("Skip preview")
             : qsTr("Skip")
+        rightPadding: Theme.spacingLarge + skipProgress.width + Theme.spacing
         onClicked: page.player.skipSegment()
+
+        // The part playing now and how far into it.
+        readonly property var part: {
+            const at = page.player.position
+            for (const segment of page.player.segments)
+                if (segment.type === page.player.segment && at >= segment.start && at < segment.end)
+                    return segment
+            return null
+        }
+        Rectangle {
+            id: skipProgress
+            objectName: "skipProgress"
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.spacingLarge
+            anchors.verticalCenter: parent.verticalCenter
+            width: 40
+            height: 3
+            radius: 1.5
+            color: Qt.alpha(Overlay.text, 0.25)
+            Rectangle {
+                height: parent.height
+                radius: parent.radius
+                color: Theme.accent
+                width: skipButton.part ? parent.width * Math.max(0, Math.min(1,
+                    (page.player.position - skipButton.part.start) / Math.max(0.1, skipButton.part.end - skipButton.part.start))) : 0
+            }
+        }
     }
 
     // Menus open just above the row of buttons, on the right.
@@ -547,19 +591,24 @@ RoutePage {
             : page.openMenu === "episodes" ? episodesMenu
             : page.openMenu === "segments" ? segmentsMenu : trackMenu
     }
+    // Audio and subtitles together, opened as either.
     Component {
         id: trackMenu
-        TrackMenu {
-            readonly property bool audio: page.openMenu === "audio"
-            heading: audio ? qsTr("Audio") : qsTr("Subtitles")
-            tracks: audio ? page.player.audioTracks : page.player.subtitleTracks
-            currentIndex: audio ? page.player.audioIndex : page.player.subtitleIndex
-            allowOff: !audio
-            onChosen: (streamIndex) => {
-                if (audio) page.player.selectAudio(streamIndex)
-                else page.player.selectSubtitle(streamIndex)
+        TracksMenu {
+            audioTracks: page.player.audioTracks
+            subtitleTracks: page.player.subtitleTracks
+            audioIndex: page.player.audioIndex
+            subtitleIndex: page.player.subtitleIndex
+            focusSubtitles: page.openMenu === "subtitles"
+            onAudioChosen: (streamIndex) => {
+                page.player.selectAudio(streamIndex)
                 page.openMenu = ""
             }
+            onSubtitleChosen: (streamIndex) => {
+                page.player.selectSubtitle(streamIndex)
+                page.openMenu = ""
+            }
+            onTuneRequested: page.toggleMenu("tune")
         }
     }
     Component {
@@ -660,7 +709,8 @@ RoutePage {
                 id: label
                 anchors.bottom: parent.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: page.clock(preview.seconds)
+                readonly property string chapter: page.player.chapters.length > 0 ? page.player.chapterAt(preview.seconds) : ""
+                text: page.clock(preview.seconds) + (chapter.length > 0 ? "  ·  " + chapter : "")
                 color: Overlay.text
                 font.pixelSize: Theme.fontSizeBody
                 padding: 2
@@ -738,6 +788,25 @@ RoutePage {
                         opacity: 0.75
                     }
                 }
+
+                // Where each chapter starts (the first, at the start, has none).
+                Repeater {
+                    model: page.player.duration > 0 ? page.player.chapters : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+                        objectName: "chapterMark"
+                        visible: index > 0 && modelData.start < page.player.duration
+                        z: -0.4
+                        x: timeline.leftPadding + modelData.start / page.player.duration * timeline.availableWidth - width / 2
+                        width: 2
+                        height: timeline.trackHeight + 8
+                        y: timeline.topPadding + timeline.availableHeight / 2 - height / 2
+                        radius: 1
+                        color: Overlay.text
+                        opacity: 0.7
+                    }
+                }
             }
 
             Item {
@@ -802,6 +871,22 @@ RoutePage {
                         color: Overlay.text
                         font.pixelSize: Theme.fontSizeBody
                     }
+                    // What part is playing: the segment, else the chapter.
+                    Text {
+                        objectName: "partText"
+                        anchors.verticalCenter: parent.verticalCenter
+                        readonly property string part: page.player.segment.length > 0
+                            ? page.segmentName(page.player.segment)
+                            : page.player.chapters.length > 0 ? page.player.chapterAt(timeline.value) : ""
+                        visible: timeText.visible && part.length > 0
+                                 && rightControls.x - x >= implicitWidth + Theme.spacing
+                        leftPadding: Theme.spacingSmall
+                        text: part
+                        color: Overlay.textSecondary
+                        font.pixelSize: Theme.fontSizeBody
+                        elide: Text.ElideRight
+                        width: Math.min(implicitWidth, 260)
+                    }
                 }
 
                 Row {
@@ -860,16 +945,11 @@ RoutePage {
                         onClicked: page.toggleMenu("episodes")
                     }
                     OsdButton {
-                        visible: !page.tvMode
-                        iconSource: PlayerIcons.audio
-                        toolTipText: qsTr("Audio")
-                        onClicked: page.toggleMenu("audio")
-                    }
-                    OsdButton {
+                        objectName: "tracksButton"
                         visible: !page.tvMode
                         iconSource: PlayerIcons.subtitles
-                        toolTipText: qsTr("Subtitles")
-                        onClicked: page.toggleMenu("subtitles")
+                        toolTipText: qsTr("Audio and subtitles")
+                        onClicked: page.toggleMenu(page.openMenu === "audio" ? "audio" : "subtitles")
                     }
                     OsdButton {
                         visible: !page.tvMode

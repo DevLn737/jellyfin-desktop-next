@@ -3,10 +3,11 @@ import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Group
 
-// The group indicator for the player's OSD: a dot (green in sync, amber
-// while catching up, red when the connection to the group is lost) and the
-// number of members. Hidden outside a group.
-Row {
+// The group badge for the player's OSD: a dot (green in sync, amber while
+// catching up, red when the connection to the group is lost), the number
+// of viewers and, while playing, how far we are from the group. Hidden
+// outside a group.
+Rectangle {
     id: osd
 
     // On the video: the dark palette in every theme (see Theme.colorsFor).
@@ -16,30 +17,50 @@ Row {
     readonly property color dotColor: !group.connected ? Overlay.error
                                       : group.correction.length > 0 ? "#d29922"
                                       : Overlay.success
+    readonly property int viewers: group.participants.length
 
     visible: group.inGroup
-    spacing: Theme.spacingSmall
+    implicitWidth: row.implicitWidth + 2 * Theme.spacing
+    implicitHeight: Theme.controlHeight
+    radius: Theme.radius
+    color: Qt.alpha(Overlay.surface, 0.85)
+    border.width: 1
+    border.color: Overlay.border
     Accessible.role: Accessible.StaticText
-    Accessible.name: qsTr("In a group of %1").arg(group.participants.length)
+    Accessible.name: label.text
 
-    Rectangle {
-        anchors.verticalCenter: parent.verticalCenter
-        width: 10
-        height: 10
-        radius: 5
-        color: osd.dotColor
-        Behavior on color { ColorAnimation { duration: Theme.durationNormal } }
-    }
-    Icon {
-        anchors.verticalCenter: parent.verticalCenter
-        source: Icons.group
-        size: 18
-    }
-    Text {
-        objectName: "memberCount"
-        anchors.verticalCenter: parent.verticalCenter
-        text: osd.group.participants.length
-        color: Overlay.text
-        font.pixelSize: Theme.fontSizeBody
+    Row {
+        id: row
+        anchors.centerIn: parent
+        spacing: Theme.spacingSmall
+
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 8
+            height: 8
+            radius: 4
+            color: osd.dotColor
+            Behavior on color { ColorAnimation { duration: Theme.durationNormal } }
+        }
+        Icon {
+            anchors.verticalCenter: parent.verticalCenter
+            source: Icons.group
+            size: 16
+        }
+        Text {
+            id: label
+            objectName: "memberCount"
+            anchors.verticalCenter: parent.verticalCenter
+            text: {
+                let line = qsTr("Together: %n viewer(s)", "", osd.viewers)
+                if (!osd.group.connected)
+                    return line + ", " + qsTr("reconnecting")
+                if (osd.group.hasDrift)
+                    line += ", " + qsTr("%1 ms apart").arg(Math.abs(osd.group.driftMs))
+                return line
+            }
+            color: Overlay.text
+            font.pixelSize: Theme.fontSizeSmall
+        }
     }
 }
