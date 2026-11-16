@@ -32,6 +32,7 @@ RoutePage {
     readonly property bool sidePanel: hasEpisodes && wide
 
     title: loaded ? details.name : ""
+    hasTopBar: true
 
     Component.onCompleted: details = Library.createDetails(routeArgument, page)
 
@@ -153,11 +154,38 @@ RoutePage {
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
+        // Back, where the page is, search and more.
+        PageTopBar {
+            id: topBar
+            objectName: "itemTopBar"
+            x: Theme.pageMargin
+            y: Theme.spacingLarge
+            width: flick.width - 2 * Theme.pageMargin
+            readonly property bool inSeries: page.details !== null && page.details.seriesId.length > 0
+                                             && (page.details.type === "Season" || page.details.type === "Episode")
+            crumbs: {
+                if (!page.loaded)
+                    return []
+                const out = []
+                if (inSeries)
+                    out.push({ text: page.details.seriesName, route: Library.routeFor(page.details.seriesId, "Series") })
+                out.push({ text: page.details.name })
+                return out
+            }
+            moreEntries: inSeries ? [qsTr("Refresh"), qsTr("Go to series")] : [qsTr("Refresh")]
+            onMoreActivated: (index) => {
+                if (index === 0)
+                    page.details.reload()
+                else
+                    Navigator.navigate(Library.routeFor(page.details.seriesId, "Series"))
+            }
+        }
+
         // --- The main column ------------------------------------------------
         Column {
             id: main
             x: Theme.pageMargin
-            y: Theme.spacingHuge
+            y: topBar.y + topBar.height + Theme.spacingLarge
             width: flick.width - 2 * Theme.pageMargin - (page.sidePanel ? panel.width + Theme.spacingHuge : 0)
             spacing: Theme.spacingHuge
 
@@ -607,7 +635,7 @@ RoutePage {
             objectName: "episodesPanel"
             visible: page.sidePanel
             x: flick.width - Theme.pageMargin - width
-            y: Theme.spacingHuge
+            y: main.y
             width: Theme.tvMode ? 520 : 400
             height: Math.max(episodesSection.height + 2 * Theme.spacingLarge, Math.min(flick.height - 2 * Theme.spacingHuge, 720))
         }

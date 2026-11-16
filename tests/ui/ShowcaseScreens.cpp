@@ -462,7 +462,8 @@ namespace {
                            {QStringLiteral("Type"), QStringLiteral("CollectionFolder")},
                            {QStringLiteral("IsFolder"), true},
                            {QStringLiteral("ImageTags"), QJsonObject{{QStringLiteral("Primary"), QStringLiteral("p")}}},
-                           {QStringLiteral("CollectionType"), type}};
+                           {QStringLiteral("CollectionType"), type},
+                           {QStringLiteral("ChildCount"), type == QLatin1String("movies") ? 7 : 3}};
       };
       return page(QJsonArray{view(QStringLiteral("movies"), QStringLiteral("Фильмы"), QStringLiteral("movies")),
                              view(QStringLiteral("tv"), QStringLiteral("Сериалы"), QStringLiteral("tvshows"))});
@@ -606,6 +607,7 @@ namespace {
                 anchors.fill: parent
                 libraries: Library.home ? Library.home.libraries : null
                 accountName: "Анна"
+                accountDetail: "Дом · jellyfin.local"
                 onPaletteRequested: palette.toggle()
             }
             CommandPalette { id: palette; objectName: "palette"; anchors.fill: parent }

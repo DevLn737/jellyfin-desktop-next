@@ -34,6 +34,7 @@ FocusScope {
     // The user's libraries and the account line for the sidebar (optional).
     property alias libraries: sidebar.libraries
     property alias accountName: sidebar.accountName
+    property alias accountDetail: sidebar.accountDetail
     signal libraryChosen(string itemId, string type)
     // The account menu's Sign out, confirmed.
     signal signOutRequested()
@@ -134,6 +135,7 @@ FocusScope {
             z: 2
             collapsed: Theme.compact && !shell.menuOpen
             menuButton: Theme.compact
+            backVisible: !(shell.currentPage && shell.currentPage.hasTopBar === true)
             onMenuToggled: shell.menuOpen = !shell.menuOpen
             onChosen: shell.menuOpen = false
             onLibraryChosen: (itemId, type) => shell.libraryChosen(itemId, type)

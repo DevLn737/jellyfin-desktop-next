@@ -1,10 +1,14 @@
 import QtQuick
+import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
 
-// Main navigation on the left, a glass panel: destinations, libraries and
-// the account at the bottom. Collapses to an icon rail on narrow windows.
+// Main navigation on the left, a glass panel: the app's sign and name,
+// destinations, the libraries with their sizes, then Settings and the
+// account card (name, server and address) at the bottom. Back shows here
+// only for pages without a top bar of their own (`backVisible`). Collapses
+// to an icon rail on narrow windows.
 FocusScope {
     id: sidebar
 
@@ -19,11 +23,16 @@ FocusScope {
     // bottom (the server's name). Both are optional.
     property var libraries: null
     property string accountName
+    // Under the name: the server and its address ("Home · jellyfin.local").
+    property string accountDetail
+    property bool backVisible: true
     signal libraryChosen(string itemId, string type)
     // "Sign out" in the account menu, confirmed.
     signal signOutRequested()
-    // Registered by the screens' modules (Navigator.registerRoute).
-    readonly property var entries: Navigator.sidebarEntries
+    // Registered by the screens' modules (Navigator.registerRoute); Settings
+    // has its own place at the bottom.
+    readonly property var entries: Navigator.sidebarEntries.filter((entry) => entry.route !== "settings")
+    readonly property var settingsEntry: Navigator.sidebarEntries.find((entry) => entry.route === "settings")
     // An entry's icon is a name from Icons or a file URL.
     function iconFor(name) { return Icons[name] !== undefined ? Icons[name] : name }
     // The Menu key: focus on the entry of the current page (or the first).
@@ -68,8 +77,43 @@ FocusScope {
         anchors.rightMargin: Theme.spacingSmall
         spacing: Theme.spacingTiny
 
+        // The app's sign and name.
+        Item {
+            objectName: "sidebarBrand"
+            width: parent.width
+            height: Theme.controlHeight
+            Rectangle {
+                id: brandSign
+                x: sidebar.collapsed ? (parent.width - width) / 2 : Theme.spacing - Theme.spacingTiny
+                anchors.verticalCenter: parent.verticalCenter
+                width: 28
+                height: 28
+                radius: Theme.radiusSmall + 2
+                color: Qt.alpha(Theme.accent, 0.14)
+                border.width: 1
+                border.color: Qt.alpha(Theme.accent, 0.5)
+                Icon {
+                    anchors.centerIn: parent
+                    source: Icons.play
+                    size: 14
+                    color: Theme.accent
+                }
+            }
+            Text {
+                visible: !sidebar.collapsed
+                anchors.left: brandSign.right
+                anchors.leftMargin: Theme.spacingSmall + 2
+                anchors.verticalCenter: parent.verticalCenter
+                text: qsTr("Media library")
+                color: Theme.text
+                font.pixelSize: Math.round(Theme.fontSizeBody * 1.2)
+                font.weight: Theme.fontWeightBold
+            }
+        }
+
         IconButton {
             objectName: "backButton"
+            visible: sidebar.backVisible
             iconSource: Icons.back
             toolTipText: qsTr("Back")
             enabled: Navigator.canGoBack
@@ -92,7 +136,7 @@ FocusScope {
         id: scroller
         anchors.top: header.bottom
         anchors.topMargin: Theme.spacingSmall
-        anchors.bottom: gamepadSign.top
+        anchors.bottom: settingsItem.top
         anchors.bottomMargin: Theme.spacingSmall
         anchors.left: parent.left
         anchors.right: parent.right
@@ -145,10 +189,11 @@ FocusScope {
                 objectName: "librariesLabel"
                 visible: libs.count > 0 && !sidebar.collapsed
                 leftPadding: Theme.spacing
-                text: qsTr("Libraries")
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Libraries").toUpperCase()
+                color: Theme.textDisabled
+                font.pixelSize: Theme.fontSizeSmall - 1
                 font.weight: Theme.fontWeightBold
+                font.letterSpacing: 1.2
             }
 
             Repeater {
@@ -160,6 +205,8 @@ FocusScope {
                     objectName: "library_" + (model.itemId || "")
                     width: nav.width
                     text: sidebar.collapsed ? "" : (model.name || "")
+                    trailingText: sidebar.collapsed || !(model.childCount > 0) ? "" : String(model.childCount)
+                    highlighted: Navigator.currentRoute === "library/" + (model.itemId || "")
                     iconSource: Icons.library
                     Accessible.name: model.name || ""
                     onClicked: {
@@ -168,6 +215,27 @@ FocusScope {
                     }
                 }
             }
+        }
+    }
+
+    // Settings, over the account card.
+    ListItem {
+        id: settingsItem
+        objectName: "nav_settings"
+        anchors.bottom: gamepadSign.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacingSmall
+        anchors.rightMargin: Theme.spacingSmall
+        visible: sidebar.settingsEntry !== undefined
+        height: visible ? implicitHeight : 0
+        text: sidebar.collapsed || !visible ? "" : sidebar.settingsEntry.text
+        iconSource: visible ? sidebar.iconFor(sidebar.settingsEntry.icon) : ""
+        highlighted: Navigator.currentName === "settings"
+        Accessible.name: visible ? sidebar.settingsEntry.text : ""
+        onClicked: {
+            Navigator.navigate("settings")
+            sidebar.chosen()
         }
     }
 
@@ -207,10 +275,10 @@ FocusScope {
         }
     }
 
-    // The account line; choosing it opens a small menu (the first use of
-    // PopupMenu): Settings, and Sign out after the same question the
+    // The account card: the user's initial, name and server; choosing it
+    // opens a small menu: Settings, and Sign out after the same question the
     // settings page asks.
-    ListItem {
+    T.ItemDelegate {
         id: account
         objectName: "sidebarAccount"
         anchors.bottom: parent.bottom
@@ -218,11 +286,65 @@ FocusScope {
         anchors.right: parent.right
         anchors.margins: Theme.spacingSmall
         visible: sidebar.accountName.length > 0
-        height: visible ? implicitHeight : 0
-        text: sidebar.collapsed ? "" : sidebar.accountName
-        iconSource: Icons.group
+        height: visible ? 52 : 0
+        focusPolicy: Qt.StrongFocus
+        hoverEnabled: true
         Accessible.name: sidebar.accountName
+        Keys.onReturnPressed: account.clicked()
+        Keys.onEnterPressed: account.clicked()
         onClicked: accountMenu.open()
+
+        background: Rectangle {
+            radius: Theme.radius
+            color: account.hovered || account.down ? Theme.surfaceHover : Theme.surface
+            border.width: sidebar.collapsed ? 0 : 1
+            border.color: Theme.glassBorder
+            FocusFrame { shown: account.visualFocus }
+        }
+        contentItem: Item {
+            Rectangle {
+                id: avatar
+                x: sidebar.collapsed ? (parent.width - width) / 2 : Theme.spacingSmall
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                radius: 15
+                color: Qt.alpha(Theme.accent, 0.25)
+                Text {
+                    anchors.centerIn: parent
+                    text: sidebar.accountName.charAt(0).toUpperCase()
+                    color: Theme.text
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Theme.fontWeightBold
+                }
+            }
+            Column {
+                visible: !sidebar.collapsed
+                anchors.left: avatar.right
+                anchors.leftMargin: Theme.spacingSmall
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.spacingSmall
+                anchors.verticalCenter: parent.verticalCenter
+                Text {
+                    objectName: "accountName"
+                    width: parent.width
+                    text: sidebar.accountName
+                    color: Theme.text
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Theme.fontWeightBold
+                    elide: Text.ElideRight
+                }
+                Text {
+                    objectName: "accountDetail"
+                    width: parent.width
+                    visible: text.length > 0
+                    text: sidebar.accountDetail
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeSmall - 1
+                    elide: Text.ElideRight
+                }
+            }
+        }
     }
 
     PopupMenu {

@@ -60,6 +60,13 @@ Window {
             backgroundVisible: !HdrOutput.videoShown
             libraries: Library.home ? Library.home.libraries : null
             accountName: Library.signIn ? (Library.signIn.userName.length > 0 ? Library.signIn.userName : Library.signIn.serverName) : ""
+            // "Home · jellyfin.local": the server's name and its host.
+            accountDetail: {
+                if (!Library.signIn || Library.signIn.userName.length === 0)
+                    return ""
+                const host = Library.signIn.serverAddress.replace(/^[a-z]+:\/\//i, "").replace(/[:\/].*$/, "")
+                return [Library.signIn.serverName, host].filter((part) => part.length > 0).join(" · ")
+            }
             onLibraryChosen: (itemId, type) => Navigator.navigate(Library.routeFor(itemId, type))
             onPaletteRequested: palette.toggle()
             // The same action as Sign out on the settings page.

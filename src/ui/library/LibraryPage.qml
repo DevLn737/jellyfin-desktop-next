@@ -29,6 +29,7 @@ RoutePage {
     }
 
     title: Library.libraryName(routeArgument) || (library ? library.name : "") || qsTr("Library")
+    hasTopBar: true
 
     ColumnLayout {
         anchors.fill: parent
@@ -36,6 +37,11 @@ RoutePage {
         anchors.rightMargin: Theme.pageMargin
         anchors.topMargin: Theme.spacingLarge
         spacing: Theme.spacingLarge
+
+        PageTopBar {
+            objectName: "libraryTopBar"
+            Layout.fillWidth: true
+        }
 
         RowLayout {
             Layout.fillWidth: true
