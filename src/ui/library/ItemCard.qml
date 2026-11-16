@@ -60,7 +60,9 @@ PosterCard {
     onMenuRequested: (at) => {
         menuAnchor.x = at.x
         menuAnchor.y = at.y
-        menu.open()
+        // Made on first use: a grid has hundreds of cards.
+        menuLoader.active = true
+        menuLoader.item.open()
     }
     // Downloaded, or downloading (the series or album for its items).
     downloadState: Downloads.revision >= 0 && itemId.length > 0 ? Downloads.stateOf(itemId) : ""
@@ -87,33 +89,42 @@ PosterCard {
 
     Item { id: menuAnchor; width: 1; height: 1 }
 
-    PopupMenu {
-        id: menu
-        objectName: "cardMenu"
-        anchorItem: menuAnchor
-        // [text, action] pairs, only those that apply.
-        readonly property var actions: {
-            const out = []
-            if (card.isVideo) {
-                out.push([card.resumable ? qsTr("Resume") : qsTr("Play"), () => card.play(false)])
-                if (card.resumable)
-                    out.push([qsTr("Play from the start"), () => card.play(true)])
-            } else {
-                out.push([qsTr("Open"), () => card.clicked()])
+    Loader {
+        id: menuLoader
+        active: false
+        sourceComponent: cardMenu
+    }
+
+    Component {
+        id: cardMenu
+        PopupMenu {
+            id: menu
+            objectName: "cardMenu"
+            anchorItem: menuAnchor
+            // [text, action] pairs, only those that apply.
+            readonly property var actions: {
+                const out = []
+                if (card.isVideo) {
+                    out.push([card.resumable ? qsTr("Resume") : qsTr("Play"), () => card.play(false)])
+                    if (card.resumable)
+                        out.push([qsTr("Play from the start"), () => card.play(true)])
+                } else {
+                    out.push([qsTr("Open"), () => card.clicked()])
+                }
+                out.push([card.played ? qsTr("Mark as not watched") : qsTr("Mark as watched"),
+                          () => Library.setPlayed(card.itemId, !card.played, card.favorite)])
+                out.push([card.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites"),
+                          () => Library.setFavorite(card.itemId, !card.favorite)])
+                if (card.isEpisode && (card.model.seriesId || "").length > 0)
+                    out.push([qsTr("Go to series"), () => Navigator.navigate(Library.routeFor(card.model.seriesId, "Series"))])
+                return out
             }
-            out.push([card.played ? qsTr("Mark as not watched") : qsTr("Mark as watched"),
-                      () => Library.setPlayed(card.itemId, !card.played, card.favorite)])
-            out.push([card.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites"),
-                      () => Library.setFavorite(card.itemId, !card.favorite)])
-            if (card.isEpisode && (card.model.seriesId || "").length > 0)
-                out.push([qsTr("Go to series"), () => Navigator.navigate(Library.routeFor(card.model.seriesId, "Series"))])
-            return out
-        }
-        entries: actions.map((a) => a[0])
-        onActivated: (i) => {
-            const action = actions[i]
-            if (action)
-                action[1]()
+            entries: actions.map((a) => a[0])
+            onActivated: (i) => {
+                const action = actions[i]
+                if (action)
+                    action[1]()
+            }
         }
     }
 }
