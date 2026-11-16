@@ -10,8 +10,10 @@ import Jfd.Ui.Library
 // One library as a grid: every card has its place from the start, so the
 // scroll bar and End work at once; pages of cards load as they come into
 // view. Sort, order, watched state, favorites, genres and year filter the
-// grid; a movie library can list its collections instead. The library
-// remembers its choices (Library.createLibrary).
+// grid; a movie library can list its collections instead. The cards come
+// in three sizes. Listed by name from A to Z, a bar of letters on the right
+// (and typing a letter on the grid) scrolls to where that letter starts.
+// The library remembers its choices (Library.createLibrary).
 RoutePage {
     id: page
 
@@ -148,6 +150,17 @@ RoutePage {
                     ? Math.max(0, indexOfValue(page.library.years[0])) : 0
                 onActivated: if (page.library) page.library.years = currentValue > 0 ? [currentValue] : []
             }
+            ChoiceBox {
+                objectName: "libraryDensity"
+                implicitWidth: 170
+                model: [
+                    { value: "small", label: qsTr("Small cards") },
+                    { value: "medium", label: qsTr("Medium cards") },
+                    { value: "large", label: qsTr("Large cards") },
+                ]
+                currentIndex: page.library ? Math.max(0, indexOfValue(page.library.density)) : 1
+                onActivated: if (page.library) page.library.density = currentValue
+            }
             Row {
                 height: Theme.controlHeight
                 spacing: Theme.spacingSmall
@@ -179,37 +192,76 @@ RoutePage {
             onRetry: if (page.library) page.library.reload()
         }
 
-        CardGrid {
-            id: grid
-            objectName: "libraryGrid"
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            focus: true
-            model: page.library
-            delegate: ItemCard {}
+            spacing: Theme.spacingSmall
 
-            // While the first page loads: grey cards where the grid will be.
-            Flow {
-                objectName: "librarySkeleton"
-                width: parent.width
-                spacing: Theme.spacing
-                visible: page.library && page.library.loading && grid.count === 0
-                Repeater {
-                    model: visible ? 12 : 0
-                    SkeletonBox {
-                        width: Theme.posterWidth
-                        height: Math.round(Theme.posterWidth / Theme.posterAspect)
-                        radius: Theme.radiusLarge
+            CardGrid {
+                id: grid
+                objectName: "libraryGrid"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                focus: true
+                model: page.library
+                readonly property real sizeFactor: !page.library ? 1
+                    : page.library.density === "small" ? 0.78 : page.library.density === "large" ? 1.3 : 1
+                cardWidth: Math.round(Theme.posterWidth * sizeFactor)
+                cardHeight: Math.round(cardWidth / Theme.posterAspect) + Theme.cardCaptionHeight
+                delegate: ItemCard { cardWidth: grid.cardWidth }
+
+                function showRow(row) {
+                    if (row < 0 || row >= count)
+                        return
+                    view.positionViewAtIndex(row, GridView.Beginning)
+                    currentIndex = row
+                }
+
+                // A letter typed on the grid goes to it, as the bar does.
+                Keys.onPressed: (event) => {
+                    const letter = event.text.length === 1 ? event.text.toUpperCase() : ""
+                    if (page.library && page.library.alphabetical && letter.length === 1
+                            && letter.toLowerCase() !== letter
+                            && (event.modifiers & ~(Qt.ShiftModifier | Qt.KeypadModifier)) === 0) {
+                        page.library.locateLetter(letter)
+                        event.accepted = true
                     }
                 }
+                Connections {
+                    target: page.library
+                    function onLetterLocated(letter, row) { grid.showRow(row) }
+                }
+
+                // While the first page loads: grey cards where the grid will be.
+                Flow {
+                    objectName: "librarySkeleton"
+                    width: parent.width
+                    spacing: Theme.spacing
+                    visible: page.library && page.library.loading && grid.count === 0
+                    Repeater {
+                        model: visible ? 12 : 0
+                        SkeletonBox {
+                            width: grid.cardWidth
+                            height: Math.round(grid.cardWidth / Theme.posterAspect)
+                            radius: Theme.radiusLarge
+                        }
+                    }
+                }
+                StateMessage {
+                    objectName: "libraryEmpty"
+                    anchors.centerIn: parent
+                    visible: page.library && !page.library.loading && page.library.count === 0
+                             && page.library.errorText.length === 0
+                    kind: "empty"
+                    title: qsTr("Nothing matches these filters.")
+                }
             }
-            StateMessage {
-                objectName: "libraryEmpty"
-                anchors.centerIn: parent
-                visible: page.library && !page.library.loading && page.library.count === 0
-                         && page.library.errorText.length === 0
-                kind: "empty"
-                title: qsTr("Nothing matches these filters.")
+
+            AlphabetBar {
+                objectName: "alphabetBar"
+                Layout.fillHeight: true
+                visible: page.library !== null && page.library.alphabetical && grid.view.contentHeight > grid.height
+                onLetterChosen: (letter) => page.library.locateLetter(letter)
             }
         }
     }

@@ -748,4 +748,16 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
     return grid != nullptr && grid->property("count").toInt() == 7;
   }, Timeout));
   show.screenshot(QStringLiteral("library-1920"));
+
+  // Large cards in a smaller window: the grid scrolls, so the letters show.
+  auto* library = show.page()->property("library").value<QObject*>();
+  REQUIRE(library != nullptr);
+  library->setProperty("density", QStringLiteral("large"));
+  show.resize(1280, 800);
+  QQuickItem* bar = findItem(show.page(), QStringLiteral("alphabetBar"));
+  REQUIRE(bar != nullptr);
+  CHECK(waitFor([&] { return bar->isVisible(); }, Timeout));
+  CHECK(findItem(bar, QStringLiteral("letter_Я")) != nullptr);
+  show.screenshot(QStringLiteral("library-1280-large"));
+  library->setProperty("density", QStringLiteral("medium"));
 }

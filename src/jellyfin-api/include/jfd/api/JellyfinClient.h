@@ -63,6 +63,10 @@ namespace jfd::api {
     QStringList artistIds;
     // Items these people (actors, directors, ...) appear in.
     QStringList personIds;
+    // Only items whose sort name comes before this (lower case, as the
+    // server keeps sort names): with limit 0, the count is the row where
+    // that letter starts in a listing by name.
+    QString nameLessThan;
   };
 
   // Image types the server keeps per item: "Primary", "Backdrop", "Thumb",

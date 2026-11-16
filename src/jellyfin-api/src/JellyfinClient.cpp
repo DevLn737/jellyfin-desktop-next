@@ -505,6 +505,7 @@ namespace jfd::api {
       query.addQueryItem(QStringLiteral("artistIds"), q.artistIds.join(QLatin1Char(',')));
     if (!q.personIds.isEmpty())
       query.addQueryItem(QStringLiteral("personIds"), q.personIds.join(QLatin1Char(',')));
+    if (!q.nameLessThan.isEmpty()) query.addQueryItem(QStringLiteral("nameLessThan"), q.nameLessThan);
     query.addQueryItem(QStringLiteral("recursive"), boolText(q.recursive));
     query.addQueryItem(QStringLiteral("startIndex"), QString::number(q.startIndex));
     query.addQueryItem(QStringLiteral("limit"), QString::number(q.limit));

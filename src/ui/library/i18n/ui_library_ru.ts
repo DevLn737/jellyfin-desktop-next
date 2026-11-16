@@ -2,6 +2,18 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>AlphabetBar</name>
+    <message>
+        <source>ABCDEFGHIJKLMNOPQRSTUVWXYZ</source>
+        <extracomment>The letters titles start with, in order, for the library&apos;s alphabet bar; leave out letters no word starts with.</extracomment>
+        <translation>АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЭЮЯ</translation>
+    </message>
+    <message>
+        <source>Switch alphabet</source>
+        <translation>Сменить алфавит</translation>
+    </message>
+</context>
+<context>
     <name>ChannelPage</name>
     <message>
         <source>Channel</source>
@@ -811,6 +823,18 @@
     <message>
         <source>All years</source>
         <translation>Все годы</translation>
+    </message>
+    <message>
+        <source>Small cards</source>
+        <translation>Мелкие карточки</translation>
+    </message>
+    <message>
+        <source>Medium cards</source>
+        <translation>Средние карточки</translation>
+    </message>
+    <message>
+        <source>Large cards</source>
+        <translation>Крупные карточки</translation>
     </message>
     <message>
         <source>Favorites</source>

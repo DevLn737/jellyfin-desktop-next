@@ -171,6 +171,7 @@ TEST_CASE("Library listings send sorting, filters and paging") {
   q.isFavorite = true;
   q.startIndex = 100;
   q.limit = 50;
+  q.nameLessThan = QStringLiteral("m");
   auto page = run<ItemPage>([&](auto done) { s.client.items(q, nullptr, done); });
   REQUIRE(page.ok());
   CHECK(page->totalRecordCount == 340);
@@ -182,6 +183,7 @@ TEST_CASE("Library listings send sorting, filters and paging") {
   CHECK(s.param("isPlayed") == QStringLiteral("false"));
   CHECK(s.param("isFavorite") == QStringLiteral("true"));
   CHECK(s.param("startIndex") == QStringLiteral("100"));
+  CHECK(s.param("nameLessThan") == QStringLiteral("m"));
 
   s.server.setHandler([](const HttpRequest&) {
     return jfd::test::json(

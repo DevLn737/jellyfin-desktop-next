@@ -189,6 +189,7 @@ namespace jfd::library {
       years.append(year);
     out.insert(QStringLiteral("years"), years);
     out.insert(QStringLiteral("collections"), m_showCollections);
+    out.insert(QStringLiteral("density"), m_density);
     return out;
   }
 
@@ -215,6 +216,8 @@ namespace jfd::library {
     if (const QJsonValue collections = filters.value(QStringLiteral("collections"));
         collections.isBool())
       setShowCollections(collections.toBool());
+    if (const QJsonValue density = filters.value(QStringLiteral("density")); density.isString())
+      setDensity(density.toString());
   }
 
   QVariantList LibraryModel::availableYears() const {
@@ -288,12 +291,7 @@ namespace jfd::library {
     if (!m_pages.contains(page)) loadPage(page);
   }
 
-  void LibraryModel::loadPage(int page) {
-    if (!mayLoad(page) || m_libraryId.isEmpty()) return;
-    const bool wasLoading = loading();
-    m_inFlight.insert(page);
-    if (!wasLoading) Q_EMIT loadingChanged();
-
+  api::ItemQuery LibraryModel::listQuery() const {
     api::ItemQuery query;
     if (m_collectionType == PersonItems)
       query.personIds = {m_libraryId};
@@ -312,6 +310,45 @@ namespace jfd::library {
     query.years = m_years;
     if (m_played != PlayedFilter::All) query.isPlayed = m_played == PlayedFilter::Played;
     if (m_favoritesOnly) query.isFavorite = true;
+    return query;
+  }
+
+  void LibraryModel::locateLetter(const QString& letter) {
+    if (letter.isEmpty() || m_libraryId.isEmpty()) return;
+    if (letter == QLatin1String("#") || !alphabetical()) {
+      Q_EMIT letterLocated(letter, 0);
+      return;
+    }
+    api::ItemQuery query = listQuery();
+    query.nameLessThan = letter.toLower();
+    query.limit = 0;
+    const quint64 generation = m_generation;
+    m_client.items(query, this, [this, generation, letter](api::Result<api::ItemPage> result) {
+      if (generation != m_generation || !result) return;
+      Q_EMIT letterLocated(letter, std::clamp(result->totalRecordCount, 0, std::max(0, m_total - 1)));
+    });
+  }
+
+  void LibraryModel::setDensity(const QString& density) {
+    if (m_density == density) return;
+    if (density != QLatin1String("small") && density != QLatin1String("medium")
+        && density != QLatin1String("large"))
+      return;
+    m_density = density;
+    Q_EMIT queryChanged();
+  }
+
+  bool LibraryModel::alphabetical() const {
+    return m_sortBy == QLatin1String("SortName") && !m_descending;
+  }
+
+  void LibraryModel::loadPage(int page) {
+    if (!mayLoad(page) || m_libraryId.isEmpty()) return;
+    const bool wasLoading = loading();
+    m_inFlight.insert(page);
+    if (!wasLoading) Q_EMIT loadingChanged();
+
+    api::ItemQuery query = listQuery();
     query.startIndex = page * m_options.pageSize;
     query.limit = m_options.pageSize;
 
