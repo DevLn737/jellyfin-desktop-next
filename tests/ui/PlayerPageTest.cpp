@@ -214,6 +214,14 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   REQUIRE(part != nullptr);
   CHECK(part->property("text").toString() == QStringLiteral("Intro"));
   CHECK(find(f.page, "skipSegment")->isVisible());
+  // JFD_UI_SCREENSHOTS=<dir> keeps a picture of the controls for review.
+  const QString shots = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
+  const auto shoot = [&](const char* name) {
+    if (shots.isEmpty()) return;
+    QTest::qWait(300);
+    f.window.grabWindow().save(shots + QLatin1Char('/') + QLatin1String(name) + QStringLiteral(".png"));
+  };
+  shoot("player-1280-intro");
   // Past it, the chapter.
   f.player->seek(400);
   REQUIRE(waitFor([&] { return part->property("text").toString() == QStringLiteral("Part 1"); }, 3000));
@@ -226,6 +234,7 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   CHECK(find(menu, "audioTrack_2") == nullptr);
   CHECK(find(menu, "subtitleTrack_2") != nullptr);
   CHECK(find(menu, "subtitleTune") != nullptr);
+  shoot("player-1280-tracks");
 }
 
 TEST_CASE("Delays are rounded to tenths and reset for the next file") {
