@@ -104,6 +104,7 @@ namespace jfd::library {
             [this](const api::UserItemData& data) {
               for (const auto& row : m_rows)
                 row->items->applyUserData(data);
+              m_featured.applyUserData(data);
               if (m_recommendations != nullptr) {
                 // Recommended cards show watched state too.
                 for (const auto& row : m_external) {
@@ -267,6 +268,7 @@ namespace jfd::library {
       row->items->setEntries(entries(result->items, cardShapeOf(row->shape)));
       row->loaded = true;
       updateVisible();
+      updateFeatured();
     } else {
       // A failed row keeps what it showed.
       setError(library::errorText(result.error()));
@@ -389,10 +391,86 @@ namespace jfd::library {
     Q_EMIT sectionListChanged();
   }
 
+  void HomeModel::updateFeatured() {
+    const auto isVideo = [](const api::Item& item) {
+      return item.type == QLatin1String("Movie") || item.type == QLatin1String("Episode") ||
+             item.type == QLatin1String("Series") || item.type == QLatin1String("Video") ||
+             item.type == QLatin1String("MusicVideo");
+    };
+    const qreal dpr = m_options.devicePixelRatio;
+    const QSize backdropPixels = cardImageSize(CardShape::Thumb, m_options.backdropWidth, dpr);
+    const int logoPixels = static_cast<int>(m_options.logoWidth * dpr);
+
+    QList<ItemListModel::Entry> out;
+    QStringList keys;
+    // An episode stands for its series, so the series is not featured twice.
+    const auto add = [&](const api::Item& item) {
+      if (out.size() >= m_options.featuredLimit || !isVideo(item)) return false;
+      const QString key = item.seriesId.isEmpty() ? item.id : item.seriesId;
+      if (keys.contains(key)) return false;
+      const QUrl backdrop = library::backdropUrl(m_client, item, backdropPixels);
+      if (backdrop.isEmpty()) return false;
+      keys.append(key);
+      ItemListModel::Entry entry{item, {}};
+      entry.backdropUrl = backdrop;
+      entry.logoUrl = library::logoUrl(m_client, item, logoPixels);
+      out.append(std::move(entry));
+      return true;
+    };
+    const auto rowById = [this](const QString& id) -> Row* {
+      for (const auto& row : m_rows) {
+        if (row->id == id && row->loaded && !m_arrangement.hidden.contains(row->id)) return row.get();
+      }
+      return nullptr;
+    };
+
+    // What the user was watching (or watches next) comes first.
+    bool personal = false;
+    for (const QString& id : {QStringLiteral("resume"), QStringLiteral("nextUp")}) {
+      if (personal) break;
+      if (Row* row = rowById(id)) {
+        for (int i = 0; i < row->items->count() && !personal; ++i)
+          personal = add(row->items->entry(i)->item);
+      }
+    }
+    // Then the newest items, taking turns between the libraries.
+    QList<Row*> latest;
+    for (const auto& row : m_rows) {
+      if (row->kind == QLatin1String("latest") && rowById(row->id) != nullptr) latest.append(row.get());
+    }
+    for (int i = 0; out.size() < m_options.featuredLimit; ++i) {
+      bool any = false;
+      for (Row* row : std::as_const(latest)) {
+        if (i < row->items->count()) {
+          any = true;
+          add(row->items->entry(i)->item);
+        }
+      }
+      if (!any) break;
+    }
+
+    // The same items keep the banner where it is (a reload must not jump
+    // back to the first one); only their state is brought up to date.
+    QStringList ids;
+    for (const auto& entry : std::as_const(out)) ids.append(entry.item.id);
+    QStringList current;
+    for (int i = 0; i < m_featured.count(); ++i) current.append(m_featured.entry(i)->item.id);
+    if (ids == current) {
+      for (const auto& entry : std::as_const(out)) {
+        api::UserItemData data = entry.item.userData;
+        data.itemId = entry.item.id;
+        m_featured.applyUserData(data);
+      }
+      return;
+    }
+    m_featured.setEntries(std::move(out));
+  }
+
   void HomeModel::setArrangement(const HomeArrangement& arrangement) {
     if (arrangement == m_arrangement) return;
     m_arrangement = arrangement;
     updateVisible();
+    updateFeatured();
   }
 
   QVariantList HomeModel::sectionList() const {
@@ -446,6 +524,7 @@ namespace jfd::library {
     m_visible.clear();
     endResetModel();
     Q_EMIT countChanged();
+    m_featured.setEntries({});
     m_syncing = true;
     for (const auto& row : m_rows) m_sections.remove(row->id);
     m_rows.clear();

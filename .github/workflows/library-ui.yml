@@ -5,7 +5,8 @@ name: Library screens
 # library, a series, an episode, Play and Watch together, search, sign out.
 # Screenshots of each screen are kept as an artifact. Then the startup and
 # navigation timings are checked against their thresholds under Xvfb, and the
-# 1000-item grid scroll is measured as a preliminary (job summary).
+# 1000-item grid scroll is measured as a preliminary (job summary). The
+# showcase screens (a demo catalogue) are saved with them.
 on:
   push:
     branches: [main]
@@ -53,13 +54,20 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_REQUIRE_QT=ON -DJFD_ENFORCE_PINS=ON -DJFD_SERVER_TESTS=ON
 
       - name: Build
-        run: cmake --build build --parallel --target jfd_ui_library_server_tests jfd_library_bench
+        run: cmake --build build --parallel --target jfd_ui_library_server_tests jfd_library_bench jfd_ui_showcase_tests
 
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
           JFD_UI_SCREENSHOTS: ${{ github.workspace }}/screenshots
         run: ctest --test-dir build --output-on-failure -V -R jfd_ui_library_server_tests
+
+      # The key screens on a demo catalogue with drawn pictures (no server):
+      # the look at 1280x800, 1920x1080 and a narrow window, in Russian.
+      - name: Showcase screens
+        env:
+          JFD_UI_SCREENSHOTS: ${{ github.workspace }}/screenshots/showcase
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" build/tests/jfd_ui_showcase_tests
 
       - name: Timings (Xvfb with Mesa)
         run: xvfb-run -a -s "-screen 0 1920x1080x24" scripts/measure/library-bench.sh build/tests/jfd_library_bench 5

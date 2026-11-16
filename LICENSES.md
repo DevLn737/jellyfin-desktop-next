@@ -50,6 +50,10 @@ only reformatted.
 | `src/ui/controls/icons/pause.svg` | Material Icons `pause` | Apache-2.0 |
 | `src/ui/controls/icons/play.svg` | Material Icons `play_arrow` | Apache-2.0 |
 | `src/ui/controls/icons/retry.svg` | Material Icons `refresh` | Apache-2.0 |
+| `src/ui/controls/icons/favorite.svg` | Material Icons `favorite` | Apache-2.0 |
+| `src/ui/controls/icons/favorite-border.svg` | Material Icons `favorite_border` | Apache-2.0 |
+| `src/ui/controls/icons/info.svg` | Material Icons `info_outline` | Apache-2.0 |
+| `src/ui/controls/icons/more.svg` | Material Icons `more_horiz` | Apache-2.0 |
 | `src/ui/controls/icons/search.svg` | Material Icons `search` | Apache-2.0 |
 | `src/ui/controls/icons/settings.svg` | Material Icons `settings` | Apache-2.0 |
 | `src/ui/controls/icons/up.svg` | Material Icons `keyboard_arrow_up` | Apache-2.0 |
@@ -69,6 +73,10 @@ only reformatted.
 | `src/ui/controls/icons-dark/pause.svg` | Material Icons `pause` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/play.svg` | Material Icons `play_arrow` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/retry.svg` | Material Icons `refresh` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/favorite.svg` | Material Icons `favorite` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/favorite-border.svg` | Material Icons `favorite_border` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/info.svg` | Material Icons `info_outline` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/more.svg` | Material Icons `more_horiz` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/search.svg` | Material Icons `search` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/settings.svg` | Material Icons `settings` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/up.svg` | Material Icons `keyboard_arrow_up` (dark fill) | Apache-2.0 |

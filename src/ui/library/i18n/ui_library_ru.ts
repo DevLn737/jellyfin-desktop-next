@@ -443,10 +443,69 @@
     </message>
 </context>
 <context>
+    <name>HeroBanner</name>
+    <message>
+        <source>Featured</source>
+        <translation>Рекомендуем</translation>
+    </message>
+    <message>
+        <source>Continue</source>
+        <translation>Продолжить</translation>
+    </message>
+    <message>
+        <source>Next up</source>
+        <translation>Следующая серия</translation>
+    </message>
+    <message>
+        <source>Recently added</source>
+        <translation>Недавно добавлено</translation>
+    </message>
+    <message>
+        <source>Resume from %1</source>
+        <translation>Продолжить с %1</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Смотреть</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>Подробнее</translation>
+    </message>
+    <message>
+        <source>Remove from favorites</source>
+        <translation>Убрать из избранного</translation>
+    </message>
+    <message>
+        <source>Add to favorites</source>
+        <translation>В избранное</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min left</source>
+        <translation>
+            <numerusform>осталась %n мин</numerusform>
+            <numerusform>осталось %n мин</numerusform>
+            <numerusform>осталось %n мин</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Item %1 of %2</source>
+        <translation>%1 из %2</translation>
+    </message>
+</context>
+<context>
     <name>HomePage</name>
     <message>
         <source>Home</source>
         <translation>Главная</translation>
+    </message>
+    <message>
+        <source>Search the library</source>
+        <translation>Поиск по медиатеке</translation>
+    </message>
+    <message>
+        <source>Ctrl K</source>
+        <translation>Ctrl K</translation>
     </message>
     <message>
         <source>Customize home</source>

@@ -38,6 +38,10 @@ namespace jfd::library {
   class HomeModel : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(jfd::library::ItemListModel* libraries READ libraries CONSTANT)
+    // The items of the banner at the top: what the user was watching, then
+    // the newest films and series of each library, with a backdrop and,
+    // when the server has one, a logo. Taken from the rows already loaded.
+    Q_PROPERTY(jfd::library::ItemListModel* featured READ featured CONSTANT)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
@@ -65,6 +69,11 @@ namespace jfd::library {
       int resumeLimit = 12;
       int nextUpLimit = 24;
       int latestLimit = 16;
+      // Banner items, and the width of their backdrops and logos in
+      // device-independent pixels.
+      int featuredLimit = 5;
+      int backdropWidth = 1600;
+      int logoWidth = 500;
       // Card width in device-independent pixels and the screen's ratio, for
       // the image sizes.
       int cardWidth = 200;
@@ -88,6 +97,7 @@ namespace jfd::library {
     QHash<int, QByteArray> roleNames() const override;
 
     ItemListModel* libraries() { return &m_libraries; }
+    ItemListModel* featured() { return &m_featured; }
     bool loading() const { return m_pending > 0; }
     QString errorText() const { return m_errorText; }
     int count() const { return static_cast<int>(m_visible.size()); }
@@ -153,6 +163,7 @@ namespace jfd::library {
     void fill(quint64 generation, Row* row, api::Result<api::ItemPage> result);
     void loadRows(quint64 generation);
     void updateVisible();
+    void updateFeatured();
     void requestDone();
     void setError(const QString& text);
     QList<ItemListModel::Entry> entries(const QList<api::Item>& items, CardShape shape) const;
@@ -160,6 +171,7 @@ namespace jfd::library {
     api::JellyfinClient& m_client;
     Options m_options;
     ItemListModel m_libraries;
+    ItemListModel m_featured;
     // Every row in display order, shown or not.
     std::vector<std::unique_ptr<Row>> m_rows;
     // The rows other modules registered as sections.

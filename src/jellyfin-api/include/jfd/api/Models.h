@@ -146,6 +146,9 @@ namespace jfd::api {
     QStringList parentBackdropImageTags;
     QString parentThumbItemId;
     QString parentThumbImageTag;
+    // An episode's or season's series logo.
+    QString parentLogoItemId;
+    QString parentLogoImageTag;
     // Music: tracks carry their album and artists; artists and genres their
     // counts (the server leaves them out for other types).
     QString album;

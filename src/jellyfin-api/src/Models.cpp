@@ -189,6 +189,8 @@ namespace jfd::api::json {
     i.parentBackdropImageTags = strings(o, "ParentBackdropImageTags");
     i.parentThumbItemId = text(o, "ParentThumbItemId");
     i.parentThumbImageTag = text(o, "ParentThumbImageTag");
+    i.parentLogoItemId = text(o, "ParentLogoItemId");
+    i.parentLogoImageTag = text(o, "ParentLogoImageTag");
     i.album = text(o, "Album");
     i.albumId = text(o, "AlbumId");
     i.albumArtist = text(o, "AlbumArtist");

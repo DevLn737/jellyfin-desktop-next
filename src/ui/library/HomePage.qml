@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls.Basic as Basic
+import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
@@ -25,13 +26,47 @@ RoutePage {
 
     title: qsTr("Home")
 
+    readonly property Item heroBanner: rows.headerItem ? rows.headerItem.heroBanner : null
+
+    // The banner arrives after the first rows, and the header changes height
+    // with the window: a list the user has not moved stays at its top (the
+    // view would otherwise keep the first row in place and push the banner
+    // up out of sight).
+    property bool movedByUser: false
+    Connections {
+        target: rows.headerItem
+        function onHeightChanged() {
+            if (!page.movedByUser)
+                rows.positionViewAtBeginning()
+        }
+    }
+
+    // Today, for the date over the banner; set again when the page shows.
+    property date today: new Date()
+
     Component.onCompleted: if (home) home.reload()
-    Basic.StackView.onActivated: if (home && home.count > 0) home.reload()
+    Basic.StackView.onActivated: {
+        today = new Date()
+        if (home && home.count > 0) home.reload()
+    }
 
     // Back from a lost connection: what failed loads again.
     Connections {
         target: Library
         function onReconnected() { if (page.home && page.home.errorText.length > 0) page.home.reload() }
+    }
+
+    // The featured item's backdrop, behind the rows and wider than their
+    // margins: it scrolls away with the banner and fades into the page.
+    HeroBackdrop {
+        objectName: "homeHeroBackdrop"
+        z: -1
+        width: page.width
+        height: page.heroBanner ? page.heroBanner.y + page.heroBanner.height + Theme.spacingHuge * 2 : 0
+        y: -(rows.contentY - rows.originY)
+        visible: !page.offlineHome && page.heroBanner !== null && page.heroBanner.visible
+        model: page.home ? page.home.featured : null
+        current: page.heroBanner ? page.heroBanner.current : 0
     }
 
     ListView {
@@ -54,8 +89,11 @@ RoutePage {
         // Rows are tall; keep one more on each side ready.
         cacheBuffer: 600
         model: page.home
+        onMovementStarted: page.movedByUser = true
+        onCurrentIndexChanged: if (currentIndex > 0) page.movedByUser = true
 
         header: Column {
+            readonly property alias heroBanner: hero
             width: rows.width
             topPadding: Theme.spacingLarge
             bottomPadding: Theme.spacingHuge
@@ -71,18 +109,110 @@ RoutePage {
                 onRetry: if (page.home) page.home.reload()
             }
 
+            // The date, the search field (it opens Ctrl+K) and the
+            // home page's settings.
             Item {
+                objectName: "homeTopBar"
                 width: parent.width
-                height: customize.implicitHeight
-                ActionButton {
-                    id: customize
-                    objectName: "customizeHomeButton"
-                    anchors.right: parent.right
-                    iconSource: Icons.settings
-                    text: qsTr("Customize home")
-                    onClicked: Navigator.navigate("customizeHome")
-                    KeyNavigation.down: libraries
+                height: Theme.controlHeight
+                Text {
+                    objectName: "homeDate"
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: {
+                        const date = Qt.locale().toString(page.today, "dddd, d MMMM")
+                        return date.charAt(0).toUpperCase() + date.slice(1)
+                    }
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeBody
+                    visible: !Theme.compact
                 }
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.spacingSmall
+                    T.AbstractButton {
+                        id: searchField
+                        objectName: "homeSearch"
+                        width: Theme.compact ? 220 : Theme.tvMode ? 480 : 300
+                        height: Theme.controlHeight
+                        focusPolicy: Qt.StrongFocus
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: qsTr("Search the library")
+                        onClicked: CommandRegistry.requestPalette()
+                        Keys.onReturnPressed: CommandRegistry.requestPalette()
+                        Keys.onEnterPressed: CommandRegistry.requestPalette()
+                        KeyNavigation.down: hero.count > 0 ? hero : libraries
+                        background: Rectangle {
+                            radius: Theme.radiusLarge
+                            color: searchField.hovered ? Theme.surfaceHover : Theme.panelFill
+                            border.width: 1
+                            border.color: Theme.glassBorder
+                            FocusFrame { shown: searchField.visualFocus; radius: Theme.radiusLarge }
+                        }
+                        contentItem: Item {
+                            Icon {
+                                id: searchIcon
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.spacing
+                                anchors.verticalCenter: parent.verticalCenter
+                                size: Theme.iconSize - 4
+                                source: Icons.search
+                                color: Theme.textSecondary
+                                opacity: 0.8
+                            }
+                            Text {
+                                anchors.left: searchIcon.right
+                                anchors.leftMargin: Theme.spacingSmall
+                                anchors.right: shortcut.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: qsTr("Search the library")
+                                color: Theme.textDisabled
+                                font.pixelSize: Theme.fontSizeBody
+                                elide: Text.ElideRight
+                            }
+                            Rectangle {
+                                id: shortcut
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.spacingSmall
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: !Theme.tvMode
+                                width: shortcutText.implicitWidth + Theme.spacingSmall
+                                height: shortcutText.implicitHeight + 4
+                                radius: Theme.radiusSmall
+                                color: "transparent"
+                                border.width: 1
+                                border.color: Theme.border
+                                Text {
+                                    id: shortcutText
+                                    anchors.centerIn: parent
+                                    text: qsTr("Ctrl K")
+                                    color: Theme.textDisabled
+                                    font.pixelSize: Theme.fontSizeSmall - 1
+                                }
+                            }
+                        }
+                    }
+                    IconButton {
+                        id: customize
+                        objectName: "customizeHomeButton"
+                        iconSource: Icons.settings
+                        toolTipText: qsTr("Customize home")
+                        onClicked: Navigator.navigate("customizeHome")
+                        KeyNavigation.down: hero.count > 0 ? hero : libraries
+                    }
+                }
+            }
+
+            HeroBanner {
+                id: hero
+                objectName: "homeHero"
+                width: parent.width
+                visible: count > 0
+                height: visible ? implicitHeight : 0
+                model: page.home ? page.home.featured : null
+                KeyNavigation.down: libraries
             }
 
             CardRow {

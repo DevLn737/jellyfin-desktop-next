@@ -1,6 +1,8 @@
 #include "jfd/ui/LibraryUi.h"
 
+#include <jfd/api/JellyfinClient.h>
 #include <jfd/library/CollectionIndex.h>
+#include <jfd/library/ErrorText.h>
 #include <jfd/library/ItemListModel.h>
 #include <jfd/library/LibraryUpdates.h>
 #include <jfd/ui/LibraryImageProvider.h>
@@ -242,6 +244,36 @@ namespace jfd::ui {
       return;
     }
     m_play(itemId, startPositionTicks);
+  }
+
+  void LibraryUi::setFavorite(const QString& itemId, bool favorite) {
+    if (itemId.isEmpty() || m_services.client == nullptr) return;
+    m_services.client->setFavorite(itemId, favorite, this, [this](api::Result<api::UserItemData> result) {
+      if (!result) {
+        Q_EMIT message(library::errorText(result.error()), true);
+        return;
+      }
+      if (m_services.updates != nullptr) m_services.updates->publish(result.value());
+    });
+  }
+
+  void LibraryUi::setPlayed(const QString& itemId, bool played, bool favorite) {
+    if (itemId.isEmpty() || m_services.client == nullptr) return;
+    api::UserItemData data;
+    data.itemId = itemId;
+    data.played = played;
+    data.isFavorite = favorite;
+    auto finish = [this, data](api::Result<api::Empty> result) {
+      if (!result) {
+        Q_EMIT message(library::errorText(result.error()), true);
+        return;
+      }
+      if (m_services.updates != nullptr) m_services.updates->publish(data);
+    };
+    if (played)
+      m_services.client->markPlayed(itemId, this, finish);
+    else
+      m_services.client->markUnplayed(itemId, this, finish);
   }
 
   void LibraryUi::playChannel(const QString& channelId) {

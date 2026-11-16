@@ -99,10 +99,16 @@ namespace jfd::library {
   }
 
   QUrl logoUrl(const api::JellyfinClient& client, const api::Item& item, int maxWidth) {
-    const QString tag = item.imageTags.value(QStringLiteral("Logo"));
+    // An episode or season shows its series' logo.
+    QString id = item.id;
+    QString tag = item.imageTags.value(QStringLiteral("Logo"));
+    if (tag.isEmpty() && !item.parentLogoItemId.isEmpty()) {
+      id = item.parentLogoItemId;
+      tag = item.parentLogoImageTag;
+    }
     if (tag.isEmpty()) return {};
     api::ImageRequest request;
-    request.itemId = item.id;
+    request.itemId = id;
     request.type = QStringLiteral("Logo");
     request.tag = tag;
     request.maxWidth = maxWidth;

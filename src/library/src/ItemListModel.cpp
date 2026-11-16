@@ -90,6 +90,16 @@ namespace jfd::library {
       return item.communityRating ? QVariant(*item.communityRating) : QVariant();
     case AlbumIdRole:
       return item.albumId;
+    case SeriesIdRole:
+      return item.seriesId;
+    case GenresRole:
+      return item.genres;
+    case OfficialRatingRole:
+      return item.officialRating;
+    case BackdropUrlRole:
+      return e->backdropUrl;
+    case LogoUrlRole:
+      return e->logoUrl;
     default:
       return {};
     }
@@ -116,7 +126,12 @@ namespace jfd::library {
             {OverviewRole, "overview"},
             {YearRole, "year"},
             {CommunityRatingRole, "communityRating"},
-            {AlbumIdRole, "albumId"}};
+            {AlbumIdRole, "albumId"},
+            {SeriesIdRole, "seriesId"},
+            {GenresRole, "genres"},
+            {OfficialRatingRole, "officialRating"},
+            {BackdropUrlRole, "backdropUrl"},
+            {LogoUrlRole, "logoUrl"}};
   }
 
   const ItemListModel::Entry* ItemListModel::entry(int row) const {

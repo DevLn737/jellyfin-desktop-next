@@ -36,6 +36,16 @@
     </message>
 </context>
 <context>
+    <name>HeroBanner</name>
+    <message numerus="yes">
+        <source>%n min left</source>
+        <translation>
+            <numerusform>%n min left</numerusform>
+            <numerusform>%n min left</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>LibraryPage</name>
     <message numerus="yes">
         <source>%n item(s)</source>
