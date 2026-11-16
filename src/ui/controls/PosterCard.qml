@@ -166,53 +166,64 @@ T.AbstractButton {
             progress: card.downloadProgress
         }
 
-        // The quick actions: a shade, Play, Watched and Favorite.
-        Item {
-            id: quick
-            objectName: "quickActions"
+        // The quick actions: a shade, Play, Watched and Favorite. Made the
+        // first time they show (a grid has hundreds of cards) and kept.
+        Loader {
+            id: quickLoader
             anchors.fill: parent
-            visible: opacity > 0
-            opacity: card.quickShown ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
-
-            Rectangle {
-                anchors.fill: parent
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.15) }
-                    GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.6) }
-                }
+            active: false
+            Connections {
+                target: card
+                function onQuickShownChanged() { if (card.quickShown) quickLoader.active = true }
             }
+            sourceComponent: Component {
+                Item {
+                    id: quick
+                    objectName: "quickActions"
+                    visible: opacity > 0
+                    opacity: card.quickShown ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
 
-            QuickButton {
-                objectName: "quickPlay"
-                anchors.centerIn: parent
-                visible: card.canPlay
-                diameter: Math.min(56, Math.round(frame.width * 0.32))
-                iconSource: Icons.play
-                filled: true
-                toolTipText: qsTr("Play")
-                onClicked: card.playRequested()
-            }
+                    Rectangle {
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.15) }
+                            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.6) }
+                        }
+                    }
 
-            Row {
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.margins: Theme.spacingSmall
-                anchors.bottomMargin: Theme.spacingSmall + (card.progress > 0 && card.progress < 1 ? 4 : 0)
-                spacing: Theme.spacingTiny
-                QuickButton {
-                    objectName: "quickPlayed"
-                    iconSource: Icons.check
-                    on: card.played
-                    toolTipText: card.played ? qsTr("Mark as not watched") : qsTr("Mark as watched")
-                    onClicked: card.playedToggled()
-                }
-                QuickButton {
-                    objectName: "quickFavorite"
-                    iconSource: card.favorite ? Icons.favorite : Icons.favoriteBorder
-                    on: card.favorite
-                    toolTipText: card.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
-                    onClicked: card.favoriteToggled()
+                    QuickButton {
+                        objectName: "quickPlay"
+                        anchors.centerIn: parent
+                        visible: card.canPlay
+                        diameter: Math.min(56, Math.round(frame.width * 0.32))
+                        iconSource: Icons.play
+                        filled: true
+                        toolTipText: qsTr("Play")
+                        onClicked: card.playRequested()
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: Theme.spacingSmall
+                        anchors.bottomMargin: Theme.spacingSmall + (card.progress > 0 && card.progress < 1 ? 4 : 0)
+                        spacing: Theme.spacingTiny
+                        QuickButton {
+                            objectName: "quickPlayed"
+                            iconSource: Icons.check
+                            on: card.played
+                            toolTipText: card.played ? qsTr("Mark as not watched") : qsTr("Mark as watched")
+                            onClicked: card.playedToggled()
+                        }
+                        QuickButton {
+                            objectName: "quickFavorite"
+                            iconSource: card.favorite ? Icons.favorite : Icons.favoriteBorder
+                            on: card.favorite
+                            toolTipText: card.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+                            onClicked: card.favoriteToggled()
+                        }
+                    }
                 }
             }
         }
