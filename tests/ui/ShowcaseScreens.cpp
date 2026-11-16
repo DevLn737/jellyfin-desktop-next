@@ -157,6 +157,36 @@ namespace {
                   {QStringLiteral("ImageTags"), tags},
                   {QStringLiteral("BackdropImageTags"), QJsonArray{QStringLiteral("b")}},
                   {QStringLiteral("PrimaryImageAspectRatio"), 0.6667}};
+    // People, studio and streams, as a detail page asks for them.
+    const QStringList cast{QStringLiteral("Анна Северова"), QStringLiteral("Илья Громов"),
+                           QStringLiteral("Мария Лесная"), QStringLiteral("Олег Тихонов"),
+                           QStringLiteral("Вера Ключ"), QStringLiteral("Пётр Ветров")};
+    const QStringList roles{QStringLiteral("Смотритель"), QStringLiteral("Капитан"), QStringLiteral("Врач"),
+                            QStringLiteral("Рыбак"), QStringLiteral("Почтальон"), QStringLiteral("Гость")};
+    QJsonArray people;
+    for (int i = 0; i < cast.size(); ++i)
+      people.append(QJsonObject{{QStringLiteral("Id"), QStringLiteral("p%1").arg(i)},
+                                {QStringLiteral("Name"), cast[i]},
+                                {QStringLiteral("Role"), roles[i]},
+                                {QStringLiteral("Type"), QStringLiteral("Actor")},
+                                {QStringLiteral("PrimaryImageTag"), QStringLiteral("p")}});
+    people.append(QJsonObject{{QStringLiteral("Id"), QStringLiteral("p9")},
+                              {QStringLiteral("Name"), QStringLiteral("Дарья Маяк")},
+                              {QStringLiteral("Type"), QStringLiteral("Director")}});
+    o.insert(QStringLiteral("People"), people);
+    o.insert(QStringLiteral("Studios"), QJsonArray{QJsonObject{{QStringLiteral("Name"), QStringLiteral("Северная студия")}}});
+    if (!series)
+      o.insert(QStringLiteral("MediaStreams"),
+               QJsonArray{QJsonObject{{QStringLiteral("Type"), QStringLiteral("Video")}, {QStringLiteral("Codec"), QStringLiteral("hevc")},
+                                      {QStringLiteral("Width"), 1920}, {QStringLiteral("Height"), 804}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Audio")}, {QStringLiteral("Language"), QStringLiteral("rus")},
+                                      {QStringLiteral("Channels"), 6}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Audio")}, {QStringLiteral("Language"), QStringLiteral("eng")},
+                                      {QStringLiteral("Channels"), 2}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Subtitle")}, {QStringLiteral("Language"), QStringLiteral("rus")}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Subtitle")}, {QStringLiteral("Language"), QStringLiteral("eng")}}});
+    else
+      o.insert(QStringLiteral("RecursiveItemCount"), seasonsOf(t.id) * episodesIn(t.id));
     if (!series) {
       o.insert(QStringLiteral("RunTimeTicks"), t.minutes * TicksPerMinute);
       o.insert(QStringLiteral("MediaType"), QStringLiteral("Video"));
@@ -353,6 +383,23 @@ namespace {
         }
         break;
       }
+    }
+    // A person: a soft portrait silhouette.
+    if (bytes.isEmpty() && id.size() == 2 && id.startsWith(QLatin1Char('p'))) {
+      const int n = id.mid(1).toInt();
+      QImage picture(240, 240, QImage::Format_RGB32);
+      QPainter p(&picture);
+      p.setRenderHint(QPainter::Antialiasing);
+      QLinearGradient back(0, 0, 0, 240);
+      back.setColorAt(0, QColor::fromHsv((n * 47 + 180) % 360, 70, 120));
+      back.setColorAt(1, QColor::fromHsv((n * 47 + 200) % 360, 90, 60));
+      p.fillRect(picture.rect(), back);
+      p.setPen(Qt::NoPen);
+      p.setBrush(QColor::fromHsv((n * 31 + 20) % 360, 40, 200));
+      p.drawEllipse(QPointF(120, 100), 46, 54);
+      p.drawEllipse(QPointF(120, 250), 95, 80);
+      p.end();
+      bytes = encode(picture, "JPEG");
     }
     // A library: a scene with its name.
     if (bytes.isEmpty() && (id == QLatin1String("movies") || id == QLatin1String("tv"))) {

@@ -6,6 +6,8 @@
 #include <jfd/library/CollectionIndex.h>
 #include <jfd/library/LibraryUpdates.h>
 
+#include <QLocale>
+
 namespace jfd::library {
 
   namespace {
@@ -88,6 +90,113 @@ namespace jfd::library {
   }
   qint64 ItemDetails::resumePositionTicks() const {
     return m_target ? m_target->userData.playbackPositionTicks : 0;
+  }
+  QString ItemDetails::playTargetSubtitle() const {
+    if (!m_target || !is(*m_target, "Episode") || !m_target->indexNumber) return {};
+    if (m_target->parentIndexNumber)
+      return QStringLiteral("S%1:E%2").arg(*m_target->parentIndexNumber).arg(*m_target->indexNumber);
+    return QStringLiteral("E%1").arg(*m_target->indexNumber);
+  }
+  qint64 ItemDetails::playTargetRunTimeTicks() const {
+    return m_target ? m_target->runTimeTicks.value_or(0) : 0;
+  }
+  double ItemDetails::playTargetProgress() const {
+    return m_target ? progressOf(*m_target) : 0.0;
+  }
+
+  QVariantList ItemDetails::people() const {
+    QVariantList out;
+    if (!m_item) return out;
+    const int width = static_cast<int>(120 * m_options.devicePixelRatio);
+    // Actors first, in the server's order (billing), then the crew.
+    for (int pass = 0; pass < 2; ++pass) {
+      for (const api::ItemPerson& person : m_item->people) {
+        const bool actor = person.type == QLatin1String("Actor") || person.type == QLatin1String("GuestStar");
+        if ((pass == 0) != actor) continue;
+        QUrl image;
+        if (!person.id.isEmpty() && !person.primaryImageTag.isEmpty()) {
+          api::ImageRequest request;
+          request.itemId = person.id;
+          request.type = QStringLiteral("Primary");
+          request.tag = person.primaryImageTag;
+          request.maxWidth = width;
+          image = m_client.imageUrl(request);
+        }
+        out.append(QVariantMap{{QStringLiteral("id"), person.id},
+                               {QStringLiteral("name"), person.name},
+                               {QStringLiteral("role"), actor ? person.role : person.type},
+                               {QStringLiteral("imageUrl"), image}});
+      }
+    }
+    return out;
+  }
+  QStringList ItemDetails::studios() const {
+    return m_item ? m_item->studios : QStringList();
+  }
+
+  namespace {
+    // "rus" -> "русский", "eng" -> "English"; unknown codes as they are.
+    QString languageName(const QString& code) {
+      if (code.isEmpty()) return {};
+      const QLocale::Language language = QLocale::codeToLanguage(code, QLocale::AnyLanguageCode);
+      if (language == QLocale::AnyLanguage || language == QLocale::C) return code;
+      // English names itself after a country ("American English").
+      QString name = language == QLocale::English ? QStringLiteral("English") : QLocale(language).nativeLanguageName();
+      if (!name.isEmpty()) name[0] = name[0].toUpper();
+      return name;
+    }
+
+    QStringList languagesOf(const std::optional<api::Item>& item, const char* type) {
+      QStringList out;
+      if (!item) return out;
+      for (const api::ItemStream& stream : item->streams) {
+        if (stream.type != QLatin1String(type)) continue;
+        const QString name = languageName(stream.language);
+        if (!name.isEmpty() && !out.contains(name)) out.append(name);
+      }
+      return out;
+    }
+  } // namespace
+
+  QStringList ItemDetails::audioLanguages() const {
+    return languagesOf(m_item, "Audio");
+  }
+  QStringList ItemDetails::subtitleLanguages() const {
+    return languagesOf(m_item, "Subtitle");
+  }
+  QString ItemDetails::quality() const {
+    if (!m_item) return {};
+    QStringList parts;
+    for (const api::ItemStream& stream : m_item->streams) {
+      if (stream.type != QLatin1String("Video")) continue;
+      const int width = stream.width.value_or(0);
+      const int height = stream.height.value_or(0);
+      // By width, so a wide film (1920x800) still reads as 1080p.
+      if (width >= 3200 || height >= 2000)
+        parts.append(QStringLiteral("4K"));
+      else if (width >= 1800 || height >= 1000)
+        parts.append(QStringLiteral("1080p"));
+      else if (width >= 1200 || height >= 700)
+        parts.append(QStringLiteral("720p"));
+      else if (height > 0)
+        parts.append(QStringLiteral("%1p").arg(height));
+      if (!stream.codec.isEmpty()) parts.append(stream.codec.toUpper());
+      break;
+    }
+    for (const api::ItemStream& stream : m_item->streams) {
+      if (stream.type != QLatin1String("Audio") || !stream.channels) continue;
+      const int channels = *stream.channels;
+      parts.append(channels == 6 ? QStringLiteral("5.1") : channels == 8 ? QStringLiteral("7.1")
+                                                         : QStringLiteral("%1.0").arg(channels));
+      break;
+    }
+    return parts.join(QStringLiteral(" · "));
+  }
+  int ItemDetails::episodeCount() const {
+    return m_item ? m_item->recursiveItemCount.value_or(0) : 0;
+  }
+  int ItemDetails::unplayedCount() const {
+    return m_item ? m_item->userData.unplayedItemCount.value_or(0) : 0;
   }
 
   // --- Loading -------------------------------------------------------------

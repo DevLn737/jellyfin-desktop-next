@@ -32,6 +32,7 @@ qt_add_qml_module(jfd_ui_controls
     StateMessage.qml
     Toast.qml
     TitleLogo.qml
+    ToggleIconButton.qml
     ToggleSwitch.qml
     ToolTipLabel.qml
     ValueSlider.qml

@@ -16,6 +16,10 @@ T.ItemDelegate {
     required property var model
     required property int index
 
+    // In the side panel of a series page: a smaller still, the number and
+    // the name, no description and no play button (the row plays).
+    property bool compact: false
+
     signal playClicked()
 
     implicitHeight: Math.max(still.height, captions.implicitHeight) + 2 * Theme.spacingSmall
@@ -37,7 +41,7 @@ T.ItemDelegate {
     contentItem: Item {
         Rectangle {
             id: still
-            width: Theme.thumbWidth * 0.75
+            width: row.compact ? (Theme.tvMode ? 200 : 128) : Theme.thumbWidth * 0.75
             height: Math.round(width / Theme.thumbAspect)
             radius: Theme.radius
             color: Theme.surfaceRaised
@@ -84,18 +88,28 @@ T.ItemDelegate {
             id: captions
             anchors.left: still.right
             anchors.leftMargin: Theme.spacing
-            anchors.right: play.left
-            anchors.rightMargin: Theme.spacing
+            anchors.right: row.compact ? parent.right : play.left
+            anchors.rightMargin: row.compact ? 0 : Theme.spacing
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingTiny
 
             Text {
                 width: parent.width
-                text: (row.model.subtitle ? row.model.subtitle + " · " : "") + (row.model.name || "")
+                visible: row.compact
+                text: (row.model.subtitle || "").replace(/^S\d+:/, "")
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSmall
+            }
+            Text {
+                width: parent.width
+                text: row.compact ? (row.model.name || "")
+                    : (row.model.subtitle ? row.model.subtitle + " · " : "") + (row.model.name || "")
                 color: Theme.text
                 font.pixelSize: Theme.fontSizeBody
                 font.weight: Theme.fontWeightBold
                 elide: Text.ElideRight
+                wrapMode: row.compact ? Text.Wrap : Text.NoWrap
+                maximumLineCount: row.compact ? 2 : 1
             }
             Text {
                 width: parent.width
@@ -106,7 +120,7 @@ T.ItemDelegate {
             }
             Text {
                 width: parent.width
-                visible: text.length > 0
+                visible: text.length > 0 && !row.compact
                 text: row.model.overview || ""
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSmall
@@ -118,6 +132,7 @@ T.ItemDelegate {
 
         IconButton {
             id: play
+            visible: !row.compact
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             iconSource: Icons.play

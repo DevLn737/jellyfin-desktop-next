@@ -8,6 +8,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QVariant>
+#include <QVariantList>
 
 namespace jfd::api {
   class JellyfinClient;
@@ -47,6 +48,18 @@ namespace jfd::library {
     Q_PROPERTY(QUrl posterUrl READ posterUrl NOTIFY itemChanged)
     Q_PROPERTY(QUrl backdropUrl READ backdropUrl NOTIFY itemChanged)
     Q_PROPERTY(QUrl logoUrl READ logoUrl NOTIFY itemChanged)
+    // Cast and crew, actors first: maps with "id", "name", "role" (the
+    // character, or "Director" and the like) and "imageUrl" (may be empty).
+    Q_PROPERTY(QVariantList people READ people NOTIFY itemChanged)
+    Q_PROPERTY(QStringList studios READ studios NOTIFY itemChanged)
+    // Languages of the audio and subtitle streams, as their own speakers
+    // write them ("русский", "English"); "1080p · HEVC · 5.1".
+    Q_PROPERTY(QStringList audioLanguages READ audioLanguages NOTIFY itemChanged)
+    Q_PROPERTY(QStringList subtitleLanguages READ subtitleLanguages NOTIFY itemChanged)
+    Q_PROPERTY(QString quality READ quality NOTIFY itemChanged)
+    // A series' or season's episodes, and how many are still unwatched.
+    Q_PROPERTY(int episodeCount READ episodeCount NOTIFY itemChanged)
+    Q_PROPERTY(int unplayedCount READ unplayedCount NOTIFY userDataChanged)
 
     Q_PROPERTY(bool played READ played NOTIFY userDataChanged)
     Q_PROPERTY(bool favorite READ favorite NOTIFY userDataChanged)
@@ -57,6 +70,10 @@ namespace jfd::library {
     Q_PROPERTY(QString playTargetId READ playTargetId NOTIFY playTargetChanged)
     Q_PROPERTY(QString playTargetName READ playTargetName NOTIFY playTargetChanged)
     Q_PROPERTY(qint64 resumePositionTicks READ resumePositionTicks NOTIFY playTargetChanged)
+    // "S1:E3" for an episode target; its length and watched part.
+    Q_PROPERTY(QString playTargetSubtitle READ playTargetSubtitle NOTIFY playTargetChanged)
+    Q_PROPERTY(qint64 playTargetRunTimeTicks READ playTargetRunTimeTicks NOTIFY playTargetChanged)
+    Q_PROPERTY(double playTargetProgress READ playTargetProgress NOTIFY playTargetChanged)
 
     Q_PROPERTY(jfd::library::ItemListModel* seasons READ seasons CONSTANT)
     Q_PROPERTY(jfd::library::ItemListModel* episodes READ episodes CONSTANT)
@@ -99,6 +116,13 @@ namespace jfd::library {
     QUrl posterUrl() const { return m_posterUrl; }
     QUrl backdropUrl() const { return m_backdropUrl; }
     QUrl logoUrl() const { return m_logoUrl; }
+    QVariantList people() const;
+    QStringList studios() const;
+    QStringList audioLanguages() const;
+    QStringList subtitleLanguages() const;
+    QString quality() const;
+    int episodeCount() const;
+    int unplayedCount() const;
 
     bool played() const;
     bool favorite() const;
@@ -108,6 +132,9 @@ namespace jfd::library {
     QString playTargetId() const { return m_target ? m_target->id : QString(); }
     QString playTargetName() const { return m_target ? m_target->name : QString(); }
     qint64 resumePositionTicks() const;
+    QString playTargetSubtitle() const;
+    qint64 playTargetRunTimeTicks() const;
+    double playTargetProgress() const;
 
     ItemListModel* seasons() { return &m_seasons; }
     ItemListModel* episodes() { return &m_episodes; }

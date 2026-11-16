@@ -555,6 +555,66 @@
 <context>
     <name>ItemPage</name>
     <message>
+        <source>Film</source>
+        <translation>Фильм</translation>
+    </message>
+    <message>
+        <source>Series</source>
+        <translation>Сериал</translation>
+    </message>
+    <message>
+        <source>Season</source>
+        <translation>Сезон</translation>
+    </message>
+    <message>
+        <source>Episode</source>
+        <translation>Серия</translation>
+    </message>
+    <message>
+        <source>Director</source>
+        <translation>Режиссёр</translation>
+    </message>
+    <message>
+        <source>Writer</source>
+        <translation>Сценарист</translation>
+    </message>
+    <message>
+        <source>Producer</source>
+        <translation>Продюсер</translation>
+    </message>
+    <message>
+        <source>Composer</source>
+        <translation>Композитор</translation>
+    </message>
+    <message>
+        <source>Watched %1 of %2</source>
+        <translation>Просмотрено %1 из %2</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n season(s)</source>
+        <translation>
+            <numerusform>%n сезон</numerusform>
+            <numerusform>%n сезона</numerusform>
+            <numerusform>%n сезонов</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n episode(s)</source>
+        <translation>
+            <numerusform>%n серия</numerusform>
+            <numerusform>%n серии</numerusform>
+            <numerusform>%n серий</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Less</source>
+        <translation>Свернуть</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>Ещё</translation>
+    </message>
+    <message>
         <source>Resume from %1</source>
         <translation>Продолжить с %1</translation>
     </message>
@@ -571,6 +631,14 @@
         <translation>Смотреть вместе</translation>
     </message>
     <message>
+        <source>Remove from favorites</source>
+        <translation>Убрать из избранного</translation>
+    </message>
+    <message>
+        <source>Add to favorites</source>
+        <translation>В избранное</translation>
+    </message>
+    <message>
         <source>Watched</source>
         <translation>Просмотрено</translation>
     </message>
@@ -579,16 +647,52 @@
         <translation>Отметить просмотренным</translation>
     </message>
     <message>
-        <source>♥ Favorite</source>
-        <translation>♥ В избранном</translation>
+        <source>Seasons and episodes</source>
+        <translation>Сезоны и серии</translation>
     </message>
     <message>
-        <source>♡ Add to favorites</source>
-        <translation>♡ В избранное</translation>
+        <source>%1 of %2 watched</source>
+        <translation>%1 из %2 просмотрено</translation>
     </message>
     <message>
         <source>Next: %1</source>
         <translation>Следующая: %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min left</source>
+        <translation>
+            <numerusform>осталась %n мин</numerusform>
+            <numerusform>осталось %n мин</numerusform>
+            <numerusform>осталось %n мин</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Cast and crew</source>
+        <translation>В ролях</translation>
+    </message>
+    <message>
+        <source>Studio</source>
+        <translation>Студия</translation>
+    </message>
+    <message>
+        <source>Genres</source>
+        <translation>Жанры</translation>
+    </message>
+    <message>
+        <source>Audio</source>
+        <translation>Аудио</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Субтитры</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Качество</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Подробности</translation>
     </message>
     <message>
         <source>In collections</source>
