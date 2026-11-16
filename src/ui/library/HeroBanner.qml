@@ -13,7 +13,9 @@ import Jfd.Ui.Library
 // genres, length and age rating, two lines of the description, then Play or
 // Resume, More and a favorite toggle, with the part left to watch. The next
 // item comes every few seconds, unless the pointer or the focus is on the
-// banner or effects are simplified; the dots below choose one.
+// banner, effects are simplified or in TV mode (the focus is nearly always
+// on the screen there); the dots below choose one, also by focusing them,
+// so Left and Right along the dots go through the items.
 //
 // The backdrop is not drawn here: the page draws it behind its rows
 // (HeroBackdrop), wider than the margins, from `current`.
@@ -52,7 +54,7 @@ FocusScope {
         interval: banner.interval
         repeat: true
         running: banner.count > 1 && banner.visible && !hover.hovered && !banner.activeFocus
-                 && !Theme.reducedEffects && Qt.application.state === Qt.ApplicationActive
+                 && !Theme.reducedEffects && !Theme.tvMode && Qt.application.state === Qt.ApplicationActive
         onTriggered: banner.current = (banner.current + 1) % banner.count
     }
 
@@ -299,6 +301,7 @@ FocusScope {
                 activeFocusOnTab: true
                 Accessible.name: qsTr("Item %1 of %2").arg(index + 1).arg(banner.count)
                 onClicked: banner.current = index
+                onActiveFocusChanged: if (activeFocus) banner.current = index
                 Keys.onReturnPressed: banner.current = index
                 Keys.onEnterPressed: banner.current = index
                 Rectangle {

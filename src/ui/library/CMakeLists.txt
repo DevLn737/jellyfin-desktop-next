@@ -21,6 +21,7 @@ qt_add_qml_module(jfd_ui_library
   URI Jfd.Ui.Library
   VERSION 1.0
   QML_FILES
+    AlphabetBar.qml
     ChannelPage.qml
     CollectionPage.qml
     CommandPalette.qml

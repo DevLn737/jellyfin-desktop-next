@@ -14,6 +14,7 @@
 
 namespace jfd::api {
   class JellyfinClient;
+  struct ItemQuery;
 }
 
 namespace jfd::library {
@@ -42,6 +43,8 @@ namespace jfd::library {
     Q_PROPERTY(
         bool showCollections READ showCollections WRITE setShowCollections NOTIFY queryChanged)
     Q_PROPERTY(bool canShowCollections READ canShowCollections NOTIFY queryChanged)
+    Q_PROPERTY(QString density READ density WRITE setDensity NOTIFY queryChanged)
+    Q_PROPERTY(bool alphabetical READ alphabetical NOTIFY queryChanged)
     Q_PROPERTY(QString name READ name NOTIFY nameChanged)
     Q_PROPERTY(QStringList availableGenres READ availableGenres NOTIFY filtersChanged)
     Q_PROPERTY(QVariantList availableYears READ availableYears NOTIFY filtersChanged)
@@ -100,6 +103,12 @@ namespace jfd::library {
     bool showCollections() const { return m_showCollections; }
     void setShowCollections(bool show);
     bool canShowCollections() const;
+    // The cards' size, kept with the filters: "small", "medium" (the
+    // default) or "large". Changing it does not reload.
+    QString density() const { return m_density; }
+    void setDensity(const QString& density);
+    // Listed by name from A to Z: the alphabet bar can jump to a letter.
+    bool alphabetical() const;
     // The library's or collection's name, from the server.
     QString name() const { return m_name; }
 
@@ -131,8 +140,12 @@ namespace jfd::library {
     // Loads the page holding `row` (QML calls this for rows coming into view;
     // data() does it too).
     Q_INVOKABLE void ensureLoaded(int row);
+    // Asks the server where `letter` starts (how many items sort before
+    // it, with the same filters); letterLocated() answers. "#" is row 0.
+    Q_INVOKABLE void locateLetter(const QString& letter);
 
   Q_SIGNALS:
+    void letterLocated(const QString& letter, int row);
     void queryChanged();
     void filtersChanged();
     void nameChanged();
@@ -143,6 +156,8 @@ namespace jfd::library {
   private:
     void scheduleReload();
     void loadPage(int page);
+    // The listing's query without paging.
+    api::ItemQuery listQuery() const;
     // A failed page waits for its backoff.
     bool mayLoad(int page) const;
     void dropFarPages(int keep);
@@ -161,6 +176,7 @@ namespace jfd::library {
     QStringList m_genres;
     QList<int> m_years;
     bool m_showCollections = false;
+    QString m_density = QStringLiteral("medium");
     QString m_name;
 
     quint64 m_generation = 0;

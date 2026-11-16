@@ -211,6 +211,22 @@ namespace jfd::api::json {
     i.albumCount = smallInteger(o, "AlbumCount");
     i.playlistItemId = text(o, "PlaylistItemId");
     i.trickplay = trickplay(o.value(QLatin1String("Trickplay")).toObject());
+    for (const auto& value : o.value(QLatin1String("People")).toArray()) {
+      const QJsonObject p = value.toObject();
+      ItemPerson person{text(p, "Id"), text(p, "Name"), text(p, "Type"), text(p, "Role"),
+                        text(p, "PrimaryImageTag")};
+      if (!person.name.isEmpty()) i.people.append(std::move(person));
+    }
+    for (const auto& value : o.value(QLatin1String("Studios")).toArray()) {
+      const QString studio = text(value.toObject(), "Name");
+      if (!studio.isEmpty()) i.studios.append(studio);
+    }
+    for (const auto& value : o.value(QLatin1String("MediaStreams")).toArray()) {
+      const QJsonObject m = value.toObject();
+      i.streams.append({text(m, "Type"), text(m, "Codec"), text(m, "Language"), text(m, "DisplayTitle"),
+                        smallInteger(m, "Width"), smallInteger(m, "Height"), smallInteger(m, "Channels")});
+    }
+    i.recursiveItemCount = smallInteger(o, "RecursiveItemCount");
     readUserData(o.value(QLatin1String("UserData")).toObject(), i.userData);
     if (i.id.isEmpty()) return invalid(QStringLiteral("Item has no Id"));
     return i;

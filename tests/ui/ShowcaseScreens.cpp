@@ -6,8 +6,9 @@
 // The pictures are drawn here (gradients, shapes and the title), so the
 // screens look like a real library without any third-party artwork.
 //
-// JFD_UI_SCREENSHOTS=<dir> saves a screenshot of each screen at 1280x800
-// and 1920x1080 (and 860x700 for the narrow layout).
+// JFD_UI_SCREENSHOTS=<dir> saves a screenshot of each screen at 1280x800,
+// 1600x900 (the mockups' size) and 1920x1080 (and 860x700 for the narrow
+// layout).
 
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
@@ -17,7 +18,10 @@
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
+#include <jfd/settings/CommonSections.h>
+#include <jfd/settings/Settings.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/SettingsModel.h>
 #include <jfd/ui/ThemePalette.h>
 
 #include <QBuffer>
@@ -27,6 +31,7 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QJsonArray>
+#include <QKeyEvent>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLinearGradient>
@@ -47,6 +52,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ControlsPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
+Q_IMPORT_QML_PLUGIN(Jfd_Ui_SettingsPlugin)
 
 using namespace jfd;
 using jfd::test::waitFor;
@@ -157,6 +163,36 @@ namespace {
                   {QStringLiteral("ImageTags"), tags},
                   {QStringLiteral("BackdropImageTags"), QJsonArray{QStringLiteral("b")}},
                   {QStringLiteral("PrimaryImageAspectRatio"), 0.6667}};
+    // People, studio and streams, as a detail page asks for them.
+    const QStringList cast{QStringLiteral("Анна Северова"), QStringLiteral("Илья Громов"),
+                           QStringLiteral("Мария Лесная"), QStringLiteral("Олег Тихонов"),
+                           QStringLiteral("Вера Ключ"), QStringLiteral("Пётр Ветров")};
+    const QStringList roles{QStringLiteral("Смотритель"), QStringLiteral("Капитан"), QStringLiteral("Врач"),
+                            QStringLiteral("Рыбак"), QStringLiteral("Почтальон"), QStringLiteral("Гость")};
+    QJsonArray people;
+    for (int i = 0; i < cast.size(); ++i)
+      people.append(QJsonObject{{QStringLiteral("Id"), QStringLiteral("p%1").arg(i)},
+                                {QStringLiteral("Name"), cast[i]},
+                                {QStringLiteral("Role"), roles[i]},
+                                {QStringLiteral("Type"), QStringLiteral("Actor")},
+                                {QStringLiteral("PrimaryImageTag"), QStringLiteral("p")}});
+    people.append(QJsonObject{{QStringLiteral("Id"), QStringLiteral("p9")},
+                              {QStringLiteral("Name"), QStringLiteral("Дарья Маяк")},
+                              {QStringLiteral("Type"), QStringLiteral("Director")}});
+    o.insert(QStringLiteral("People"), people);
+    o.insert(QStringLiteral("Studios"), QJsonArray{QJsonObject{{QStringLiteral("Name"), QStringLiteral("Северная студия")}}});
+    if (!series)
+      o.insert(QStringLiteral("MediaStreams"),
+               QJsonArray{QJsonObject{{QStringLiteral("Type"), QStringLiteral("Video")}, {QStringLiteral("Codec"), QStringLiteral("hevc")},
+                                      {QStringLiteral("Width"), 1920}, {QStringLiteral("Height"), 804}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Audio")}, {QStringLiteral("Language"), QStringLiteral("rus")},
+                                      {QStringLiteral("Channels"), 6}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Audio")}, {QStringLiteral("Language"), QStringLiteral("eng")},
+                                      {QStringLiteral("Channels"), 2}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Subtitle")}, {QStringLiteral("Language"), QStringLiteral("rus")}},
+                          QJsonObject{{QStringLiteral("Type"), QStringLiteral("Subtitle")}, {QStringLiteral("Language"), QStringLiteral("eng")}}});
+    else
+      o.insert(QStringLiteral("RecursiveItemCount"), seasonsOf(t.id) * episodesIn(t.id));
     if (!series) {
       o.insert(QStringLiteral("RunTimeTicks"), t.minutes * TicksPerMinute);
       o.insert(QStringLiteral("MediaType"), QStringLiteral("Video"));
@@ -354,6 +390,23 @@ namespace {
         break;
       }
     }
+    // A person: a soft portrait silhouette.
+    if (bytes.isEmpty() && id.size() == 2 && id.startsWith(QLatin1Char('p'))) {
+      const int n = id.mid(1).toInt();
+      QImage picture(240, 240, QImage::Format_RGB32);
+      QPainter p(&picture);
+      p.setRenderHint(QPainter::Antialiasing);
+      QLinearGradient back(0, 0, 0, 240);
+      back.setColorAt(0, QColor::fromHsv((n * 47 + 180) % 360, 70, 120));
+      back.setColorAt(1, QColor::fromHsv((n * 47 + 200) % 360, 90, 60));
+      p.fillRect(picture.rect(), back);
+      p.setPen(Qt::NoPen);
+      p.setBrush(QColor::fromHsv((n * 31 + 20) % 360, 40, 200));
+      p.drawEllipse(QPointF(120, 100), 46, 54);
+      p.drawEllipse(QPointF(120, 250), 95, 80);
+      p.end();
+      bytes = encode(picture, "JPEG");
+    }
     // A library: a scene with its name.
     if (bytes.isEmpty() && (id == QLatin1String("movies") || id == QLatin1String("tv"))) {
       QImage picture = scene(640, 360, id == QLatin1String("tv") ? 215 : 280, qHash(id));
@@ -479,6 +532,15 @@ namespace {
     return nullptr;
   }
 
+  // The first card with quick actions under `root`.
+  QQuickItem* findQuickCard(QQuickItem* root) {
+    if (root == nullptr) return nullptr;
+    if (root->property("quickActions").toBool() && root->isVisible()) return root;
+    for (QQuickItem* child : root->childItems())
+      if (QQuickItem* found = findQuickCard(child)) return found;
+    return nullptr;
+  }
+
   // --- The window -------------------------------------------------------------
 
   class Showcase {
@@ -495,6 +557,14 @@ namespace {
       navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
       REQUIRE(navigator != nullptr);
       navigator->setPlaceholderPage(QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
+      // The settings screen, on the common sections.
+      REQUIRE(settings::registerCommonSections(m_registry));
+      m_settings = std::make_unique<settings::Settings>(m_registry, m_dir.filePath(QStringLiteral("settings.ini")));
+      auto* appSettings = engine.singletonInstance<ui::AppSettings*>("Jfd.Ui.Settings", "AppSettings");
+      REQUIRE(appSettings != nullptr);
+      appSettings->attach(m_settings.get());
+      navigator->registerPage(QStringLiteral("settings"),
+                              QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Settings/SettingsPage.qml")));
       // Russian unless JFD_UI_LANG says otherwise (en: the source strings).
       const QString language = qEnvironmentVariable("JFD_UI_LANG", QStringLiteral("ru"));
       if (language != QLatin1String("en")) {
@@ -584,6 +654,8 @@ namespace {
 
     QObject m_translations;
     QTemporaryDir m_dir;
+    settings::SettingsRegistry m_registry;
+    std::unique_ptr<settings::Settings> m_settings;
     test::FakeServer server;
     std::unique_ptr<ui::LibraryScreens> screens;
     QQmlApplicationEngine engine;
@@ -623,6 +695,8 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   CHECK(play->property("text").toString().contains(QStringLiteral("12:40")));
 
   show.screenshot(QStringLiteral("home-1280"));
+  show.resize(1600, 900);
+  show.screenshot(QStringLiteral("home-1600"));
   show.resize(1920, 1080);
   show.screenshot(QStringLiteral("home-1920"));
   hero->setProperty("current", 1);
@@ -631,6 +705,32 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   show.screenshot(QStringLiteral("home-860"));
   show.resize(1280, 800);
   hero->setProperty("current", 0);
+
+  // A card's quick actions show on focus; the Menu key opens its menu.
+  show.resize(1600, 900);
+  QQuickItem* resume = findItem(show.page(), QStringLiteral("homeRow_resume"));
+  REQUIRE(resume != nullptr);
+  QQuickItem* card = nullptr;
+  REQUIRE(waitFor([&] { return (card = findQuickCard(resume)) != nullptr; }, Timeout));
+  show.find("homeRows")->setProperty("contentY", resume->y() - 120);
+  Showcase::settle(300);
+  card->forceActiveFocus(Qt::TabFocusReason);
+  card->setProperty("focusReason", int(Qt::TabFocusReason));
+  QQuickItem* quick = findItem(card, QStringLiteral("quickActions"));
+  REQUIRE(quick != nullptr);
+  CHECK(waitFor([&] { return quick->opacity() > 0.99; }, Timeout));
+  CHECK(findItem(card, QStringLiteral("quickPlay"))->isVisible());
+  show.screenshot(QStringLiteral("home-1600-card-focus"));
+  QKeyEvent menuKey(QEvent::KeyPress, Qt::Key_Menu, Qt::NoModifier);
+  QGuiApplication::sendEvent(show.window, &menuKey);
+  QObject* menu = card->findChild<QObject*>(QStringLiteral("cardMenu"));
+  REQUIRE(menu != nullptr);
+  CHECK(waitFor([&] { return menu->property("opened").toBool(); }, Timeout));
+  const QStringList entries = menu->property("entries").toStringList();
+  CHECK(entries.contains(QStringLiteral("Перейти к сериалу")));
+  CHECK(entries.contains(QStringLiteral("Смотреть с начала")));
+  show.screenshot(QStringLiteral("home-1600-card-menu"));
+  QMetaObject::invokeMethod(menu, "close");
 }
 
 TEST_CASE("Series, film and library pages on the demo catalogue") {
@@ -644,6 +744,8 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
     return list != nullptr && list->property("count").toInt() == 8;
   }, Timeout));
   show.screenshot(QStringLiteral("series-1280"));
+  show.resize(1600, 900);
+  show.screenshot(QStringLiteral("series-1600"));
   show.resize(1920, 1080);
   show.screenshot(QStringLiteral("series-1920"));
 
@@ -660,4 +762,33 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
     return grid != nullptr && grid->property("count").toInt() == 7;
   }, Timeout));
   show.screenshot(QStringLiteral("library-1920"));
+
+  // Large cards in a smaller window: the grid scrolls, so the letters show.
+  auto* library = show.page()->property("library").value<QObject*>();
+  REQUIRE(library != nullptr);
+  library->setProperty("density", QStringLiteral("large"));
+  show.resize(1280, 800);
+  QQuickItem* bar = findItem(show.page(), QStringLiteral("alphabetBar"));
+  REQUIRE(bar != nullptr);
+  CHECK(waitFor([&] { return bar->isVisible(); }, Timeout));
+  CHECK(findItem(bar, QStringLiteral("letter_Я")) != nullptr);
+  show.screenshot(QStringLiteral("library-1280-large"));
+  library->setProperty("density", QStringLiteral("medium"));
+}
+
+TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
+  Showcase show;
+  show.navigator->navigate(QStringLiteral("settings"));
+  REQUIRE(waitFor([&] { return show.find("settingsSearch") != nullptr; }, Timeout));
+  QObject* list = show.find("settingsList");
+  REQUIRE(list != nullptr);
+  const int all = list->property("count").toInt();
+  CHECK(all > 10);
+  show.find("settingsSearch")->setProperty("text", QStringLiteral("цвет"));
+  CHECK(waitFor([&] { return list->property("count").toInt() > 0 && list->property("count").toInt() < all; }, Timeout));
+  show.resize(1600, 900);
+  show.screenshot(QStringLiteral("settings-1600-search"));
+  show.find("settingsSearch")->setProperty("text", QStringLiteral("zzzz"));
+  CHECK(waitFor([&] { return list->property("count").toInt() == 0; }, Timeout));
+  CHECK(show.find("settingsNothingFound")->property("visible").toBool());
 }

@@ -17,8 +17,10 @@ namespace jfd::api {
     // Fields every item list asks for; Jellyfin omits most of them otherwise.
     const QString ItemFields = QStringLiteral(
         "Overview,MediaSourceCount,ProductionYear,Genres,PrimaryImageAspectRatio,ChildCount");
-    // A detail page also needs trickplay for the seek bar.
-    const QString DetailFields = ItemFields + QStringLiteral(",Trickplay");
+    // A detail page also needs trickplay for the seek bar,
+    // and the people, studios, streams and episode count of its tables.
+    const QString DetailFields =
+        ItemFields + QStringLiteral(",Trickplay,People,Studios,MediaStreams,RecursiveItemCount");
     const QString Fields = QStringLiteral("fields");
 
     QString joinNumbers(const QList<int>& numbers) {
@@ -503,6 +505,7 @@ namespace jfd::api {
       query.addQueryItem(QStringLiteral("artistIds"), q.artistIds.join(QLatin1Char(',')));
     if (!q.personIds.isEmpty())
       query.addQueryItem(QStringLiteral("personIds"), q.personIds.join(QLatin1Char(',')));
+    if (!q.nameLessThan.isEmpty()) query.addQueryItem(QStringLiteral("nameLessThan"), q.nameLessThan);
     query.addQueryItem(QStringLiteral("recursive"), boolText(q.recursive));
     query.addQueryItem(QStringLiteral("startIndex"), QString::number(q.startIndex));
     query.addQueryItem(QStringLiteral("limit"), QString::number(q.limit));

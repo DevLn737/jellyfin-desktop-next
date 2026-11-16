@@ -419,6 +419,7 @@ Item {
     spacing: 4
     ActionButton { objectName: "ActionButton"; text: "Play"; onClicked: root.answered("ActionButton") }
     IconButton { objectName: "IconButton"; iconSource: Icons.play; onClicked: root.answered("IconButton") }
+    ToggleIconButton { objectName: "ToggleIconButton"; iconSource: Icons.check; onClicked: root.answered("ToggleIconButton") }
     PosterCard { objectName: "PosterCard"; title: "Title"; onClicked: root.answered("PosterCard") }
     ListItem { objectName: "ListItem"; text: "Entry"; onClicked: root.answered("ListItem") }
     RoomCard { objectName: "RoomCard"; text: "Room"; onClicked: root.answered("RoomCard") }
@@ -439,6 +440,7 @@ Item {
     return scene.root->property("answers").toMap().value(QLatin1String(name)).toInt();
   };
   const QStringList tested = {QStringLiteral("ActionButton"), QStringLiteral("IconButton"),
+                              QStringLiteral("ToggleIconButton"),
                               QStringLiteral("PosterCard"),   QStringLiteral("ListItem"),
                               QStringLiteral("RoomCard"),
                               QStringLiteral("ToggleSwitch"), QStringLiteral("ChoiceBox"),

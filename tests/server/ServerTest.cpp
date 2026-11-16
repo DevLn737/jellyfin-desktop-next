@@ -303,6 +303,20 @@ TEST_CASE("Home rows, library listings, filters and similar items") {
   REQUIRE(page.ok());
   CHECK(page->totalRecordCount == 0);
 
+  // The alphabet bar: how many sort before a letter ("Test Movie" is the
+  // only film; sort names are lower case).
+  query.years = {};
+  query.isPlayed = std::nullopt;
+  query.limit = 0;
+  query.nameLessThan = QStringLiteral("t");
+  page = run<ItemPage>([&](auto done) { client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  CHECK(page->totalRecordCount == 0);
+  query.nameLessThan = QStringLiteral("u");
+  page = run<ItemPage>([&](auto done) { client->items(query, nullptr, done); });
+  REQUIRE(page.ok());
+  CHECK(page->totalRecordCount == 1);
+
   auto filters = run<ItemFilters>(
       [&](auto done) { client->itemFilters(movies, {QStringLiteral("Movie")}, nullptr, done); });
   CHECK(filters.ok());

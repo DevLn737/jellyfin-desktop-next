@@ -46,6 +46,30 @@
     </message>
 </context>
 <context>
+    <name>ItemPage</name>
+    <message numerus="yes">
+        <source>%n season(s)</source>
+        <translation>
+            <numerusform>%n season</numerusform>
+            <numerusform>%n seasons</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n episode(s)</source>
+        <translation>
+            <numerusform>%n episode</numerusform>
+            <numerusform>%n episodes</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min left</source>
+        <translation>
+            <numerusform>%n min left</numerusform>
+            <numerusform>%n min left</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>LibraryPage</name>
     <message numerus="yes">
         <source>%n item(s)</source>

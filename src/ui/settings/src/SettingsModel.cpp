@@ -68,6 +68,60 @@ namespace jfd::ui {
     return {};
   }
 
+  bool SettingsModel::matches(int row, const QString& text) const {
+    if (row < 0 || row >= m_rows.size()) return false;
+    const QStringList words = text.simplified().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    if (words.isEmpty()) return true;
+    const Row& r = m_rows[row];
+    const char* context = r.section->context;
+    const settings::SettingDescriptor& setting = *r.setting;
+    QStringList haystack;
+    const auto add = [&](const char* source) {
+      if (source == nullptr) return;
+      haystack.append(QString::fromUtf8(source));
+      haystack.append(translated(context, source));
+    };
+    add(r.section->title);
+    add(setting.label);
+    add(setting.description);
+    for (const settings::Choice& choice : settings::choicesOf(setting)) {
+      if (choice.label) add(choice.label);
+      else haystack.append(choice.text);
+    }
+    const QString all = haystack.join(QLatin1Char('\n'));
+    for (const QString& word : words)
+      if (!all.contains(word, Qt::CaseInsensitive)) return false;
+    return true;
+  }
+
+  SettingsSearch::SettingsSearch(QObject* parent) : QSortFilterProxyModel(parent) {
+    connect(this, &QAbstractItemModel::rowsInserted, this, &SettingsSearch::countChanged);
+    connect(this, &QAbstractItemModel::rowsRemoved, this, &SettingsSearch::countChanged);
+    connect(this, &QAbstractItemModel::modelReset, this, &SettingsSearch::countChanged);
+    connect(this, &QAbstractItemModel::layoutChanged, this, &SettingsSearch::countChanged);
+  }
+
+  void SettingsSearch::setSettings(SettingsModel* settings) {
+    if (m_settings == settings) return;
+    m_settings = settings;
+    setSourceModel(settings);
+    Q_EMIT settingsChanged();
+    Q_EMIT countChanged();
+  }
+
+  void SettingsSearch::setText(const QString& text) {
+    if (m_text == text) return;
+    beginFilterChange();
+    m_text = text;
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    Q_EMIT textChanged();
+    Q_EMIT countChanged();
+  }
+
+  bool SettingsSearch::filterAcceptsRow(int sourceRow, const QModelIndex&) const {
+    return m_settings == nullptr || m_settings->matches(sourceRow, m_text);
+  }
+
   QVariant SettingsModel::data(const QModelIndex& index, int role) const {
     if (!checkIndex(index, CheckIndexOption::IndexIsValid | CheckIndexOption::ParentIsInvalid)) {
       return {};

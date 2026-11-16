@@ -45,5 +45,13 @@
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
+    <message>
+        <source>Search settings</source>
+        <translation>Поиск по настройкам</translation>
+    </message>
+    <message>
+        <source>No settings match “%1”.</source>
+        <translation>Нет настроек по запросу «%1».</translation>
+    </message>
 </context>
 </TS>

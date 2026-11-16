@@ -26,6 +26,8 @@ namespace {
       // The library's own name.
       if (r.path == QLatin1String("/Items/lib1")) return ok(R"({"Id": "lib1", "Name": "Films"})");
       if (r.path != QLatin1String("/Items")) return {404, {}, {}, 0};
+      // Where a letter starts: a count only.
+      if (r.query.hasQueryItem(QStringLiteral("nameLessThan"))) return ok(page({}, 120, 0));
       const int start = r.query.queryItemValue(QStringLiteral("startIndex")).toInt();
       const int limit = r.query.queryItemValue(QStringLiteral("limit")).toInt();
       QByteArray items;
@@ -195,6 +197,45 @@ TEST_CASE("Sort and filters go to the server and start the grid over") {
   CHECK(q.queryItemValue(QStringLiteral("startIndex")) == QStringLiteral("0"));
 }
 
+TEST_CASE("The alphabet bar asks the server where a letter starts") {
+  Movies movies;
+  LibraryFixture f([&movies](const HttpRequest& r) { return movies(r); });
+  LibraryModel library(f.client);
+  library.setCollectionType(QStringLiteral("movies"));
+  library.setLibraryId(QStringLiteral("lib1"));
+  library.setFavoritesOnly(true);
+  REQUIRE(waitFor([&] { return library.count() == 250; }));
+  CHECK(library.alphabetical());
+
+  QSignalSpy located(&library, &LibraryModel::letterLocated);
+  library.locateLetter(QStringLiteral("M"));
+  REQUIRE(waitFor([&] { return located.size() == 1; }));
+  CHECK(located[0][0].toString() == QStringLiteral("M"));
+  CHECK(located[0][1].toInt() == 120);
+  QUrlQuery q;
+  for (const HttpRequest& r : f.server.requests())
+    if (r.query.hasQueryItem(QStringLiteral("nameLessThan"))) q = r.query;
+  // Sort names are lower case; the same filters, no items.
+  CHECK(q.queryItemValue(QStringLiteral("nameLessThan")) == QStringLiteral("m"));
+  CHECK(q.queryItemValue(QStringLiteral("limit")) == QStringLiteral("0"));
+  CHECK(q.queryItemValue(QStringLiteral("isFavorite")) == QStringLiteral("true"));
+  CHECK(q.queryItemValue(QStringLiteral("sortBy")) == QStringLiteral("SortName"));
+
+  // "#" is the start, without asking.
+  const int asked = static_cast<int>(f.server.requests().size());
+  library.locateLetter(QStringLiteral("#"));
+  CHECK(located.size() == 2);
+  CHECK(located[1][1].toInt() == 0);
+  CHECK(f.server.requests().size() == asked);
+
+  // Density does not reload; another sort hides the bar.
+  library.setDensity(QStringLiteral("small"));
+  library.setDensity(QStringLiteral("huge"));
+  CHECK(library.density() == QStringLiteral("small"));
+  library.setDescending(true);
+  CHECK_FALSE(library.alphabetical());
+}
+
 TEST_CASE("Pages of a previous listing are dropped") {
   Movies movies;
   movies.delayMs = 300;
@@ -272,6 +313,7 @@ TEST_CASE("Sort and filters can be kept and applied again") {
   one.setGenres({QStringLiteral("Drama"), QStringLiteral("Comedy")});
   one.setYears({2001});
   one.setShowCollections(true);
+  one.setDensity(QStringLiteral("large"));
   const QJsonObject kept = one.filters();
 
   // Through JSON, as the settings keep it.
@@ -286,6 +328,7 @@ TEST_CASE("Sort and filters can be kept and applied again") {
   CHECK(two.genres() == QStringList{QStringLiteral("Drama"), QStringLiteral("Comedy")});
   CHECK(two.years() == QVariantList{2001});
   CHECK(two.showCollections());
+  CHECK(two.density() == QStringLiteral("large"));
   CHECK(two.filters() == kept);
 
   // Missing or foreign keys change nothing.

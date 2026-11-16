@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QPointer>
+#include <QSortFilterProxyModel>
 #include <QList>
 #include <QUrl>
 #include <qqmlintegration.h>
@@ -47,6 +49,9 @@ namespace jfd::ui {
 
     // The row of a full key, or -1.
     Q_INVOKABLE int indexOf(const QString& key) const;
+    // Whether every word of `text` is in the row's label, description,
+    // section title or choices, translated or in English, whatever the case.
+    bool matches(int row, const QString& text) const;
 
     // Type names used in the "type" role.
     static QString typeName(int type);
@@ -62,6 +67,36 @@ namespace jfd::ui {
 
     settings::Settings& m_settings;
     QList<Row> m_rows;
+  };
+
+  // The settings a search leaves, in screen order (the settings screen's
+  // search field). An empty `text` leaves them all.
+  class SettingsSearch : public QSortFilterProxyModel {
+    Q_OBJECT
+    QML_ELEMENT
+    Q_PROPERTY(jfd::ui::SettingsModel* settings READ settings WRITE setSettings NOTIFY settingsChanged)
+    Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+  public:
+    explicit SettingsSearch(QObject* parent = nullptr);
+
+    SettingsModel* settings() const { return m_settings; }
+    void setSettings(SettingsModel* settings);
+    QString text() const { return m_text; }
+    void setText(const QString& text);
+    int count() const { return rowCount(); }
+
+  Q_SIGNALS:
+    void settingsChanged();
+    void textChanged();
+    void countChanged();
+
+  protected:
+    bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
+
+  private:
+    QPointer<SettingsModel> m_settings;
+    QString m_text;
   };
 
   // The QML face of the settings store: AppSettings.value("interface/scale"),

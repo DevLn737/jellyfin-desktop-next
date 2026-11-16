@@ -110,6 +110,30 @@ namespace jfd::api {
     QString name;
   };
 
+  // A person credited on an item (asked for with the People field).
+  struct ItemPerson {
+    QString id;
+    QString name;
+    // "Actor", "Director", "Writer", ...
+    QString type;
+    // The character, for an actor.
+    QString role;
+    QString primaryImageTag;
+  };
+
+  // A stream of an item's default version, as an item listing describes it
+  // (the MediaStreams field); enough for a details table.
+  struct ItemStream {
+    // "Video", "Audio", "Subtitle".
+    QString type;
+    QString codec;
+    QString language;
+    QString displayTitle;
+    std::optional<int> width;
+    std::optional<int> height;
+    std::optional<int> channels;
+  };
+
   struct Item {
     QString id;
     QString name;
@@ -167,6 +191,12 @@ namespace jfd::api {
     QString playlistItemId;
     // Asked for with the Trickplay field: resolutions by media source id.
     QHash<QString, QList<TrickplayInfo>> trickplay;
+    // Asked for on a detail page only (People, Studios, MediaStreams,
+    // RecursiveItemCount).
+    QList<ItemPerson> people;
+    QStringList studios;
+    QList<ItemStream> streams;
+    std::optional<int> recursiveItemCount;
     UserItemData userData;
   };
 

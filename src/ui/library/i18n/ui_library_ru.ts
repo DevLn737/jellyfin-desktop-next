@@ -2,6 +2,18 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>AlphabetBar</name>
+    <message>
+        <source>ABCDEFGHIJKLMNOPQRSTUVWXYZ</source>
+        <extracomment>The letters titles start with, in order, for the library&apos;s alphabet bar; leave out letters no word starts with.</extracomment>
+        <translation>АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЭЮЯ</translation>
+    </message>
+    <message>
+        <source>Switch alphabet</source>
+        <translation>Сменить алфавит</translation>
+    </message>
+</context>
+<context>
     <name>ChannelPage</name>
     <message>
         <source>Channel</source>
@@ -553,7 +565,106 @@
     </message>
 </context>
 <context>
+    <name>ItemCard</name>
+    <message>
+        <source>Resume</source>
+        <translation>Продолжить</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Смотреть</translation>
+    </message>
+    <message>
+        <source>Play from the start</source>
+        <translation>Смотреть с начала</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Открыть</translation>
+    </message>
+    <message>
+        <source>Mark as not watched</source>
+        <translation>Снять отметку просмотра</translation>
+    </message>
+    <message>
+        <source>Mark as watched</source>
+        <translation>Отметить просмотренным</translation>
+    </message>
+    <message>
+        <source>Remove from favorites</source>
+        <translation>Убрать из избранного</translation>
+    </message>
+    <message>
+        <source>Add to favorites</source>
+        <translation>В избранное</translation>
+    </message>
+    <message>
+        <source>Go to series</source>
+        <translation>Перейти к сериалу</translation>
+    </message>
+</context>
+<context>
     <name>ItemPage</name>
+    <message>
+        <source>Film</source>
+        <translation>Фильм</translation>
+    </message>
+    <message>
+        <source>Series</source>
+        <translation>Сериал</translation>
+    </message>
+    <message>
+        <source>Season</source>
+        <translation>Сезон</translation>
+    </message>
+    <message>
+        <source>Episode</source>
+        <translation>Серия</translation>
+    </message>
+    <message>
+        <source>Director</source>
+        <translation>Режиссёр</translation>
+    </message>
+    <message>
+        <source>Writer</source>
+        <translation>Сценарист</translation>
+    </message>
+    <message>
+        <source>Producer</source>
+        <translation>Продюсер</translation>
+    </message>
+    <message>
+        <source>Composer</source>
+        <translation>Композитор</translation>
+    </message>
+    <message>
+        <source>Watched %1 of %2</source>
+        <translation>Просмотрено %1 из %2</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n season(s)</source>
+        <translation>
+            <numerusform>%n сезон</numerusform>
+            <numerusform>%n сезона</numerusform>
+            <numerusform>%n сезонов</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n episode(s)</source>
+        <translation>
+            <numerusform>%n серия</numerusform>
+            <numerusform>%n серии</numerusform>
+            <numerusform>%n серий</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Less</source>
+        <translation>Свернуть</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>Ещё</translation>
+    </message>
     <message>
         <source>Resume from %1</source>
         <translation>Продолжить с %1</translation>
@@ -571,6 +682,14 @@
         <translation>Смотреть вместе</translation>
     </message>
     <message>
+        <source>Remove from favorites</source>
+        <translation>Убрать из избранного</translation>
+    </message>
+    <message>
+        <source>Add to favorites</source>
+        <translation>В избранное</translation>
+    </message>
+    <message>
         <source>Watched</source>
         <translation>Просмотрено</translation>
     </message>
@@ -579,16 +698,52 @@
         <translation>Отметить просмотренным</translation>
     </message>
     <message>
-        <source>♥ Favorite</source>
-        <translation>♥ В избранном</translation>
+        <source>Seasons and episodes</source>
+        <translation>Сезоны и серии</translation>
     </message>
     <message>
-        <source>♡ Add to favorites</source>
-        <translation>♡ В избранное</translation>
+        <source>%1 of %2 watched</source>
+        <translation>%1 из %2 просмотрено</translation>
     </message>
     <message>
         <source>Next: %1</source>
         <translation>Следующая: %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min left</source>
+        <translation>
+            <numerusform>осталась %n мин</numerusform>
+            <numerusform>осталось %n мин</numerusform>
+            <numerusform>осталось %n мин</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Cast and crew</source>
+        <translation>В ролях</translation>
+    </message>
+    <message>
+        <source>Studio</source>
+        <translation>Студия</translation>
+    </message>
+    <message>
+        <source>Genres</source>
+        <translation>Жанры</translation>
+    </message>
+    <message>
+        <source>Audio</source>
+        <translation>Аудио</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Субтитры</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Качество</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Подробности</translation>
     </message>
     <message>
         <source>In collections</source>
@@ -668,6 +823,18 @@
     <message>
         <source>All years</source>
         <translation>Все годы</translation>
+    </message>
+    <message>
+        <source>Small cards</source>
+        <translation>Мелкие карточки</translation>
+    </message>
+    <message>
+        <source>Medium cards</source>
+        <translation>Средние карточки</translation>
+    </message>
+    <message>
+        <source>Large cards</source>
+        <translation>Крупные карточки</translation>
     </message>
     <message>
         <source>Favorites</source>
