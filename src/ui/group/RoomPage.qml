@@ -1,16 +1,16 @@
 import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
+import Jfd.Ui.Shell
 import Jfd.Ui.Group
 
 // Inside a room (GroupPage shows it while GroupSession.inGroup): its
-// members, the speed for everyone, the queue, how well we keep up, and
+// members, the speed for everyone (changed in the player), the queue, how well we keep up, and
 // leaving.
 FocusScope {
     id: root
 
     readonly property var group: GroupSession
-    readonly property var rates: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
     function stateText(state) {
         switch (state) {
@@ -88,28 +88,28 @@ FocusScope {
                 }
             }
 
-            Row {
+            // The speed is changed in the player, by anyone in the room;
+            // here it is only shown.
+            Text {
+                objectName: "rateText"
                 visible: root.group.rateSupported
-                spacing: Theme.spacing
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: qsTr("Speed for everyone")
-                    color: Theme.text
-                    font.pixelSize: Theme.fontSizeBody
-                }
-                ChoiceBox {
-                    id: rateBox
-                    objectName: "rateBox"
-                    width: Theme.tvMode ? 180 : 120
-                    model: root.rates.map(r => ({ value: r, label: Number(r).toLocaleString(Qt.locale(), "g", 3) + "×" }))
-                    currentIndex: Math.max(0, root.rates.indexOf(root.group.rate))
-                    onActivated: root.group.setRate(root.rates[currentIndex])
-                }
+                text: qsTr("Speed for everyone: %1").arg(Number(root.group.rate).toLocaleString(Qt.locale(), "g", 3) + "×")
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeBody
             }
 
             SectionHeader {
                 text: qsTr("Members (%1)").arg(root.group.participants.length)
+            }
+            // Only our own: the server shares no other member's.
+            Text {
+                objectName: "pingText"
+                width: parent.width
+                visible: root.group.pingMs >= 0
+                text: qsTr("Your delay to the server: %1 ms").arg(root.group.pingMs)
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeBody
+                wrapMode: Text.Wrap
             }
             Column {
                 width: parent.width
@@ -157,11 +157,21 @@ FocusScope {
                 Text {
                     visible: queue.count === 0
                     width: parent.width
-                    text: qsTr("Nothing queued. Start a film or episode with “Watch together” and everyone in the room gets it.")
+                    text: qsTr("Nothing queued. Press Play on any film or episode and it starts for everyone in the room.")
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeBody
                     wrapMode: Text.Wrap
                 }
+            }
+
+            // Back to the room's film after looking around the library.
+            ActionButton {
+                objectName: "openPlayerButton"
+                visible: queue.count > 0 && root.group.state !== "idle" && root.group.state !== ""
+                primary: true
+                iconSource: Icons.play
+                text: qsTr("Open the player")
+                onClicked: Navigator.navigate("player")
             }
 
             ActionButton {

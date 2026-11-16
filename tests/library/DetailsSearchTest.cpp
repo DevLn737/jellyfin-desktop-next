@@ -86,12 +86,10 @@ TEST_CASE("A series page plays its next-up episode and shows that episode's seas
 
   page.resume();
   page.play();
-  page.watchTogether();
-  REQUIRE(play.count() == 3);
+  REQUIRE(play.count() == 2);
   CHECK(play[0][0].toString() == QStringLiteral("e22"));
   CHECK(play[0][1].toLongLong() == 70);
   CHECK(play[1][1].toLongLong() == 0);
-  CHECK(play[2][2].toBool());
 
   // Choosing another season lists its episodes.
   page.selectSeason(QStringLiteral("se1"));

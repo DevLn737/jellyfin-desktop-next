@@ -51,7 +51,6 @@ namespace jfd::ui {
     // cancelling, the recordings to come (route "recordings").
     Q_PROPERTY(jfd::library::LiveTvRecorder* recorder READ recorder NOTIFY attached)
     Q_PROPERTY(bool canPlay READ canPlay NOTIFY handlersChanged)
-    Q_PROPERTY(bool canWatchTogether READ canWatchTogether NOTIFY handlersChanged)
     Q_PROPERTY(bool canPlayTracks READ canPlayTracks NOTIFY handlersChanged)
     Q_PROPERTY(bool canPlayChannels READ canPlayChannels NOTIFY handlersChanged)
     // The server's live connection (the session socket) is up. A screen
@@ -76,8 +75,6 @@ namespace jfd::ui {
     };
 
     using PlayHandler = std::function<void(const QString& itemId, qint64 startPositionTicks)>;
-    using WatchTogetherHandler =
-        std::function<void(const QString& itemId, const QString& name, qint64 startPositionTicks)>;
     // A track found by search plays in the music player, its album as the
     // queue. `play` answers false when music cannot play now (in a group);
     // `stopsVideo` says that starting it would stop the video playing.
@@ -90,7 +87,6 @@ namespace jfd::ui {
 
     void attach(const Services& services);
     void setPlayHandler(PlayHandler handler);
-    void setWatchTogetherHandler(WatchTogetherHandler handler);
     void setTrackHandler(TrackHandler handler);
     // A Live TV channel plays on this device only, never for a group (a
     // live stream has no shared position).
@@ -102,7 +98,6 @@ namespace jfd::ui {
     library::LiveTvChannels* liveTv() const { return m_services.liveTv; }
     library::LiveTvRecorder* recorder() const { return m_services.recorder; }
     bool canPlay() const { return bool(m_play); }
-    bool canWatchTogether() const { return bool(m_watchTogether); }
     bool canPlayTracks() const { return bool(m_track.play); }
     bool canPlayChannels() const { return bool(m_channel); }
     bool online() const { return m_online; }
@@ -155,8 +150,6 @@ namespace jfd::ui {
     Q_INVOKABLE void setPlayed(const QString& itemId, bool played, bool favorite);
     // Tunes to a Live TV channel (setChannelHandler).
     Q_INVOKABLE void playChannel(const QString& channelId);
-    Q_INVOKABLE void watchTogether(const QString& itemId, const QString& name,
-                                   qint64 startPositionTicks);
     // Plays a track in its album. With a video playing it first asks
     // (trackConfirmationNeeded); `confirmed` is the answer.
     Q_INVOKABLE void playTrack(const QString& trackId, const QString& albumId,
@@ -184,7 +177,6 @@ namespace jfd::ui {
 
     Services m_services;
     PlayHandler m_play;
-    WatchTogetherHandler m_watchTogether;
     TrackHandler m_track;
     std::function<void(const QString&)> m_channel;
     bool m_online = true;

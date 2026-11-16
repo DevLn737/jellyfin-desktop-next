@@ -9,6 +9,7 @@
 #include <jfd/ui/GroupSession.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
+#include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/RoomsSession.h>
 
 #include <QLoggingCategory>
@@ -106,37 +107,27 @@ namespace jfd::desktop {
                        [&rooms, libraryUi] { rooms.setOnline(libraryUi->online()); });
     }
 
-    // "Watch together" on an item page: a group named after the item that
-    // starts it for everyone (or the item played in the group we are in),
-    // then the group page with its members and queue. Offered to users who
-    // may create a room, or who are in one.
-    const auto watchTogether = [&group, navigator](const QString& itemId, const QString& name,
-                                                    qint64 startPositionTicks) {
-      group.watchTogether(itemId, name, startPositionTicks);
-      navigator->navigate(QStringLiteral("group"));
-    };
     // SyncPlayAccess (brief 3.9): None closes the route everywhere (the
-    // sidebar, Ctrl+K, a command from another start, the phone) and takes
-    // Watch together away; JoinGroups keeps the rooms without Create.
-    const auto applyAccess = [&group, navigator, libraryUi = services.libraryUi, watchTogether] {
+    // sidebar, Ctrl+K, a command from another start, the phone); JoinGroups
+    // keeps the rooms without Create. Rooms are made and joined on that
+    // page only; in one, the ordinary Play plays for the room.
+    const auto applyAccess = [&group, navigator] {
       navigator->setRouteClosed(QStringLiteral("group"), !group.canJoin());
-      if (libraryUi == nullptr) return;
-      const bool offered = group.canCreate() || (group.inGroup() && group.canJoin());
-      if (offered != libraryUi->canWatchTogether()) {
-        qCInfo(lcGroupInstall) << "Watch together" << (offered ? "offered" : "not offered");
-        libraryUi->setWatchTogetherHandler(offered ? ui::LibraryUi::WatchTogetherHandler(watchTogether)
-                                                   : ui::LibraryUi::WatchTogetherHandler());
-      }
     };
+    // The room's item opens: the player shows it, as in Web, whoever started
+    // it. Not over the picture-in-picture window, which already shows it.
+    QObject::connect(&group, &session::GroupModel::itemOpening, &group, [&services, navigator] {
+      if (services.playerModel != nullptr && services.playerModel->pip()) return;
+      if (navigator->currentRoute() == QLatin1String("player")) return;
+      qCInfo(lcGroupInstall) << "The room's item opens: showing the player";
+      navigator->navigate(QStringLiteral("player"));
+    });
     QObject::connect(&group, &session::GroupModel::accessChanged, &group, applyAccess);
     QObject::connect(&group, &session::GroupModel::changed, &group, applyAccess);
     applyAccess();
   }
 
   void uninstallGroup(AppServices& services) {
-    // The watch-together handler stays on LibraryUi: nothing calls it once
-    // the window is gone, and LibraryUi's signals must not fire after the
-    // QML engine that bound them.
     ui::RoomsSession::setInstance(nullptr);
     ui::GroupSession::setInstance(nullptr);
     services.rooms.reset();

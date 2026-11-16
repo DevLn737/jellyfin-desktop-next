@@ -229,8 +229,8 @@ namespace jfd::desktop {
   bool registerGroupSettings(settings::SettingsRegistry& registry);
   // The watch-together page (route "group": the rooms, and the room we are
   // in), the GroupSession and RoomsSession singletons for it and the
-  // player's group indicator, and "Watch together" on item pages, all
-  // within the user's SyncPlayAccess. Needs installSession. uninstallGroup,
+  // player's group indicator, all within the user's SyncPlayAccess; in a
+  // room, a group item opens the player. Needs installSession. uninstallGroup,
   // after the QML engine is gone, drops the models before the session they
   // read.
   void installGroup(AppServices& services, QQmlEngine& engine);

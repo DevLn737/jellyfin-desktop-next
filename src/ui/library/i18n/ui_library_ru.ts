@@ -686,10 +686,6 @@
         <translation>С начала</translation>
     </message>
     <message>
-        <source>Watch together</source>
-        <translation>Смотреть вместе</translation>
-    </message>
-    <message>
         <source>Remove from favorites</source>
         <translation>Убрать из избранного</translation>
     </message>
@@ -1157,10 +1153,6 @@
     <message>
         <source>Playback is not available in this build yet.</source>
         <translation>Воспроизведение в этой сборке пока недоступно.</translation>
-    </message>
-    <message>
-        <source>Watching together is not available in this build yet.</source>
-        <translation>Совместный просмотр в этой сборке пока недоступен.</translation>
     </message>
     <message>
         <source>Music is not available in this build yet.</source>

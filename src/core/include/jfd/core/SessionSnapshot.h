@@ -44,6 +44,10 @@ namespace jfd::core {
     std::optional<std::int64_t> driftMilliseconds;
     SyncCorrection correction = SyncCorrection::None;
     std::uint32_t correctionsSinceSynced = 0;
+    // Our round trip to the server (the TimeSync measurement), once known.
+    // The server tells nobody the other members' (GroupInfoDto has names
+    // only).
+    std::optional<std::int64_t> pingMilliseconds;
     bool operator==(const GroupSnapshot&) const = default;
   };
 

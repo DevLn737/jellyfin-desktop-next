@@ -98,6 +98,10 @@ namespace jfd::session {
     return m_group && m_group->driftMilliseconds ? int(*m_group->driftMilliseconds) : 0;
   }
 
+  int GroupModel::pingMs() const {
+    return m_group && m_group->pingMilliseconds ? int(*m_group->pingMilliseconds) : -1;
+  }
+
   QString GroupModel::correction() const {
     if (!m_group) return {};
     switch (m_group->correction) {
@@ -303,6 +307,12 @@ namespace jfd::session {
   }
 
   void GroupModel::onNotice(const core::SessionNotice& notice) {
+    if (std::holds_alternative<core::notice::GroupItemRequested>(notice)) {
+      // Whoever started it (Play here, another member, Next): the app shows
+      // the player for it.
+      Q_EMIT itemOpening();
+      return;
+    }
     if (const auto* failed = std::get_if<core::notice::GroupRequestFailed>(&notice)) {
       // Create, join and leave failures arrive as replies (onReplied).
       if (failed->request == core::group::Request::Rejoin) {

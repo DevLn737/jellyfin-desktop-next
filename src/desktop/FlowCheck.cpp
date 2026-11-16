@@ -4,6 +4,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/library/SignIn.h>
+#include <jfd/session/GroupModel.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/PlayerModel.h>
@@ -195,6 +196,8 @@ namespace jfd::desktop {
       if (!page || page->items.isEmpty()) return fail(QStringLiteral("no movie on the server"));
       const QString movieId = page->items.first().id;
       const QString title = page->items.first().name;
+      m_movieId = movieId;
+      m_movieTitle = title;
       m_services.libraryUi->play(movieId, 0);
       ui::PlayerModel& player = *m_services.playerModel;
       waitFor(
@@ -271,8 +274,43 @@ namespace jfd::desktop {
           if (!external) {
             switchSubtitles(true);
           } else {
-            finish();
+            watchTogether();
           }
+        });
+  }
+
+  void FlowCheck::watchTogether() {
+    // A room made on the rooms page, then the movie's ordinary Play: in a
+    // room Play starts the item for the room, and the player must open on
+    // it (it used to stay on the rooms page with nothing playing).
+    session::GroupModel* group = m_services.group.get();
+    if (group == nullptr) return fail(QStringLiteral("no watch-together model"));
+    m_services.playerModel->stop();
+    m_services.navigator->navigate(QStringLiteral("group"));
+    group->createGroup(QStringLiteral("Flow room"));
+    waitFor(
+        QStringLiteral("the new room"), [this, group] { return group->inGroup() && shows(QStringLiteral("group")); },
+        PageMs, [this, group] {
+          done(QStringLiteral("room \"%1\" created").arg(group->groupName()));
+          screenshot(QStringLiteral("8-room"));
+          m_services.libraryUi->play(m_movieId, 0);
+          ui::PlayerModel& player = *m_services.playerModel;
+          waitFor(
+              QStringLiteral("the movie to play in the room"),
+              [this, &player, group] {
+                return shows(QStringLiteral("player")) && player.inGroup() && player.title().contains(m_movieTitle) &&
+                       !player.loading() && !player.paused() && player.position() >= 2.0 &&
+                       group->state() == QLatin1String("playing");
+              },
+              PlaybackMs, [this, &player, group] {
+                done(QStringLiteral("movie playing in the room at %1 s").arg(player.position(), 0, 'f', 1));
+                screenshot(QStringLiteral("9-room-playing"));
+                group->leaveGroup();
+                waitFor(QStringLiteral("leaving the room"), [group] { return !group->inGroup(); }, PageMs, [this] {
+                  done(QStringLiteral("left the room"));
+                  finish();
+                });
+              });
         });
   }
 

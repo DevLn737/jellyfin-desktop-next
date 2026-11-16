@@ -17,7 +17,9 @@ namespace jfd::desktop {
   // from scripts/test-server/stock-server.sh: the checkpoint-1 path on a
   // real server. Signs in on the login page, opens home, the series, an
   // episode, plays it, then plays the movie and switches its audio and
-  // subtitle tracks (embedded and external), stops and quits. Prints each
+  // subtitle tracks (embedded and external), creates a watch-together room
+  // and plays the movie in it with the ordinary Play, leaves, stops and
+  // quits. Prints each
   // step with its time; JFD_SMOKE_SCREENSHOTS saves a picture of each. The
   // exit code is 0 on success.
   class FlowCheck : public QObject {
@@ -48,6 +50,7 @@ namespace jfd::desktop {
     void playMovie();
     void switchAudio();
     void switchSubtitles(bool external);
+    void watchTogether();
     void finish();
 
     QQuickWindow& m_window;
@@ -59,6 +62,8 @@ namespace jfd::desktop {
     Check m_check;
     Next m_next;
     int m_timeoutMs = 0;
+    QString m_movieId;
+    QString m_movieTitle;
     double m_positionBefore = 0;
     int m_wantedIndex = -1;
     bool m_passed = false;

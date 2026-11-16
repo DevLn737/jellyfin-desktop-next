@@ -135,8 +135,8 @@ namespace jfd::desktop {
       case PlayCommand::PlayShuffle:
       case PlayCommand::PlayInstantMix: break;
       }
+      // The player shows once the group's item opens (installGroup).
       group.playInGroup(request.itemIds, request.startIndex, request.startPositionTicks);
-      if (services.navigator != nullptr) services.navigator->navigate(QStringLiteral("group"));
     }
 
     platform::InputAction inputAction(remote::NavigationKey key) {

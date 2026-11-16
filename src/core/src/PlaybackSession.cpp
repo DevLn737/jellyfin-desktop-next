@@ -432,6 +432,7 @@ namespace jfd::core {
     const bool changed = !m_clockSynced || synced.offset != m_offset;
     m_offset = synced.offset;
     m_clockSynced = true;
+    m_roundTrip = synced.roundTrip;
     if (!m_group || !changed) return;
     // What waited for server time, or was armed by the old offset.
     if (m_group->deferredReady) {
@@ -450,6 +451,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const group::ClockLost&) {
     m_clockSynced = false;
+    m_roundTrip.reset();
     if (!m_group) return;
     // An armed command would fire by a clock that may be wrong by however
     // long the computer slept: wait for the new offset.
@@ -897,6 +899,8 @@ namespace jfd::core {
       g.driftMilliseconds = m_group->driftMilliseconds;
       g.correction = m_group->correction;
       g.correctionsSinceSynced = m_group->corrections;
+      if (m_roundTrip)
+        g.pingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(*m_roundTrip).count();
       s.group = g;
     }
     return s;

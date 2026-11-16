@@ -119,6 +119,19 @@ TEST_CASE("A group item that cannot be opened leaves the group and says why") {
   CHECK(told);
 }
 
+TEST_CASE("A group item to open, whoever started it, asks the app to show the player") {
+  Fixture f;
+  QSignalSpy opening(f.model.get(), &session::GroupModel::itemOpening);
+  f.joined();
+  CHECK(opening.count() == 0);
+  // Another member (or our own Play) set a new queue: the item opens here.
+  Q_EMIT f.socket.syncPlayGroupUpdate(json(R"({"GroupId":"g1","Type":"PlayQueue","Data":{
+    "Reason":"NewPlaylist","LastUpdate":"2026-10-20T07:00:00Z",
+    "Playlist":[{"ItemId":"movie","PlaylistItemId":"p1"}],"PlayingItemIndex":0,
+    "StartPositionTicks":0,"IsPlaying":false,"PlaybackRate":1}})"));
+  REQUIRE(waitUntil([&] { return opening.count() == 1; }));
+}
+
 TEST_CASE("Remote control's Play in a group asks the group for a new queue or adds to it") {
   Fixture f;
   // Outside a group nothing is sent.
