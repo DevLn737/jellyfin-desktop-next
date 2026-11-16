@@ -43,12 +43,21 @@ namespace jfd::library {
       CommunityRatingRole,
       // A track's album, so it can play in its album.
       AlbumIdRole,
+      SeriesIdRole,
+      GenresRole,
+      OfficialRatingRole,
+      // Set only on the lists that fetch them (the home page's featured
+      // items); empty otherwise.
+      BackdropUrlRole,
+      LogoUrlRole,
     };
     Q_ENUM(Role)
 
     struct Entry {
       api::Item item;
       QUrl imageUrl;
+      QUrl backdropUrl = {};
+      QUrl logoUrl = {};
     };
 
     using QAbstractListModel::QAbstractListModel;

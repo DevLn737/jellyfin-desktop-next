@@ -31,6 +31,7 @@ qt_add_qml_module(jfd_ui_controls
     SmoothWheel.qml
     StateMessage.qml
     Toast.qml
+    TitleLogo.qml
     ToggleSwitch.qml
     ToolTipLabel.qml
     ValueSlider.qml
@@ -54,6 +55,14 @@ qt_add_qml_module(jfd_ui_controls
     icons/downloaded.svg
     icons/pause.svg
     icons/retry.svg
+    icons/favorite.svg
+    icons/favorite-border.svg
+    icons/info.svg
+    icons/more.svg
+    icons-dark/favorite.svg
+    icons-dark/favorite-border.svg
+    icons-dark/info.svg
+    icons-dark/more.svg
     icons-dark/back.svg
     icons-dark/check.svg
     icons-dark/close.svg

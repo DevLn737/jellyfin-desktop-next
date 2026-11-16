@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QHash>
 #include <QList>
+#include <QFont>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -85,6 +86,8 @@ namespace jfd::desktop {
     QVariantMap m_palette;
     bool m_darkBase = true;
     bool m_depthFontLoaded = false;
+    // The application's font before a theme changed its family.
+    QFont m_systemFont;
   };
 
   // Resets the theme settings to their defaults; for --reset-theme, before

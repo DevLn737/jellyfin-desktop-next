@@ -147,6 +147,12 @@ namespace jfd::ui {
     Q_INVOKABLE QString formatRunTime(qint64 ticks) const;
 
     Q_INVOKABLE void play(const QString& itemId, qint64 startPositionTicks);
+    // A card's or the banner's quick actions. The answer reaches every
+    // screen through LibraryUpdates; a failure is a message.
+    Q_INVOKABLE void setFavorite(const QString& itemId, bool favorite);
+    // `favorite` is the item's current favorite state: the update carries
+    // the whole user data, as the server's own messages do.
+    Q_INVOKABLE void setPlayed(const QString& itemId, bool played, bool favorite);
     // Tunes to a Live TV channel (setChannelHandler).
     Q_INVOKABLE void playChannel(const QString& channelId);
     Q_INVOKABLE void watchTogether(const QString& itemId, const QString& name,

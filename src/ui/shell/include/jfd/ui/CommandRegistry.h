@@ -43,9 +43,13 @@ namespace jfd::ui {
     // Runs a command if it is available. False for an unknown or
     // unavailable id.
     Q_INVOKABLE bool run(const QString& id);
+    // A screen's own search field (the home page's) asks for the palette;
+    // the window opens it.
+    Q_INVOKABLE void requestPalette() { Q_EMIT paletteRequested(); }
 
   Q_SIGNALS:
     void changed();
+    void paletteRequested();
 
   private:
     bool isAvailable(const Command& command) const;

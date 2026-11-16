@@ -70,6 +70,10 @@ Window {
             id: palette
             anchors.fill: parent
         }
+        Connections {
+            target: CommandRegistry
+            function onPaletteRequested() { palette.open() }
+        }
 
         // A track from the search would stop the video that plays: ask first.
         Connections {

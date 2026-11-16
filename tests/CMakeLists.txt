@@ -479,6 +479,20 @@ if(JFD_BUILD_APP)
     set_tests_properties(jfd_ui_library_server_tests PROPERTIES TIMEOUT 300 RESOURCE_LOCK jellyfin_server)
   endif()
 
+  if(TARGET jfd_ui_library AND TARGET jfd_ui_shell)
+    # The key screens on a demo catalogue with drawn pictures: checks of the
+    # banner and logos, and screenshots with JFD_UI_SCREENSHOTS.
+    add_executable(jfd_ui_showcase_tests support/QtGuiTestMain.cpp ui/ShowcaseScreens.cpp)
+    target_include_directories(jfd_ui_showcase_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jfd_ui_showcase_tests PRIVATE
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
+      jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
+      Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
+    target_compile_options(jfd_ui_showcase_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
+    add_test(NAME jfd_ui_showcase_tests COMMAND jfd_ui_showcase_tests)
+    set_tests_properties(jfd_ui_showcase_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen TIMEOUT 300)
+  endif()
+
   if(TARGET jfd_ui_library)
     # Timings for the startup, home and library-scroll thresholds; run by
     # scripts/library-bench.sh, not by ctest.

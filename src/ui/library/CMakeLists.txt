@@ -32,6 +32,8 @@ qt_add_qml_module(jfd_ui_library
     EpisodeRow.qml
     GenrePicker.qml
     GuidePage.qml
+    HeroBackdrop.qml
+    HeroBanner.qml
     HomePage.qml
     ItemCard.qml
     ItemPage.qml

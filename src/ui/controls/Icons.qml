@@ -23,4 +23,8 @@ QtObject {
     readonly property url pause: Qt.resolvedUrl("icons/pause.svg")
     readonly property url retry: Qt.resolvedUrl("icons/retry.svg")
     readonly property url remove: Qt.resolvedUrl("icons/delete.svg")
+    readonly property url favorite: Qt.resolvedUrl("icons/favorite.svg")
+    readonly property url favoriteBorder: Qt.resolvedUrl("icons/favorite-border.svg")
+    readonly property url info: Qt.resolvedUrl("icons/info.svg")
+    readonly property url more: Qt.resolvedUrl("icons/more.svg")
 }

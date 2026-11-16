@@ -143,6 +143,7 @@ namespace jfd::desktop {
         m_overlay(engine.singletonInstance<QObject*>("Jfd.Ui.Theme", "Overlay")),
         m_window(window) {
     Q_ASSERT(m_theme != nullptr && m_overlay != nullptr);
+    m_systemFont = QGuiApplication::font();
     // Manrope, the typeface of the default look, ships in the program (SIL
     // OFL 1.1). If it cannot be loaded the system font is used.
     for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold"}) {
@@ -272,6 +273,11 @@ namespace jfd::desktop {
     m_theme->setProperty("colors", palette);
     m_theme->setProperty("radiusOverride", radius);
     m_theme->setProperty("fontFamilyOverride", font);
+    // Every text takes the application font, so the theme's family (Manrope
+    // for "Depth") reaches all of them; without one, the system font.
+    QFont appFont = m_systemFont;
+    if (!font.isEmpty()) appFont.setFamilies({font});
+    if (QGuiApplication::font() != appFont) QGuiApplication::setFont(appFont);
     // What is drawn over the video stays dark, with the same accent.
     m_overlay->setProperty("colors", ui::withAccent(ui::darkPalette(), shownAccent, true));
   }
