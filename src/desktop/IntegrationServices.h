@@ -42,11 +42,17 @@ namespace jfd::desktop {
     // Set by the updater that exists; empty until startIntegrations.
     std::function<bool()> updateSupported;
     std::function<void(const integrations::Release&)> prepareUpdate;
+    // The version downloaded and checked, or empty.
+    std::function<QString()> readyVersion;
     // Offers the downloaded update again (playback ended).
-    std::function<void()> offerReadyUpdate;    // Something plays or this client is in a group: no update restarts it.
+    std::function<void()> offerReadyUpdate;
+    // Something plays or this client is in a group: no update restarts it.
     bool busy = false;
     // A downloaded update waits for playback to end before it is offered.
     bool offerWhenIdle = false;
+    // "Check for updates" in the settings: the result is said in the toast,
+    // also when there is nothing new or the check failed.
+    bool manualCheck = false;
     // Set by connectIntegrations; the controls' commands go nowhere before.
     integrations::MediaSessionBridge::Post post;
     std::unique_ptr<integrations::MediaSessionBridge> bridge;

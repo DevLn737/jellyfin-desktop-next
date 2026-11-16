@@ -20,6 +20,9 @@ namespace jfd::integrations {
     inline constexpr QLatin1String CheckForUpdates{"integrations/checkForUpdates"};
     // "beta" (pre-releases too) or "stable".
     inline constexpr QLatin1String UpdateChannel{"integrations/updateChannel"};
+    // Action: asks for a newer release now and says what came back (the
+    // startup check stays silent when there is none or it fails).
+    inline constexpr QLatin1String CheckNow{"integrations/checkNow"};
   } // namespace keys
 
   // False if the section is already registered.

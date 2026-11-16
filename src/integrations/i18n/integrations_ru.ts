@@ -78,6 +78,14 @@
         <source>Stable</source>
         <translation>Стабильный</translation>
     </message>
+    <message>
+        <source>Check for updates</source>
+        <translation>Проверить обновления</translation>
+    </message>
+    <message>
+        <source>Looks for a newer version in the chosen channel now and says what it found.</source>
+        <translation>Ищет новую версию в выбранном канале прямо сейчас и сообщает, что нашлось.</translation>
+    </message>
 </context>
 <context>
     <name>MediaSessionBridge</name>

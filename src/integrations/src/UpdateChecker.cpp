@@ -105,6 +105,8 @@ namespace jfd::integrations {
         m_url(std::move(releasesUrl)) {}
 
   void UpdateChecker::check() {
+    if (m_checking) return;
+    m_checking = true;
     QNetworkRequest request(m_url);
     request.setRawHeader("Accept", "application/vnd.github+json");
     request.setRawHeader("X-GitHub-Api-Version", "2022-11-28");
@@ -113,6 +115,7 @@ namespace jfd::integrations {
     QNetworkReply* reply = m_network->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
       reply->deleteLater();
+      m_checking = false;
       const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
       if (reply->error() != QNetworkReply::NoError && status == 0) {
         Q_EMIT checkFailed(reply->errorString());
@@ -136,6 +139,7 @@ namespace jfd::integrations {
         m_available = newest;
         Q_EMIT updateAvailable(newest->version, newest->page);
       } else {
+        m_available.reset();
         Q_EMIT upToDate();
       }
     });

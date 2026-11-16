@@ -16,6 +16,7 @@
 #include <QQuickWindow>
 
 #include <type_traits>
+#include <utility>
 
 Q_LOGGING_CATEGORY(lcIntegrations, "jfd.integrations")
 
@@ -94,6 +95,7 @@ namespace jfd::desktop {
 
       integrations.updateSupported = [&updater] { return updater.supported(); };
       integrations.prepareUpdate = [&updater](const integrations::Release& release) { updater.prepare(release); };
+      integrations.readyVersion = [&updater] { return updater.readyVersion(); };
       integrations.offerReadyUpdate = [&updater] {
         if (!updater.readyVersion().isEmpty()) Q_EMIT updater.ready(updater.readyVersion());
       };
@@ -224,22 +226,62 @@ namespace jfd::desktop {
     if (!checkForUpdates) return;
     // Also confirms an update that started this version.
     startPlatformUpdates(services, window);
-    if (!services.settings->value(integrations::keys::CheckForUpdates).toBool()) return;
+    settings::Settings& settings = *services.settings;
     integrations.updates = std::make_unique<integrations::UpdateChecker>(
         &integrations.network, QCoreApplication::applicationVersion(),
-        integrations::updateChannel(services.settings->value(integrations::keys::UpdateChannel).toString()));
+        integrations::updateChannel(settings.value(integrations::keys::UpdateChannel).toString()));
     auto* checker = integrations.updates.get();
     QObject::connect(checker, &integrations::UpdateChecker::updateAvailable, &window,
                      [&integrations, &window, checker](const QString& version, const QUrl& downloadPage) {
+                       const bool manual = std::exchange(integrations.manualCheck, false);
                        if (integrations.updateSupported && integrations.updateSupported() && checker->available()) {
+                         if (manual) {
+                           // Already downloaded: offer it again, even while
+                           // something plays (the link then says it waits).
+                           if (integrations.readyVersion && integrations.readyVersion() == version) {
+                             offerRestart(window, version);
+                             return;
+                           }
+                           callShell(window, "showMessage",
+                                     QCoreApplication::translate(
+                                         "Integrations",
+                                         "Version %1 is available. It is downloading; when it is ready, you can "
+                                         "restart and update.")
+                                         .arg(version));
+                         }
                          integrations.prepareUpdate(*checker->available());
                        } else {
                          showDownloadPage(window, version, downloadPage);
                        }
                      });
-    QObject::connect(checker, &integrations::UpdateChecker::checkFailed, checker,
-                     [](const QString& reason) { qCInfo(lcIntegrations) << "Update check failed:" << reason; });
-    checker->check();
+    QObject::connect(checker, &integrations::UpdateChecker::upToDate, &window, [&integrations, &window] {
+      if (!std::exchange(integrations.manualCheck, false)) return;
+      callShell(window, "showMessage",
+                QCoreApplication::translate("Integrations", "You have the latest version (%1).")
+                    .arg(QCoreApplication::applicationVersion()));
+    });
+    QObject::connect(checker, &integrations::UpdateChecker::checkFailed, &window,
+                     [&integrations, &window](const QString& reason) {
+                       qCInfo(lcIntegrations) << "Update check failed:" << reason;
+                       if (!std::exchange(integrations.manualCheck, false)) return;
+                       callShell(window, "showError",
+                                 QCoreApplication::translate(
+                                     "Integrations",
+                                     "Could not check for updates. Check the internet connection and try again."));
+                     });
+    // "Check for updates" in the settings, in the channel chosen now.
+    QObject::connect(&settings, &settings::Settings::actionTriggered, &window,
+                     [&integrations, &settings, &window, checker](const QString& key) {
+                       if (key != integrations::keys::CheckNow) return;
+                       integrations.manualCheck = true;
+                       if (checker->checking()) return;
+                       callShell(window, "showMessage",
+                                 QCoreApplication::translate("Integrations", "Checking for updates…"));
+                       checker->setChannel(integrations::updateChannel(
+                           settings.value(integrations::keys::UpdateChannel).toString()));
+                       checker->check();
+                     });
+    if (settings.value(integrations::keys::CheckForUpdates).toBool()) checker->check();
   }
 
 } // namespace jfd::desktop

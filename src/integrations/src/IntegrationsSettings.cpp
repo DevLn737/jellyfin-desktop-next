@@ -61,6 +61,15 @@ namespace jfd::integrations {
     };
     section.settings.append(channel);
 
+    settings::SettingDescriptor checkNow;
+    checkNow.key = key(keys::CheckNow);
+    checkNow.type = settings::SettingType::Action;
+    checkNow.label = QT_TRANSLATE_NOOP("IntegrationsSettings", "Check for updates");
+    checkNow.description = QT_TRANSLATE_NOOP(
+        "IntegrationsSettings",
+        "Looks for a newer version in the chosen channel now and says what it found.");
+    section.settings.append(checkNow);
+
     return registry.registerSection(section);
   }
 
