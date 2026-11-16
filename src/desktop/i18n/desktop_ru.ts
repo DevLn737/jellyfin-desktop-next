@@ -318,6 +318,22 @@
         <translation>Не удалось установить обновление.</translation>
     </message>
     <message>
+        <source>Version %1 is available. It is downloading; when it is ready, you can restart and update.</source>
+        <translation>Вышла версия %1. Она скачивается; когда будет готова, можно будет перезапустить и обновить.</translation>
+    </message>
+    <message>
+        <source>You have the latest version (%1).</source>
+        <translation>У вас последняя версия (%1).</translation>
+    </message>
+    <message>
+        <source>Could not check for updates. Check the internet connection and try again.</source>
+        <translation>Не удалось проверить обновления. Проверьте интернет и попробуйте ещё раз.</translation>
+    </message>
+    <message>
+        <source>Checking for updates…</source>
+        <translation>Проверяем обновления…</translation>
+    </message>
+    <message>
         <source>The update restarts the app, so it waits until playback ends and you are not in a group.</source>
         <translation>Обновление перезапускает приложение, поэтому ждёт конца просмотра и выхода из группы.</translation>
     </message>

@@ -53,8 +53,13 @@ namespace jfd::integrations {
     UpdateChecker(QNetworkAccessManager* network, QString currentVersion, UpdateChannel channel,
                   QUrl releasesUrl = defaultReleasesUrl(), QObject* parent = nullptr);
 
-    // One request; the result arrives as one of the signals.
+    // One request; the result arrives as one of the signals. While a request
+    // is under way another call does nothing: its result answers both.
     void check();
+    bool checking() const { return m_checking; }
+
+    // For the next check (the setting changed since the start).
+    void setChannel(UpdateChannel channel) { m_channel = channel; }
 
     // The release last reported by updateAvailable.
     const std::optional<Release>& available() const { return m_available; }
@@ -63,8 +68,9 @@ namespace jfd::integrations {
     // downloadPage: the release page on GitHub, where the files are.
     void updateAvailable(const QString& version, const QUrl& downloadPage);
     void upToDate();
-    // Network errors, no client release, unexpected answers. Not shown to
-    // the user; the next start tries again.
+    // Network errors, no client release, unexpected answers. Shown to the
+    // user only after "Check for updates" in the settings; at startup the
+    // next start tries again.
     void checkFailed(const QString& reason);
 
   private:
@@ -73,6 +79,7 @@ namespace jfd::integrations {
     UpdateChannel m_channel;
     QUrl m_url;
     std::optional<Release> m_available;
+    bool m_checking = false;
   };
 
 } // namespace jfd::integrations

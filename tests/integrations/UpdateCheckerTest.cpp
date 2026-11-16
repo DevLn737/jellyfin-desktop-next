@@ -179,3 +179,37 @@ TEST_CASE("Missing releases and unexpected answers are failures") {
   server.setHandler([](const HttpRequest&) { return jfd::test::json("not json"); });
   CHECK_FALSE(runCheck(server, QStringLiteral("0.1.0")).failure.isEmpty());
 }
+
+TEST_CASE("Checking again: one request at a time, in the channel set last") {
+  // "Check for updates" in the settings reuses the startup checker.
+  FakeServer server;
+  int requests = 0;
+  server.setHandler([&](const HttpRequest&) {
+    ++requests;
+    return releases({release(QStringLiteral("v0.2.0-beta.1"), true), release(QStringLiteral("v0.1.0"))});
+  });
+  QNetworkAccessManager network;
+  UpdateChecker checker(&network, QStringLiteral("0.1.0"), UpdateChannel::Beta,
+                        server.url(QStringLiteral("/repos/o/r/releases")));
+  int available = 0;
+  int upToDate = 0;
+  QObject::connect(&checker, &UpdateChecker::updateAvailable, [&] { ++available; });
+  QObject::connect(&checker, &UpdateChecker::upToDate, [&] { ++upToDate; });
+
+  checker.check();
+  CHECK(checker.checking());
+  checker.check();
+  REQUIRE(waitFor([&] { return available + upToDate > 0; }));
+  CHECK_FALSE(checker.checking());
+  CHECK(requests == 1);
+  CHECK(available == 1);
+  REQUIRE(checker.available());
+
+  checker.setChannel(UpdateChannel::Stable);
+  checker.check();
+  REQUIRE(waitFor([&] { return upToDate == 1; }));
+  CHECK(requests == 2);
+  CHECK(available == 1);
+  // Nothing newer any more: the old answer is not kept.
+  CHECK_FALSE(checker.available());
+}
