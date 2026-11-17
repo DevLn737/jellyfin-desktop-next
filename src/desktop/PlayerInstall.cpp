@@ -645,10 +645,10 @@ namespace jfd::desktop {
     if (services.libraryUi != nullptr) {
       services.libraryUi->setPlayHandler([&model, &navigator, &services](const QString& itemId, qint64 startTicks) {
         // In a group, Play starts the item for the group, as Web does: a
-        // file opened beside it would not follow the group's commands.
+        // file opened beside it would not follow the group's commands. The
+        // player shows once the group's item opens (installGroup).
         if (services.group != nullptr && services.group->inGroup()) {
           services.group->watchTogether(itemId, QString(), startTicks);
-          navigator.navigate(QStringLiteral("group"));
           return;
         }
         model.play(itemId, startTicks);

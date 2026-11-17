@@ -221,7 +221,7 @@ FocusScope {
                 // Not "the server has none": rooms playing what this user
                 // may not see are not listed to them.
                 description: root.rooms.canCreate
-                             ? qsTr("Rooms you can join show up here. Create one, or start one from a film or episode with “Watch together”.")
+                             ? qsTr("Rooms you can join show up here. Create one above, then press Play on any film or episode.")
                              : qsTr("Rooms you can join show up here when someone creates one.")
             }
 

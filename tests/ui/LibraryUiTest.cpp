@@ -74,10 +74,6 @@ TEST_CASE("Play goes to the player's handler, or says it is not available") {
   CHECK(played == QStringLiteral("item"));
   CHECK(at == 10);
   CHECK(messages.count() == 1);
-
-  CHECK_FALSE(ui.canWatchTogether());
-  ui.watchTogether(QStringLiteral("item"), QStringLiteral("Name"), 0);
-  CHECK(messages.count() == 2);
 }
 
 TEST_CASE("Without services the screens get no models") {

@@ -50,6 +50,10 @@ namespace jfd::session {
     Q_PROPERTY(int driftMs READ driftMs NOTIFY changed)
     // "", "speed" or "skip": how we are catching up right now.
     Q_PROPERTY(QString correction READ correction NOTIFY changed)
+    // Our round trip to the server in ms, -1 until measured. Only our own:
+    // the server does not share the other members' (GroupInfoDto and the
+    // group updates carry user names only).
+    Q_PROPERTY(int pingMs READ pingMs NOTIFY changed)
     // The group's queue: [{playlistItemId, itemId, name, current}].
     Q_PROPERTY(QVariantList queue READ queue NOTIFY queueChanged)
     // The user's SyncPlayAccess policy: "CreateAndJoinGroups", "JoinGroups"
@@ -78,6 +82,7 @@ namespace jfd::session {
     bool hasDrift() const { return m_group && m_group->driftMilliseconds.has_value(); }
     int driftMs() const;
     QString correction() const;
+    int pingMs() const;
     QVariantList queue() const;
     QString access() const { return m_access; }
     // None closes watching together altogether; JoinGroups only creating.
@@ -116,6 +121,9 @@ namespace jfd::session {
     void errorTextChanged();
     void rateSupportedChanged();
     void notice(const QString& text, bool error);
+    // The group moved to an item and this player is opening it, whoever
+    // started it (our Play, another member, Next).
+    void itemOpening();
 
   public:
     // What the room page says for a group update that refuses a request

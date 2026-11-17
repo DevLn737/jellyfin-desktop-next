@@ -402,21 +402,17 @@ namespace jfd::library {
   // --- Actions -------------------------------------------------------------
 
   void ItemDetails::play() {
-    if (m_target) Q_EMIT playRequested(m_target->id, 0, false);
+    if (m_target) Q_EMIT playRequested(m_target->id, 0);
   }
 
   void ItemDetails::resume() {
-    if (m_target) Q_EMIT playRequested(m_target->id, resumePositionTicks(), false);
-  }
-
-  void ItemDetails::watchTogether() {
-    if (m_target) Q_EMIT playRequested(m_target->id, resumePositionTicks(), true);
+    if (m_target) Q_EMIT playRequested(m_target->id, resumePositionTicks());
   }
 
   void ItemDetails::playEpisode(int row) {
     const auto* entry = m_episodes.entry(row);
     if (!entry) return;
-    Q_EMIT playRequested(entry->item.id, entry->item.userData.playbackPositionTicks, false);
+    Q_EMIT playRequested(entry->item.id, entry->item.userData.playbackPositionTicks);
   }
 
   void ItemDetails::toggleFavorite() {

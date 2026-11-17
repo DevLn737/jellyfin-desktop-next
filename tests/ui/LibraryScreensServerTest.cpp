@@ -1,6 +1,6 @@
 // The library screens against a real server, driven the way a user would:
 // type the address, sign in, open a library from the home page, a series
-// from the grid, an episode from the season, then Play and Watch together;
+// from the grid, an episode from the season, then Play;
 // search; sign out. Needs JFD_TEST_SERVER_URL, JFD_TEST_USER and
 // JFD_TEST_PASSWORD (scripts/test-server/stock-server.sh up).
 //
@@ -62,11 +62,6 @@ namespace {
       REQUIRE(screens->install(engine, *navigator));
       screens->ui()->setPlayHandler(
           [this](const QString& id, qint64 ticks) { played.append({id, ticks}); });
-      screens->ui()->setWatchTogetherHandler(
-          [this](const QString& id, const QString& name, qint64 ticks) {
-            together.append({id, ticks});
-            togetherName = name;
-          });
       navigator->reset(QStringLiteral("login"));
 
       engine.loadData(R"(
@@ -151,8 +146,6 @@ namespace {
     ui::Navigator* navigator = nullptr;
     QQuickWindow* window = nullptr;
     QList<QPair<QString, qint64>> played;
-    QList<QPair<QString, qint64>> together;
-    QString togetherName;
   };
 
 } // namespace
@@ -219,10 +212,9 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   CHECK_FALSE(screens.find("playTarget")->property("text").toString().isEmpty());
   screens.screenshot(QStringLiteral("series"));
 
-  // Watch together hands the series' next episode over.
-  Screens::click(screens.find("watchTogetherButton"));
-  REQUIRE(screens.together.size() == 1);
-  CHECK_FALSE(screens.togetherName.isEmpty());
+  // Rooms are made and joined on the watch-together page only: an item
+  // page has just Play, which plays in the room while in one.
+  CHECK(screens.find("watchTogetherButton") == nullptr);
 
   // An episode has no page: clicking its row plays it.
   QQuickItem* episodeRow = nullptr;

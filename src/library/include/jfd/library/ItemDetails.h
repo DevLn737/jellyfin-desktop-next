@@ -151,8 +151,6 @@ namespace jfd::library {
     Q_INVOKABLE void play();
     // Starts the play target from its resume point.
     Q_INVOKABLE void resume();
-    // Creates a SyncPlay group with the play target (the session decides).
-    Q_INVOKABLE void watchTogether();
     Q_INVOKABLE void playEpisode(int row);
     Q_INVOKABLE void toggleFavorite();
     Q_INVOKABLE void togglePlayed();
@@ -167,7 +165,7 @@ namespace jfd::library {
     void playTargetChanged();
     void seasonIdChanged();
     // `startPositionTicks` 0 starts from the beginning.
-    void playRequested(const QString& itemId, qint64 startPositionTicks, bool together);
+    void playRequested(const QString& itemId, qint64 startPositionTicks);
 
   private:
     void begin();

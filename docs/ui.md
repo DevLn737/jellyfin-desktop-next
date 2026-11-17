@@ -291,10 +291,11 @@ From QML, `Library` gives `signIn`, `home`, `search`,
 `routeFor(id, type)`. Cards load images through `image://jfd/`, which
 decodes at the card's `sourceSize` and keeps what Qt Quick holds under a
 video memory budget (192 MiB by default; over it, new images come at half
-size). Play and Watch together on the item page call the handlers set with
-`AppServices::libraryUi->setPlayHandler(...)` and
-`setWatchTogetherHandler(...)`; without one the page says the feature is not
-available yet.
+size). Play on the item page calls the handler set with
+`AppServices::libraryUi->setPlayHandler(...)`; without one the page says the
+feature is not available yet. In a room the handler starts the item for the
+room (there is no separate Watch together button: rooms are made and joined
+on the `group` page only).
 
 Libraries remember their sort, watched state, favorites, genres (several at
 once; an item matches any of them), year and, for movie libraries, whether
@@ -511,8 +512,16 @@ the owner decides on "Rooms") is `GroupPage`, which shows one of two pages:
   rooms whose queue holds something the user may not see), "No connection"
   while `Library.online` is false, a refusal from the server in words above
   the list.
-- `RoomPage` in a room: the former group screen (members, speed for
-  everyone, queue, how well we keep up, Leave room).
+- `RoomPage` in a room: the former group screen (members, our own delay to
+  the server, the speed for everyone as text (anyone changes it in the
+  player), queue, how well we keep up, Open the player, Leave room).
+
+Whenever the room moves to an item (our Play, another member's, Next),
+`GroupModel::itemOpening` fires and `installGroup` shows the player (not
+over the picture-in-picture window). The server shares no other member's
+delay or position with a non-admin (`GroupInfoDto` has names only, and
+`GET /Sessions` returns only the user's own sessions), so the room shows
+only ours.
 
 Both read the session's `GroupModel` (QML `GroupSession`) and `RoomsModel`
 (QML `RoomsSession`, `src/session`). `RoomsModel` is the list: it asks for
@@ -528,8 +537,8 @@ The user's `SyncPlayAccess` (from `Users/Me`, asked again after each sign-in):
 | Access | What the app offers |
 | --- | --- |
 | `CreateAndJoinGroups` (or unknown) | everything |
-| `JoinGroups` | the rooms and Join; no Create room, no Watch together on item pages outside a room |
-| `None` | no tab and no Watch together: `Navigator.setRouteClosed("group")` hides the entry, drops Ctrl+K's "Open Watch together" and refuses the route from anywhere (a command from a second start, the phone); the phone's Play in a group plays nothing in one |
+| `JoinGroups` | the rooms and Join; no Create room |
+| `None` | no tab: `Navigator.setRouteClosed("group")` hides the entry, drops Ctrl+K's "Open Watch together" and refuses the route from anywhere (a command from a second start, the phone); the phone's Play in a group plays nothing in one |
 
 On stock 12.2 a room has only a name, a state and its members' names, so the
 card shows those; marks for a member limit, a password or an invitation, and

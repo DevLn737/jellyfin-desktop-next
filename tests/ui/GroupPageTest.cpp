@@ -142,20 +142,22 @@ TEST_CASE("The group page creates a group, changes its speed, leaves and joins a
   CHECK(model.groupName() == QStringLiteral("jfd-group-page"));
   CHECK_FALSE(shown(page, "createButton"));
 
-  // Speed: offered and applied on the fork, hidden on stock 12.2.
-  QQuickItem* rateBox = find(page, "rateBox");
-  REQUIRE(rateBox != nullptr);
+  // Speed: changed in the player by anyone in the room (here through the
+  // model, as the player does); the room only shows it, on the fork.
+  QQuickItem* rateText = find(page, "rateText");
+  REQUIRE(rateText != nullptr);
+  CHECK(find(page, "rateBox") == nullptr);
   if (forkServer()) {
-    REQUIRE(waitFor([&] { return rateBox->isVisible(); }, 5000));
-    const QVariantList rates = find(page, "roomPage")->property("rates").toList();
-    const int index = int(rates.indexOf(QVariant(1.5)));
-    REQUIRE(index >= 0);
-    rateBox->setProperty("currentIndex", index);
-    QMetaObject::invokeMethod(rateBox, "activated", Q_ARG(int, index));
+    REQUIRE(waitFor([&] { return rateText->isVisible(); }, 5000));
+    model.setRate(1.5);
     REQUIRE(waitFor([&] { return model.rate() == doctest::Approx(1.5); }, 20000));
+    CHECK(rateText->property("text").toString().contains(QStringLiteral("1.5")));
   } else {
-    CHECK_FALSE(rateBox->isVisible());
+    CHECK_FALSE(rateText->isVisible());
   }
+
+  // Our own delay to the server shows once the clock is measured.
+  REQUIRE(waitFor([&] { return model.pingMs() >= 0 && shown(page, "pingText"); }, 20000));
 
   click(find(page, "leaveButton"));
   REQUIRE(waitFor([&] { return !model.inGroup() && shown(page, "createButton"); }, 20000));

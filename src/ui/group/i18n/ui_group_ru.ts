@@ -62,12 +62,24 @@
         <translation>Синхронно (%1 мс)</translation>
     </message>
     <message>
-        <source>Speed for everyone</source>
-        <translation>Скорость для всех</translation>
+        <source>Speed for everyone: %1</source>
+        <translation>Скорость для всех: %1</translation>
+    </message>
+    <message>
+        <source>Nothing queued. Press Play on any film or episode and it starts for everyone in the room.</source>
+        <translation>Очередь пуста. Нажмите «Смотреть» на любом фильме или серии, и он запустится у всех в комнате.</translation>
+    </message>
+    <message>
+        <source>Open the player</source>
+        <translation>Открыть плеер</translation>
     </message>
     <message>
         <source>Members (%1)</source>
         <translation>Участники (%1)</translation>
+    </message>
+    <message>
+        <source>Your delay to the server: %1 ms</source>
+        <translation>Ваша задержка до сервера: %1 мс</translation>
     </message>
     <message>
         <source>Queue</source>
@@ -80,10 +92,6 @@
     <message>
         <source>Loading…</source>
         <translation>Загрузка…</translation>
-    </message>
-    <message>
-        <source>Nothing queued. Start a film or episode with “Watch together” and everyone in the room gets it.</source>
-        <translation>Очередь пуста. Начните фильм или серию кнопкой «Смотреть вместе» — и она запустится у всех в комнате.</translation>
     </message>
     <message>
         <source>Leave room</source>
@@ -145,8 +153,8 @@
         <translation>Сейчас комнат нет</translation>
     </message>
     <message>
-        <source>Rooms you can join show up here. Create one, or start one from a film or episode with “Watch together”.</source>
-        <translation>Здесь появляются комнаты, в которые можно войти. Создайте свою или начните с фильма или серии кнопкой «Смотреть вместе».</translation>
+        <source>Rooms you can join show up here. Create one above, then press Play on any film or episode.</source>
+        <translation>Здесь появляются комнаты, в которые можно войти. Создайте свою выше, затем нажмите «Смотреть» на любом фильме или серии.</translation>
     </message>
     <message>
         <source>Rooms you can join show up here when someone creates one.</source>

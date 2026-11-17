@@ -40,11 +40,6 @@ namespace jfd::ui {
     Q_EMIT handlersChanged();
   }
 
-  void LibraryUi::setWatchTogetherHandler(WatchTogetherHandler handler) {
-    m_watchTogether = std::move(handler);
-    Q_EMIT handlersChanged();
-  }
-
   void LibraryUi::setTrackHandler(TrackHandler handler) {
     m_track = std::move(handler);
     Q_EMIT handlersChanged();
@@ -173,13 +168,7 @@ namespace jfd::ui {
     details->setUpdates(m_services.updates);
     details->setCollectionIndex(m_services.collections);
     connect(details, &library::ItemDetails::playRequested, this,
-            [this, details](const QString& id, qint64 startTicks, bool together) {
-              if (together) {
-                watchTogether(id, details->name(), startTicks);
-              } else {
-                play(id, startTicks);
-              }
-            });
+            [this](const QString& id, qint64 startTicks) { play(id, startTicks); });
     details->setItemId(itemId);
     return details;
   }
@@ -284,17 +273,6 @@ namespace jfd::ui {
       return;
     }
     m_channel(channelId);
-  }
-
-  void LibraryUi::watchTogether(const QString& itemId, const QString& name,
-                                qint64 startPositionTicks) {
-    if (itemId.isEmpty()) return;
-    if (!m_watchTogether) {
-      qCInfo(lcLibraryUi) << "Watch together" << itemId << "with no group module installed";
-      Q_EMIT message(tr("Watching together is not available in this build yet."), false);
-      return;
-    }
-    m_watchTogether(itemId, name, startPositionTicks);
   }
 
   void LibraryUi::playTrack(const QString& trackId, const QString& albumId, bool confirmed) {

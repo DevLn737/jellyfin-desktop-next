@@ -214,6 +214,8 @@ namespace jfd::core {
     // Whether m_offset was measured since the last ClockLost. A session
     // starts without one: server time is unknown until the first ClockSynced.
     bool m_clockSynced = false;
+    // The round trip to the server of the latest ClockSynced, while synced.
+    std::optional<WallTicks> m_roundTrip;
     PlaybackRate m_personalRate = PlaybackRate::normal();
     PlaybackPhase m_endPhase = PlaybackPhase::Idle;
     std::string m_error;
