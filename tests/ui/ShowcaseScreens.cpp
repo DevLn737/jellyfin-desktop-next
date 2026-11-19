@@ -42,6 +42,7 @@
 #include <QQuickWindow>
 #include <QRadialGradient>
 #include <QRandomGenerator>
+#include <QTest>
 #include <QTemporaryDir>
 #include <QTranslator>
 #include <QtQml/qqmlextensionplugin.h>
@@ -720,7 +721,11 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   show.resize(1280, 800);
   hero->setProperty("current", 0);
 
-  // It goes on to the next item by itself.
+  // It goes on to the next item by itself (only while the app is active).
+  show.window->requestActivate();
+  REQUIRE(QTest::qWaitForWindowActive(show.window));
+  REQUIRE(waitFor([] { return QGuiApplication::applicationState() == Qt::ApplicationActive; }, Timeout));
+  CHECK_FALSE(hero->property("activeFocus").toBool());
   hero->setProperty("interval", 200);
   CHECK(waitFor([&] { return hero->property("current").toInt() == 1; }, Timeout));
   hero->setProperty("interval", 8000);
