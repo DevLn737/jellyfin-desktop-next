@@ -228,6 +228,17 @@ namespace jfd::ui {
       return nullptr;
     }
 
+    // A control focused by a key shows it (visualFocus) whatever moved the
+    // focus there: a ListView moving its current item by its own keys gives
+    // the delegate the focus for no particular reason.
+    void showAsKeyFocus(QQuickItem* item) {
+      const QVariant reason = item->property("focusReason");
+      if (!reason.isValid()) return;
+      const int value = reason.toInt();
+      if (value == Qt::TabFocusReason || value == Qt::BacktabFocusReason || value == Qt::ShortcutFocusReason) return;
+      item->setProperty("focusReason", int(Qt::TabFocusReason));
+    }
+
     QPointF centreIn(QQuickItem* item, QQuickItem* reference) {
       return item->mapToItem(reference, QPointF(item->width() / 2, item->height() / 2));
     }
@@ -402,12 +413,67 @@ namespace jfd::ui {
 
   void SpatialNavigation::onFocusChanged() {
     // Only for keys: a click focuses what is already in view.
-    if (!m_enabled || !m_fromKeys || !m_window) return;
+    if (!m_enabled || !m_fromKeys || !m_window || m_aligning) return;
     QQuickItem* focused = m_window->activeFocusItem();
     QQuickItem* scope = item();
     if (!focused || !scope || !scope->isAncestorOf(focused)) return;
+    if (alignInRow(focused)) return;
+    showAsKeyFocus(focused);
     followInViews(focused);
     reveal(focused);
+  }
+
+  bool SpatialNavigation::alignInRow(QQuickItem* focused) {
+    if (!m_keyDirection || (*m_keyDirection != Up && *m_keyDirection != Down) || !m_keyOrigin ||
+        m_keyOrigin == focused)
+      return false;
+    // The innermost horizontal ListView around the new focus, which the old
+    // one was not in.
+    QQuickItem* row = nullptr;
+    for (QQuickItem* node = focused->parentItem(); node; node = node->parentItem()) {
+      if (node->inherits("QQuickListView") && node->property("orientation").toInt() == Qt::Horizontal) {
+        row = node;
+        break;
+      }
+    }
+    if (!row || row->isAncestorOf(m_keyOrigin) || row->property("enterAtCurrent").toBool()) return false;
+    QQuickItem* content = contentItemOf(row);
+    if (!content) return false;
+    // Its visible delegate nearest across to where the focus was.
+    const QRectF visible = sceneRect(row);
+    const double x = m_keyOriginRect.center().x();
+    QQuickItem* best = nullptr;
+    double bestDistance = std::numeric_limits<double>::max();
+    QQuickItem* current = nullptr;
+    const QList<QQuickItem*> delegates = content->childItems();
+    for (QQuickItem* delegate : delegates) {
+      if (!delegate->isVisible() || !delegate->isEnabled() || delegate->width() <= 0) continue;
+      const QRectF rect = sceneRect(delegate);
+      if (!rect.intersects(visible)) continue;
+      if (delegate == focused || delegate->isAncestorOf(focused)) current = delegate;
+      const double distance = rect.left() <= x && x <= rect.right() ? 0.0
+                              : std::min(std::abs(rect.left() - x), std::abs(rect.right() - x));
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = delegate;
+      }
+    }
+    if (!best || best == current) return false;
+    const int index = delegateIndex(row, best);
+    if (index < 0) return false;
+    m_aligning = true;
+    row->setProperty("currentIndex", index);
+    QQuickItem* target = qvariant_cast<QQuickItem*>(row->property("currentItem"));
+    if (target) {
+      followInViews(target);
+      target->forceActiveFocus(Qt::TabFocusReason);
+    }
+    m_aligning = false;
+    if (QQuickItem* now = m_window ? m_window->activeFocusItem() : nullptr) {
+      showAsKeyFocus(now);
+      reveal(now);
+    }
+    return true;
   }
 
   bool SpatialNavigation::handleKey(QKeyEvent* event, bool fromWindow) {
@@ -444,8 +510,19 @@ namespace jfd::ui {
     const bool fromWindow = watched == m_window;
     switch (event->type()) {
     case QEvent::KeyPress:
-      if (fromWindow) m_fromKeys = true;
+      if (fromWindow) {
+        m_fromKeys = true;
+        Direction direction = Left;
+        const int key = static_cast<QKeyEvent*>(event)->key();
+        m_keyDirection = directionOfKey(key, &direction) ? std::optional<Direction>(direction) : std::nullopt;
+        m_keyOrigin = m_window ? m_window->activeFocusItem() : nullptr;
+        m_keyOriginRect = m_keyOrigin ? sceneRect(m_keyOrigin) : QRectF();
+      }
       return handleKey(static_cast<QKeyEvent*>(event), fromWindow);
+    case QEvent::KeyRelease:
+      // A later focus change (a page loading) is not this key's.
+      if (fromWindow) m_keyDirection.reset();
+      return false;
     case QEvent::MouseButtonPress:
     case QEvent::TouchBegin:
       if (fromWindow) m_fromKeys = false;

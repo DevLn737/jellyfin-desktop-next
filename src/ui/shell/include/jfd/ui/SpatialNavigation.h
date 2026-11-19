@@ -6,6 +6,8 @@
 #include <QRectF>
 #include <qqmlintegration.h>
 
+#include <optional>
+
 // Arrow keys move the focus to the nearest focusable item in that direction,
 // so a screen works with arrows, Enter and Back alone (a TV remote, a
 // gamepad through InputRouter, a keyboard). Attached to the item whose
@@ -28,6 +30,14 @@
 // there; when it lands outside the visible part of a Flickable, the
 // Flickable scrolls to it. Delegates a view has not created are reached
 // through the view's own keys, not by geometry.
+//
+// Focus that a key moved shows as keyboard focus (visualFocus, the focus
+// ring), even when a view's own key handling moved it, which Qt reports as
+// no particular reason. Up or Down into a horizontal ListView from outside
+// it (a row of cards under another) lands on its card nearest across, not
+// on the card the row remembered from before, so the focus goes straight
+// down or up the screen. A list where its current entry matters more (tabs)
+// says so with a true `enterAtCurrent` property.
 //
 // A control that has to keep some arrows from its own key handling (a
 // drop-down list, whose Up and Down would change the value) names them in a
@@ -92,12 +102,21 @@ namespace jfd::ui {
     QQuickItem* item() const;
     void attachToWindow();
     void onFocusChanged();
+    // After a vertical key: the card of the row the focus entered nearest
+    // to where the focus was (see above); true when it moved the focus.
+    bool alignInRow(QQuickItem* focused);
     bool handleKey(QKeyEvent* event, bool fromWindow);
 
     bool m_enabled = false;
     // The last input was a key (not a click or a touch).
     bool m_fromKeys = false;
     QPointer<QQuickWindow> m_window;
+    // The item focused when the last key came, its place then, and the
+    // key's direction (none for other keys).
+    QPointer<QQuickItem> m_keyOrigin;
+    QRectF m_keyOriginRect;
+    std::optional<Direction> m_keyDirection;
+    bool m_aligning = false;
     QMetaObject::Connection m_focusConnection;
   };
 

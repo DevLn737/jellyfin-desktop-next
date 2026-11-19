@@ -3,16 +3,17 @@ import QtQuick.Templates as T
 import Jfd.Ui.Theme
 
 // A drop-down list. The model is a list of { value, label } objects;
-// `currentValue` is the chosen value. Up/Down change it when focused;
-// Enter opens the list, where Up/Down and Enter choose. In TV mode Up and
-// Down move the focus on to the next control instead (a column of settings
-// would otherwise be a trap), so the list is opened with Enter.
+// `currentValue` is the chosen value. Up and Down move the focus on to the
+// control above or below (a column of settings would otherwise be a trap
+// for arrows and a gamepad, and passing over a setting would change it);
+// Enter (the gamepad's A) opens the list, where Up/Down and Enter choose
+// and Escape (B) closes it without a change.
 T.ComboBox {
     id: control
     // Colours of the nearest colour scope (the video player has its own).
     readonly property var colors: Theme.colorsFor(control)
     // The arrows the shell's SpatialNavigation takes before this control.
-    readonly property var navigationKeys: Theme.tvMode && !popup.visible ? [Qt.Key_Up, Qt.Key_Down] : []
+    readonly property var navigationKeys: !popup.visible ? [Qt.Key_Up, Qt.Key_Down] : []
 
     // Enter opened the list: its release must not choose at once.
     property bool openedByEnter: false
