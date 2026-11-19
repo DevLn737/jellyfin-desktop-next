@@ -102,7 +102,7 @@ QtObject {
     readonly property int spacingHuge: 32
     readonly property int radius: radiusOverride
     readonly property int radiusSmall: Math.max(1, Math.round(radiusOverride / 2))
-    readonly property int focusRingWidth: tvMode ? 4 : 2
+    readonly property int focusRingWidth: tvMode ? 4 : 3
     // Larger corners for panels and menus ("Depth" uses 10 px and 14 px).
     readonly property int radiusLarge: Math.round(radiusOverride * 1.4)
     // Elevation: popups get one light shadow; flat panels get none.

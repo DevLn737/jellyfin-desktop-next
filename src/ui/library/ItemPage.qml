@@ -664,6 +664,9 @@ RoutePage {
             ListView {
                 id: seasons
                 objectName: "seasonTabs"
+                // Up or Down into the tabs lands on the chosen season
+                // (SpatialNavigation), not on the tab nearest across.
+                readonly property bool enterAtCurrent: true
                 width: parent.width
                 height: Theme.controlHeight
                 visible: page.isSeries && count > 0
