@@ -42,6 +42,7 @@
 #include <QQuickWindow>
 #include <QRadialGradient>
 #include <QRandomGenerator>
+#include <QTest>
 #include <QTemporaryDir>
 #include <QTranslator>
 #include <QtQml/qqmlextensionplugin.h>
@@ -676,11 +677,23 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   CHECK(first->item.id == episodeId(QStringLiteral("s1"), 1, 3));
   CHECK_FALSE(first->backdropUrl.isEmpty());
   CHECK(first->logoUrl.toString().contains(QStringLiteral("Items/s1/Images/Logo")));
-  // The film in progress is not the first item, and a series is not there
-  // twice.
+  // Then the film in progress and one next episode, then new items nobody
+  // started; a series is not there twice.
   QStringList ids;
-  for (int i = 0; i < home.featured()->count(); ++i) ids.append(home.featured()->entry(i)->item.id);
+  QStringList reasons;
+  for (int i = 0; i < home.featured()->count(); ++i) {
+    ids.append(home.featured()->entry(i)->item.id);
+    reasons.append(home.featured()->entry(i)->featuredReason);
+  }
+  CHECK(ids.at(1) == QStringLiteral("m1"));
+  CHECK(reasons == QStringList{QStringLiteral("resume"), QStringLiteral("resume"), QStringLiteral("nextUp"),
+                               QStringLiteral("latest"), QStringLiteral("latest")});
   CHECK_FALSE(ids.contains(QStringLiteral("s1")));
+  for (int i = 3; i < home.featured()->count(); ++i) {
+    const auto& data = home.featured()->entry(i)->item.userData;
+    CHECK_FALSE(data.played);
+    CHECK(data.playbackPositionTicks == 0);
+  }
 
   REQUIRE(waitFor([&] { return show.find("homeHero") != nullptr && show.find("homeHero")->property("count").toInt() == 5; }, Timeout));
   QObject* hero = show.find("homeHero");
@@ -706,6 +719,16 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   show.resize(860, 700);
   show.screenshot(QStringLiteral("home-860"));
   show.resize(1280, 800);
+  hero->setProperty("current", 0);
+
+  // It goes on to the next item by itself (only while the app is active).
+  show.window->requestActivate();
+  REQUIRE(QTest::qWaitForWindowActive(show.window));
+  REQUIRE(waitFor([] { return QGuiApplication::applicationState() == Qt::ApplicationActive; }, Timeout));
+  CHECK_FALSE(hero->property("activeFocus").toBool());
+  hero->setProperty("interval", 200);
+  CHECK(waitFor([&] { return hero->property("current").toInt() == 1; }, Timeout));
+  hero->setProperty("interval", 8000);
   hero->setProperty("current", 0);
 
   // A card's quick actions show on focus; the Menu key opens its menu.

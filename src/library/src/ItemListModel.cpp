@@ -102,6 +102,8 @@ namespace jfd::library {
       return item.childCount ? QVariant(*item.childCount) : QVariant();
     case LogoUrlRole:
       return e->logoUrl;
+    case FeaturedReasonRole:
+      return e->featuredReason;
     default:
       return {};
     }
@@ -134,7 +136,8 @@ namespace jfd::library {
             {OfficialRatingRole, "officialRating"},
             {BackdropUrlRole, "backdropUrl"},
             {LogoUrlRole, "logoUrl"},
-            {ChildCountRole, "childCount"}};
+            {ChildCountRole, "childCount"},
+            {FeaturedReasonRole, "featuredReason"}};
   }
 
   const ItemListModel::Entry* ItemListModel::entry(int row) const {

@@ -461,16 +461,16 @@
         <translation>Рекомендуем</translation>
     </message>
     <message>
-        <source>Continue</source>
-        <translation>Продолжить</translation>
+        <source>Continue watching</source>
+        <translation>Продолжить просмотр</translation>
     </message>
     <message>
-        <source>Next up</source>
+        <source>Next episode</source>
         <translation>Следующая серия</translation>
     </message>
     <message>
-        <source>Recently added</source>
-        <translation>Недавно добавлено</translation>
+        <source>New</source>
+        <translation>Новинка</translation>
     </message>
     <message>
         <source>Resume from %1</source>
