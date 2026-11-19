@@ -235,6 +235,13 @@ namespace jfd::ui {
     // (image://jfd/...) and x, y, width, height the thumbnail inside it.
     // Empty without trickplay.
     Q_INVOKABLE QVariantMap trickplayFrame(double seconds) const;
+    // What the player's statistics overlay shows, read from mpv now:
+    // method (the server's play method), container, videoCodec, width,
+    // height, fps, displayFps, hwdec, droppedFrames, videoBitrate,
+    // audioCodec, channels, sampleRate, audioBitrate (bits per second),
+    // cacheSeconds, cacheSpeed (bytes per second) and speed. A value mpv
+    // does not know (yet) is left out. Empty with nothing playing.
+    Q_INVOKABLE QVariantMap stats() const;
 
     // The display's refresh rate follows the video (docs/display-refresh-
     // rate.md): with a switcher set and the switch on, a video opened while

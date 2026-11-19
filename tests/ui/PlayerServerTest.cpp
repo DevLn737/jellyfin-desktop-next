@@ -282,6 +282,11 @@ TEST_CASE("A lower quality reopens the file as a transcode at the same position,
   REQUIRE(waitFor([&] { return p.model->playMethod() == QStringLiteral("Transcode") && !p.model->loading(); }, 60000));
   CHECK(p.model->paused());
   CHECK(std::abs(p.model->position() - before) < 1.0);
+  // The statistics say why: the server's reasons from its transcoding URL.
+  const QVariantMap stats = p.model->stats();
+  CHECK(stats.value(QStringLiteral("method")).toString() == QStringLiteral("Transcode"));
+  CHECK_MESSAGE(stats.value(QStringLiteral("transcodeReasons")).toString().contains(QStringLiteral("Bitrate")),
+                stats.value(QStringLiteral("transcodeReasons")).toString().toStdString());
   CHECK(waitFor(
       [&] {
         return p.serverSession().value(QStringLiteral("PlayState")).toObject().value(QStringLiteral("PlayMethod")).toString() ==
