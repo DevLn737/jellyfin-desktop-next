@@ -148,6 +148,7 @@ Rectangle {
                 delegate: T.AbstractButton {
                     id: tab
                     required property int modelData
+                    objectName: "seasonTab_" + modelData
                     readonly property bool selected: modelData === panel.season
                     height: tabs.height
                     implicitWidth: tabText.implicitWidth

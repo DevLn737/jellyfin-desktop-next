@@ -314,10 +314,7 @@ TEST_CASE("The episodes panel shows each episode's still, the watched check and 
 
   // The second season's tab: its episodes, the first half seen.
   QQuickItem* second = nullptr;
-  for (QQuickItem* item : tabs->property("contentItem").value<QQuickItem*>()->childItems()) {
-    if (item->property("modelData").toInt() == 2) second = item;
-  }
-  REQUIRE(second != nullptr);
+  REQUIRE(waitFor([&] { return (second = find(f.page, "seasonTab_2")) != nullptr; }, 2000));
   QMetaObject::invokeMethod(second, "clicked");
   REQUIRE(waitFor([&] { return visible(f.page, "episodeProgress") == 1; }, 2000));
   CHECK(visible(f.page, "episodeRow") == 2);
