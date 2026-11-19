@@ -27,6 +27,11 @@ namespace jfd::playback {
       std::function<void(const command::Reopen&)> reopen;
       // The Jellyfin stream indices now selected, for PlaybackReporter::setTracks.
       std::function<void(std::optional<int> audio, std::optional<int> subtitle)> selectionChanged;
+      // TrackTable::loading changed for a type.
+      std::function<void()> loadingChanged;
+      // An external file the viewer chose could not be loaded, after every
+      // attempt (it is then left out of the menus).
+      std::function<void(TrackKind kind)> loadFailed;
     };
 
     explicit TrackController(Callbacks callbacks);
@@ -55,6 +60,8 @@ namespace jfd::playback {
     void run(std::vector<Command> commands);
 
     using Selection = std::pair<std::optional<int>, std::optional<int>>;
+    using Loading = std::pair<bool, bool>;
+    Loading m_loading{false, false};
 
     Callbacks m_callbacks;
     std::optional<core::MediaEpoch> m_epoch;

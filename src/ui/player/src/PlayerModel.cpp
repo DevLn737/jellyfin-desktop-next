@@ -103,6 +103,12 @@ namespace jfd::ui {
               m_reporter.setTracks(audio, subtitle);
               Q_EMIT tracksChanged();
             },
+            [this] { Q_EMIT tracksChanged(); },
+            [this](TrackKind kind) {
+              qCInfo(lcPlayer) << "external" << (kind == TrackKind::Audio ? "audio" : "subtitles")
+                               << "could not be loaded";
+              Q_EMIT trackLoadFailed(kind == TrackKind::Subtitle);
+            },
         }),
         m_skipper([&runtime](core::SessionInput input) { runtime.post(std::move(input)); }),
         m_liveTv(client) {
@@ -152,7 +158,7 @@ namespace jfd::ui {
   bool PlayerModel::paused() const { return m_snapshot.phase == PlaybackPhase::Paused; }
 
   bool PlayerModel::loading() const {
-    return m_waitingPlay || m_waitingDisplay || m_snapshot.phase == PlaybackPhase::Loading ||
+    return m_waitingPlay || m_waitingOpen || m_waitingDisplay || m_snapshot.phase == PlaybackPhase::Loading ||
            m_snapshot.phase == PlaybackPhase::Buffering;
   }
 
@@ -374,6 +380,7 @@ namespace jfd::ui {
   // is not the video player's to stop.
   void PlayerModel::stop() {
     m_waitingPlay.reset();
+    m_waitingOpen = nullptr;
     m_runtime.launcher().cancel();
     restoreDisplay();
     if (m_current) m_runtime.post(core::intent::Stop{});
@@ -430,8 +437,18 @@ namespace jfd::ui {
     setWaitingDisplay(false);
   }
 
-  void PlayerModel::beforeOpen(const session::PlaybackLauncher::Request&, const api::Item& item,
+  void PlayerModel::beforeOpen(const session::PlaybackLauncher::Request& request, const api::Item& item,
                                const api::MediaSource& source, std::function<void()> open) {
+    // mpv opens its video output only once the render context exists: a
+    // video opened before the player page first showed (a room's item,
+    // opened as the page appears) would stay black and without subtitles.
+    // play() waits on its own; this catches the opens it does not start.
+    if (m_player && !m_videoReady && item.mediaType != QLatin1String("Audio")) {
+      m_waitingOpen = [this, request, item, source, open = std::move(open)]() mutable {
+        beforeOpen(request, item, source, std::move(open));
+      };
+      return;
+    }
     const std::optional<double> frameRate = videoFrameRate(source);
     const std::optional<QString> screen = fullscreenScreen();
     if (!m_displayModes || !m_refreshRateSwitch || item.mediaType == QLatin1String("Audio") || !frameRate ||
@@ -515,6 +532,7 @@ namespace jfd::ui {
       m_videoSuspended = false;
       m_player->setStringProperty("vid", "auto");
     }
+    if (auto waiting = std::exchange(m_waitingOpen, nullptr)) waiting();
     if (auto waiting = std::exchange(m_waitingPlay, std::nullopt))
       m_runtime.play(waiting->first, waiting->second);
   }

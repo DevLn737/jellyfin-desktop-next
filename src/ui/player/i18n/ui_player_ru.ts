@@ -118,6 +118,14 @@
         <translation>Реклама</translation>
     </message>
     <message>
+        <source>Loading subtitles from the server…</source>
+        <translation>Субтитры загружаются с сервера…</translation>
+    </message>
+    <message>
+        <source>The server could not give these subtitles</source>
+        <translation>Сервер не смог отдать эти субтитры</translation>
+    </message>
+    <message>
         <source>Play</source>
         <translation>Воспроизвести</translation>
     </message>
