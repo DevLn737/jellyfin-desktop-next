@@ -16,6 +16,7 @@ namespace jfd::playback {
     m_pending.clear();
     m_added = 0;
     m_reported.reset();
+    m_loading = {false, false};
     run(m_table.selectInitial(audioStreamIndex, subtitleStreamIndex));
   }
 
@@ -35,6 +36,11 @@ namespace jfd::playback {
         if (m_callbacks.reopen) m_callbacks.reopen(*reopen);
       }
     }
+    const Loading loading{m_table.loading(TrackKind::Audio), m_table.loading(TrackKind::Subtitle)};
+    if (loading != m_loading) {
+      m_loading = loading;
+      if (m_callbacks.loadingChanged) m_callbacks.loadingChanged();
+    }
     const Selection now{m_table.selected(TrackKind::Audio), m_table.selected(TrackKind::Subtitle)};
     if (now == m_reported) return;
     m_reported = now;
@@ -53,8 +59,17 @@ namespace jfd::playback {
       answers.emplace_back(add.key, state.status == Status::Added ? state.trackId : std::nullopt);
       return true;
     });
-    for (const auto& [key, trackId] : answers)
-      run(trackId ? m_table.trackAdded(key, *trackId) : m_table.trackFailed(key));
+    for (const auto& [key, trackId] : answers) {
+      if (trackId) {
+        run(m_table.trackAdded(key, *trackId));
+        continue;
+      }
+      const auto kind = m_table.pendingKind(key);
+      const auto wanted = kind ? m_table.selected(*kind) : std::nullopt;
+      run(m_table.trackFailed(key));
+      // Given up on the track the viewer wanted: it is gone from the menu.
+      if (kind && wanted && m_table.failed(*wanted) && m_callbacks.loadFailed) m_callbacks.loadFailed(*kind);
+    }
   }
 
 } // namespace jfd::playback

@@ -409,6 +409,45 @@ RoutePage {
         wrapMode: Text.Wrap
     }
 
+    // External subtitles the server is still preparing, or could not give:
+    // said near the top, where subtitles do not go.
+    Rectangle {
+        id: trackStatus
+        objectName: "trackStatus"
+        property bool failedShown: false
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Theme.controlHeight + 2 * Theme.spacingLarge
+        visible: page.player.subtitleLoading || failedShown
+        width: trackStatusText.implicitWidth + 2 * Theme.spacingLarge
+        height: trackStatusText.implicitHeight + Theme.spacing
+        radius: height / 2
+        color: Overlay.background
+        Text {
+            id: trackStatusText
+            objectName: "trackStatusText"
+            anchors.centerIn: parent
+            text: page.player.subtitleLoading ? qsTr("Loading subtitles from the server…")
+                                              : qsTr("The server could not give these subtitles")
+            color: Overlay.text
+            font.pixelSize: Theme.fontSizeBody
+        }
+        Timer {
+            id: failedTimer
+            interval: 6000
+            onTriggered: trackStatus.failedShown = false
+        }
+        Connections {
+            target: page.player
+            function onTrackLoadFailed(subtitles) {
+                if (!subtitles)
+                    return
+                trackStatus.failedShown = true
+                failedTimer.restart()
+            }
+        }
+    }
+
     // Top bar.
     Rectangle {
         id: topBar

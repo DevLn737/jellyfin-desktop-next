@@ -76,7 +76,10 @@ namespace {
 
     // `stand`: the environment prefix, JFD_TEST (stock-server.sh) or
     // JFD_EXTRAS (extras-server.sh).
-    Player(const QString& device, const DeviceProfileOptions& profile, const QString& stand = QStringLiteral("JFD_TEST"))
+    // `withVideo`: the model drives mpv as the app's does, and so waits for
+    // a video item (none is ever attached here) before mpv opens a video.
+    Player(const QString& device, const DeviceProfileOptions& profile, const QString& stand = QStringLiteral("JFD_TEST"),
+           bool withVideo = false)
         : deviceId(device) {
       client = std::make_unique<JellyfinClient>(ClientIdentity{
           QStringLiteral("Jellyfin Desktop Next Tests"), QStringLiteral("0.0.1"), QStringLiteral("CI ") + device, device});
@@ -104,7 +107,7 @@ namespace {
           },
           std::move(settings));
       // No video item: mpv renders nothing, so the model need not wait for one.
-      model = std::make_unique<ui::PlayerModel>(*runtime, *client, nullptr);
+      model = std::make_unique<ui::PlayerModel>(*runtime, *client, withVideo ? &mpv : nullptr);
     }
 
     ~Player() {
@@ -755,4 +758,33 @@ TEST_CASE("Alone in a group, the player's pause pauses the video and Play goes o
 
   p.model->togglePause();
   REQUIRE(waitFor([&] { return p.playing() && p.model->position() > pausedAt + 1; }, 20000));
+}
+
+TEST_CASE("A room's item that opens before the player's video exists waits for it") {
+  // mpv opened before the render context existed showed a black picture
+  // without subtitles: the first film of a fresh start in a room.
+  Player p(QStringLiteral("jfd-player-group-no-video"), {}, QStringLiteral("JFD_TEST"), true);
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+  SyncPlayApi syncPlay(*p.client);
+
+  p.runtime->createGroup(QStringLiteral("jfd-player-group-no-video"));
+  REQUIRE(waitFor([&] { return p.model->inGroup(); }, 20000));
+  QSignalSpy resolved(&p.runtime->launcher(), &session::PlaybackLauncher::resolved);
+  REQUIRE(run<Empty>([&](auto done) { syncPlay.setNewQueue({movie.id}, 0, 0, nullptr, done); }).ok());
+  // Resolved by the server, then held: mpv has not opened it, the page
+  // shows loading.
+  REQUIRE(waitFor([&] { return p.model->loading(); }, 20000));
+  QTest::qWait(3000);
+  CHECK(resolved.count() == 0);
+  CHECK(p.runtime->snapshot().phase == core::PlaybackPhase::Idle);
+  CHECK(p.model->loading());
+
+  // Stopping drops the held file.
+  p.model->stop();
+  CHECK_FALSE(p.model->loading());
 }
