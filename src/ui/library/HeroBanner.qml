@@ -8,14 +8,16 @@ import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
 // The banner at the top of the home page: one featured film or series at a
-// time (HomeModel.featured: what the user was watching, then the newest of
-// each library). A line saying why it is here, the logo or the title, year,
+// time (HomeModel.featured: the last few things the user started, then a
+// couple of new ones nobody started). A line saying why it is here
+// ("Continue watching", "Next episode", "New"), the logo or the title, year,
 // genres, length and age rating, two lines of the description, then Play or
 // Resume, More and a favorite toggle, with the part left to watch. The next
-// item comes every few seconds, unless the pointer or the focus is on the
-// banner, effects are simplified or in TV mode (the focus is nearly always
-// on the screen there); the dots below choose one, also by focusing them,
-// so Left and Right along the dots go through the items.
+// item comes by itself every few seconds, also in TV mode and with simplified
+// effects; moving the pointer over the banner starts the wait again, and it
+// stays put while the focus is on the banner (the user is choosing). The
+// dots below choose one, also by focusing them, so Left and Right along the
+// dots go through the items.
 //
 // The backdrop is not drawn here: the page draws it behind its rows
 // (HeroBackdrop), wider than the margins, from `current`.
@@ -47,14 +49,22 @@ FocusScope {
         }
     }
 
-    HoverHandler { id: hover }
+    // Called on any sign of the user: the next change waits a full interval.
+    function postpone() { if (timer.running) timer.restart() }
+
+    HoverHandler {
+        id: hover
+        onPointChanged: banner.postpone()
+    }
 
     Timer {
+        id: timer
         objectName: "heroTimer"
         interval: banner.interval
         repeat: true
-        running: banner.count > 1 && banner.visible && !hover.hovered && !banner.activeFocus
-                 && !Theme.reducedEffects && !Theme.tvMode && Qt.application.state === Qt.ApplicationActive
+        // Not while the focus is on the banner: the user is choosing there.
+        running: banner.count > 1 && banner.visible && !banner.activeFocus
+                 && Qt.application.state === Qt.ApplicationActive
         onTriggered: banner.current = (banner.current + 1) % banner.count
     }
 
@@ -82,6 +92,7 @@ FocusScope {
             required property bool favorite
             required property bool played
             required property var logoUrl
+            required property string featuredReason
 
             readonly property bool shown: index === banner.current
             readonly property bool isEpisode: type === "Episode"
@@ -120,8 +131,9 @@ FocusScope {
                     objectName: "heroEyebrow"
                     width: parent.width
                     text: {
-                        let reason = slide.resumable ? qsTr("Continue")
-                                   : slide.isEpisode ? qsTr("Next up") : qsTr("Recently added")
+                        let reason = slide.featuredReason === "resume" ? qsTr("Continue watching")
+                                   : slide.featuredReason === "nextUp" ? qsTr("Next episode")
+                                   : qsTr("New")
                         if (slide.isEpisode && slide.subtitle.length > 0)
                             reason += " · " + slide.subtitle + " · " + slide.name
                         return reason.toUpperCase()

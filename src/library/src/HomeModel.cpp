@@ -404,8 +404,8 @@ namespace jfd::library {
     QList<ItemListModel::Entry> out;
     QStringList keys;
     // An episode stands for its series, so the series is not featured twice.
-    const auto add = [&](const api::Item& item) {
-      if (out.size() >= m_options.featuredLimit || !isVideo(item)) return false;
+    const auto add = [&](const api::Item& item, const QString& reason, int limit) {
+      if (out.size() >= limit || !isVideo(item)) return false;
       const QString key = item.seriesId.isEmpty() ? item.id : item.seriesId;
       if (keys.contains(key)) return false;
       const QUrl backdrop = library::backdropUrl(m_client, item, backdropPixels);
@@ -414,6 +414,7 @@ namespace jfd::library {
       ItemListModel::Entry entry{item, {}};
       entry.backdropUrl = backdrop;
       entry.logoUrl = library::logoUrl(m_client, item, logoPixels);
+      entry.featuredReason = reason;
       out.append(std::move(entry));
       return true;
     };
@@ -424,16 +425,25 @@ namespace jfd::library {
       return nullptr;
     };
 
-    // What the user was watching (or watches next) comes first.
-    bool personal = false;
-    for (const QString& id : {QStringLiteral("resume"), QStringLiteral("nextUp")}) {
-      if (personal) break;
-      if (Row* row = rowById(id)) {
-        for (int i = 0; i < row->items->count() && !personal; ++i)
-          personal = add(row->items->entry(i)->item);
-      }
+    // First what the user is watching: "Continue watching" comes from the
+    // server most recently watched first, so these are the last few things
+    // they started. One next episode may join them.
+    const int personalLimit = std::clamp(m_options.featuredPersonalLimit, 0, m_options.featuredLimit);
+    if (Row* row = rowById(QStringLiteral("resume"))) {
+      for (int i = 0; i < row->items->count() && out.size() < personalLimit; ++i)
+        add(row->items->entry(i)->item, QStringLiteral("resume"), personalLimit);
     }
-    // Then the newest items, taking turns between the libraries.
+    if (Row* row = rowById(QStringLiteral("nextUp"))) {
+      const int limit = std::min<int>(personalLimit, static_cast<int>(out.size()) + m_options.featuredNextUpLimit);
+      for (int i = 0; i < row->items->count() && out.size() < limit; ++i)
+        add(row->items->entry(i)->item, QStringLiteral("nextUp"), limit);
+    }
+    // Then the newest items nobody started, taking turns between the
+    // libraries. Something half watched or watched long ago is not new:
+    // it belongs to "Continue watching", not here.
+    const auto fresh = [](const api::Item& item) {
+      return !item.userData.played && item.userData.playbackPositionTicks <= 0;
+    };
     QList<Row*> latest;
     for (const auto& row : m_rows) {
       if (row->kind == QLatin1String("latest") && rowById(row->id) != nullptr) latest.append(row.get());
@@ -443,7 +453,8 @@ namespace jfd::library {
       for (Row* row : std::as_const(latest)) {
         if (i < row->items->count()) {
           any = true;
-          add(row->items->entry(i)->item);
+          const api::Item& item = row->items->entry(i)->item;
+          if (fresh(item)) add(item, QStringLiteral("latest"), m_options.featuredLimit);
         }
       }
       if (!any) break;

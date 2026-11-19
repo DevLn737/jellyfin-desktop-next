@@ -72,6 +72,11 @@ namespace jfd::library {
       // Banner items, and the width of their backdrops and logos in
       // device-independent pixels.
       int featuredLimit = 5;
+      // Of those, at most this many of what the user is watching (the most
+      // recently watched first) and at most one next episode among them;
+      // the rest are new items nobody has started.
+      int featuredPersonalLimit = 3;
+      int featuredNextUpLimit = 1;
       int backdropWidth = 1600;
       int logoWidth = 500;
       // Card width in device-independent pixels and the screen's ratio, for
