@@ -46,7 +46,7 @@ namespace {
 
 } // namespace
 
-TEST_CASE("The mini player strip shows under the pages wherever the shell shows its sidebar") {
+TEST_CASE("The mini player strip shows under the pages wherever the shell shows its navigation bar") {
   QQmlEngine engine;
   auto* navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
   REQUIRE(navigator != nullptr);
@@ -65,37 +65,50 @@ TEST_CASE("The mini player strip shows under the pages wherever the shell shows 
   QQuickItem* pages = find(shell, "pageStack");
   REQUIRE(slot != nullptr);
   REQUIRE(pages != nullptr);
-  // Nothing in it: no strip, the pages use the whole height.
+  QQuickItem* nav = find(shell, "topNav");
+  REQUIRE(nav != nullptr);
+  const double navHeight = nav->height();
+  CHECK(navHeight > 0);
+  // Nothing in it: no strip, the pages use the height under the bar.
   CHECK_FALSE(slot->isVisible());
-  CHECK(pages->height() == doctest::Approx(700.0));
+  CHECK(pages->y() == doctest::Approx(navHeight));
+  CHECK(pages->height() == doctest::Approx(700.0 - navHeight));
 
   auto bar = create(engine, "import QtQuick\nRectangle { width: 400; height: 64 }");
   auto* barItem = qobject_cast<QQuickItem*>(bar.get());
   barItem->setParentItem(slot);
   CHECK(slot->isVisible());
   CHECK(slot->height() == doctest::Approx(64.0));
-  CHECK(pages->height() == doctest::Approx(636.0));
+  CHECK(pages->height() == doctest::Approx(636.0 - navHeight));
   CHECK(slot->y() + slot->height() == doctest::Approx(700.0));
 
-  // The player and the sign-in page have no shell chrome: no strip.
+  // The player and the sign-in page have no shell chrome: no strip, no bar.
   navigator->navigate(QStringLiteral("player"));
   CHECK_FALSE(slot->isVisible());
+  CHECK(pages->y() == doctest::Approx(0.0));
   CHECK(pages->height() == doctest::Approx(700.0));
   navigator->reset(QStringLiteral("home"));
   CHECK(slot->isVisible());
 
-  // The sidebar lists the registered routes.
+  // The bar lists the registered routes; Settings is in the account menu.
   ui::RouteSpec music;
   music.name = QStringLiteral("music");
   music.hasSidebarEntry = true;
   music.sidebar = {QStringLiteral("library"), QStringLiteral("Music"), nullptr, 400};
   navigator->registerRoute(music);
+  // The bar's list makes its delegates at the next polish.
+  QCoreApplication::processEvents();
   CHECK(find(shell, "nav_music") != nullptr);
   navigator->setRouteAvailable(QStringLiteral("music"), false);
   // The Repeater removes its delegate once the model change is processed.
   QCoreApplication::processEvents();
   CHECK(find(shell, "nav_music") == nullptr);
-  CHECK(find(shell, "nav_settings") != nullptr);
+  CHECK(find(shell, "nav_home") != nullptr);
+  CHECK(find(shell, "nav_settings") == nullptr);
+  bool settingsInMenu = false;
+  for (const QVariant& entry : nav->property("accountEntries").toList())
+    settingsInMenu |= entry.toMap().value(QStringLiteral("route")).toString() == QStringLiteral("settings");
+  CHECK(settingsInMenu);
 }
 
 TEST_CASE("Card shapes: poster, thumb, square and circle") {
@@ -283,17 +296,22 @@ TEST_CASE("The account menu signs out after a confirmation") {
   QQmlEngine engine;
   QQuickWindow window;
   window.resize(1000, 700);
-  auto object = create(engine, "import QtQuick\nimport Jfd.Ui.Shell\nSidebar { height: 700; accountName: \"Server\" }");
-  auto* sidebar = qobject_cast<QQuickItem*>(object.get());
-  REQUIRE(sidebar != nullptr);
-  sidebar->setParentItem(window.contentItem());
+  auto object = create(engine, "import QtQuick\nimport Jfd.Ui.Shell\nTopNav { width: 1000; accountName: \"Server\" }");
+  auto* bar = qobject_cast<QQuickItem*>(object.get());
+  REQUIRE(bar != nullptr);
+  bar->setParentItem(window.contentItem());
   window.show();
-  QSignalSpy signOut(sidebar, SIGNAL(signOutRequested()));
+  QSignalSpy signOut(bar, SIGNAL(signOutRequested()));
 
-  auto* menu = sidebar->findChild<QObject*>(QStringLiteral("accountMenu"));
-  auto* confirm = sidebar->findChild<QObject*>(QStringLiteral("signOutConfirm"));
+  auto* menu = bar->findChild<QObject*>(QStringLiteral("accountMenu"));
+  auto* confirm = bar->findChild<QObject*>(QStringLiteral("signOutConfirm"));
   REQUIRE(menu != nullptr);
   REQUIRE(confirm != nullptr);
+  // Settings first, then TV mode, then Sign out at the end.
+  const QStringList entries = menu->property("entries").toStringList();
+  REQUIRE(entries.size() >= 3);
+  CHECK(entries.first() == QStringLiteral("Settings"));
+  const int signOutIndex = int(entries.size()) - 1;
   const auto settle = [] {
     QElapsedTimer timer;
     timer.start();
@@ -301,7 +319,7 @@ TEST_CASE("The account menu signs out after a confirmation") {
   };
 
   // Sign out asks first; Cancel changes nothing.
-  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, 1));
+  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, signOutIndex));
   settle();
   CHECK(confirm->property("visible").toBool());
   CHECK(signOut.isEmpty());
@@ -309,7 +327,7 @@ TEST_CASE("The account menu signs out after a confirmation") {
   settle();
   CHECK(signOut.isEmpty());
 
-  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, 1));
+  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, signOutIndex));
   settle();
   QMetaObject::invokeMethod(confirm, "accept");
   settle();
@@ -405,26 +423,27 @@ TEST_CASE("Layout at window sizes from 640x420 to 4K, in logical pixels") {
     int width;
     int height;
     const char* sizeClass;
-    int sidebar;
   };
   // 1366x768 at 150 % is 911x512; 1920x1080 at 200 % is 960x540; 3840x2160
   // at 100/150/200 % is 3840x2160, 2560x1440 and 1920x1080.
-  const Size sizes[] = {{640, 420, "compact", 64},    {899, 600, "compact", 64},   {900, 600, "normal", 216},
-                        {911, 512, "normal", 216},    {960, 540, "normal", 216},   {1024, 768, "normal", 216},
-                        {1280, 720, "normal", 216},   {1600, 900, "normal", 216},  {1920, 1080, "spacious", 216},
-                        {2560, 1440, "spacious", 216}, {3840, 2160, "spacious", 216}};
+  const Size sizes[] = {{640, 420, "compact"},    {899, 600, "compact"},   {900, 600, "normal"},
+                        {911, 512, "normal"},    {960, 540, "normal"},   {1024, 768, "normal"},
+                        {1280, 720, "normal"},   {1600, 900, "normal"},  {1920, 1080, "spacious"},
+                        {2560, 1440, "spacious"}, {3840, 2160, "spacious"}};
   QQuickItem* stack = find(shell, "pageStack");
+  QQuickItem* nav = find(shell, "topNav");
   REQUIRE(stack != nullptr);
+  REQUIRE(nav != nullptr);
   for (const Size& size : sizes) {
     CAPTURE(size.width);
     window.resize(size.width, size.height);
     shell->setSize(QSizeF(size.width, size.height));
     QCoreApplication::processEvents();
     CHECK(theme->property("sizeClass").toString() == QLatin1String(size.sizeClass));
-    // The sidebar is a rail in a compact window; the pages get the rest.
-    CHECK(stack->x() == doctest::Approx(size.sidebar));
-    CHECK(stack->x() + stack->width() == doctest::Approx(size.width));
-    CHECK(stack->height() == doctest::Approx(size.height));
+    // The bar on top; the pages get the whole width under it.
+    CHECK(stack->x() == doctest::Approx(0.0));
+    CHECK(stack->width() == doctest::Approx(size.width));
+    CHECK(stack->height() == doctest::Approx(size.height - nav->height()));
     // Cards are 110 to 220 px wide, and at least one fits beside the margins.
     const int poster = theme->property("posterWidth").toInt();
     CHECK(poster >= 110);
@@ -436,52 +455,64 @@ TEST_CASE("Layout at window sizes from 640x420 to 4K, in logical pixels") {
   }
 }
 
-TEST_CASE("The menu opens the names over the pages in a compact window") {
+TEST_CASE("The navigation bar narrows to icons, then to one menu") {
   QQmlEngine engine;
   auto* navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
   navigator->setPlaceholderPage(QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
   navigator->reset(QStringLiteral("home"));
   QQuickWindow window;
-  window.resize(700, 500);
-  auto object = create(engine, "import QtQuick\nimport Jfd.Ui.Shell\nAppShell { width: 700; height: 500 }");
+  window.resize(500, 500);
+  auto object = create(engine, "import QtQuick\nimport Jfd.Ui.Shell\nAppShell { width: 500; height: 500; accountName: \"Anna\" }");
   auto* shell = qobject_cast<QQuickItem*>(object.get());
   shell->setParentItem(window.contentItem());
   window.show();
   QCoreApplication::processEvents();
 
-  QQuickItem* sidebar = find(shell, "sidebar");
-  QQuickItem* stack = find(shell, "pageStack");
-  QQuickItem* menu = find(shell, "menuButton");
-  REQUIRE(sidebar != nullptr);
-  REQUIRE(stack != nullptr);
-  REQUIRE(menu != nullptr);
-  CHECK(menu->isVisible());
-  CHECK(sidebar->width() == doctest::Approx(64.0));
-  const qreal pageX = stack->x();
+  QQuickItem* nav = find(shell, "topNav");
+  QQuickItem* pill = find(shell, "topNavPill");
+  QQuickItem* menuButton = find(shell, "menuButton");
+  auto* all = nav->findChild<QObject*>(QStringLiteral("allDestinationsMenu"));
+  REQUIRE(nav != nullptr);
+  REQUIRE(pill != nullptr);
+  REQUIRE(menuButton != nullptr);
+  REQUIRE(all != nullptr);
+  // Very narrow: one menu with every destination, and Sign out.
+  CHECK(menuButton->isVisible());
+  CHECK_FALSE(pill->isVisible());
+  const QStringList entries = all->property("entries").toStringList();
+  CHECK(entries.contains(QStringLiteral("Home")));
+  CHECK(entries.contains(QStringLiteral("Settings")));
+  CHECK(entries.last() == QStringLiteral("Sign out"));
+  // Choosing one goes there.
+  QMetaObject::invokeMethod(all, "activated", Q_ARG(int, int(entries.indexOf(QStringLiteral("Search")))));
+  CHECK(navigator->currentRoute() == QStringLiteral("search"));
+  // The menu opens from the keyboard too (Menu key: the button).
+  QMetaObject::invokeMethod(shell, "toggleNavFocus");
+  CHECK(menuButton->hasActiveFocus());
 
-  QMetaObject::invokeMethod(menu, "clicked");
-  QElapsedTimer waited;
-  waited.start();
-  while (sidebar->width() <= 200 && waited.elapsed() < 2000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-  REQUIRE(sidebar->width() > 200);
-  // Over the pages, which do not move.
-  CHECK(stack->x() == doctest::Approx(pageX));
-  CHECK(shell->property("menuOpen").toBool());
-
-  // Choosing a destination closes it.
-  QQuickItem* search = find(shell, "nav_search");
-  REQUIRE(search != nullptr);
-  QMetaObject::invokeMethod(search, "clicked");
-  CHECK_FALSE(shell->property("menuOpen").toBool());
-
-  // A wide window has no menu button.
-  window.resize(1200, 700);
-  shell->setSize(QSizeF(1200, 700));
+  // Narrow: the pill with icons only.
+  window.resize(700, 500);
+  shell->setSize(QSizeF(700, 500));
   QCoreApplication::processEvents();
-  CHECK_FALSE(menu->isVisible());
-  waited.restart();
-  while (sidebar->width() < 216 && waited.elapsed() < 2000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-  CHECK(sidebar->width() == doctest::Approx(216.0));
+  CHECK(pill->isVisible());
+  CHECK_FALSE(menuButton->isVisible());
+  CHECK(nav->property("iconsOnly").toBool());
+  // Wide: names too, and the pill inside the window.
+  window.resize(1600, 700);
+  shell->setSize(QSizeF(1600, 700));
+  QCoreApplication::processEvents();
+  CHECK_FALSE(nav->property("iconsOnly").toBool());
+  // At any width the pill stays inside the window: the names go first
+  // when they would not fit (wider fonts, longer words).
+  for (int width : {1600, 1200, 1000, 900, 860}) {
+    window.resize(width, 700);
+    shell->setSize(QSizeF(width, 700));
+    QCoreApplication::processEvents();
+    const QPointF pillLeft = pill->mapToItem(shell, QPointF(0, 0));
+    CAPTURE(width);
+    CHECK(pillLeft.x() >= 0);
+    CHECK(pillLeft.x() + pill->width() <= width);
+  }
 }
 
 TEST_CASE("The plain wheel over a card row scrolls the page; Shift + wheel scrolls the row") {

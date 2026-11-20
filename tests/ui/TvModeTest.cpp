@@ -1041,7 +1041,7 @@ AppShell {
 
 } // namespace
 
-TEST_CASE("The shell in TV mode: safe area, every item reachable, Menu goes to the sidebar and back") {
+TEST_CASE("The shell in TV mode: safe area, every item reachable, Menu goes to the navigation bar and back") {
   ShellScene scene;
   QQuickWindow& window = scene.window;
   scene.setTvMode(true);
@@ -1064,16 +1064,17 @@ TEST_CASE("The shell in TV mode: safe area, every item reachable, Menu goes to t
   scene.setSafeArea(true);
   pump(50);
 
-  // From the first button: Left to the sidebar, Right back to the page.
+  // From the first button: Up to the bar, at the current page's entry
+  // whichever is nearest; Down back to the page where the focus was.
   QQuickItem* first = scene.item(QStringLiteral("button0"));
   REQUIRE(first != nullptr);
   SpatialNavigation::focusItem(first);
-  tap(window, Qt::Key_Left);
-  CHECK(focusName(window).startsWith(QLatin1String("nav_")));
-  tap(window, Qt::Key_Right);
-  CHECK(focusName(window).startsWith(QLatin1String("button")));
+  tap(window, Qt::Key_Up);
+  CHECK(focusName(window) == QStringLiteral("nav_home"));
+  tap(window, Qt::Key_Down);
+  CHECK(focusName(window) == QStringLiteral("button0"));
 
-  // Menu: the sidebar's entry of the current page; Menu again: the page.
+  // Menu: the bar's entry of the current page; Menu again: the page.
   SpatialNavigation::focusItem(scene.item(QStringLiteral("button5")));
   tap(window, Qt::Key_Menu);
   CHECK(focusName(window) == QStringLiteral("nav_home"));
@@ -1081,7 +1082,7 @@ TEST_CASE("The shell in TV mode: safe area, every item reachable, Menu goes to t
   CHECK(focusName(window).startsWith(QLatin1String("button")));
 
   // Every focusable item reaches every other by arrows (a scope such as
-  // the sidebar passes the focus on to its entry: not a node of its own).
+  // the bar passes the focus on to its entry: not a node of its own).
   std::map<QString, QSet<QString>> edges;
   std::map<QString, QSet<QString>> reverse;
   QSet<QString> names;
