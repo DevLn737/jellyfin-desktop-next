@@ -1,0 +1,2 @@
+// The executable's icon (Explorer, taskbar before the window shows).
+IDI_ICON1 ICON "../../packaging/icons/jellyfin-desktop-next.ico"

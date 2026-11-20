@@ -83,7 +83,7 @@ FocusScope {
     }
     onIconsOnlyChanged: Qt.callLater(remember)
 
-    implicitHeight: (Theme.tvMode ? 112 : 88)
+    implicitHeight: (Theme.tvMode ? 100 : 72)
     activeFocusOnTab: true
 
     Keys.onDownPressed: (event) => {
@@ -128,30 +128,10 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingSmall + 2
             visible: !bar.iconsOnly || !Navigator.canGoBack
-            Rectangle {
+            AppLogo {
+                objectName: "topNavLogo"
                 anchors.verticalCenter: parent.verticalCenter
-                width: Theme.tvMode ? 40 : 30
-                height: width
-                radius: Math.round(width * 0.3)
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0; color: Qt.lighter(Theme.accent, 1.15) }
-                    GradientStop { position: 1; color: Qt.darker(Theme.accent, 1.25) }
-                }
-                Icon {
-                    anchors.centerIn: parent
-                    source: Icons.play
-                    size: Math.round(parent.width * 0.42)
-                    color: Theme.background
-                }
-            }
-            Text {
-                visible: !bar.iconsOnly
-                anchors.verticalCenter: parent.verticalCenter
-                text: qsTr("Media library")
-                color: Theme.text
-                font.pixelSize: Math.round(Theme.fontSizeBody * 1.15)
-                font.weight: Font.Bold
+                size: Theme.tvMode ? 40 : 32
             }
         }
     }
@@ -170,9 +150,9 @@ FocusScope {
         }
         width: content.implicitWidth + 2 * padding
         onWidthChanged: bar.remember()
-        height: (Theme.tvMode ? 64 : 50)
-        readonly property int padding: 5
-        radius: Theme.tvMode ? 20 : 16
+        height: (Theme.tvMode ? 56 : 42)
+        readonly property int padding: 4
+        radius: Theme.tvMode ? 18 : 14
         color: Qt.alpha(Theme.surfaceRaised, Theme.blurEnabled ? 0.72 : 0.9)
         border.width: 1
         border.color: Theme.glassBorder
@@ -208,7 +188,7 @@ FocusScope {
                     implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset, implicitContentWidth + leftPadding + rightPadding)
                     readonly property bool current: Navigator.currentName === modelData.route
                     height: pill.height
-                    leftPadding: bar.iconsOnly ? 11 : 15
+                    leftPadding: bar.iconsOnly ? 9 : 12
                     rightPadding: leftPadding
                     focusPolicy: Qt.StrongFocus
                     hoverEnabled: true
@@ -230,7 +210,7 @@ FocusScope {
                             anchors.verticalCenter: parent.verticalCenter
                             text: entry.modelData.text
                             color: entry.current || entry.hovered ? Theme.text : Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeBody
+                            font.pixelSize: Theme.fontSizeBody - 1
                             font.weight: entry.current ? Font.Bold : Font.DemiBold
                         }
                         // Ctrl+K opens the command palette from anywhere.

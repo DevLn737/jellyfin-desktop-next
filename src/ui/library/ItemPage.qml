@@ -377,6 +377,8 @@ RoutePage {
                 }
                 DownloadActions {
                     objectName: "downloadActions"
+                    buttonHeight: parent.buttonHeight
+                    buttonFontSize: Theme.fontSizeLarge - 1
                     itemId: page.details ? page.details.itemId : ""
                     itemType: page.loaded ? page.details.type : ""
                     itemName: page.title

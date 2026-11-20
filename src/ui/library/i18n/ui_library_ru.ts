@@ -841,6 +841,10 @@
         <translation>Дата просмотра</translation>
     </message>
     <message>
+        <source>Sort: %1</source>
+        <translation>Сортировка: %1</translation>
+    </message>
+    <message>
         <source>Ascending</source>
         <translation>По возрастанию</translation>
     </message>
@@ -952,10 +956,6 @@
     <message>
         <source>Sign in</source>
         <translation>Войти</translation>
-    </message>
-    <message>
-        <source>Media library</source>
-        <translation>Медиатека</translation>
     </message>
     <message>
         <source>Connect to a server</source>

@@ -18,6 +18,9 @@ Row {
     property string itemId
     property string itemType
     property string itemName
+    // The buttons' height and text size, to match the row they sit in.
+    property int buttonHeight: Theme.controlHeight
+    property int buttonFontSize: Theme.fontSizeBody
 
     // `var` lists: a literal string list compiles to a QStringList, whose
     // indexOf (qsizetype) does not convert to int under -Wconversion.
@@ -43,6 +46,8 @@ Row {
     ActionButton {
         id: mainButton
         objectName: "downloadButton"
+        implicitHeight: actions.buttonHeight
+        font.pixelSize: actions.buttonFontSize
         visible: actions.showMain
         iconSource: actions.downloadState === "complete" && !actions.isGroup ? Icons.downloaded : Icons.download
         text: {
@@ -74,6 +79,8 @@ Row {
     ActionButton {
         id: deleteButton
         objectName: "deleteDownloadButton"
+        implicitHeight: actions.buttonHeight
+        font.pixelSize: actions.buttonFontSize
         visible: actions.showDelete
         iconSource: Icons.remove
         text: actions.isGroup ? qsTr("Delete downloads") : qsTr("Delete download")

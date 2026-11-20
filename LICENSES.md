@@ -42,6 +42,8 @@ only reformatted.
 | `src/ui/controls/icons/left.svg` | Material Icons `keyboard_arrow_left` | Apache-2.0 |
 | `src/ui/controls/icons/right.svg` | Material Icons `keyboard_arrow_right` | Apache-2.0 |
 | `src/ui/controls/icons/tune.svg` | Material Icons `tune` | Apache-2.0 |
+| `src/ui/controls/icons/sort.svg` | Material Icons `sort` | Apache-2.0 |
+| `src/ui/controls/icons/filter.svg` | Material Icons `filter_alt` | Apache-2.0 |
 | `src/ui/controls/icons/download.svg` | Material Icons `download` | Apache-2.0 |
 | `src/ui/controls/icons/downloaded.svg` | Material Icons `download_done` | Apache-2.0 |
 | `src/ui/controls/icons/error.svg` | Material Icons `error` | Apache-2.0 |
@@ -68,6 +70,8 @@ only reformatted.
 | `src/ui/controls/icons-dark/left.svg` | Material Icons `keyboard_arrow_left` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/right.svg` | Material Icons `keyboard_arrow_right` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/tune.svg` | Material Icons `tune` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/sort.svg` | Material Icons `sort` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/filter.svg` | Material Icons `filter_alt` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/download.svg` | Material Icons `download` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/downloaded.svg` | Material Icons `download_done` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/error.svg` | Material Icons `error` (dark fill) | Apache-2.0 |

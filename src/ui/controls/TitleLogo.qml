@@ -32,7 +32,8 @@ Item {
         sourceSize.width: title.maxWidth * 2
         fillMode: Image.PreserveAspectFit
         horizontalAlignment: Image.AlignLeft
-        verticalAlignment: Image.AlignBottom
+        // At the top: the item is as tall as the painted logo.
+        verticalAlignment: Image.AlignTop
         asynchronous: true
         visible: title.showsLogo
         opacity: visible ? 1 : 0

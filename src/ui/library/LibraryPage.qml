@@ -154,20 +154,43 @@ RoutePage {
                 id: toolbar
                 spacing: Theme.spacingSmall
 
-                ActionButton {
+                // Filters: an icon with the number in use; the filters drop
+                // down under it.
+                IconButton {
                     id: filtersButton
                     objectName: "libraryFiltersButton"
+                    square: true
                     readonly property int active: page.activeFilters.length
-                    iconSource: Icons.tune
-                    text: active > 0 ? qsTr("Filters · %1").arg(active) : qsTr("Filters")
-                    highlighted: page.filtersOpen
+                    iconSource: Icons.filter
+                    toolTipText: qsTr("Filters")
+                    Accessible.name: active > 0 ? qsTr("Filters · %1").arg(active) : qsTr("Filters")
+                    highlighted: page.filtersOpen || active > 0
                     onClicked: page.filtersOpen = !page.filtersOpen
+                    Rectangle {
+                        visible: filtersButton.active > 0
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: -2
+                        width: Math.max(18, badgeText.implicitWidth + 8)
+                        height: 18
+                        radius: 9
+                        color: Theme.accent
+                        Text {
+                            id: badgeText
+                            anchors.centerIn: parent
+                            text: String(filtersButton.active)
+                            color: Theme.accentText
+                            font.pixelSize: 11
+                            font.weight: Font.ExtraBold
+                        }
+                    }
                 }
-                ChoiceBox {
-                    id: sort
-                    objectName: "librarySort"
-                    implicitWidth: 210
-                    model: [
+                // Sort: an icon; the fields drop down, the current one marked.
+                IconButton {
+                    id: sortButton
+                    objectName: "librarySortButton"
+                    square: true
+                    readonly property var fields: [
                         { value: "SortName", label: qsTr("Name") },
                         { value: "DateCreated", label: qsTr("Date added") },
                         { value: "PremiereDate", label: qsTr("Release date") },
@@ -175,38 +198,78 @@ RoutePage {
                         { value: "Runtime", label: qsTr("Runtime") },
                         { value: "DatePlayed", label: qsTr("Date played") },
                     ]
-                    currentIndex: page.library ? indexOfValue(page.library.sortBy) : 0
-                    onActivated: {
-                        if (!page.library)
-                            return
-                        page.library.sortBy = currentValue
-                        // Newest and best first, as Jellyfin Web does.
-                        page.library.descending = currentValue !== "SortName"
+                    function indexOfValue(value) {
+                        for (let i = 0; i < fields.length; ++i)
+                            if (fields[i].value === value) return i
+                        return 0
+                    }
+                    iconSource: Icons.sort
+                    toolTipText: qsTr("Sort: %1").arg(fields[page.library ? indexOfValue(page.library.sortBy) : 0].label)
+                    Accessible.name: toolTipText
+                    highlighted: sortMenu.visible
+                    onClicked: sortMenu.visible ? sortMenu.close() : sortMenu.open()
+                    PopupMenu {
+                        id: sortMenu
+                        objectName: "librarySort"
+                        anchorItem: sortButton
+                        alignRight: true
+                        entries: sortButton.fields.map((f) => f.label)
+                        currentIndex: page.library ? sortButton.indexOfValue(page.library.sortBy) : 0
+                        onActivated: (index) => {
+                            if (!page.library)
+                                return
+                            const value = sortButton.fields[index].value
+                            page.library.sortBy = value
+                            // Newest and best first, as Jellyfin Web does.
+                            page.library.descending = value !== "SortName"
+                        }
                     }
                 }
-                ChoiceBox {
+                // The order: one press turns it round.
+                IconButton {
                     objectName: "libraryOrder"
-                    implicitWidth: 190
-                    model: [
-                        { value: false, label: qsTr("Ascending") },
-                        { value: true, label: qsTr("Descending") },
-                    ]
-                    currentIndex: page.library && page.library.descending ? 1 : 0
-                    onActivated: if (page.library) page.library.descending = currentValue
+                    square: true
+                    readonly property bool descending: page.library !== null && page.library.descending
+                    iconSource: descending ? Icons.down : Icons.up
+                    toolTipText: descending ? qsTr("Descending") : qsTr("Ascending")
+                    Accessible.name: toolTipText
+                    onClicked: if (page.library) page.library.descending = !page.library.descending
                 }
             }
         }
 
-        // The filters, shown by the Filters button.
-        Flow {
-            objectName: "libraryFilters"
-            Layout.fillWidth: true
+        // The filters, dropped down under the Filters button.
+        T.Popup {
+            id: filtersPopup
+            objectName: "libraryFiltersPopup"
+            parent: T.Overlay.overlay
             visible: page.filtersOpen
-            spacing: Theme.spacing
+            onClosed: page.filtersOpen = false
+            onAboutToShow: {
+                const corner = filtersButton.mapToItem(parent, 0, 0)
+                x = Math.max(Theme.spacingSmall, Math.min(corner.x + filtersButton.width - width, parent.width - width - Theme.spacingSmall))
+                y = corner.y + filtersButton.height + 8
+            }
+            width: 300
+            // A templated Popup has no height of its own.
+            implicitHeight: contentHeight + topPadding + bottomPadding
+            padding: Theme.spacing
+            focus: true
+            closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutsideParent
+            background: Rectangle {
+                radius: Theme.radiusLarge
+                color: Theme.popupFill
+                border.width: 1
+                border.color: Theme.glassBorder
+            }
+
+            contentItem: Column {
+            objectName: "libraryFilters"
+            spacing: Theme.spacingSmall
 
             ChoiceBox {
                 objectName: "libraryPlayed"
-                implicitWidth: 180
+                width: parent.width
                 model: [
                     { value: LibraryModel.All, label: qsTr("All") },
                     { value: LibraryModel.Unplayed, label: qsTr("Unwatched") },
@@ -217,7 +280,7 @@ RoutePage {
             }
             ChoiceBox {
                 objectName: "libraryShow"
-                implicitWidth: 180
+                width: parent.width
                 visible: page.library && page.library.canShowCollections
                 model: [
                     { value: false, label: qsTr("Movies") },
@@ -244,7 +307,7 @@ RoutePage {
             }
             ChoiceBox {
                 objectName: "libraryYear"
-                implicitWidth: 160
+                width: parent.width
                 visible: page.library && (page.library.availableYears.length > 0 || page.library.years.length > 0)
                 model: {
                     const years = [{ value: 0, label: qsTr("All years") }]
@@ -266,7 +329,7 @@ RoutePage {
             }
             ChoiceBox {
                 objectName: "libraryDensity"
-                implicitWidth: 170
+                width: parent.width
                 model: [
                     { value: "small", label: qsTr("Small cards") },
                     { value: "medium", label: qsTr("Medium cards") },
@@ -294,6 +357,7 @@ RoutePage {
                     font.pixelSize: Theme.fontSizeBody
                 }
             }
+        }
         }
 
         // How many, then the filters in use, each with a way to drop it.

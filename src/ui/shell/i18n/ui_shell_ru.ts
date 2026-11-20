@@ -174,10 +174,6 @@
         <translation>Назад</translation>
     </message>
     <message>
-        <source>Media library</source>
-        <translation>Медиатека</translation>
-    </message>
-    <message>
         <source>Ctrl K</source>
         <translation>Ctrl K</translation>
     </message>

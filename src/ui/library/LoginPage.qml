@@ -100,34 +100,11 @@ RoutePage {
                         (page.height - implicitHeight + (loginError.visible ? loginError.height + spacing : 0)) / 3)
             spacing: Theme.spacingLarge
 
-            // The brand, as in the top bar.
-            Row {
+            // The app's mark, as in the top bar.
+            AppLogo {
+                objectName: "loginLogo"
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.spacingSmall + 2
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Theme.tvMode ? 44 : 34
-                    height: width
-                    radius: Math.round(width * 0.3)
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0; color: Qt.lighter(Theme.accent, 1.15) }
-                        GradientStop { position: 1; color: Qt.darker(Theme.accent, 1.25) }
-                    }
-                    Icon {
-                        anchors.centerIn: parent
-                        source: Icons.play
-                        size: Math.round(parent.width * 0.42)
-                        color: Theme.background
-                    }
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: qsTr("Media library")
-                    color: Theme.text
-                    font.pixelSize: Math.round(Theme.fontSizeBody * 1.3)
-                    font.weight: Font.Bold
-                }
+                size: Theme.tvMode ? 72 : 56
             }
 
             Column {

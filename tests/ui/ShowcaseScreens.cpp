@@ -828,7 +828,7 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
     chip = findItem(show.page(), QStringLiteral("filterChip_favorites"));
     return chip != nullptr && chip->isVisible();
   }, Timeout));
-  CHECK(findItem(show.page(), QStringLiteral("libraryFilters"))->isVisible());
+  CHECK(waitFor([&] { return show.find("libraryFilters")->property("visible").toBool(); }, Timeout));
   show.screenshot(QStringLiteral("library-1600-filters"));
   REQUIRE(chip != nullptr);
   QMetaObject::invokeMethod(chip, "clicked");

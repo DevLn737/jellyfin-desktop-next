@@ -34,7 +34,7 @@ T.Button {
 
     background: Rectangle {
         radius: control.square ? Theme.radius : width / 2
-        color: control.down || control.hovered ? colors.surfaceHover
+        color: control.down || control.hovered || control.highlighted ? colors.surfaceHover
              : control.square ? colors.surfaceRaised : "transparent"
         border.width: control.square ? 1 : 0
         border.color: colors.glassBorder !== undefined ? colors.glassBorder : colors.border
