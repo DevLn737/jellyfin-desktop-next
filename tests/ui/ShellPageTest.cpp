@@ -498,13 +498,21 @@ TEST_CASE("The navigation bar narrows to icons, then to one menu") {
   CHECK_FALSE(menuButton->isVisible());
   CHECK(nav->property("iconsOnly").toBool());
   // Wide: names too, and the pill inside the window.
-  window.resize(1200, 700);
-  shell->setSize(QSizeF(1200, 700));
+  window.resize(1600, 700);
+  shell->setSize(QSizeF(1600, 700));
   QCoreApplication::processEvents();
   CHECK_FALSE(nav->property("iconsOnly").toBool());
-  const QPointF pillLeft = pill->mapToItem(shell, QPointF(0, 0));
-  CHECK(pillLeft.x() >= 0);
-  CHECK(pillLeft.x() + pill->width() <= 1200);
+  // At any width the pill stays inside the window: the names go first
+  // when they would not fit (wider fonts, longer words).
+  for (int width : {1600, 1200, 1000, 900, 860}) {
+    window.resize(width, 700);
+    shell->setSize(QSizeF(width, 700));
+    QCoreApplication::processEvents();
+    const QPointF pillLeft = pill->mapToItem(shell, QPointF(0, 0));
+    CAPTURE(width);
+    CHECK(pillLeft.x() >= 0);
+    CHECK(pillLeft.x() + pill->width() <= width);
+  }
 }
 
 TEST_CASE("The plain wheel over a card row scrolls the page; Shift + wheel scrolls the row") {

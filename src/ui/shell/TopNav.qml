@@ -36,8 +36,17 @@ FocusScope {
 
     readonly property int iconsOnlyBelow: 860
     readonly property int menuBelow: 560
+    // Names go when the bar with them would not fit beside the brand (the
+    // width depends on the font and the language). The width with names is
+    // remembered from when they last showed.
+    property real fullPillWidth: 0
+    property real fullLeftWidth: 0
+    // The same for icons only: below that, one menu.
+    property real iconPillWidth: 0
     readonly property bool iconsOnly: width < iconsOnlyBelow
+        || left.x + fullLeftWidth + Theme.spacing + fullPillWidth + Theme.spacingSmall > width
     readonly property bool menuOnly: width < menuBelow
+        || (iconsOnly && left.x + left.width + Theme.spacing + iconPillWidth + Theme.spacingSmall > width)
 
     readonly property var primaryEntries: Navigator.navEntries.filter(
         (entry) => entry.placement === "primary" || (bar.offline && entry.route === "downloads"))
@@ -62,6 +71,17 @@ FocusScope {
         pill.forceActiveFocus(Qt.TabFocusReason)
     }
     function openAccountMenu() { accountMenu.open() }
+    function remember() {
+        if (bar.menuOnly)
+            return
+        if (bar.iconsOnly) {
+            bar.iconPillWidth = pillFrame.width
+        } else {
+            bar.fullPillWidth = pillFrame.width
+            bar.fullLeftWidth = left.width
+        }
+    }
+    onIconsOnlyChanged: Qt.callLater(remember)
 
     implicitHeight: (Theme.tvMode ? 112 : 88)
     activeFocusOnTab: true
@@ -91,6 +111,7 @@ FocusScope {
         anchors.left: parent.left
         anchors.leftMargin: Theme.pageMargin - Theme.spacingSmall
         anchors.verticalCenter: parent.verticalCenter
+        onWidthChanged: bar.remember()
         spacing: Theme.spacing
 
         IconButton {
@@ -148,6 +169,7 @@ FocusScope {
             return free < need ? need - free : 0
         }
         width: content.implicitWidth + 2 * padding
+        onWidthChanged: bar.remember()
         height: (Theme.tvMode ? 64 : 50)
         readonly property int padding: 5
         radius: Theme.tvMode ? 20 : 16
