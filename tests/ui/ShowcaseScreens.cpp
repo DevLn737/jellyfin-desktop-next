@@ -799,6 +799,23 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   CHECK(findItem(bar, QStringLiteral("letter_Я")) != nullptr);
   show.screenshot(QStringLiteral("library-1280-large"));
   library->setProperty("density", QStringLiteral("medium"));
+
+  // The Filters button shows the filters; those in use show as chips that
+  // drop them.
+  show.resize(1600, 900);
+  library->setProperty("favoritesOnly", true);
+  show.page()->setProperty("filtersOpen", true);
+  QQuickItem* chip = nullptr;
+  CHECK(waitFor([&] {
+    chip = findItem(show.page(), QStringLiteral("filterChip_favorites"));
+    return chip != nullptr && chip->isVisible();
+  }, Timeout));
+  CHECK(findItem(show.page(), QStringLiteral("libraryFilters"))->isVisible());
+  show.screenshot(QStringLiteral("library-1600-filters"));
+  REQUIRE(chip != nullptr);
+  QMetaObject::invokeMethod(chip, "clicked");
+  CHECK_FALSE(library->property("favoritesOnly").toBool());
+  show.page()->setProperty("filtersOpen", false);
 }
 
 TEST_CASE("Settings: the search leaves the matching rows and marks the words") {

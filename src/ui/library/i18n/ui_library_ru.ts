@@ -777,6 +777,14 @@
         <translation>Название</translation>
     </message>
     <message>
+        <source>Filters · %1</source>
+        <translation>Фильтры · %1</translation>
+    </message>
+    <message>
+        <source>Filters</source>
+        <translation>Фильтры</translation>
+    </message>
+    <message>
         <source>Date added</source>
         <translation>Дата добавления</translation>
     </message>
@@ -843,6 +851,10 @@
     <message>
         <source>Favorites</source>
         <translation>Избранное</translation>
+    </message>
+    <message>
+        <source>Remove filter %1</source>
+        <translation>Убрать фильтр %1</translation>
     </message>
     <message>
         <source>Nothing matches these filters.</source>

@@ -57,7 +57,7 @@ T.Button {
         radius: Theme.radius
         color: control.primary
             ? (control.down || control.hovered ? control.primaryHoverFill : control.primaryFill)
-            : (control.down ? colors.surfaceHover : control.hovered ? colors.surfaceHover : colors.surfaceRaised)
+            : (control.down || control.hovered || control.highlighted ? colors.surfaceHover : colors.surfaceRaised)
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
         Rectangle {

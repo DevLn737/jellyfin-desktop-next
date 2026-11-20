@@ -34,6 +34,31 @@ RoutePage {
         function onReconnected() { if (page.library && page.library.errorText.length > 0) page.library.reload() }
     }
 
+    // The Filters button shows the filter controls.
+    property bool filtersOpen: false
+
+    // The filters in use, as chips under the toolbar: {key, label}.
+    readonly property var activeFilters: {
+        const out = []
+        const l = library
+        if (!l)
+            return out
+        if (l.playedFilter === LibraryModel.Unplayed) out.push({ key: "played", label: qsTr("Unwatched") })
+        else if (l.playedFilter === LibraryModel.Played) out.push({ key: "played", label: qsTr("Watched") })
+        if (l.favoritesOnly) out.push({ key: "favorites", label: qsTr("Favorites") })
+        for (const genre of l.genres) out.push({ key: "genre:" + genre, label: genre })
+        for (const year of l.years) out.push({ key: "year", label: String(year) })
+        return out
+    }
+    function dropFilter(key) {
+        if (!library)
+            return
+        if (key === "played") library.playedFilter = LibraryModel.All
+        else if (key === "favorites") library.favoritesOnly = false
+        else if (key === "year") library.years = []
+        else if (key.startsWith("genre:")) library.genres = library.genres.filter(g => g !== key.slice(6))
+    }
+
     title: Library.libraryName(libraryId) || (library ? library.name : "") || qsTr("Library")
     hasTopBar: true
 
@@ -44,115 +69,141 @@ RoutePage {
         anchors.topMargin: Theme.spacingLarge
         spacing: Theme.spacingLarge
 
+        // The libraries as tabs, then Filters, sort and order.
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing
 
-            // The libraries, as tabs: the page's own, the others (a music
-            // or Live TV library opens its own section).
-            ListView {
-                id: tabs
-                objectName: "libraryTabs"
-                readonly property bool enterAtCurrent: true
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.controlHeight + 8
-                orientation: ListView.Horizontal
-                spacing: 2
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                model: Library.home ? Library.home.libraries : null
-                keyNavigationEnabled: true
-                activeFocusOnTab: true
-                highlightFollowsCurrentItem: false
-                currentIndex: Library.home ? Math.max(0, Library.home.libraries.rowOf(page.libraryId)) : 0
-                delegate: T.ItemDelegate {
-                    id: tab
-                    required property var model
-                    required property int index
-                    readonly property string libraryId: model.itemId || ""
-                    readonly property bool current: libraryId === page.libraryId
-                    objectName: "library_" + libraryId
-                    implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset, implicitContentWidth + leftPadding + rightPadding)
-                    height: tabs.height
-                    leftPadding: 14
-                    rightPadding: 14
-                    focusPolicy: Qt.StrongFocus
-                    hoverEnabled: true
-                    Accessible.name: model.name || ""
-                    Keys.onReturnPressed: tab.clicked()
-                    Keys.onEnterPressed: tab.clicked()
-                    onClicked: if (!current) Navigator.navigate(Library.routeFor(libraryId, model.type || ""))
-                    contentItem: Row {
-                        spacing: Theme.spacingSmall
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: tab.model.name || ""
-                            color: tab.current || tab.hovered ? Theme.text : Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeBody
-                            font.weight: Font.Bold
+            Rectangle {
+                id: tabsFrame
+                objectName: "libraryTabsFrame"
+                readonly property int padding: 5
+                readonly property real maxWidth: parent.width - toolbar.width - Theme.spacing
+                Layout.preferredWidth: tabs.width + 2 * padding
+                Layout.preferredHeight: tabs.height + 2 * padding
+                radius: Theme.radiusLarge + 2
+                color: Qt.alpha(Theme.text, 0.04)
+                border.width: 1
+                border.color: Theme.glassBorder
+
+                ListView {
+                    id: tabs
+                    objectName: "libraryTabs"
+                    readonly property bool enterAtCurrent: true
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: tabsFrame.padding
+                    width: Math.min(contentWidth, tabsFrame.maxWidth - 2 * tabsFrame.padding)
+                    height: Theme.controlHeight + 4
+                    orientation: ListView.Horizontal
+                    spacing: 2
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: Library.home ? Library.home.libraries : null
+                    keyNavigationEnabled: true
+                    activeFocusOnTab: true
+                    highlightFollowsCurrentItem: false
+                    currentIndex: Library.home ? Math.max(0, Library.home.libraries.rowOf(page.libraryId)) : 0
+                    delegate: T.ItemDelegate {
+                        id: tab
+                        required property var model
+                        required property int index
+                        readonly property string libraryId: model.itemId || ""
+                        readonly property bool current: libraryId === page.libraryId
+                        objectName: "library_" + libraryId
+                        implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset, implicitContentWidth + leftPadding + rightPadding)
+                        height: tabs.height
+                        leftPadding: 14
+                        rightPadding: 14
+                        focusPolicy: Qt.StrongFocus
+                        hoverEnabled: true
+                        Accessible.name: model.name || ""
+                        Keys.onReturnPressed: tab.clicked()
+                        Keys.onEnterPressed: tab.clicked()
+                        onClicked: if (!current) Navigator.navigate(Library.routeFor(libraryId, model.type || ""))
+                        contentItem: Row {
+                            spacing: Theme.spacingSmall
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: tab.model.name || ""
+                                color: tab.current || tab.hovered ? Theme.text : Theme.textSecondary
+                                font.pixelSize: Theme.fontSizeBody
+                                font.weight: Font.Bold
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: tab.model.childCount > 0
+                                text: String(tab.model.childCount)
+                                color: Theme.textDisabled
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.Bold
+                            }
                         }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: tab.model.childCount > 0
-                            text: String(tab.model.childCount)
-                            color: Theme.textDisabled
-                            font.pixelSize: Theme.fontSizeSmall
-                            font.weight: Font.Bold
+                        background: Rectangle {
+                            radius: Theme.radius + 3
+                            color: tab.current ? Qt.alpha(Theme.text, 0.12)
+                                 : tab.hovered ? Qt.alpha(Theme.text, 0.05) : "transparent"
+                            FocusFrame { shown: tab.visualFocus; inset: 0 }
                         }
-                    }
-                    background: Rectangle {
-                        radius: Theme.radius + 3
-                        color: tab.current ? Qt.alpha(Theme.text, 0.12)
-                             : tab.hovered ? Qt.alpha(Theme.text, 0.05) : "transparent"
-                        FocusFrame { shown: tab.visualFocus; inset: 0 }
                     }
                 }
             }
-            Text {
-                objectName: "libraryCount"
-                // Not "0 items" beside an error, nor while the first page loads.
-                visible: page.library !== null && page.library.errorText.length === 0
-                         && !(page.library.loading && page.library.count === 0)
-                text: page.library ? qsTr("%n item(s)", "", page.library.count) : ""
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall
+
+            Item { Layout.fillWidth: true }
+
+            Row {
+                id: toolbar
+                spacing: Theme.spacingSmall
+
+                ActionButton {
+                    id: filtersButton
+                    objectName: "libraryFiltersButton"
+                    readonly property int active: page.activeFilters.length
+                    iconSource: Icons.tune
+                    text: active > 0 ? qsTr("Filters · %1").arg(active) : qsTr("Filters")
+                    highlighted: page.filtersOpen
+                    onClicked: page.filtersOpen = !page.filtersOpen
+                }
+                ChoiceBox {
+                    id: sort
+                    objectName: "librarySort"
+                    implicitWidth: 210
+                    model: [
+                        { value: "SortName", label: qsTr("Name") },
+                        { value: "DateCreated", label: qsTr("Date added") },
+                        { value: "PremiereDate", label: qsTr("Release date") },
+                        { value: "CommunityRating", label: qsTr("Rating") },
+                        { value: "Runtime", label: qsTr("Runtime") },
+                        { value: "DatePlayed", label: qsTr("Date played") },
+                    ]
+                    currentIndex: page.library ? indexOfValue(page.library.sortBy) : 0
+                    onActivated: {
+                        if (!page.library)
+                            return
+                        page.library.sortBy = currentValue
+                        // Newest and best first, as Jellyfin Web does.
+                        page.library.descending = currentValue !== "SortName"
+                    }
+                }
+                ChoiceBox {
+                    objectName: "libraryOrder"
+                    implicitWidth: 190
+                    model: [
+                        { value: false, label: qsTr("Ascending") },
+                        { value: true, label: qsTr("Descending") },
+                    ]
+                    currentIndex: page.library && page.library.descending ? 1 : 0
+                    onActivated: if (page.library) page.library.descending = currentValue
+                }
             }
         }
 
+        // The filters, shown by the Filters button.
         Flow {
+            objectName: "libraryFilters"
             Layout.fillWidth: true
+            visible: page.filtersOpen
             spacing: Theme.spacing
 
-            ChoiceBox {
-                id: sort
-                objectName: "librarySort"
-                model: [
-                    { value: "SortName", label: qsTr("Name") },
-                    { value: "DateCreated", label: qsTr("Date added") },
-                    { value: "PremiereDate", label: qsTr("Release date") },
-                    { value: "CommunityRating", label: qsTr("Rating") },
-                    { value: "Runtime", label: qsTr("Runtime") },
-                    { value: "DatePlayed", label: qsTr("Date played") },
-                ]
-                currentIndex: page.library ? indexOfValue(page.library.sortBy) : 0
-                onActivated: {
-                    if (!page.library)
-                        return
-                    page.library.sortBy = currentValue
-                    // Newest and best first, as Jellyfin Web does.
-                    page.library.descending = currentValue !== "SortName"
-                }
-            }
-            ChoiceBox {
-                objectName: "libraryOrder"
-                implicitWidth: 180
-                model: [
-                    { value: false, label: qsTr("Ascending") },
-                    { value: true, label: qsTr("Descending") },
-                ]
-                currentIndex: page.library && page.library.descending ? 1 : 0
-                onActivated: if (page.library) page.library.descending = currentValue
-            }
             ChoiceBox {
                 objectName: "libraryPlayed"
                 implicitWidth: 180
@@ -241,6 +292,68 @@ RoutePage {
                     text: qsTr("Favorites")
                     color: Theme.text
                     font.pixelSize: Theme.fontSizeBody
+                }
+            }
+        }
+
+        // How many, then the filters in use, each with a way to drop it.
+        Flow {
+            objectName: "libraryActiveFilters"
+            Layout.fillWidth: true
+            spacing: Theme.spacingSmall
+            Text {
+                objectName: "libraryCount"
+                height: Theme.tvMode ? 40 : 28
+                verticalAlignment: Text.AlignVCenter
+                // Not "0 items" beside an error, nor while the first page loads.
+                visible: page.library !== null && page.library.errorText.length === 0
+                         && !(page.library.loading && page.library.count === 0)
+                text: page.library ? qsTr("%n item(s)", "", page.library.count) : ""
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeBody
+                font.weight: Font.DemiBold
+                rightPadding: Theme.spacingSmall
+            }
+            Repeater {
+                model: page.activeFilters
+                T.AbstractButton {
+                    id: chip
+                    required property var modelData
+                    objectName: "filterChip_" + modelData.key
+                    implicitWidth: chipRow.implicitWidth + 24
+                    implicitHeight: Theme.tvMode ? 40 : 28
+                    focusPolicy: Qt.StrongFocus
+                    hoverEnabled: true
+                    Accessible.name: qsTr("Remove filter %1").arg(modelData.label)
+                    Keys.onReturnPressed: chip.clicked()
+                    Keys.onEnterPressed: chip.clicked()
+                    onClicked: page.dropFilter(modelData.key)
+                    contentItem: Row {
+                        id: chipRow
+                        spacing: 6
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: chip.modelData.label
+                            color: Theme.accent
+                            font.pixelSize: Theme.fontSizeSmall + 1
+                            font.weight: Font.Bold
+                        }
+                        Icon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            source: Icons.close
+                            size: Theme.tvMode ? 18 : 13
+                            color: Theme.accent
+                        }
+                    }
+                    leftPadding: 12
+                    rightPadding: 12
+                    background: Rectangle {
+                        radius: Theme.radius - 2
+                        color: Qt.alpha(Theme.accent, chip.hovered ? 0.24 : 0.14)
+                        border.width: 1
+                        border.color: Qt.alpha(Theme.accent, 0.3)
+                        FocusFrame { shown: chip.visualFocus; inset: 0 }
+                    }
                 }
             }
         }
