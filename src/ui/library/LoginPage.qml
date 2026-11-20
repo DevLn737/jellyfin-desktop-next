@@ -299,33 +299,6 @@ RoutePage {
                 width: parent.width
                 spacing: Theme.spacing
 
-                // TV mode: the recommended way, before the fields.
-                Column {
-                    width: parent.width
-                    visible: page.quickConnectFirst
-                    spacing: Theme.spacing
-                    bottomPadding: Theme.spacingLarge
-
-                    Text {
-                        width: parent.width
-                        text: qsTr("Recommended on a TV: sign in with Quick Connect, no typing needed. You get a code to enter in Jellyfin on your phone or computer.")
-                        color: Theme.text
-                        font.pixelSize: Theme.fontSizeBody
-                        wrapMode: Text.Wrap
-                    }
-                    ActionButton {
-                        id: quickConnectFirstButton
-                        objectName: "quickConnectTvButton"
-                        primary: true
-                        text: qsTr("Sign in with Quick Connect")
-                        onClicked: page.signIn.startQuickConnect()
-                    }
-                    SectionHeader {
-                        width: parent.width
-                        text: qsTr("Or with a password")
-                    }
-                }
-
                 // The server, and the way to another.
                 Rectangle {
                     objectName: "loginServer"
@@ -379,6 +352,33 @@ RoutePage {
                             verticalAlignment: Text.AlignVCenter
                         }
                         background: FocusFrame { shown: changeServer.visualFocus }
+                    }
+                }
+
+                // TV mode: the recommended way, before the fields.
+                Column {
+                    width: parent.width
+                    visible: page.quickConnectFirst
+                    spacing: Theme.spacing
+                    bottomPadding: Theme.spacingLarge
+
+                    Text {
+                        width: parent.width
+                        text: qsTr("Recommended on a TV: sign in with Quick Connect, no typing needed. You get a code to enter in Jellyfin on your phone or computer.")
+                        color: Theme.text
+                        font.pixelSize: Theme.fontSizeBody
+                        wrapMode: Text.Wrap
+                    }
+                    ActionButton {
+                        id: quickConnectFirstButton
+                        objectName: "quickConnectTvButton"
+                        primary: true
+                        text: qsTr("Sign in with Quick Connect")
+                        onClicked: page.signIn.startQuickConnect()
+                    }
+                    SectionHeader {
+                        width: parent.width
+                        text: qsTr("Or with a password")
                     }
                 }
 
