@@ -14,6 +14,7 @@ qt_add_qml_module(jfd_ui_controls
     ChoiceBox.qml
     DownloadBadge.qml
     CardRow.qml
+    Chip.qml
     FocusFrame.qml
     GlassPanel.qml
     Heading.qml
@@ -60,6 +61,9 @@ qt_add_qml_module(jfd_ui_controls
     icons/favorite-border.svg
     icons/info.svg
     icons/more.svg
+    icons/left.svg
+    icons/right.svg
+    icons/tune.svg
     icons-dark/favorite.svg
     icons-dark/favorite-border.svg
     icons-dark/info.svg
@@ -78,6 +82,9 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/settings.svg
     icons-dark/up.svg
     icons-dark/down.svg
+    icons-dark/left.svg
+    icons-dark/right.svg
+    icons-dark/tune.svg
     icons-dark/delete.svg
     icons-dark/download.svg
     icons-dark/downloaded.svg

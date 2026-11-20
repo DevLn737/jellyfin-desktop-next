@@ -173,21 +173,22 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   Screens::click(screens.find("signInButton"));
   REQUIRE(screens.waitShowing(QStringLiteral("home")));
 
-  // Home: the libraries, then rows of cards.
-  REQUIRE(screens.waitCount("librariesRow", 2));
+  // Home: the banner and rows of cards (the libraries are loaded too).
+  REQUIRE(waitFor([&] { return screens.screens->home().libraries()->count() >= 2; }, Timeout));
   REQUIRE(screens.waitCount("homeRows", 1));
   CHECK(screens.find("homeError")->property("text").toString().isEmpty());
   screens.screenshot(QStringLiteral("home"));
 
-  // The shows library from its card.
+  // The shows library from its tab on the Library page.
   const library::ItemListModel* libraries = screens.screens->home().libraries();
   int shows = -1;
   for (int row = 0; row < libraries->count(); ++row)
     if (libraries->entry(row)->item.collectionType == QLatin1String("tvshows")) shows = row;
   REQUIRE(shows >= 0);
   const QString showsId = libraries->entry(shows)->item.id;
-  Screens::click(screens.card("librariesRow", shows));
+  REQUIRE(screens.navigator->navigate(QStringLiteral("library/") + showsId));
   REQUIRE(screens.waitShowing(QStringLiteral("library/") + showsId));
+  REQUIRE(screens.waitCount("libraryTabs", 2));
 
   // The grid, then the first series.
   REQUIRE(screens.waitCount("libraryGrid", 1));
@@ -271,7 +272,7 @@ namespace {
     screens.find("password")->setProperty("text", env("JFD_TEST_PASSWORD"));
     Screens::click(screens.find("signInButton"));
     REQUIRE(screens.waitShowing(QStringLiteral("home")));
-    REQUIRE(screens.waitCount("librariesRow", 2));
+    REQUIRE(waitFor([&] { return screens.screens->home().libraries()->count() >= 2; }, Timeout));
   }
 
   // Sets a ChoiceBox the way a click on one of its entries does.
@@ -417,6 +418,9 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   REQUIRE(model != nullptr);
   CHECK(model->property("canShowCollections").toBool());
   const int movies = model->property("count").toInt();
+
+  // The filters sit in a panel behind the Filters button.
+  Screens::click(screens.find("libraryFiltersButton"));
 
   // Year: the library offers its years, and one year narrows the grid.
   REQUIRE(waitFor([&] { return model->property("availableYears").toList().size() > 0; }, Timeout));

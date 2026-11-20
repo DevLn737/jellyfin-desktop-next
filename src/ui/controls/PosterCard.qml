@@ -294,8 +294,8 @@ T.AbstractButton {
             text: card.title
             color: colors.text
             font.pixelSize: Theme.fontSizeBody
+            font.weight: Font.Bold
             elide: Text.ElideRight
-            horizontalAlignment: Text.AlignHCenter
         }
         Text {
             width: parent.width
@@ -303,8 +303,8 @@ T.AbstractButton {
             text: card.subtitle
             color: colors.textSecondary
             font.pixelSize: Theme.fontSizeSmall
+            font.weight: Font.DemiBold
             elide: Text.ElideRight
-            horizontalAlignment: Text.AlignHCenter
         }
     }
 }

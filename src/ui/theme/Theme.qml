@@ -124,7 +124,7 @@ QtObject {
                                       : windowWidth > spaciousAbove ? "spacious" : "normal"
     readonly property bool compact: sizeClass === "compact"
     // Left and right margin of a page.
-    readonly property int pageMargin: compact ? spacingLarge : sizeClass === "spacious" || tvMode ? 48 : spacingHuge
+    readonly property int pageMargin: compact ? spacingLarge : sizeClass === "spacious" || tvMode ? 56 : 44
 
     // Sizes
     readonly property int controlHeight: tvMode ? 64 : 38

@@ -36,6 +36,8 @@ namespace jfd::library {
     // Asks the module to refresh the model (returning to home); may be
     // empty.
     std::function<void()> reload;
+    // Not shown until the user turns it on in Customize home ("My media").
+    bool hiddenByDefault = false;
   };
 
   // The sections the home screen can show. Sections come and go (a module

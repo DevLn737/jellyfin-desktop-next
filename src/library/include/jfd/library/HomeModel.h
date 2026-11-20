@@ -161,6 +161,8 @@ namespace jfd::library {
 
     Row* findRow(const QString& id) const;
     bool shown(const Row& row) const;
+    // Hidden by the user, or hidden by default and never arranged.
+    bool sectionHidden(const QString& id) const;
     void syncSections();
     void scheduleUpdate();
     void addBuiltinSection(const Row& row, int order);

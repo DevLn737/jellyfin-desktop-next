@@ -27,6 +27,14 @@ FocusScope {
     // sign-in page and not in the video player.
     readonly property alias miniPlayerSlot: miniPlayerSlot
     readonly property Item currentPage: stack.currentItem
+    // The current page draws under the navigation bar.
+    readonly property bool pageUnderBar: currentPage !== null && currentPage.underTopBar === true
+    Binding {
+        target: shell.currentPage
+        property: "topInset"
+        value: Navigator.chromeVisible ? topNav.height : 0
+        when: shell.pageUnderBar
+    }
     readonly property string title: currentPage && currentPage.title ? currentPage.title : ""
     // The account in the bar (optional), and whether the server is out of
     // reach (Downloads then come into the bar).
@@ -130,6 +138,8 @@ FocusScope {
             y: Navigator.chromeVisible ? 0 : -height
             visible: y > -height
             z: 2
+            transparent: shell.currentPage !== null && shell.currentPage.underTopBar === true
+                         && shell.currentPage.topBarTransparent === true
             onSignOutRequested: shell.signOutRequested()
             onLeaveDown: stack.forceActiveFocus(Qt.TabFocusReason)
             Behavior on y { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
@@ -153,7 +163,7 @@ FocusScope {
             anchors.top: parent.top
             // At once, not with the bar's slide: the player and sign-in
             // page take the whole window from their first frame.
-            anchors.topMargin: Navigator.chromeVisible ? topNav.height : 0
+            anchors.topMargin: Navigator.chromeVisible && !shell.pageUnderBar ? topNav.height : 0
             anchors.bottom: miniPlayerSlot.top
             anchors.right: parent.right
             anchors.left: parent.left

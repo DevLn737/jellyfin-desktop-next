@@ -66,6 +66,10 @@
 <context>
     <name>jfd::library::HomeModel</name>
     <message>
+        <source>My media</source>
+        <translation>Мои медиа</translation>
+    </message>
+    <message>
         <source>Continue watching</source>
         <translation>Продолжить просмотр</translation>
     </message>

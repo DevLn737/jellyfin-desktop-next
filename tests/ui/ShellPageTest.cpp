@@ -311,6 +311,7 @@ TEST_CASE("The account menu signs out after a confirmation") {
   const QStringList entries = menu->property("entries").toStringList();
   REQUIRE(entries.size() >= 3);
   CHECK(entries.first() == QStringLiteral("Settings"));
+  CHECK(entries.contains(QStringLiteral("Customize home")));
   const int signOutIndex = int(entries.size()) - 1;
   const auto settle = [] {
     QElapsedTimer timer;
@@ -679,7 +680,7 @@ Item {
     const char* accent;
     bool depth = false;
   };
-  const Look looks[] = {{"depth", true, "#6fa8b3", true},
+  const Look looks[] = {{"depth", true, "#5fb3c6", true},
                         {"dark", true, "#00a4dc"}, {"light", false, "#00a4dc"}, {"light-purple", false, "#8e6be8"},
                         {"dark-orange", true, "#f08c2e"}};
   const QSize sizes[] = {{640, 420}, {1024, 768}, {1280, 720}, {1920, 1080}};

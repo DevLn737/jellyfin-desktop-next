@@ -177,3 +177,43 @@ TEST_CASE("The user's arrangement orders the rows, hides some and tolerates unkn
   CHECK(id(0) == QStringLiteral("resume"));
   CHECK(home.arrangement() == jfd::library::HomeArrangement{});
 }
+
+TEST_CASE("My media, the libraries as cards, shows only once the user turns it on") {
+  Server routes;
+  LibraryFixture f([&routes](const HttpRequest& r) { return routes(r); });
+  HomeModel home(f.client);
+  home.reload();
+  REQUIRE(waitFor([&] { return !home.loading(); }));
+  const auto ids = [&] {
+    QStringList shown;
+    for (int row = 0; row < home.count(); ++row)
+      shown.append(home.data(home.index(row), HomeModel::SectionIdRole).toString());
+    return shown;
+  };
+  // Hidden by default, but listed in Customize home.
+  CHECK_FALSE(ids().contains(QStringLiteral("libraries")));
+  bool listed = false;
+  for (const QVariant& section : home.sectionList()) {
+    const QVariantMap map = section.toMap();
+    if (map.value(QStringLiteral("id")).toString() == QLatin1String("libraries")) {
+      listed = true;
+      CHECK_FALSE(map.value(QStringLiteral("visible")).toBool());
+    }
+  }
+  CHECK(listed);
+
+  // Hiding another row keeps it hidden.
+  home.setSectionVisible(QStringLiteral("resume"), false);
+  CHECK_FALSE(ids().contains(QStringLiteral("libraries")));
+
+  home.setSectionVisible(QStringLiteral("libraries"), true);
+  REQUIRE(ids().contains(QStringLiteral("libraries")));
+  const int row = int(ids().indexOf(QStringLiteral("libraries")));
+  CHECK(home.rowItems(row)->count() == 3);
+  // Saved and read back, it stays on.
+  const auto saved = jfd::library::parseArrangement(jfd::library::formatArrangement(home.arrangement()));
+  home.resetArrangement();
+  CHECK_FALSE(ids().contains(QStringLiteral("libraries")));
+  home.setArrangement(saved);
+  CHECK(ids().contains(QStringLiteral("libraries")));
+}

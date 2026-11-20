@@ -155,6 +155,10 @@
         <translation>Поиск</translation>
     </message>
     <message>
+        <source>Customize home</source>
+        <translation>Настроить главную</translation>
+    </message>
+    <message>
         <source>Watch together</source>
         <translation>Смотреть вместе</translation>
     </message>

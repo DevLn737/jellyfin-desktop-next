@@ -45,12 +45,12 @@ theme is.
 
 ### The "Depth" look (default)
 
-`Palettes.depth` / `depthPalette()`: a blue-black page (`#0a0e16`), panels
+`Palettes.depth` / `depthPalette()`: a blue-black page (`#0b0e15`), panels
 of translucent glass, hairline white edges (8 %), a muted teal accent
-(`#6fa8b3`) used only for progress, the active entry and focus, near-white
-text, and a pale main button with dark text. Manrope (SIL OFL 1.1, in
+(`#5fb3c6`) used only for progress, the active entry and focus, near-white
+text, and a pale main button with dark text. Nunito (SIL OFL 1.1, in
 `src/ui/theme/fonts` with its licence) is the typeface; the application
-loads it, and a system font is used if that fails. Radius 10.
+loads it, and a system font is used if that fails. Radius 12.
 
 A palette may add optional names (`optionalColorNames()`): `glassFill`,
 `glassBorder`, `primary`, `primaryText`. `Theme` has a fallback for each

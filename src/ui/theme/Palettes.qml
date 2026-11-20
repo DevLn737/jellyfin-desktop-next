@@ -9,26 +9,26 @@ QtObject {
     // "Depth", the default look. Beside the shared names it has glass and
     // main-button colours (Theme.qml has fallbacks for palettes without them).
     readonly property var depth: ({
-        background: "#0a0e16",
+        background: "#0b0e15",
         surface: "#111826",
         surfaceRaised: "#1a2232",
         surfaceHover: "#232e42",
         border: "#14ffffff",
-        accent: "#6fa8b3",
-        accentHover: "#8ab8c1",
+        accent: "#5fb3c6",
+        accentHover: "#7dc1d1",
         accentText: "#000000",
         text: "#e8ecf2",
         textSecondary: "#aab3c1",
         textDisabled: "#6f7a8c",
         error: "#e5534b",
         success: "#3fb950",
-        focusRing: "#6fa8b3",
+        focusRing: "#5fb3c6",
         scrim: "#b0060910",
-        progress: "#6fa8b3",
-        glassFill: "#80101622",
+        progress: "#5fb3c6",
+        glassFill: "#8c121620",
         glassBorder: "#14ffffff",
         primary: "#e8ecf2",
-        primaryText: "#0a0e16",
+        primaryText: "#0b0e15",
     })
 
     readonly property var dark: ({

@@ -9,9 +9,9 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   the same drawing as its twin in `icons`, with a dark fill for light themes.
   The `licenses_check` test fails when an icon file has no row here or a row
   names a file that is gone.
-- **Manrope** typeface (`src/ui/theme/fonts`: Regular, Medium, SemiBold, Bold),
-  [SIL Open Font License 1.1](src/ui/theme/fonts/LICENSE-Manrope.txt),
-  copyright 2018 The Manrope Project Authors. Embedded unmodified; the licence
+- **Nunito** typeface (`src/ui/theme/fonts`: Regular, Medium, SemiBold, Bold,
+  ExtraBold, Black), [SIL Open Font License 1.1](src/ui/theme/fonts/LICENSE-Nunito.txt),
+  copyright 2014 The Nunito Project Authors. Embedded unmodified; the licence
   text ships with the font files.
 - **SDL3** 3.4.20 (gamepad input: the joystick, gamepad and HIDAPI
   subsystems only), [zlib licence](packaging/licenses/SDL3.txt) (copyright
@@ -39,6 +39,9 @@ only reformatted.
 | `src/ui/controls/icons/close.svg` | Material Icons `close` | Apache-2.0 |
 | `src/ui/controls/icons/delete.svg` | Material Icons `delete` | Apache-2.0 |
 | `src/ui/controls/icons/down.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
+| `src/ui/controls/icons/left.svg` | Material Icons `keyboard_arrow_left` | Apache-2.0 |
+| `src/ui/controls/icons/right.svg` | Material Icons `keyboard_arrow_right` | Apache-2.0 |
+| `src/ui/controls/icons/tune.svg` | Material Icons `tune` | Apache-2.0 |
 | `src/ui/controls/icons/download.svg` | Material Icons `download` | Apache-2.0 |
 | `src/ui/controls/icons/downloaded.svg` | Material Icons `download_done` | Apache-2.0 |
 | `src/ui/controls/icons/error.svg` | Material Icons `error` | Apache-2.0 |
@@ -62,6 +65,9 @@ only reformatted.
 | `src/ui/controls/icons-dark/close.svg` | Material Icons `close` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/delete.svg` | Material Icons `delete` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/down.svg` | Material Icons `keyboard_arrow_down` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/left.svg` | Material Icons `keyboard_arrow_left` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/right.svg` | Material Icons `keyboard_arrow_right` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/tune.svg` | Material Icons `tune` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/download.svg` | Material Icons `download` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/downloaded.svg` | Material Icons `download_done` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/error.svg` | Material Icons `error` (dark fill) | Apache-2.0 |

@@ -382,13 +382,6 @@
     </message>
 </context>
 <context>
-    <name>EpisodeRow</name>
-    <message>
-        <source>Play</source>
-        <translation>Смотреть</translation>
-    </message>
-</context>
-<context>
     <name>GenrePicker</name>
     <message>
         <source>All genres</source>
@@ -472,6 +465,14 @@
         <source>New</source>
         <translation>Новинка</translation>
     </message>
+    <message numerus="yes">
+        <source>%n season(s)</source>
+        <translation>
+            <numerusform>%n сезон</numerusform>
+            <numerusform>%n сезона</numerusform>
+            <numerusform>%n сезонов</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Resume from %1</source>
         <translation>Продолжить с %1</translation>
@@ -481,8 +482,24 @@
         <translation>Смотреть</translation>
     </message>
     <message>
+        <source>Mark as not watched</source>
+        <translation>Отметить как непросмотренное</translation>
+    </message>
+    <message>
+        <source>Mark as watched</source>
+        <translation>Отметить как просмотренное</translation>
+    </message>
+    <message>
         <source>More</source>
         <translation>Подробнее</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>Предыдущий</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Следующий</translation>
     </message>
     <message>
         <source>Remove from favorites</source>
@@ -491,14 +508,6 @@
     <message>
         <source>Add to favorites</source>
         <translation>В избранное</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n min left</source>
-        <translation>
-            <numerusform>осталась %n мин</numerusform>
-            <numerusform>осталось %n мин</numerusform>
-            <numerusform>осталось %n мин</numerusform>
-        </translation>
     </message>
     <message>
         <source>Item %1 of %2</source>
@@ -510,22 +519,6 @@
     <message>
         <source>Home</source>
         <translation>Главная</translation>
-    </message>
-    <message>
-        <source>Search the library</source>
-        <translation>Поиск по медиатеке</translation>
-    </message>
-    <message>
-        <source>Ctrl K</source>
-        <translation>Ctrl K</translation>
-    </message>
-    <message>
-        <source>Customize home</source>
-        <translation>Настроить главную</translation>
-    </message>
-    <message>
-        <source>My media</source>
-        <translation>Мои медиа</translation>
     </message>
     <message>
         <source>Nothing here yet. Add media to a library on the server.</source>
@@ -645,10 +638,6 @@
         <source>Go to series</source>
         <translation>Перейти к сериалу</translation>
     </message>
-    <message>
-        <source>Watched %1 of %2</source>
-        <translation>Просмотрено %1 из %2</translation>
-    </message>
     <message numerus="yes">
         <source>%n season(s)</source>
         <translation>
@@ -702,16 +691,16 @@
         <translation>Отметить просмотренным</translation>
     </message>
     <message>
-        <source>Seasons and episodes</source>
-        <translation>Сезоны и серии</translation>
-    </message>
-    <message>
         <source>%1 of %2 watched</source>
         <translation>%1 из %2 просмотрено</translation>
     </message>
     <message>
         <source>Next: %1</source>
         <translation>Следующая: %1</translation>
+    </message>
+    <message>
+        <source>More actions</source>
+        <translation>Другие действия</translation>
     </message>
     <message numerus="yes">
         <source>%n min left</source>
@@ -720,6 +709,14 @@
             <numerusform>осталось %n мин</numerusform>
             <numerusform>осталось %n мин</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Mark season unwatched</source>
+        <translation>Снять отметку сезона</translation>
+    </message>
+    <message>
+        <source>Mark season watched</source>
+        <translation>Отметить сезон</translation>
     </message>
     <message>
         <source>Cast and crew</source>
@@ -775,6 +772,14 @@
     <message>
         <source>Name</source>
         <translation>Название</translation>
+    </message>
+    <message>
+        <source>Filters · %1</source>
+        <translation>Фильтры · %1</translation>
+    </message>
+    <message>
+        <source>Filters</source>
+        <translation>Фильтры</translation>
     </message>
     <message>
         <source>Date added</source>
@@ -843,6 +848,10 @@
     <message>
         <source>Favorites</source>
         <translation>Избранное</translation>
+    </message>
+    <message>
+        <source>Remove filter %1</source>
+        <translation>Убрать фильтр %1</translation>
     </message>
     <message>
         <source>Nothing matches these filters.</source>

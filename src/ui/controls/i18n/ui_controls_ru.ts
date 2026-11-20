@@ -13,6 +13,21 @@
     </message>
 </context>
 <context>
+    <name>CardRow</name>
+    <message>
+        <source>Show all</source>
+        <translation>Показать все</translation>
+    </message>
+    <message>
+        <source>Scroll left</source>
+        <translation>Прокрутить влево</translation>
+    </message>
+    <message>
+        <source>Scroll right</source>
+        <translation>Прокрутить вправо</translation>
+    </message>
+</context>
+<context>
     <name>DownloadBadge</name>
     <message>
         <source>Downloaded</source>

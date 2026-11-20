@@ -578,15 +578,15 @@ namespace {
         QLocale::setDefault(QLocale(language));
       }
       // The default look, as the application sets it (ThemeInstall).
-      for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold"})
-        QFontDatabase::addApplicationFont(QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Manrope-") +
+      for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold", "ExtraBold", "Black"})
+        QFontDatabase::addApplicationFont(QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Nunito-") +
                                           QLatin1String(weight) + QStringLiteral(".ttf"));
-      QGuiApplication::setFont(QFont(QStringLiteral("Manrope")));
+      QGuiApplication::setFont(QFont(QStringLiteral("Nunito")));
       QObject* theme = engine.singletonInstance<QObject*>("Jfd.Ui.Theme", "Theme");
       REQUIRE(theme != nullptr);
       theme->setProperty("colors", ui::depthPalette());
-      theme->setProperty("radiusOverride", 10);
-      theme->setProperty("fontFamilyOverride", QStringLiteral("Manrope"));
+      theme->setProperty("radiusOverride", 12);
+      theme->setProperty("fontFamilyOverride", QStringLiteral("Nunito"));
       REQUIRE(screens->install(engine, *navigator));
       screens->ui()->setPlayHandler([](const QString&, qint64) {});
       api::JellyfinClient& client = screens->client();
@@ -697,7 +697,8 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   REQUIRE(waitFor([&] { return show.find("homeHero") != nullptr && show.find("homeHero")->property("count").toInt() == 5; }, Timeout));
   QObject* hero = show.find("homeHero");
   CHECK(hero->property("current").toInt() == 0);
-  REQUIRE(show.find("homeSearch") != nullptr);
+  // The page draws from the window's top, under a bar without a fill.
+  CHECK((show.find("topNav") == nullptr || show.find("topNav")->property("transparent").toBool()));
   CHECK(waitFor([&] {
     QQuickItem* logo = findItem(findItem(qobject_cast<QQuickItem*>(hero), QStringLiteral("heroSlide_0")),
                                 QStringLiteral("titleLogoImage"));
@@ -770,6 +771,13 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   show.screenshot(QStringLiteral("series-1280"));
   show.resize(1600, 900);
   show.screenshot(QStringLiteral("series-1600"));
+  // Scrolled to the episodes: four across, with numbers, lengths and
+  // watched marks.
+  QObject* flick = show.find("itemFlick");
+  REQUIRE(flick != nullptr);
+  flick->setProperty("contentY", 640);
+  show.screenshot(QStringLiteral("series-1600-episodes"));
+  flick->setProperty("contentY", 0);
   show.resize(1920, 1080);
   show.screenshot(QStringLiteral("series-1920"));
 
@@ -798,6 +806,23 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   CHECK(findItem(bar, QStringLiteral("letter_Я")) != nullptr);
   show.screenshot(QStringLiteral("library-1280-large"));
   library->setProperty("density", QStringLiteral("medium"));
+
+  // The Filters button shows the filters; those in use show as chips that
+  // drop them.
+  show.resize(1600, 900);
+  library->setProperty("favoritesOnly", true);
+  show.page()->setProperty("filtersOpen", true);
+  QQuickItem* chip = nullptr;
+  CHECK(waitFor([&] {
+    chip = findItem(show.page(), QStringLiteral("filterChip_favorites"));
+    return chip != nullptr && chip->isVisible();
+  }, Timeout));
+  CHECK(findItem(show.page(), QStringLiteral("libraryFilters"))->isVisible());
+  show.screenshot(QStringLiteral("library-1600-filters"));
+  REQUIRE(chip != nullptr);
+  QMetaObject::invokeMethod(chip, "clicked");
+  CHECK_FALSE(library->property("favoritesOnly").toBool());
+  show.page()->setProperty("filtersOpen", false);
 }
 
 TEST_CASE("Settings: the search leaves the matching rows and marks the words") {

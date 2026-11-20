@@ -30,7 +30,7 @@ qt_add_qml_module(jfd_ui_library
     DownloadDialog.qml
     DownloadRow.qml
     DownloadsPage.qml
-    EpisodeRow.qml
+    EpisodeCard.qml
     GenrePicker.qml
     GuidePage.qml
     HeroBackdrop.qml
