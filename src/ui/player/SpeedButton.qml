@@ -3,16 +3,19 @@ import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 
-// The playback speed in the bar, e.g. "1.25×": plain text like the icon
-// buttons around it, in the accent colour when the speed is not normal.
+// A labelled button of the player's bar: plain text like the icon buttons
+// around it ("1.25×", "−10"), with an icon before it when one is set
+// ("Episodes"). `changed` draws the text in the accent colour (a speed that
+// is not normal).
 T.Button {
     id: control
     readonly property var colors: Theme.colorsFor(control)
 
     property string toolTipText
     property bool changed: false
+    property url iconSource
 
-    implicitWidth: Math.max(Theme.controlHeight, label.implicitWidth + Theme.spacing * 2)
+    implicitWidth: Math.max(Theme.controlHeight, content.implicitWidth + Theme.spacing * 2)
     implicitHeight: Theme.controlHeight
     focusPolicy: Qt.StrongFocus
     Accessible.name: toolTipText
@@ -21,15 +24,26 @@ T.Button {
     Keys.onEnterPressed: control.clicked()
 
     contentItem: Item {
-        Text {
-            id: label
+        Row {
+            id: content
             anchors.centerIn: parent
-            text: control.text
-            color: control.changed ? control.colors.accent : control.colors.text
-            font.pixelSize: Theme.fontSizeBody
-            font.weight: Theme.fontWeightBold
-            style: Text.Outline
-            styleColor: "#80000000"
+            spacing: Theme.spacingSmall
+            Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: control.iconSource.toString().length > 0
+                source: control.iconSource
+            }
+            Text {
+                id: label
+                anchors.verticalCenter: parent.verticalCenter
+                visible: text.length > 0
+                text: control.text
+                color: control.changed ? control.colors.accent : control.colors.text
+                font.pixelSize: Theme.fontSizeBody
+                font.weight: Theme.fontWeightBold
+                style: Text.Outline
+                styleColor: "#80000000"
+            }
         }
     }
 

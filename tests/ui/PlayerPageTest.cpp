@@ -243,6 +243,29 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   CHECK(find(menu, "subtitleTrack_2") != nullptr);
   CHECK(find(menu, "subtitleTune") != nullptr);
   shoot("player-1280-tracks");
+
+  // "Size, position and delay" opens the player settings at the subtitles,
+  // and a size there is the player's (the application keeps it).
+  QMetaObject::invokeMethod(find(menu, "subtitleTune"), "clicked");
+  QQuickItem* tune = nullptr;
+  REQUIRE(waitFor([&] { return (tune = find(f.page, "tuneMenu")) != nullptr; }, 2000));
+  CHECK(tune->property("section").toString() == QStringLiteral("subtitles"));
+  QQuickItem* large = find(tune, "subtitleSize42");
+  REQUIRE(large != nullptr);
+  CHECK(large->isVisible());
+  QMetaObject::invokeMethod(large, "clicked");
+  CHECK(f.player->subtitleSize() == 42);
+  shoot("player-1280-subtitles");
+  // Back: the list with the values.
+  QMetaObject::invokeMethod(find(tune, "tuneBack"), "clicked");
+  CHECK(tune->property("section").toString().isEmpty());
+  QQuickItem* subtitlesRow = find(tune, "tuneSubtitles");
+  REQUIRE(subtitlesRow != nullptr);
+  CHECK(subtitlesRow->isVisible());
+  CHECK(subtitlesRow->property("value").toString() == QStringLiteral("Large"));
+  CHECK(find(tune, "tuneQuality")->isVisible());
+  shoot("player-1280-settings");
+  f.player->setSubtitleSize(-1);
 }
 
 TEST_CASE("The episodes panel shows each episode's still, the watched check and the progress, by season") {

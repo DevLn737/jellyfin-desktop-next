@@ -329,15 +329,36 @@ watched series, and "Picks" from `Items/Suggestions`. It is best effort: a
 failed or slow request (8 s) leaves its rows out, empty rows are not shown,
 and answers are kept for 5 minutes.
 
-### Player header and episodes
+### Player header, bar, menus and episodes
 
-The player's top bar shows the time now and "Ends at HH:MM": the time left
-at the current playback speed added to the clock, in the system's short time
-format. The bottom bar has an Episodes button (key E) that opens
-`EpisodesPanel` with the series' episodes in order (`PlayerSession.episodes`,
-the list `PlayerModel` already loads for Next and Previous); choosing one
-plays it from the start with `playEpisode`. Neither the button nor the key
-exists for a movie or in a SyncPlay group, where the queue is the server's.
+The player's top bar has a round Back, the title (for an episode the series,
+with "Season 1 · Episode 3 «Name»" under it, from the current entry of
+`PlayerSession.episodes`), the room pill in a SyncPlay group (`GroupOsd`:
+initials, status dot, room name and viewer count) and the time now with
+"Ends at HH:MM" (the time left at the current speed added to the clock, in the
+system's short format; the clock can be turned off).
+
+The bottom bar: the timeline (chapter marks, segment bands, trickplay preview
+with the chapter's name), elapsed time on the left and the time left on the
+right, then previous, the round light play/pause, next, −10 and +10, volume,
+and the part playing (segment, or chapter with "· 2/5"). On the right:
+audio and subtitles (with the subtitles' language), the speed, segments,
+Episodes, the player settings (gear), picture in picture and fullscreen. Skip
+intro/credits sits above the bar on the right.
+
+- **TracksMenu**: audio and subtitles side by side (one column in a narrow
+  window), and a row that opens the settings at the subtitles.
+- **TuneMenu** (gear): rows with their values (quality, speed, subtitles' look
+  and delay, audio delay), the automatic skip switch and Stats for nerds. A
+  row opens its choices in place under a header with Back. Subtitle size and
+  position are `PlayerSession.subtitleSize` / `subtitlePlacement`, the same
+  values as the `subtitles/size` and `subtitles/placement` settings (the
+  application keeps them in step).
+- **EpisodesSheet** (Episodes button, key E): a sheet along the bottom in
+  place of the bar, with season tabs (Page Up/Down, a gamepad's LB/RB) and a
+  strip of episode cards (number or "Now"/"Next", watched check, progress,
+  run time and overview). Choosing one plays it with `playEpisode`; in a
+  group it goes to the group's queue.
 
 ## Music screens
 

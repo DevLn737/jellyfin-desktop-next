@@ -104,6 +104,8 @@ only reformatted.
 | `src/ui/player/icons/fullscreenExit.svg` | Material Icons `fullscreen_exit` | Apache-2.0 |
 | `src/ui/player/icons/next.svg` | Material Icons `skip_next` | Apache-2.0 |
 | `src/ui/player/icons/pause.svg` | Material Icons `pause` | Apache-2.0 |
+| `src/ui/player/icons-dark/forward.svg` | Material Icons `replay`, mirrored (dark fill) | Apache-2.0 |
+| `src/ui/player/icons-dark/pause.svg` | Material Icons `pause` (dark fill) | Apache-2.0 |
 | `src/ui/player/icons/pip.svg` | Material Icons `picture_in_picture` | Apache-2.0 |
 | `src/ui/player/icons/previous.svg` | Material Icons `skip_previous` | Apache-2.0 |
 | `src/ui/player/icons/replay.svg` | Material Icons `replay` | Apache-2.0 |

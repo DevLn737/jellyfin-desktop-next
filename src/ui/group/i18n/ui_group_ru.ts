@@ -3,13 +3,13 @@
 <TS version="2.1" language="ru">
 <context>
     <name>GroupOsd</name>
-    <message numerus="yes">
-        <source>Together: %n viewer(s)</source>
-        <translation>
-            <numerusform>Вместе: %n зритель</numerusform>
-            <numerusform>Вместе: %n зрителя</numerusform>
-            <numerusform>Вместе: %n зрителей</numerusform>
-        </translation>
+    <message>
+        <source>Room «%1»</source>
+        <translation>Комната «%1»</translation>
+    </message>
+    <message>
+        <source>Together</source>
+        <translation>Вместе</translation>
     </message>
     <message>
         <source>reconnecting</source>
