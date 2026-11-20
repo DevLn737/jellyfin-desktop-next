@@ -26,6 +26,13 @@ qt_add_executable(jellyfin-desktop WIN32 MACOSX_BUNDLE
 # update check compares pre-releases with each other. A build without a tag is
 # -0.dev, which sorts below every pre-release of the same version
 # (packaging/release-version.sh); a release passes "" for none.
+# The app's own mark: the window's and taskbar's icon, and the executable's
+# on Windows.
+qt_add_resources(jellyfin-desktop jellyfin-desktop_icon PREFIX "/icons" BASE "${PROJECT_SOURCE_DIR}/packaging/icons"
+  FILES "${PROJECT_SOURCE_DIR}/packaging/icons/jellyfin-desktop-next.png")
+if(WIN32)
+  target_sources(jellyfin-desktop PRIVATE app.rc)
+endif()
 set(JFD_VERSION_SUFFIX "-0.dev" CACHE STRING "Pre-release suffix of the version, such as -beta.1")
 target_compile_definitions(jellyfin-desktop PRIVATE JFD_VERSION="${PROJECT_VERSION}${JFD_VERSION_SUFFIX}")
 set_target_properties(jellyfin-desktop PROPERTIES AUTOMOC ON)

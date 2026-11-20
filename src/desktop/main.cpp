@@ -29,6 +29,7 @@
 #include <QFileInfo>
 #include <QEventLoop>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QStandardPaths>
@@ -177,6 +178,7 @@ int main(int argc, char* argv[]) {
   desktop::requestHdrOutput(*services.settings);
 
   QGuiApplication app(argc, argv);
+  QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/jellyfin-desktop-next.png")));
 
   QCommandLineParser parser;
   parser.setApplicationDescription(QStringLiteral("Jellyfin desktop client"));

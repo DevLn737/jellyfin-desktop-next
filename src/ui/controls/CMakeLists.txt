@@ -9,6 +9,7 @@ qt_add_qml_module(jfd_ui_controls
   VERSION 1.0
   QML_FILES
     ActionButton.qml
+    AppLogo.qml
     AppDialog.qml
     CardGrid.qml
     ChoiceBox.qml
@@ -64,6 +65,9 @@ qt_add_qml_module(jfd_ui_controls
     icons/left.svg
     icons/right.svg
     icons/tune.svg
+    brand/logo.svg
+    icons/sort.svg
+    icons/filter.svg
     icons-dark/favorite.svg
     icons-dark/favorite-border.svg
     icons-dark/info.svg
@@ -85,6 +89,8 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/left.svg
     icons-dark/right.svg
     icons-dark/tune.svg
+    icons-dark/sort.svg
+    icons-dark/filter.svg
     icons-dark/delete.svg
     icons-dark/download.svg
     icons-dark/downloaded.svg

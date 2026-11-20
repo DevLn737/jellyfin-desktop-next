@@ -62,18 +62,18 @@ FocusScope {
         }
     }
 
+    // Shows the arrows. Moving the pointer does not hold the next item
+    // back: only a press does. The arrows sit in the page margins, so the
+    // area reaches out to them.
     HoverHandler {
         id: hover
-        // Hover events also come while the scene animates under a still
-        // pointer: only a real move counts.
-        property point last: Qt.point(-1, -1)
-        onPointChanged: {
-            const at = point.scenePosition
-            if (at.x !== last.x || at.y !== last.y) {
-                last = at
-                banner.postpone()
-            }
-        }
+        margin: banner.sideInset
+    }
+    // A press anywhere on the banner, buttons included (a passive grab):
+    // the next change waits a full interval.
+    PointHandler {
+        acceptedButtons: Qt.AllButtons
+        onActiveChanged: if (active) banner.postpone()
     }
 
     Timer {
@@ -317,6 +317,7 @@ FocusScope {
         objectName: "heroPrevious"
         visible: banner.count > 1 && !Theme.tvMode && (hover.hovered || hovered)
         focusPolicy: Qt.NoFocus
+        hoverEnabled: true
         anchors.left: parent.left
         anchors.leftMargin: -banner.sideInset + Math.max(4, (banner.sideInset - width) / 2)
         anchors.verticalCenter: parent.verticalCenter
@@ -330,6 +331,7 @@ FocusScope {
         objectName: "heroNext"
         visible: banner.count > 1 && !Theme.tvMode && (hover.hovered || hovered)
         focusPolicy: Qt.NoFocus
+        hoverEnabled: true
         anchors.right: parent.right
         anchors.rightMargin: -banner.sideInset + Math.max(4, (banner.sideInset - width) / 2)
         anchors.verticalCenter: parent.verticalCenter

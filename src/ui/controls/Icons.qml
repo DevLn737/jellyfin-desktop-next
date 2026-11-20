@@ -20,6 +20,8 @@ QtObject {
     readonly property url left: Qt.resolvedUrl("icons/left.svg")
     readonly property url right: Qt.resolvedUrl("icons/right.svg")
     readonly property url tune: Qt.resolvedUrl("icons/tune.svg")
+    readonly property url sort: Qt.resolvedUrl("icons/sort.svg")
+    readonly property url filter: Qt.resolvedUrl("icons/filter.svg")
     readonly property url gamepad: Qt.resolvedUrl("icons/gamepad.svg")
     readonly property url download: Qt.resolvedUrl("icons/download.svg")
     readonly property url downloaded: Qt.resolvedUrl("icons/downloaded.svg")
