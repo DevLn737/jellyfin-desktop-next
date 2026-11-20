@@ -48,7 +48,7 @@ namespace {
     b.append(char(0x80 | track));
     b.append(char((offset >> 8) & 0xff));
     b.append(char(offset & 0xff));
-    b.append(char(0x80));
+    b.append('\x80');
     return el(0xA3, b + payload);
   }
 
