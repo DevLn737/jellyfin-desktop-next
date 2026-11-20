@@ -58,6 +58,10 @@
         <translation>Вперёд</translation>
     </message>
     <message>
+        <source>Position</source>
+        <translation>Позиция</translation>
+    </message>
+    <message>
         <source>Now playing</source>
         <translation>Сейчас играет</translation>
     </message>
@@ -123,6 +127,10 @@
         <translation>Альбомы</translation>
     </message>
     <message>
+        <source>Overview</source>
+        <translation>Обзор</translation>
+    </message>
+    <message>
         <source>Artists</source>
         <translation>Исполнители</translation>
     </message>
@@ -142,13 +150,9 @@
         <source>Music</source>
         <translation>Музыка</translation>
     </message>
-    <message numerus="yes">
-        <source>%n item(s)</source>
-        <translation>
-            <numerusform>%n элемент</numerusform>
-            <numerusform>%n элемента</numerusform>
-            <numerusform>%n элементов</numerusform>
-        </translation>
+    <message>
+        <source>Play</source>
+        <translation>Играть</translation>
     </message>
     <message>
         <source>Search</source>
@@ -177,6 +181,34 @@
     <message>
         <source>Shuffle all</source>
         <translation>Перемешать всё</translation>
+    </message>
+    <message>
+        <source>Recently added</source>
+        <translation>Недавно добавленные</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n album(s)</source>
+        <translation>
+            <numerusform>%n альбом</numerusform>
+            <numerusform>%n альбома</numerusform>
+            <numerusform>%n альбомов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Favourites</source>
+        <translation>Избранное</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n track(s)</source>
+        <translation>
+            <numerusform>%n трек</numerusform>
+            <numerusform>%n трека</numerusform>
+            <numerusform>%n треков</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Recently played</source>
+        <translation>Недавно слушали</translation>
     </message>
     <message>
         <source>Nothing here yet.</source>
