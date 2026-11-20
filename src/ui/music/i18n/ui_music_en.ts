@@ -21,10 +21,17 @@
 <context>
     <name>MusicPage</name>
     <message numerus="yes">
-        <source>%n item(s)</source>
+        <source>%n album(s)</source>
         <translation>
-            <numerusform>%n item</numerusform>
-            <numerusform>%n items</numerusform>
+            <numerusform>%n album</numerusform>
+            <numerusform>%n albums</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n track(s)</source>
+        <translation>
+            <numerusform>%n track</numerusform>
+            <numerusform>%n tracks</numerusform>
         </translation>
     </message>
 </context>

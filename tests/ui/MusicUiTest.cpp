@@ -210,6 +210,20 @@ MusicPage { width: 1280; height: 720 }
   item->setParentItem(window.contentItem());
   window.show();
 
+  // The overview first: its rows, then the albums' tab.
+  QQuickItem* overview = find(item, "musicOverview");
+  REQUIRE(overview != nullptr);
+  CHECK(overview->isVisible());
+  CHECK(find(item, "musicRecentlyAdded") != nullptr);
+  if (const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS"); !dir.isEmpty()) {
+    waitFor([] { return false; }, 500);
+    window.grabWindow().save(dir + QStringLiteral("/music-1280-overview.png"));
+  }
+  QQuickItem* albumsTab = find(item, "musicTab_albums");
+  REQUIRE(albumsTab != nullptr);
+  QMetaObject::invokeMethod(albumsTab, "clicked");
+  CHECK_FALSE(overview->isVisible());
+
   QQuickItem* grid = find(item, "musicGrid");
   REQUIRE(grid != nullptr);
   CHECK(waitFor([&] { return find(item, "musicCount") != nullptr; }));
