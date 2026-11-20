@@ -29,6 +29,11 @@ FocusScope {
     readonly property int count: slides.count
     // Seconds per item when it changes by itself.
     property int interval: 8000
+    // Room kept free: the bar over the banner's top, the row that overlaps
+    // its bottom, and the page margin beside it (the arrows sit in it).
+    property real topInset: 0
+    property real bottomInset: Theme.spacingHuge
+    property real sideInset: 0
 
     implicitHeight: Theme.compact ? 340 : Theme.tvMode ? 520 : 440
     activeFocusOnTab: false
@@ -50,11 +55,25 @@ FocusScope {
     }
 
     // Called on any sign of the user: the next change waits a full interval.
-    function postpone() { if (timer.running) timer.restart() }
+    function postpone() {
+        if (timer.running) {
+            timer.restart()
+            fill.restart()
+        }
+    }
 
     HoverHandler {
         id: hover
-        onPointChanged: banner.postpone()
+        // Hover events also come while the scene animates under a still
+        // pointer: only a real move counts.
+        property point last: Qt.point(-1, -1)
+        onPointChanged: {
+            const at = point.scenePosition
+            if (at.x !== last.x || at.y !== last.y) {
+                last = at
+                banner.postpone()
+            }
+        }
     }
 
     Timer {
@@ -93,6 +112,8 @@ FocusScope {
             required property bool played
             required property var logoUrl
             required property string featuredReason
+            required property var communityRating
+            required property int childCount
 
             readonly property bool shown: index === banner.current
             readonly property bool isEpisode: type === "Episode"
@@ -122,11 +143,11 @@ FocusScope {
                 id: info
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: Theme.spacingHuge
-                width: Math.min(parent.width - Theme.spacingHuge * 3, Theme.tvMode ? 900 : 640)
+                anchors.bottomMargin: banner.bottomInset
+                width: Math.min(parent.width - Theme.spacingHuge * 3, Theme.tvMode ? 1000 : 760)
                 spacing: Theme.spacing
 
-                // Why it is here.
+                // Why it is here: "CONTINUE · S1 E3 «NAME»".
                 Text {
                     objectName: "heroEyebrow"
                     width: parent.width
@@ -135,13 +156,13 @@ FocusScope {
                                    : slide.featuredReason === "nextUp" ? qsTr("Next episode")
                                    : qsTr("New")
                         if (slide.isEpisode && slide.subtitle.length > 0)
-                            reason += " · " + slide.subtitle + " · " + slide.name
+                            reason += " · " + slide.subtitle + (slide.name.length > 0 ? " «" + slide.name + "»" : "")
                         return reason.toUpperCase()
                     }
                     color: Theme.accent
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.weight: Theme.fontWeightBold
-                    font.letterSpacing: 1.2
+                    font.pixelSize: Theme.fontSizeSmall + 1
+                    font.weight: Font.ExtraBold
+                    font.letterSpacing: 1.6
                     elide: Text.ElideRight
                 }
 
@@ -150,71 +171,79 @@ FocusScope {
                     width: parent.width
                     text: slide.title
                     source: String(slide.logoUrl || "").length > 0 ? Library.image(slide.logoUrl) : ""
-                    maxWidth: Math.min(parent.width, Theme.tvMode ? 560 : 420)
-                    maxHeight: Theme.compact ? 80 : Theme.tvMode ? 150 : 120
-                    fontSize: Theme.compact ? Theme.fontSizeHeadline : Math.round(Theme.fontSizeHeadline * 1.35)
+                    maxWidth: Math.min(parent.width, Theme.tvMode ? 760 : 600)
+                    maxHeight: Theme.compact ? 96 : Theme.tvMode ? 220 : 180
+                    fontSize: Theme.compact ? Theme.fontSizeHeadline + 8 : Theme.tvMode ? 96 : 76
+                    fontWeight: Font.Black
                 }
 
-                // Year / genres / length / age rating.
+                // Genres.
+                Flow {
+                    objectName: "heroGenres"
+                    width: parent.width
+                    spacing: Theme.spacingSmall
+                    visible: slide.genres && slide.genres.length > 0 && !Theme.compact
+                    Repeater {
+                        model: slide.genres ? slide.genres.slice(0, 3) : []
+                        Chip { required property string modelData; text: modelData }
+                    }
+                }
+
+                // Year, seasons or length, age rating, score.
                 Row {
                     objectName: "heroMeta"
-                    spacing: Theme.spacingSmall
+                    spacing: Theme.spacingLarge
                     readonly property var parts: {
                         const out = []
                         if (slide.year) out.push(String(slide.year))
-                        if (slide.genres && slide.genres.length > 0) out.push(slide.genres.slice(0, 2).join(", "))
-                        const length = slide.type !== "Series" ? Library.formatRunTime(slide.runTimeTicks || 0) : ""
-                        if (length.length > 0) out.push(length)
+                        if (slide.type === "Series") {
+                            if (slide.childCount > 0) out.push(qsTr("%n season(s)", "", slide.childCount))
+                        } else {
+                            const length = Library.formatRunTime(slide.runTimeTicks || 0)
+                            if (length.length > 0) out.push(length)
+                        }
+                        if (slide.officialRating.length > 0) out.push(slide.officialRating)
                         return out
                     }
                     Repeater {
                         model: parent.parts
-                        Row {
-                            id: part
+                        Text {
                             required property string modelData
-                            required property int index
-                            spacing: Theme.spacingSmall
-                            Text {
-                                visible: part.index > 0
-                                text: "/"
-                                color: Theme.textDisabled
-                                font.pixelSize: Theme.fontSizeBody
-                            }
-                            Text {
-                                text: part.modelData
-                                color: Theme.textSecondary
-                                font.pixelSize: Theme.fontSizeBody
-                            }
+                            text: modelData
+                            color: Theme.text
+                            opacity: 0.86
+                            font.pixelSize: Theme.fontSizeLarge
+                            font.weight: Font.DemiBold
                         }
                     }
-                    Rectangle {
-                        objectName: "heroRating"
-                        visible: slide.officialRating.length > 0
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: rating.implicitWidth + 2 * Theme.spacingSmall
-                        height: rating.implicitHeight + Theme.spacingTiny
-                        radius: Theme.radiusSmall
-                        color: "transparent"
-                        border.width: 1
-                        border.color: Theme.textDisabled
+                    Row {
+                        objectName: "heroScore"
+                        visible: (slide.communityRating || 0) > 0
+                        spacing: 4
                         Text {
-                            id: rating
-                            anchors.centerIn: parent
-                            text: slide.officialRating
-                            color: Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeSmall
+                            text: "★"
+                            color: "#f5c04a"
+                            font.pixelSize: Theme.fontSizeLarge
+                        }
+                        Text {
+                            text: Number(slide.communityRating || 0).toLocaleString(Qt.locale(), "f", 1)
+                            color: Theme.text
+                            opacity: 0.86
+                            font.pixelSize: Theme.fontSizeLarge
+                            font.weight: Font.DemiBold
                         }
                     }
                 }
 
                 Text {
                     objectName: "heroOverview"
-                    width: parent.width
+                    width: Math.min(parent.width, Theme.tvMode ? 900 : 640)
                     visible: text.length > 0 && !Theme.compact
                     text: slide.overview
-                    color: Theme.textSecondary
-                    font.pixelSize: Theme.fontSizeBody
-                    lineHeight: 1.3
+                    color: Theme.text
+                    opacity: 0.78
+                    font.pixelSize: Theme.fontSizeBody + 1
+                    lineHeight: 1.35
                     wrapMode: Text.Wrap
                     maximumLineCount: 2
                     elide: Text.ElideRight
@@ -224,13 +253,19 @@ FocusScope {
 
                 Row {
                     spacing: Theme.spacing
+                    readonly property int buttonHeight: Theme.tvMode ? 72 : Theme.compact ? Theme.controlHeight : 48
 
                     ActionButton {
                         id: playButton
                         objectName: "heroPlay"
                         primary: true
                         focus: true
+                        implicitHeight: parent.buttonHeight
+                        leftPadding: Theme.spacingHuge - 4
+                        rightPadding: Theme.spacingHuge - 4
+                        font.pixelSize: Theme.fontSizeLarge - 1
                         iconSource: Icons.play
+                        progress: slide.progress > 0 ? slide.progress : -1
                         text: slide.resumable
                             ? qsTr("Resume from %1").arg(slide.clock(slide.playbackPositionTicks))
                             : qsTr("Play")
@@ -242,64 +277,76 @@ FocusScope {
                                 Library.play(slide.itemId, slide.resumable ? slide.playbackPositionTicks : 0)
                         }
                     }
+                    IconButton {
+                        objectName: "heroFavorite"
+                        square: true
+                        implicitWidth: parent.buttonHeight
+                        implicitHeight: parent.buttonHeight
+                        iconSource: slide.favorite ? Icons.favorite : Icons.favoriteBorder
+                        toolTipText: slide.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+                        onClicked: Library.setFavorite(slide.itemId, !slide.favorite)
+                    }
+                    IconButton {
+                        objectName: "heroPlayed"
+                        square: true
+                        visible: slide.type !== "Series"
+                        implicitWidth: parent.buttonHeight
+                        implicitHeight: parent.buttonHeight
+                        iconSource: Icons.check
+                        opacity: slide.played ? 1 : 0.75
+                        toolTipText: slide.played ? qsTr("Mark as not watched") : qsTr("Mark as watched")
+                        onClicked: Library.setPlayed(slide.itemId, !slide.played, slide.favorite)
+                    }
                     ActionButton {
                         objectName: "heroMore"
+                        implicitHeight: parent.buttonHeight
+                        font.pixelSize: Theme.fontSizeLarge - 1
                         iconSource: Icons.info
                         text: qsTr("More")
                         onClicked: Navigator.navigate(slide.isEpisode && slide.seriesId.length > 0
                             ? Library.routeFor(slide.seriesId, "Series")
                             : Library.routeFor(slide.itemId, slide.type))
                     }
-                    IconButton {
-                        objectName: "heroFavorite"
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconSource: slide.favorite ? Icons.favorite : Icons.favoriteBorder
-                        toolTipText: slide.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
-                        onClicked: Library.setFavorite(slide.itemId, !slide.favorite)
-                    }
-
-                    // The part left to watch.
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: slide.progress > 0 && !Theme.compact
-                        spacing: Theme.spacingSmall
-                        leftPadding: Theme.spacingSmall
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 96
-                            height: 3
-                            radius: 1.5
-                            color: Qt.alpha(Theme.text, 0.2)
-                            Rectangle {
-                                width: parent.width * slide.progress
-                                height: parent.height
-                                radius: parent.radius
-                                color: Theme.progress
-                            }
-                        }
-                        Text {
-                            objectName: "heroLeft"
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: {
-                                const left = Math.max(0, (slide.runTimeTicks || 0) - (slide.playbackPositionTicks || 0))
-                                const minutes = Math.max(1, Math.round(left / 600000000))
-                                return qsTr("%n min left", "", minutes)
-                            }
-                            color: Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeSmall
-                        }
-                    }
                 }
             }
         }
     }
 
-    // One dot per item; the current one is longer.
+    // Previous and next, for the pointer (keys go along the dots).
+    IconButton {
+        objectName: "heroPrevious"
+        visible: banner.count > 1 && !Theme.tvMode && (hover.hovered || hovered)
+        focusPolicy: Qt.NoFocus
+        anchors.left: parent.left
+        anchors.leftMargin: -banner.sideInset + Math.max(4, (banner.sideInset - width) / 2)
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: banner.topInset / 2 - banner.bottomInset / 2
+        square: true
+        iconSource: Icons.left
+        toolTipText: qsTr("Previous")
+        onClicked: banner.show(banner.current - 1)
+    }
+    IconButton {
+        objectName: "heroNext"
+        visible: banner.count > 1 && !Theme.tvMode && (hover.hovered || hovered)
+        focusPolicy: Qt.NoFocus
+        anchors.right: parent.right
+        anchors.rightMargin: -banner.sideInset + Math.max(4, (banner.sideInset - width) / 2)
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: banner.topInset / 2 - banner.bottomInset / 2
+        square: true
+        iconSource: Icons.right
+        toolTipText: qsTr("Next")
+        onClicked: banner.show(banner.current + 1)
+    }
+
+    // One dot per item; the current one is longer and fills while the item
+    // waits for the next.
     Row {
         objectName: "heroDots"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.spacingHuge + Theme.spacing
+        anchors.bottomMargin: banner.bottomInset + Theme.spacing
         spacing: Theme.spacingTiny
         visible: banner.count > 1
         Repeater {
@@ -307,7 +354,8 @@ FocusScope {
             T.AbstractButton {
                 id: dot
                 required property int index
-                width: Theme.tvMode ? 40 : 24
+                readonly property bool active: index === banner.current
+                width: active ? (Theme.tvMode ? 64 : 44) : (Theme.tvMode ? 28 : 18)
                 height: Theme.tvMode ? 32 : 20
                 focusPolicy: Qt.StrongFocus
                 activeFocusOnTab: true
@@ -316,16 +364,37 @@ FocusScope {
                 onActiveFocusChanged: if (activeFocus) banner.current = index
                 Keys.onReturnPressed: banner.current = index
                 Keys.onEnterPressed: banner.current = index
+                Behavior on width { NumberAnimation { duration: Theme.durationNormal } }
                 Rectangle {
                     anchors.centerIn: parent
-                    width: dot.index === banner.current ? parent.width - 4 : 8
-                    height: Theme.tvMode ? 6 : 3
+                    width: dot.active ? parent.width - 4 : (Theme.tvMode ? 10 : 7)
+                    height: Theme.tvMode ? 10 : 7
                     radius: height / 2
-                    color: dot.index === banner.current ? Theme.text : Qt.alpha(Theme.text, dot.hovered ? 0.6 : 0.3)
-                    Behavior on width { NumberAnimation { duration: Theme.durationNormal } }
+                    color: Qt.alpha(Theme.text, dot.active ? 0.3 : dot.hovered ? 0.6 : 0.35)
+                    Rectangle {
+                        objectName: "heroDotFill"
+                        visible: dot.active
+                        width: parent.width * (timer.running ? banner.elapsed : 1)
+                        height: parent.height
+                        radius: parent.radius
+                        color: Theme.text
+                    }
                 }
                 FocusFrame { shown: dot.visualFocus; radius: Theme.radiusSmall }
             }
         }
     }
+
+    // How much of the wait for the next item has passed (0 to 1).
+    property real elapsed: 0
+    NumberAnimation {
+        id: fill
+        target: banner
+        property: "elapsed"
+        from: 0
+        to: 1
+        duration: banner.interval
+        running: timer.running
+    }
+    onCurrentChanged: if (fill.running) fill.restart()
 }

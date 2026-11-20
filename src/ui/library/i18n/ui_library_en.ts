@@ -38,10 +38,10 @@
 <context>
     <name>HeroBanner</name>
     <message numerus="yes">
-        <source>%n min left</source>
+        <source>%n season(s)</source>
         <translation>
-            <numerusform>%n min left</numerusform>
-            <numerusform>%n min left</numerusform>
+            <numerusform>%n season</numerusform>
+            <numerusform>%n seasons</numerusform>
         </translation>
     </message>
 </context>

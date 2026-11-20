@@ -472,6 +472,14 @@
         <source>New</source>
         <translation>Новинка</translation>
     </message>
+    <message numerus="yes">
+        <source>%n season(s)</source>
+        <translation>
+            <numerusform>%n сезон</numerusform>
+            <numerusform>%n сезона</numerusform>
+            <numerusform>%n сезонов</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Resume from %1</source>
         <translation>Продолжить с %1</translation>
@@ -481,8 +489,24 @@
         <translation>Смотреть</translation>
     </message>
     <message>
+        <source>Mark as not watched</source>
+        <translation>Отметить как непросмотренное</translation>
+    </message>
+    <message>
+        <source>Mark as watched</source>
+        <translation>Отметить как просмотренное</translation>
+    </message>
+    <message>
         <source>More</source>
         <translation>Подробнее</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>Предыдущий</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Следующий</translation>
     </message>
     <message>
         <source>Remove from favorites</source>
@@ -491,14 +515,6 @@
     <message>
         <source>Add to favorites</source>
         <translation>В избранное</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n min left</source>
-        <translation>
-            <numerusform>осталась %n мин</numerusform>
-            <numerusform>осталось %n мин</numerusform>
-            <numerusform>осталось %n мин</numerusform>
-        </translation>
     </message>
     <message>
         <source>Item %1 of %2</source>
@@ -510,22 +526,6 @@
     <message>
         <source>Home</source>
         <translation>Главная</translation>
-    </message>
-    <message>
-        <source>Search the library</source>
-        <translation>Поиск по медиатеке</translation>
-    </message>
-    <message>
-        <source>Ctrl K</source>
-        <translation>Ctrl K</translation>
-    </message>
-    <message>
-        <source>Customize home</source>
-        <translation>Настроить главную</translation>
-    </message>
-    <message>
-        <source>My media</source>
-        <translation>Мои медиа</translation>
     </message>
     <message>
         <source>Nothing here yet. Add media to a library on the server.</source>

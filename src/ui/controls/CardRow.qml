@@ -17,15 +17,91 @@ FocusScope {
     // Height of the tallest card; set it so the row does not resize while
     // images load.
     property int cardHeight: Math.round(Theme.posterWidth / Theme.posterAspect) + Theme.cardCaptionHeight
+    // A "Show all" link beside the title.
+    property bool canShowAll: false
+    signal showAllClicked()
+
+    // Scrolls by about a page (the arrows beside the title).
+    function page(direction) {
+        const target = Math.max(list.originX, Math.min(list.originX + list.contentWidth - list.width,
+                                                     list.contentX + direction * list.width * 0.85))
+        scroll.to = target
+        scroll.restart()
+    }
 
     implicitWidth: 800
     implicitHeight: header.implicitHeight + Theme.spacingSmall + cardHeight
     activeFocusOnTab: true
 
-    SectionHeader {
+    Item {
         id: header
-        text: row.title
+        objectName: "cardRowHeader"
         visible: row.title.length > 0
+        width: parent.width
+        implicitHeight: Math.max(title.implicitHeight, tools.height)
+
+        SectionHeader {
+            id: title
+            anchors.left: parent.left
+            anchors.right: tools.left
+            anchors.rightMargin: Theme.spacing
+            anchors.verticalCenter: parent.verticalCenter
+            text: row.title
+        }
+        // For the pointer: keys move along the cards.
+        Row {
+            id: tools
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Theme.spacingSmall
+            readonly property bool scrolls: list.contentWidth > list.width + 1
+            height: scrolls || row.canShowAll ? (Theme.tvMode ? 48 : 34) : 0
+            visible: !Theme.tvMode
+
+            ActionButton {
+                objectName: "cardRowShowAll"
+                visible: row.canShowAll
+                focusPolicy: Qt.NoFocus
+                height: parent.height
+                leftPadding: Theme.spacing
+                rightPadding: Theme.spacing
+                font.pixelSize: Theme.fontSizeSmall + 1
+                text: qsTr("Show all")
+                onClicked: row.showAllClicked()
+            }
+            IconButton {
+                objectName: "cardRowPrevious"
+                visible: tools.scrolls
+                focusPolicy: Qt.NoFocus
+                square: true
+                width: parent.height
+                height: parent.height
+                enabled: list.contentX > list.originX + 1
+                iconSource: Icons.left
+                toolTipText: qsTr("Scroll left")
+                onClicked: row.page(-1)
+            }
+            IconButton {
+                objectName: "cardRowNext"
+                visible: tools.scrolls
+                focusPolicy: Qt.NoFocus
+                square: true
+                width: parent.height
+                height: parent.height
+                enabled: list.contentX + list.width < list.originX + list.contentWidth - 1
+                iconSource: Icons.right
+                toolTipText: qsTr("Scroll right")
+                onClicked: row.page(1)
+            }
+        }
+    }
+
+    NumberAnimation {
+        id: scroll
+        target: list
+        property: "contentX"
+        duration: Theme.durationSlow
+        easing.type: Theme.easing
     }
 
     ListView {

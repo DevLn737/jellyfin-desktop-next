@@ -8,8 +8,9 @@ import Jfd.Ui.Controls
 import Jfd.Ui.Shell
 import Jfd.Ui.Library
 
-// Home: the user's libraries, then Continue watching, Next up and the
-// latest items of each library. Up and Down move between rows, Left and
+// Home: the featured banner from the window's top, then Continue watching,
+// Next up and the latest items of each library ("My media", the libraries
+// as cards, when turned on in Customize home). Up and Down move between rows, Left and
 // Right along a row. Coming back to the page refreshes the rows in place.
 // Without the server, when there are downloads, the page shows them
 // instead: a "No connection to the server" banner and rows of what is
@@ -26,6 +27,14 @@ RoutePage {
 
     title: qsTr("Home")
     hasTopBar: true
+    // The banner reaches the window's top, under a bar without a fill while
+    // the page is at its top.
+    underTopBar: true
+    topBarTransparent: !offlineHome && heroBanner !== null && heroBanner.visible
+                       && rows.contentY - rows.originY < Theme.spacingLarge
+
+    // How far the first row reaches up into the banner.
+    readonly property int rowOverlap: Theme.compact || Theme.tvMode ? 0 : 118
 
     readonly property Item heroBanner: rows.headerItem ? rows.headerItem.heroBanner : null
 
@@ -42,12 +51,8 @@ RoutePage {
         }
     }
 
-    // Today, for the date over the banner; set again when the page shows.
-    property date today: new Date()
-
     Component.onCompleted: if (home) home.reload()
     Basic.StackView.onActivated: {
-        today = new Date()
         if (home && home.count > 0) home.reload()
     }
 
@@ -63,7 +68,7 @@ RoutePage {
         objectName: "homeHeroBackdrop"
         z: -1
         width: page.width
-        height: page.heroBanner ? page.heroBanner.y + page.heroBanner.height + Theme.spacingHuge * 2 : 0
+        height: page.heroBanner ? page.heroBanner.y + page.heroBanner.height : 0
         y: -(rows.contentY - rows.originY)
         visible: !page.offlineHome && page.heroBanner !== null && page.heroBanner.visible
         model: page.home ? page.home.featured : null
@@ -79,13 +84,16 @@ RoutePage {
         anchors.leftMargin: Theme.pageMargin
         anchors.rightMargin: Theme.pageMargin
         focus: !page.offlineHome
-        clip: true
+        // Not clipped at the sides, so the banner's arrows can sit in the
+        // page margin (each row clips its own cards; the page clips the top
+        // and bottom).
+        clip: false
         spacing: Theme.spacingHuge
         keyNavigationEnabled: true
         boundsBehavior: Flickable.StopAtBounds
         highlightMoveDuration: Theme.durationNormal
         highlightRangeMode: ListView.ApplyRange
-        preferredHighlightBegin: Theme.spacingHuge
+        preferredHighlightBegin: page.topInset + Theme.spacingHuge
         preferredHighlightEnd: height - Theme.spacingHuge
         // Rows are tall; keep one more on each side ready.
         cacheBuffer: 600
@@ -96,8 +104,9 @@ RoutePage {
         header: Column {
             readonly property alias heroBanner: hero
             width: rows.width
-            topPadding: Theme.spacingLarge
-            bottomPadding: Theme.spacingHuge
+            topPadding: hero.visible ? 0 : page.topInset + Theme.spacingLarge
+            // The first row reaches up into the banner.
+            bottomPadding: hero.visible ? -page.rowOverlap : Theme.spacingLarge
             spacing: Theme.spacingLarge
 
             StateMessage {
@@ -110,122 +119,16 @@ RoutePage {
                 onRetry: if (page.home) page.home.reload()
             }
 
-            // The date, the search field (it opens Ctrl+K) and the
-            // home page's settings.
-            Item {
-                objectName: "homeTopBar"
-                width: parent.width
-                height: Theme.controlHeight
-                Text {
-                    objectName: "homeDate"
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: {
-                        const date = Qt.locale().toString(page.today, "dddd, d MMMM")
-                        return date.charAt(0).toUpperCase() + date.slice(1)
-                    }
-                    color: Theme.textSecondary
-                    font.pixelSize: Theme.fontSizeBody
-                    visible: !Theme.compact
-                }
-                Row {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.spacingSmall
-                    T.AbstractButton {
-                        id: searchField
-                        objectName: "homeSearch"
-                        width: Theme.compact ? 220 : Theme.tvMode ? 480 : 300
-                        height: Theme.controlHeight
-                        focusPolicy: Qt.StrongFocus
-                        activeFocusOnTab: true
-                        Accessible.role: Accessible.EditableText
-                        Accessible.name: qsTr("Search the library")
-                        onClicked: CommandRegistry.requestPalette()
-                        Keys.onReturnPressed: CommandRegistry.requestPalette()
-                        Keys.onEnterPressed: CommandRegistry.requestPalette()
-                        KeyNavigation.down: hero.count > 0 ? hero : libraries
-                        background: Rectangle {
-                            radius: Theme.radiusLarge
-                            color: searchField.hovered ? Theme.surfaceHover : Theme.panelFill
-                            border.width: 1
-                            border.color: Theme.glassBorder
-                            FocusFrame { shown: searchField.visualFocus; radius: Theme.radiusLarge }
-                        }
-                        contentItem: Item {
-                            Icon {
-                                id: searchIcon
-                                anchors.left: parent.left
-                                anchors.leftMargin: Theme.spacing
-                                anchors.verticalCenter: parent.verticalCenter
-                                size: Theme.iconSize - 4
-                                source: Icons.search
-                                color: Theme.textSecondary
-                                opacity: 0.8
-                            }
-                            Text {
-                                anchors.left: searchIcon.right
-                                anchors.leftMargin: Theme.spacingSmall
-                                anchors.right: shortcut.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: qsTr("Search the library")
-                                color: Theme.textDisabled
-                                font.pixelSize: Theme.fontSizeBody
-                                elide: Text.ElideRight
-                            }
-                            Rectangle {
-                                id: shortcut
-                                anchors.right: parent.right
-                                anchors.rightMargin: Theme.spacingSmall
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: !Theme.tvMode
-                                width: shortcutText.implicitWidth + Theme.spacingSmall
-                                height: shortcutText.implicitHeight + 4
-                                radius: Theme.radiusSmall
-                                color: "transparent"
-                                border.width: 1
-                                border.color: Theme.border
-                                Text {
-                                    id: shortcutText
-                                    anchors.centerIn: parent
-                                    text: qsTr("Ctrl K")
-                                    color: Theme.textDisabled
-                                    font.pixelSize: Theme.fontSizeSmall - 1
-                                }
-                            }
-                        }
-                    }
-                    IconButton {
-                        id: customize
-                        objectName: "customizeHomeButton"
-                        iconSource: Icons.settings
-                        toolTipText: qsTr("Customize home")
-                        onClicked: Navigator.navigate("customizeHome")
-                        KeyNavigation.down: hero.count > 0 ? hero : libraries
-                    }
-                }
-            }
-
             HeroBanner {
                 id: hero
                 objectName: "homeHero"
                 width: parent.width
                 visible: count > 0
-                height: visible ? implicitHeight : 0
+                height: visible ? Math.max(Theme.compact ? 420 : 560, Math.round(page.height * (Theme.tvMode ? 0.78 : 0.86))) : 0
+                topInset: page.topInset
+                bottomInset: page.rowOverlap + Theme.spacingHuge
+                sideInset: Theme.pageMargin
                 model: page.home ? page.home.featured : null
-                KeyNavigation.down: libraries
-            }
-
-            CardRow {
-                id: libraries
-                objectName: "librariesRow"
-                width: parent.width
-                visible: count > 0
-                title: qsTr("My media")
-                model: page.home ? page.home.libraries : null
-                cardHeight: Math.round(Theme.thumbWidth / Theme.thumbAspect) + Theme.cardCaptionHeight
-                delegate: ItemCard { shape: "thumb" }
-                KeyNavigation.down: rows
             }
 
             // While the first rows load: grey cards where they will be.
@@ -267,6 +170,9 @@ RoutePage {
 
             objectName: "homeRow_" + (kind === "recommend" || kind === "section" ? sectionId : kind)
             width: rows.width
+            // "Show all": a library's latest row opens that library.
+            canShowAll: kind === "latest" && sectionId.startsWith("latest/")
+            onShowAllClicked: Navigator.navigate("library/" + sectionId.slice(7))
             focus: ListView.isCurrentItem
             model: items
             cardHeight: Math.round(Theme.cardWidthFor(cardShape) / Theme.cardAspectFor(cardShape)) + Theme.cardCaptionHeight
@@ -314,7 +220,7 @@ RoutePage {
 
         header: Column {
             width: offlineRows.width
-            topPadding: Theme.spacingLarge
+            topPadding: page.topInset + Theme.spacingLarge
             bottomPadding: Theme.spacingLarge
             spacing: Theme.spacing
 

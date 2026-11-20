@@ -16,6 +16,9 @@ T.Button {
     readonly property color primaryHoverFill: colors.primary !== undefined ? Qt.darker(colors.primary, 1.1) : colors.accentHover
     readonly property color primaryOn: colors.primaryText !== undefined ? colors.primaryText : colors.accentText
     property url iconSource
+    // The part already watched, as a line along the bottom edge (0 to 1);
+    // below 0 there is none.
+    property real progress: -1
 
     implicitWidth: Math.max(implicitBackgroundWidth, implicitContentWidth + leftPadding + rightPadding)
     implicitHeight: Theme.controlHeight
@@ -56,6 +59,18 @@ T.Button {
             ? (control.down || control.hovered ? control.primaryHoverFill : control.primaryFill)
             : (control.down ? colors.surfaceHover : control.hovered ? colors.surfaceHover : colors.surfaceRaised)
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+
+        Rectangle {
+            objectName: "buttonProgress"
+            visible: control.progress >= 0
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: parent.radius / 2
+            width: (parent.width - parent.radius) * Math.max(0, Math.min(1, control.progress))
+            height: 3
+            radius: 1.5
+            color: colors.progress
+        }
 
         FocusFrame { shown: control.visualFocus }
     }

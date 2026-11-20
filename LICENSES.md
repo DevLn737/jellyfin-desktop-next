@@ -39,6 +39,9 @@ only reformatted.
 | `src/ui/controls/icons/close.svg` | Material Icons `close` | Apache-2.0 |
 | `src/ui/controls/icons/delete.svg` | Material Icons `delete` | Apache-2.0 |
 | `src/ui/controls/icons/down.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
+| `src/ui/controls/icons/left.svg` | Material Icons `keyboard_arrow_left` | Apache-2.0 |
+| `src/ui/controls/icons/right.svg` | Material Icons `keyboard_arrow_right` | Apache-2.0 |
+| `src/ui/controls/icons/tune.svg` | Material Icons `tune` | Apache-2.0 |
 | `src/ui/controls/icons/download.svg` | Material Icons `download` | Apache-2.0 |
 | `src/ui/controls/icons/downloaded.svg` | Material Icons `download_done` | Apache-2.0 |
 | `src/ui/controls/icons/error.svg` | Material Icons `error` | Apache-2.0 |
@@ -62,6 +65,9 @@ only reformatted.
 | `src/ui/controls/icons-dark/close.svg` | Material Icons `close` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/delete.svg` | Material Icons `delete` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/down.svg` | Material Icons `keyboard_arrow_down` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/left.svg` | Material Icons `keyboard_arrow_left` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/right.svg` | Material Icons `keyboard_arrow_right` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/tune.svg` | Material Icons `tune` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/download.svg` | Material Icons `download` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/downloaded.svg` | Material Icons `download_done` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/error.svg` | Material Icons `error` (dark fill) | Apache-2.0 |

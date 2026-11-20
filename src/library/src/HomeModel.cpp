@@ -102,8 +102,9 @@ namespace jfd::library {
   void HomeModel::follow(LibraryUpdates& updates) {
     connect(&updates, &LibraryUpdates::userDataChanged, this,
             [this](const api::UserItemData& data) {
-              for (const auto& row : m_rows)
-                row->items->applyUserData(data);
+              for (const auto& row : m_rows) {
+                if (row->items) row->items->applyUserData(data);
+              }
               m_featured.applyUserData(data);
               if (m_recommendations != nullptr) {
                 // Recommended cards show watched state too.
@@ -172,7 +173,9 @@ namespace jfd::library {
       CardShape shape;
       int order;
     };
-    QList<Spec> specs{{QStringLiteral("resume"), QStringLiteral("resume"), {}, tr("Continue watching"), CardShape::Thumb, 10},
+    // "My media", the libraries as cards: off unless the user turns it on.
+    QList<Spec> specs{{QStringLiteral("libraries"), QStringLiteral("libraries"), {}, tr("My media"), CardShape::Thumb, 5},
+                      {QStringLiteral("resume"), QStringLiteral("resume"), {}, tr("Continue watching"), CardShape::Thumb, 10},
                       {QStringLiteral("nextUp"), QStringLiteral("nextUp"), {}, tr("Next up"), CardShape::Thumb, 20}};
     int latestOrder = 100;
     for (int i = 0; i < m_libraries.count(); ++i) {
@@ -199,8 +202,14 @@ namespace jfd::library {
         row->kind = spec.kind;
         row->libraryId = spec.libraryId;
         row->shape = shapeName(spec.shape);
-        row->items = std::make_unique<ItemListModel>();
-        row->model = row->items.get();
+        if (spec.kind == QLatin1String("libraries")) {
+          // The libraries the model already has.
+          row->model = &m_libraries;
+          row->loaded = true;
+        } else {
+          row->items = std::make_unique<ItemListModel>();
+          row->model = row->items.get();
+        }
       }
       row->title = spec.title;
       rows.push_back(std::move(row));
@@ -237,9 +246,11 @@ namespace jfd::library {
     m_syncing = false;
     Q_EMIT sectionListChanged();
 
-    m_pending += static_cast<int>(m_rows.size());
+    // Every request is counted before the first can answer.
+    m_pending += static_cast<int>(std::count_if(m_rows.begin(), m_rows.end(), [](const auto& row) { return row->items != nullptr; }));
     for (const auto& owned : m_rows) {
       Row* row = owned.get();
+      if (!row->items) continue;
       auto done = [this, generation, row](api::Result<api::ItemPage> r) {
         fill(generation, row, std::move(r));
       };
@@ -259,6 +270,7 @@ namespace jfd::library {
     section.cardShape = row.shape;
     section.defaultOrder = order;
     section.model = row.model;
+    section.hiddenByDefault = row.kind == QLatin1String("libraries");
     m_sections.add(std::move(section));
   }
 
@@ -288,7 +300,13 @@ namespace jfd::library {
 
   bool HomeModel::shown(const Row& row) const {
     return row.loaded && row.model != nullptr && row.model->rowCount() > 0 &&
-           !m_arrangement.hidden.contains(row.id);
+           !sectionHidden(row.id);
+  }
+
+  bool HomeModel::sectionHidden(const QString& id) const {
+    if (m_arrangement.hidden.contains(id)) return true;
+    const HomeSection* section = m_sections.find(id);
+    return section != nullptr && section->hiddenByDefault && !m_arrangement.order.contains(id);
   }
 
   void HomeModel::scheduleUpdate() {
@@ -491,7 +509,7 @@ namespace jfd::library {
       if (section == nullptr) continue;
       list.append(QVariantMap{{QStringLiteral("id"), id},
                               {QStringLiteral("title"), section->title},
-                              {QStringLiteral("visible"), !m_arrangement.hidden.contains(id)}});
+                              {QStringLiteral("visible"), !sectionHidden(id)}});
     }
     return list;
   }
@@ -509,7 +527,13 @@ namespace jfd::library {
     if (!m_sections.contains(id)) return;
     // The whole order is kept once the user has touched it, so a section
     // that appears later does not jump in front of what they arranged.
-    if (m_arrangement.order.isEmpty()) m_arrangement.order = m_sections.displayOrder({});
+    if (m_arrangement.order.isEmpty()) {
+      // Sections hidden by default stay hidden in the arrangement made now.
+      for (const QString& other : m_sections.displayOrder({})) {
+        if (sectionHidden(other) && !m_arrangement.hidden.contains(other)) m_arrangement.hidden.append(other);
+      }
+      m_arrangement.order = m_sections.displayOrder({});
+    }
     if (visible) {
       m_arrangement.hidden.removeAll(id);
     } else if (!m_arrangement.hidden.contains(id)) {

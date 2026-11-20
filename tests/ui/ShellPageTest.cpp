@@ -311,6 +311,7 @@ TEST_CASE("The account menu signs out after a confirmation") {
   const QStringList entries = menu->property("entries").toStringList();
   REQUIRE(entries.size() >= 3);
   CHECK(entries.first() == QStringLiteral("Settings"));
+  CHECK(entries.contains(QStringLiteral("Customize home")));
   const int signOutIndex = int(entries.size()) - 1;
   const auto settle = [] {
     QElapsedTimer timer;

@@ -8,7 +8,7 @@ Text {
     readonly property var colors: Theme.colorsFor(header)
 
     color: colors.text
-    font.pixelSize: Theme.fontSizeLarge
-    font.weight: Theme.fontWeightBold
+    font.pixelSize: Theme.fontSizeTitle
+    font.weight: Font.ExtraBold
     elide: Text.ElideRight
 }

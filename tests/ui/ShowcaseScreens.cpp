@@ -697,7 +697,8 @@ TEST_CASE("Home: the banner features what is being watched, then the newest, wit
   REQUIRE(waitFor([&] { return show.find("homeHero") != nullptr && show.find("homeHero")->property("count").toInt() == 5; }, Timeout));
   QObject* hero = show.find("homeHero");
   CHECK(hero->property("current").toInt() == 0);
-  REQUIRE(show.find("homeSearch") != nullptr);
+  // The page draws from the window's top, under a bar without a fill.
+  CHECK((show.find("topNav") == nullptr || show.find("topNav")->property("transparent").toBool()));
   CHECK(waitFor([&] {
     QQuickItem* logo = findItem(findItem(qobject_cast<QQuickItem*>(hero), QStringLiteral("heroSlide_0")),
                                 QStringLiteral("titleLogoImage"));

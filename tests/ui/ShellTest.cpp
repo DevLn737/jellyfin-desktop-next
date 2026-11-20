@@ -32,7 +32,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   };
   // The built-in entries, in their order.
   CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("group"), QStringLiteral("search"),
-                             QStringLiteral("settings")});
+                             QStringLiteral("settings"), QStringLiteral("customizeHome")});
   CHECK_FALSE(navigator.navigate(QStringLiteral("music")));
 
   RouteSpec music;
@@ -47,7 +47,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   navigator.registerPage(QStringLiteral("album"), QUrl(QStringLiteral("qrc:/Album.qml")));
 
   CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("group"), QStringLiteral("search"),
-                             QStringLiteral("music"), QStringLiteral("settings")});
+                             QStringLiteral("music"), QStringLiteral("settings"), QStringLiteral("customizeHome")});
   const QVariantMap entry = navigator.sidebarEntries().at(3).toMap();
   CHECK(entry.value(QStringLiteral("text")).toString() == QStringLiteral("Music"));
   CHECK(entry.value(QStringLiteral("icon")).toString() == QStringLiteral("music"));
@@ -71,7 +71,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   navigator.setRouteAvailable(QStringLiteral("music"), false);
   CHECK(sidebar.count() == 1);
   CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("group"), QStringLiteral("search"),
-                             QStringLiteral("settings")});
+                             QStringLiteral("settings"), QStringLiteral("customizeHome")});
   navigator.setRouteAvailable(QStringLiteral("music"), false);
   CHECK(sidebar.count() == 1);
   navigator.setRouteAvailable(QStringLiteral("music"), true);
@@ -164,7 +164,7 @@ TEST_CASE("Navigation entries say where they show: top bar, account menu or libr
   };
   CHECK(placements() == QStringList{QStringLiteral("home:primary"), QStringLiteral("library:primary"),
                                     QStringLiteral("group:primary"), QStringLiteral("search:primary"),
-                                    QStringLiteral("settings:account")});
+                                    QStringLiteral("settings:account"), QStringLiteral("customizeHome:account")});
   RouteSpec tv;
   tv.name = QStringLiteral("livetv");
   tv.hasSidebarEntry = true;

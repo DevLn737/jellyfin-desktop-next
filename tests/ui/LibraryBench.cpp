@@ -186,7 +186,7 @@ namespace {
     screens.load();
     if (!screens.waitDrawn([&] {
           return screens.showing(QStringLiteral("home")) && screens.count("homeRows") > 0 &&
-                 screens.count("librariesRow") > 0;
+                 screens.screens->home().libraries()->count() > 0;
         }))
       return fail(QStringLiteral("home did not show"));
     const qint64 startupMs = g_sinceMain.elapsed();

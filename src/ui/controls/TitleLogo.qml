@@ -14,6 +14,7 @@ Item {
     property int maxWidth: 480
     property int maxHeight: 140
     property int fontSize: Theme.fontSizeHeadline
+    property int fontWeight: Theme.fontWeightBold
     property int maximumLineCount: 2
     readonly property bool showsLogo: logo.status === Image.Ready && source.length > 0
 
@@ -46,7 +47,7 @@ Item {
         text: title.text
         color: Theme.colorsFor(title).text
         font.pixelSize: title.fontSize
-        font.weight: Theme.fontWeightBold
+        font.weight: title.fontWeight
         lineHeight: 1.05
         wrapMode: Text.Wrap
         maximumLineCount: title.maximumLineCount
