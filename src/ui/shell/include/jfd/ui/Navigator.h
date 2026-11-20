@@ -13,7 +13,11 @@ namespace jfd::ui {
 
   // What a screen module says about a route when it registers it.
   struct RouteSpec {
-    // A sidebar entry: where the route is listed.
+    // Where a navigation entry shows: in the top bar, in the account menu,
+    // or as a tab of the Library page.
+    enum class Placement { Primary, AccountMenu, LibraryTab };
+
+    // A navigation entry: where the route is listed.
     struct SidebarEntry {
       // A name in Jfd.Ui.Controls.Icons ("home") or an icon file URL.
       QString icon;
@@ -24,12 +28,18 @@ namespace jfd::ui {
       const char* translationContext = nullptr;
       // Ascending; ties keep the order of registration.
       int order = 0;
+      Placement placement = Placement::Primary;
     };
 
     QString name;
     // "album/<id>": the route needs an argument (and may be stacked many
     // times); the others take none and are returned to, not repeated.
     bool takesArgument = false;
+    // "library" and "library/<id>": the argument may be left out. Such a
+    // route is never stacked twice: going to it returns to the page in the
+    // stack, and a different argument replaces that page's entry (the
+    // Library page's tabs do not add history).
+    bool optionalArgument = false;
     // Going there clears the stack (login, home).
     bool root = false;
     // The shell shows its sidebar and mini-player; false on login and in
@@ -41,7 +51,7 @@ namespace jfd::ui {
   };
 
   // Page navigation by route. A route is a name with an optional argument:
-  // "login", "home", "library/<id>", "item/<id>", "search", "player",
+  // "login", "home", "library" or "library/<id>", "item/<id>", "search", "player",
   // "group", "settings". Screen modules register a RouteSpec for a name
   // (a page, whether it takes an argument, a sidebar entry); names without
   // a page show a placeholder, so navigation works before every screen
@@ -61,8 +71,12 @@ namespace jfd::ui {
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY currentChanged)
     // False on login and in the player: the shell hides its sidebar.
     Q_PROPERTY(bool chromeVisible READ chromeVisible NOTIFY currentChanged)
-    // The sidebar's entries, in order, of routes that are available: maps
-    // with "route", "text", "icon" and "order".
+    // The navigation entries, in order, of routes that are available: maps
+    // with "route", "text", "icon", "order" and "placement" ("primary",
+    // "account" or "libraryTab").
+    Q_PROPERTY(QVariantList navEntries READ navEntries NOTIFY sidebarChanged)
+    // navEntries without the Library entry, for the sidebar (which lists
+    // the libraries themselves).
     Q_PROPERTY(QVariantList sidebarEntries READ sidebarEntries NOTIFY sidebarChanged)
 
   public:
@@ -100,6 +114,7 @@ namespace jfd::ui {
     // is left for home.
     void setRouteClosed(const QString& name, bool closed);
     bool routeClosed(const QString& name) const { return m_closed.contains(name); }
+    QVariantList navEntries() const;
     QVariantList sidebarEntries() const;
     Q_INVOKABLE QUrl pageFor(const QString& name) const;
     // Shown for names without a registered page.

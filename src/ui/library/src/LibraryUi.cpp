@@ -16,6 +16,8 @@ namespace jfd::ui {
     Q_LOGGING_CATEGORY(lcLibraryUi, "jfd.ui.library")
 
     constexpr qint64 TicksPerMinute = 600'000'000;
+    // In the filters store, beside the libraries' filters: the library opened last.
+    const QString LastLibraryKey = QStringLiteral("_lastLibrary");
   } // namespace
 
   LibraryUi::LibraryUi(QObject* parent) : QObject(parent) {}
@@ -82,6 +84,7 @@ namespace jfd::ui {
     model->setLibraryId(libraryId);
     const QJsonObject saved = m_services.readFilters ? m_services.readFilters() : m_filters;
     model->applyFilters(saved.value(libraryId).toObject());
+    rememberLibrary(libraryId);
     connect(model, &library::LibraryModel::queryChanged, this, [this, model, libraryId] {
       QJsonObject all = m_services.readFilters ? m_services.readFilters() : m_filters;
       const QJsonObject filters = model->filters();
@@ -206,6 +209,37 @@ namespace jfd::ui {
     const library::ItemListModel* libraries = m_services.home->libraries();
     const int row = libraries->rowOf(libraryId);
     return row < 0 ? QString() : libraries->entry(row)->item.name;
+  }
+
+  QString LibraryUi::defaultLibraryId() const {
+    if (m_services.home == nullptr) return {};
+    const library::ItemListModel* libraries = m_services.home->libraries();
+    const QJsonObject saved = m_services.readFilters ? m_services.readFilters() : m_filters;
+    const QString last = saved.value(LastLibraryKey).toString();
+    const auto browsable = [](const QString& type) {
+      return type != QStringLiteral("music") && type != QStringLiteral("playlists") &&
+             type != QStringLiteral("livetv");
+    };
+    if (!last.isEmpty()) {
+      const int row = libraries->rowOf(last);
+      if (row >= 0 && browsable(libraries->entry(row)->item.collectionType)) return last;
+    }
+    for (int row = 0; row < libraries->count(); ++row) {
+      const auto* entry = libraries->entry(row);
+      if (browsable(entry->item.collectionType)) return entry->item.id;
+    }
+    return {};
+  }
+
+  void LibraryUi::rememberLibrary(const QString& libraryId) {
+    if (libraryId.isEmpty()) return;
+    QJsonObject all = m_services.readFilters ? m_services.readFilters() : m_filters;
+    if (all.value(LastLibraryKey).toString() == libraryId) return;
+    all.insert(LastLibraryKey, libraryId);
+    if (m_services.writeFilters)
+      m_services.writeFilters(all);
+    else
+      m_filters = all;
   }
 
   QString LibraryUi::collectionTypeOf(const QString& libraryId) const {

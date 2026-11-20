@@ -31,7 +31,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
     return routes;
   };
   // The built-in entries, in their order.
-  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("search"), QStringLiteral("group"),
+  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("group"), QStringLiteral("search"),
                              QStringLiteral("settings")});
   CHECK_FALSE(navigator.navigate(QStringLiteral("music")));
 
@@ -46,7 +46,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   navigator.registerRoute(album);
   navigator.registerPage(QStringLiteral("album"), QUrl(QStringLiteral("qrc:/Album.qml")));
 
-  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("search"), QStringLiteral("group"),
+  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("group"), QStringLiteral("search"),
                              QStringLiteral("music"), QStringLiteral("settings")});
   const QVariantMap entry = navigator.sidebarEntries().at(3).toMap();
   CHECK(entry.value(QStringLiteral("text")).toString() == QStringLiteral("Music"));
@@ -70,7 +70,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   QSignalSpy sidebar(&navigator, &Navigator::sidebarChanged);
   navigator.setRouteAvailable(QStringLiteral("music"), false);
   CHECK(sidebar.count() == 1);
-  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("search"), QStringLiteral("group"),
+  CHECK(ids() == QStringList{QStringLiteral("home"), QStringLiteral("group"), QStringLiteral("search"),
                              QStringLiteral("settings")});
   navigator.setRouteAvailable(QStringLiteral("music"), false);
   CHECK(sidebar.count() == 1);
@@ -149,6 +149,62 @@ TEST_CASE("Commands are listed when available and run by id") {
   commands.remove(QStringLiteral("navigate.home"));
   commands.remove(QStringLiteral("navigate.home"));
   CHECK(changes.count() == 1);
+}
+
+TEST_CASE("Navigation entries say where they show: top bar, account menu or library tab") {
+  Navigator navigator;
+  const auto placements = [&] {
+    QStringList listed;
+    for (const QVariant& entry : navigator.navEntries()) {
+      const QVariantMap map = entry.toMap();
+      listed.append(map.value(QStringLiteral("route")).toString() + QLatin1Char(':') +
+                    map.value(QStringLiteral("placement")).toString());
+    }
+    return listed;
+  };
+  CHECK(placements() == QStringList{QStringLiteral("home:primary"), QStringLiteral("library:primary"),
+                                    QStringLiteral("group:primary"), QStringLiteral("search:primary"),
+                                    QStringLiteral("settings:account")});
+  RouteSpec tv;
+  tv.name = QStringLiteral("livetv");
+  tv.hasSidebarEntry = true;
+  tv.sidebar.text = QStringLiteral("Live TV");
+  tv.sidebar.order = 160;
+  tv.sidebar.placement = RouteSpec::Placement::LibraryTab;
+  navigator.registerRoute(tv);
+  CHECK(placements().at(2) == QStringLiteral("livetv:libraryTab"));
+  // The sidebar lists the libraries themselves, not a Library entry.
+  for (const QVariant& entry : navigator.sidebarEntries())
+    CHECK(entry.toMap().value(QStringLiteral("route")).toString() != QStringLiteral("library"));
+}
+
+TEST_CASE("Library takes an optional argument and its tabs replace the history entry") {
+  Navigator navigator;
+  QSignalSpy changes(&navigator, &Navigator::stackChanged);
+  CHECK(navigator.parse(QStringLiteral("library")).name == QStringLiteral("library"));
+  CHECK(navigator.parse(QStringLiteral("library/movies")).argument == QStringLiteral("movies"));
+  CHECK(navigator.parse(QStringLiteral("library/")).name.isEmpty());
+  CHECK(navigator.parse(QStringLiteral("library/a/b")).name.isEmpty());
+
+  REQUIRE(navigator.reset(QStringLiteral("home")));
+  CHECK(navigator.navigate(QStringLiteral("library")));
+  CHECK(navigator.stack() == QStringList{QStringLiteral("home"), QStringLiteral("library")});
+  // A tab: the same page's entry, no new history.
+  changes.clear();
+  CHECK(navigator.navigate(QStringLiteral("library/shows")));
+  CHECK(navigator.stack() == QStringList{QStringLiteral("home"), QStringLiteral("library/shows")});
+  REQUIRE(changes.count() == 1);
+  CHECK(changes.last().at(0).value<Navigator::Operation>() == Navigator::Operation::Replace);
+  // From an item opened in the library, Library goes back to the grid and
+  // keeps its tab; an old "library/<id>" address switches it.
+  CHECK(navigator.navigate(QStringLiteral("item/1")));
+  CHECK(navigator.navigate(QStringLiteral("library")));
+  CHECK(navigator.stack() == QStringList{QStringLiteral("home"), QStringLiteral("library/shows")});
+  CHECK(navigator.navigate(QStringLiteral("item/1")));
+  CHECK(navigator.navigate(QStringLiteral("library/movies")));
+  CHECK(navigator.stack() == QStringList{QStringLiteral("home"), QStringLiteral("library/movies")});
+  CHECK(navigator.back());
+  CHECK(navigator.currentRoute() == QStringLiteral("home"));
 }
 
 TEST_CASE("The navigator keeps a stack and tells the view what to do") {

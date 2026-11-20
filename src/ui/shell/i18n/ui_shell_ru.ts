@@ -147,6 +147,10 @@
         <translation>Главная</translation>
     </message>
     <message>
+        <source>Library</source>
+        <translation>Библиотека</translation>
+    </message>
+    <message>
         <source>Search</source>
         <translation>Поиск</translation>
     </message>

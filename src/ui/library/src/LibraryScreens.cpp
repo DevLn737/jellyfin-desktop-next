@@ -138,6 +138,7 @@ namespace jfd::ui {
     liveTv.sidebar.text = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Live TV"));
     liveTv.sidebar.translationContext = "Sidebar";
     liveTv.sidebar.order = 160;
+    liveTv.sidebar.placement = RouteSpec::Placement::LibraryTab;
     navigator.registerRoute(liveTv);
     navigator.setRouteAvailable(liveTv.name, m_liveTv.available());
     QObject::connect(&m_liveTv, &library::LiveTvChannels::availableChanged, &navigator,

@@ -105,6 +105,7 @@ namespace jfd::ui {
     downloads.sidebar.text = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Downloads"));
     downloads.sidebar.translationContext = "Sidebar";
     downloads.sidebar.order = 250;
+    downloads.sidebar.placement = RouteSpec::Placement::AccountMenu;
     navigator.registerRoute(downloads);
   }
 
