@@ -382,13 +382,6 @@
     </message>
 </context>
 <context>
-    <name>EpisodeRow</name>
-    <message>
-        <source>Play</source>
-        <translation>Смотреть</translation>
-    </message>
-</context>
-<context>
     <name>GenrePicker</name>
     <message>
         <source>All genres</source>
@@ -645,10 +638,6 @@
         <source>Go to series</source>
         <translation>Перейти к сериалу</translation>
     </message>
-    <message>
-        <source>Watched %1 of %2</source>
-        <translation>Просмотрено %1 из %2</translation>
-    </message>
     <message numerus="yes">
         <source>%n season(s)</source>
         <translation>
@@ -702,16 +691,16 @@
         <translation>Отметить просмотренным</translation>
     </message>
     <message>
-        <source>Seasons and episodes</source>
-        <translation>Сезоны и серии</translation>
-    </message>
-    <message>
         <source>%1 of %2 watched</source>
         <translation>%1 из %2 просмотрено</translation>
     </message>
     <message>
         <source>Next: %1</source>
         <translation>Следующая: %1</translation>
+    </message>
+    <message>
+        <source>More actions</source>
+        <translation>Другие действия</translation>
     </message>
     <message numerus="yes">
         <source>%n min left</source>
@@ -720,6 +709,14 @@
             <numerusform>осталось %n мин</numerusform>
             <numerusform>осталось %n мин</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Mark season unwatched</source>
+        <translation>Снять отметку сезона</translation>
+    </message>
+    <message>
+        <source>Mark season watched</source>
+        <translation>Отметить сезон</translation>
     </message>
     <message>
         <source>Cast and crew</source>

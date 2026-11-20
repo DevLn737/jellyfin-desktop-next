@@ -771,6 +771,13 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   show.screenshot(QStringLiteral("series-1280"));
   show.resize(1600, 900);
   show.screenshot(QStringLiteral("series-1600"));
+  // Scrolled to the episodes: four across, with numbers, lengths and
+  // watched marks.
+  QObject* flick = show.find("itemFlick");
+  REQUIRE(flick != nullptr);
+  flick->setProperty("contentY", 640);
+  show.screenshot(QStringLiteral("series-1600-episodes"));
+  flick->setProperty("contentY", 0);
   show.resize(1920, 1080);
   show.screenshot(QStringLiteral("series-1920"));
 
