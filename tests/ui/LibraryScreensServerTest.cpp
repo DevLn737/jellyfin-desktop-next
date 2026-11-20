@@ -419,6 +419,9 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   CHECK(model->property("canShowCollections").toBool());
   const int movies = model->property("count").toInt();
 
+  // The filters sit in a panel behind the Filters button.
+  Screens::click(screens.find("libraryFiltersButton"));
+
   // Year: the library offers its years, and one year narrows the grid.
   REQUIRE(waitFor([&] { return model->property("availableYears").toList().size() > 0; }, Timeout));
   QObject* year = screens.find("libraryYear");
