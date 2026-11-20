@@ -398,7 +398,11 @@ TEST_CASE("Download shows the total and queues on Enter; without permission ther
   REQUIRE(waitFor([&] { return scene.focusIn(QStringLiteral("dialogAccept")); }));
   scene.key(Qt::Key_Return);
   REQUIRE(waitFor([&] { return scene.queue->order().size() == 2; }));
-  REQUIRE(waitFor([&] { return button->property("text").toString().startsWith(QStringLiteral("Downloading")); }));
+  // Queued, not yet transferring: the season says so, as one item would.
+  REQUIRE(waitFor([&] {
+    const QString text = button->property("text").toString();
+    return text.startsWith(QStringLiteral("Waiting")) || text.startsWith(QStringLiteral("Downloading"));
+  }));
   CHECK(shown(root, QStringLiteral("deleteDownloadButton")));
   CHECK_FALSE(messages.isEmpty());
 
