@@ -236,14 +236,16 @@ namespace jfd::offline {
 
   bool extractMatroskaAudio(const QString& input, const QString& output, const QString& language,
                             QString* error) {
+    QFile out(output);
     const auto fail = [&](const QString& why) {
+      // Closed first: Windows does not delete an open file.
+      out.close();
       if (error) *error = why;
       QFile::remove(output);
       return false;
     };
     QFile in(input);
     if (!in.open(QIODevice::ReadOnly)) return fail(QStringLiteral("cannot open the input"));
-    QFile out(output);
     if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
       return fail(QStringLiteral("cannot write the output"));
     Reader reader(in);
