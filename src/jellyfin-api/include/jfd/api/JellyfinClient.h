@@ -132,6 +132,9 @@ namespace jfd::api {
     // than MinimumServerVersion.
     void publicServerInfo(QObject* context, Callback<PublicServerInfo> done);
     void quickConnectEnabled(QObject* context, Callback<bool> done);
+    // GET Users/Public: the users the server lists on its sign-in screen
+    // (none when the administrator hides them).
+    void publicUsers(QObject* context, Callback<QList<UserInfo>> done);
     // Whether the server has the SyncPlay playback-rate extension. Probes
     // POST SyncPlay/SetPlaybackRate with an out-of-range rate, which the
     // extension rejects (403 outside a group, 400 inside one) without changing

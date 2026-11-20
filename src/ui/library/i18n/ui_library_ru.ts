@@ -915,12 +915,28 @@
         <translation>Войти</translation>
     </message>
     <message>
+        <source>Media library</source>
+        <translation>Медиатека</translation>
+    </message>
+    <message>
         <source>Connect to a server</source>
         <translation>Подключение к серверу</translation>
     </message>
     <message>
         <source>Quick Connect</source>
         <translation>Быстрое подключение</translation>
+    </message>
+    <message>
+        <source>Who&apos;s watching?</source>
+        <translation>Кто смотрит?</translation>
+    </message>
+    <message>
+        <source>Choose a profile or sign in</source>
+        <translation>Выберите профиль или войдите</translation>
+    </message>
+    <message>
+        <source>Sign in to your account</source>
+        <translation>Войдите в свою учётную запись</translation>
     </message>
     <message>
         <source>Your servers</source>
@@ -945,6 +961,14 @@
     <message>
         <source>Search again</source>
         <translation>Искать снова</translation>
+    </message>
+    <message>
+        <source>Change</source>
+        <translation>Сменить</translation>
+    </message>
+    <message>
+        <source>Other</source>
+        <translation>Другой</translation>
     </message>
     <message>
         <source>User name</source>
@@ -1105,6 +1129,30 @@
     <message>
         <source>Search</source>
         <translation>Поиск</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>Все</translation>
+    </message>
+    <message>
+        <source>Films</source>
+        <translation>Фильмы</translation>
+    </message>
+    <message>
+        <source>Series</source>
+        <translation>Сериалы</translation>
+    </message>
+    <message>
+        <source>Episodes</source>
+        <translation>Эпизоды</translation>
+    </message>
+    <message>
+        <source>People</source>
+        <translation>Люди</translation>
+    </message>
+    <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
     </message>
     <message>
         <source>Nothing found.</source>

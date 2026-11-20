@@ -25,7 +25,7 @@ namespace jfd::library {
       m_sent.clear();
       m_items.reset();
       m_people.reset();
-      m_results.setEntries({});
+      setAll({});
       setLoading(false);
       setError({});
       return;
@@ -35,6 +35,14 @@ namespace jfd::library {
 
   void SearchModel::follow(LibraryUpdates& updates) {
     connect(&updates, &LibraryUpdates::userDataChanged, &m_results, &ItemListModel::applyUserData);
+    // The entries of other kinds keep it too, for when their tab shows.
+    connect(&updates, &LibraryUpdates::userDataChanged, this, [this](const api::UserItemData& data) {
+      for (ItemListModel::Entry& entry : m_all) {
+        if (entry.item.id != data.itemId) continue;
+        entry.item.userData = data;
+        entry.item.userData.itemId.clear();
+      }
+    });
   }
 
   void SearchModel::submit() {
@@ -95,7 +103,52 @@ namespace jfd::library {
       if (person.type.isEmpty()) person.type = QStringLiteral("Person");
       entries.append({person, cardImageUrl(m_client, person, CardShape::Poster, pixels)});
     }
-    m_results.setEntries(std::move(entries));
+    setAll(std::move(entries));
+  }
+
+  QString SearchModel::kindOf(const QString& type) {
+    if (type == QLatin1String("Movie") || type == QLatin1String("Video")) return QStringLiteral("movies");
+    if (type == QLatin1String("Series")) return QStringLiteral("series");
+    if (type == QLatin1String("Episode")) return QStringLiteral("episodes");
+    if (type == QLatin1String("Person")) return QStringLiteral("people");
+    if (type == QLatin1String("MusicAlbum") || type == QLatin1String("MusicArtist") ||
+        type == QLatin1String("Playlist") || type == QLatin1String("Audio"))
+      return QStringLiteral("music");
+    return {};
+  }
+
+  void SearchModel::setAll(QList<ItemListModel::Entry> entries) {
+    m_all = std::move(entries);
+    QVariantMap counts;
+    counts.insert(QStringLiteral("all"), static_cast<int>(m_all.size()));
+    for (const ItemListModel::Entry& entry : m_all) {
+      const QString kind = kindOf(entry.item.type);
+      if (!kind.isEmpty()) counts.insert(kind, counts.value(kind).toInt() + 1);
+    }
+    if (counts != m_counts) {
+      m_counts = counts;
+      Q_EMIT countsChanged();
+    }
+    showKind();
+  }
+
+  void SearchModel::setKind(const QString& kind) {
+    const QString value = kind.isEmpty() ? QStringLiteral("all") : kind;
+    if (value == m_kind) return;
+    m_kind = value;
+    Q_EMIT kindChanged();
+    showKind();
+  }
+
+  void SearchModel::showKind() {
+    if (m_kind == QLatin1String("all")) {
+      m_results.setEntries(m_all);
+      return;
+    }
+    QList<ItemListModel::Entry> shown;
+    for (const ItemListModel::Entry& entry : m_all)
+      if (kindOf(entry.item.type) == m_kind) shown.append(entry);
+    m_results.setEntries(std::move(shown));
   }
 
   void SearchModel::setLoading(bool loading) {

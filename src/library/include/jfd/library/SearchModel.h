@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QVariantMap>
 
 #include <optional>
 
@@ -30,6 +31,11 @@ namespace jfd::library {
     Q_PROPERTY(jfd::library::ItemListModel* results READ results CONSTANT)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
+    // Which results show: "all", "movies", "series", "episodes", "people"
+    // or "music". The answer is not asked again for a change.
+    Q_PROPERTY(QString kind READ kind WRITE setKind NOTIFY kindChanged)
+    // How many results of each kind the latest answer has, "all" included.
+    Q_PROPERTY(QVariantMap counts READ counts NOTIFY countsChanged)
 
   public:
     struct Options {
@@ -49,6 +55,11 @@ namespace jfd::library {
     ItemListModel* results() { return &m_results; }
     bool loading() const { return m_loading; }
     QString errorText() const { return m_errorText; }
+    QString kind() const { return m_kind; }
+    void setKind(const QString& kind);
+    QVariantMap counts() const { return m_counts; }
+    // The kind a result of `type` belongs to ("movies", ..., or "").
+    static QString kindOf(const QString& type);
 
     void follow(LibraryUpdates& updates);
 
@@ -59,12 +70,17 @@ namespace jfd::library {
     void textChanged();
     void loadingChanged();
     void errorTextChanged();
+    void kindChanged();
+    void countsChanged();
 
   private:
     void setLoading(bool loading);
     void setError(const QString& text);
     // Shows the results once both requests answered.
     void finish();
+    // Fills the results with the latest answer's entries of the kind shown.
+    void showKind();
+    void setAll(QList<ItemListModel::Entry> entries);
 
     api::JellyfinClient& m_client;
     Options m_options;
@@ -78,6 +94,9 @@ namespace jfd::library {
     std::optional<QList<api::Item>> m_people;
     bool m_loading = false;
     QString m_errorText;
+    QString m_kind = QStringLiteral("all");
+    QList<ItemListModel::Entry> m_all;
+    QVariantMap m_counts;
   };
 
 } // namespace jfd::library

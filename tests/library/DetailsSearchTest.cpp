@@ -212,6 +212,19 @@ TEST_CASE("Search finds tracks and people; people come last") {
   // A track without a cover of its own shows its album's.
   CHECK(results.entry(0)->imageUrl.path() == QStringLiteral("/Items/al1/Images/Primary"));
 
+  // The tabs: counts by kind, and a kind shows only its results.
+  const QVariantMap counts = search.counts();
+  CHECK(counts.value(QStringLiteral("all")).toInt() == 3);
+  CHECK(counts.value(QStringLiteral("music")).toInt() == 1);
+  CHECK(counts.value(QStringLiteral("movies")).toInt() == 1);
+  CHECK(counts.value(QStringLiteral("people")).toInt() == 1);
+  CHECK_FALSE(counts.contains(QStringLiteral("series")));
+  search.setKind(QStringLiteral("people"));
+  REQUIRE(results.count() == 1);
+  CHECK(results.entry(0)->item.type == QStringLiteral("Person"));
+  search.setKind(QStringLiteral("all"));
+  CHECK(results.count() == 3);
+
   const HttpRequest* items = nullptr;
   const HttpRequest* people = nullptr;
   for (const HttpRequest& r : f.server.requests()) {

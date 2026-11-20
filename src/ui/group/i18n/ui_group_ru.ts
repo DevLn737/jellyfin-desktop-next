@@ -58,6 +58,22 @@
         <translation>Синхронно (%1 мс)</translation>
     </message>
     <message>
+        <source>Watch together</source>
+        <translation>Смотреть вместе</translation>
+    </message>
+    <message>
+        <source>The video plays in step for everyone in the room.</source>
+        <translation>Видео идёт синхронно у всех участников.</translation>
+    </message>
+    <message>
+        <source>You are in the room</source>
+        <translation>Вы в комнате</translation>
+    </message>
+    <message>
+        <source>Room «%1»</source>
+        <translation>Комната «%1»</translation>
+    </message>
+    <message>
         <source>Speed for everyone: %1</source>
         <translation>Скорость для всех: %1</translation>
     </message>
@@ -68,10 +84,6 @@
     <message>
         <source>Open the player</source>
         <translation>Открыть плеер</translation>
-    </message>
-    <message>
-        <source>Members (%1)</source>
-        <translation>Участники (%1)</translation>
     </message>
     <message>
         <source>Your delay to the server: %1 ms</source>
@@ -115,6 +127,10 @@
     <message>
         <source>Watch together</source>
         <translation>Смотреть вместе</translation>
+    </message>
+    <message>
+        <source>Rooms are seen by everyone on this server. The video plays in step for everyone in the room.</source>
+        <translation>Комнаты видны всем на этом сервере. Видео идёт синхронно у всех участников.</translation>
     </message>
     <message>
         <source>Rooms show up again when the server can be reached.</source>

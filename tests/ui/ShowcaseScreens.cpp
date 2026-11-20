@@ -630,6 +630,14 @@ namespace {
       QQuickItem* current = page();
       return current == nullptr ? nullptr : current->findChild<QObject*>(QString::fromLatin1(name));
     }
+    // Through the visual tree too, for delegates.
+    static QQuickItem* findItem(QQuickItem* item, const QString& name) {
+      if (item == nullptr || item->objectName() == name) return item;
+      for (QQuickItem* child : item->childItems())
+        if (QQuickItem* found = findItem(child, name)) return found;
+      return nullptr;
+    }
+    QQuickItem* item(const char* name) const { return findItem(page(), QString::fromLatin1(name)); }
 
     void resize(int width, int height) {
       window->resize(width, height);
@@ -833,6 +841,14 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
   REQUIRE(list != nullptr);
   const int all = list->property("count").toInt();
   CHECK(all > 10);
+  show.resize(1600, 900);
+  // The section list: one entry per section; choosing one scrolls to it.
+  REQUIRE(waitFor([&] { return show.item("settingsSection_diagnostics") != nullptr; }, Timeout));
+  show.screenshot(QStringLiteral("settings-1600"));
+  QMetaObject::invokeMethod(show.item("settingsSection_diagnostics"), "clicked");
+  CHECK(waitFor([&] { return list->property("contentY").toDouble() > 100; }, Timeout));
+  CHECK(waitFor([&] { return show.item("settingsSection_diagnostics")->property("current").toBool(); }, Timeout));
+  show.screenshot(QStringLiteral("settings-1600-diagnostics"));
   show.find("settingsSearch")->setProperty("text", QStringLiteral("цвет"));
   CHECK(waitFor([&] { return list->property("count").toInt() > 0 && list->property("count").toInt() < all; }, Timeout));
   show.resize(1600, 900);

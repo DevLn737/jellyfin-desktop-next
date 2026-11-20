@@ -62,11 +62,14 @@ namespace {
   struct Routes {
     int quickConnectPolls = 0;
     QString password = QStringLiteral("secret");
+    // Users/Public; empty: answered like the rest (not a list).
+    QByteArray publicUsers;
 
     HttpResponse operator()(const HttpRequest& r) {
       const QString p = r.path;
       if (p == QLatin1String("/System/Info/Public")) return ok(Info);
       if (p == QLatin1String("/QuickConnect/Enabled")) return ok("true");
+      if (p == QLatin1String("/Users/Public") && !publicUsers.isEmpty()) return ok(publicUsers);
       if (p == QLatin1String("/Users/AuthenticateByName")) {
         const QJsonObject body = QJsonDocument::fromJson(r.body).object();
         if (body.value(QStringLiteral("Username")).toString() != QLatin1String("alice") ||
@@ -160,6 +163,17 @@ namespace {
     QQuickItem* find(const char* name) const {
       QQuickItem* current = page();
       return current == nullptr ? nullptr : current->findChild<QQuickItem*>(QString::fromLatin1(name));
+    }
+    // Through the visual tree, for delegates.
+    QQuickItem* item(const char* name) const {
+      std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* node) -> QQuickItem* {
+        if (node == nullptr || node->objectName() == QLatin1String(name)) return node;
+        const QList<QQuickItem*> children = node->childItems();
+        for (QQuickItem* child : children)
+          if (QQuickItem* found = walk(child)) return found;
+        return nullptr;
+      };
+      return walk(page());
     }
 
     // The TextInput of an InputField.
@@ -416,4 +430,49 @@ TEST_CASE("TV sign-in with Quick Connect: Select shows the code, Back cancels it
   REQUIRE(screens.waitStep(SignIn::Step::QuickConnect));
   REQUIRE(screens.waitStep(SignIn::Step::SignedIn));
   REQUIRE(waitFor([&] { return screens.navigator->currentRoute() == QLatin1String("home"); }, Timeout));
+}
+
+TEST_CASE("Who's watching: the server's users fill the name; nothing else changes without them") {
+  Screens screens;
+  QQuickWindow& window = *screens.window;
+  screens.routes.publicUsers = R"([{"Id": "u1", "Name": "alice", "HasPassword": true},
+                                   {"Id": "u2", "Name": "bob", "HasPassword": false}])";
+  screens.screens->signIn().connectToServer(screens.server.url().toString());
+  REQUIRE(screens.waitStep(SignIn::Step::Credentials));
+  REQUIRE(waitFor([&] { return screens.item("loginUser_bob") != nullptr; }, Timeout));
+  REQUIRE(screens.item("loginUser_alice") != nullptr);
+  CHECK(screens.item("loginUserOther")->isVisible());
+  // Every user and the way to another server are reachable by arrows.
+  screens.checkNoTraps();
+
+  const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
+  if (!dir.isEmpty()) {
+    // As on a desktop.
+    QObject* theme = screens.engine.singletonInstance<QObject*>("Jfd.Ui.Theme", "Theme");
+    REQUIRE(theme != nullptr);
+    theme->setProperty("tvMode", false);
+    waitFor([] { return false; }, 300);
+    CHECK(window.grabWindow().save(dir + QStringLiteral("/login-users.png")));
+  }
+
+  // A user: the name, and the password next.
+  QMetaObject::invokeMethod(screens.item("loginUser_alice"), "clicked");
+  CHECK(screens.input("userName")->property("text").toString() == QStringLiteral("alice"));
+  CHECK(window.activeFocusItem() == screens.input("password"));
+  CHECK(screens.item("loginUser_alice")->property("selected").toBool());
+  // Other: an empty name to type.
+  QMetaObject::invokeMethod(screens.item("loginUserOther"), "clicked");
+  CHECK(screens.input("userName")->property("text").toString().isEmpty());
+  CHECK(window.activeFocusItem() == screens.input("userName"));
+
+  // Change: back to the servers.
+  QMetaObject::invokeMethod(screens.find("changeServer"), "clicked");
+  REQUIRE(screens.waitStep(SignIn::Step::ChooseServer));
+  // A server that hides its users: the plain form.
+  screens.routes.publicUsers = "[]";
+  screens.screens->signIn().connectToServer(screens.server.url().toString());
+  REQUIRE(screens.waitStep(SignIn::Step::Credentials));
+  waitFor([] { return false; }, 200);
+  CHECK(screens.screens->signIn().publicUsers().isEmpty());
+  CHECK_FALSE(screens.find("loginUsers")->isVisible());
 }

@@ -127,6 +127,10 @@ namespace jfd::library {
     m_server = SavedServer{};
     m_server.url = url;
     m_userName = preferredUserName;
+    if (!m_publicUsers.isEmpty()) {
+      m_publicUsers.clear();
+      Q_EMIT publicUsersChanged();
+    }
     Q_EMIT serverChanged();
     setStep(Step::CheckingServer);
     m_client.publicServerInfo(this, [this, attempt](api::Result<api::PublicServerInfo> info) {
@@ -138,6 +142,18 @@ namespace jfd::library {
       }
       m_server.id = info->id;
       m_server.name = info->name;
+      // Not waited for: without them the form is the same, with a name field.
+      m_client.publicUsers(this, [this, attempt](api::Result<QList<api::UserInfo>> users) {
+        if (attempt != m_attempt || !users) return;
+        QVariantList list;
+        for (const api::UserInfo& user : *users)
+          list.append(QVariantMap{{QStringLiteral("id"), user.id},
+                                  {QStringLiteral("name"), user.name},
+                                  {QStringLiteral("hasPassword"), user.hasPassword}});
+        if (list == m_publicUsers) return;
+        m_publicUsers = list;
+        Q_EMIT publicUsersChanged();
+      });
       m_client.quickConnectEnabled(this, [this, attempt](api::Result<bool> enabled) {
         if (attempt != m_attempt) return;
         m_quickConnect = enabled.ok() && enabled.value();

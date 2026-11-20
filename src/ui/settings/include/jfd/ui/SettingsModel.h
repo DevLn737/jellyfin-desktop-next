@@ -5,6 +5,7 @@
 #include <QSortFilterProxyModel>
 #include <QList>
 #include <QUrl>
+#include <QVariantList>
 #include <qqmlintegration.h>
 
 namespace jfd::settings {
@@ -77,6 +78,9 @@ namespace jfd::ui {
     Q_PROPERTY(jfd::ui::SettingsModel* settings READ settings WRITE setSettings NOTIFY settingsChanged)
     Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+    // The sections left, in screen order: { id, title, row } with the row
+    // of their first setting (the screen's section list).
+    Q_PROPERTY(QVariantList sections READ sections NOTIFY countChanged)
   public:
     explicit SettingsSearch(QObject* parent = nullptr);
 
@@ -85,6 +89,7 @@ namespace jfd::ui {
     QString text() const { return m_text; }
     void setText(const QString& text);
     int count() const { return rowCount(); }
+    QVariantList sections() const;
 
   Q_SIGNALS:
     void settingsChanged();

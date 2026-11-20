@@ -308,6 +308,18 @@ collection's items but not an item's collections, so `CollectionIndex`
 lists every collection once, remembers who is in which, and builds again
 after a library change.
 
+Sign-in is a glass card on a gradient lit by the accent. Once a server
+answers, `SignIn.publicUsers` (from `GET Users/Public`, not waited for) puts
+the server's users above the fields ("Who's watching?"): a user fills the
+name and moves to the password, "Other" clears the name. A server that hides
+its users, or does not answer, shows the plain form. "Change" on the server
+line goes back to the servers. TV mode keeps Quick Connect first.
+
+Search has a large field and tabs by kind (All, Films, Series, Episodes,
+People, Music) with how many of each the latest answer holds
+(`SearchModel.kind`, `SearchModel.counts`). A tab filters the answer
+already there; nothing is asked again, and empty kinds have no tab.
+
 ### Home sections and recommendations
 
 Every row of the home screen is a `library::HomeSection` (id, translated
@@ -397,6 +409,11 @@ sidebar and the library page.
 value)`, `AppSettings.trigger(key)` for actions. Read `AppSettings.revision`
 in a binding so it re-evaluates when values change. See
 [settings.md](settings.md) for registering a section.
+
+The settings page lists the sections on the left (`SettingsSearch.sections`,
+under the search field; hidden below 900 px) and the settings on the right,
+one card per section. A section on the left scrolls to its card, and the
+section whose card is at the top is marked.
 
 ## Tests
 
@@ -533,9 +550,10 @@ the owner decides on "Rooms") is `GroupPage`, which shows one of two pages:
   rooms whose queue holds something the user may not see), "No connection"
   while `Library.online` is false, a refusal from the server in words above
   the list.
-- `RoomPage` in a room: the former group screen (members, our own delay to
-  the server, the speed for everyone as text (anyone changes it in the
-  player), queue, how well we keep up, Open the player, Leave room).
+- `RoomPage` in a room: a panel with the state, the room's name, what plays
+  and how well we keep up, the speed for everyone as text (anyone changes it
+  in the player), the members as initials, our own delay to the server, and
+  Open the player, Next and Leave room; the queue under it.
 
 Whenever the room moves to an item (our Play, another member's, Next),
 `GroupModel::itemOpening` fires and `installGroup` shows the player (not
