@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
@@ -43,17 +44,55 @@ RoutePage {
             signIn.discover()
     }
 
+    // A dark gradient lit by two soft glows in the accent's colours.
+    Canvas {
+        id: glow
+        anchors.fill: parent
+        readonly property color first: Theme.accent
+        readonly property color second: Qt.hsla((Theme.accent.hslHue + 0.25) % 1, 0.5, 0.5, 1)
+        onFirstChanged: requestPaint()
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            const spots = [[0.22, 0.25, first], [0.8, 0.8, second]]
+            for (const spot of spots) {
+                const x = width * spot[0], y = height * spot[1], r = Math.max(width, height) * 0.55
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+                g.addColorStop(0, Qt.alpha(spot[2], 0.16))
+                g.addColorStop(1, Qt.alpha(spot[2], 0))
+                ctx.fillStyle = g
+                ctx.fillRect(0, 0, width, height)
+            }
+        }
+    }
+
     Flickable {
         SmoothWheel {}
         anchors.fill: parent
-        contentHeight: Math.max(height, column.implicitHeight + 2 * Theme.spacingHuge)
+        contentHeight: Math.max(height, column.implicitHeight + 2 * Theme.spacingHuge + 2 * cardPadding)
+        readonly property int cardPadding: Theme.tvMode ? 48 : 40
         boundsBehavior: Flickable.StopAtBounds
         clip: true
+
+        // The glass card around the form.
+        Rectangle {
+            objectName: "loginCard"
+            x: column.x - parent.parent.cardPadding
+            y: column.y - parent.parent.cardPadding
+            width: column.width + 2 * parent.parent.cardPadding
+            height: column.implicitHeight + 2 * parent.parent.cardPadding
+            radius: Theme.radiusLarge + 10
+            color: Theme.panelFill
+            border.width: 1
+            border.color: Theme.glassBorder
+        }
 
         Column {
             id: column
             objectName: "loginColumn"
-            width: Math.min(parent.width - 2 * Theme.spacingHuge, Theme.tvMode ? 760 : 420)
+            width: Math.min(parent.width - 2 * Theme.spacingHuge - 2 * parent.parent.cardPadding, Theme.tvMode ? 760 : 420)
             x: (parent.width - width) / 2
             // The error line does not count: the form stays where it was
             // when a message appears above it. Never in a TV's outer 5 %.
@@ -61,18 +100,56 @@ RoutePage {
                         (page.height - implicitHeight + (loginError.visible ? loginError.height + spacing : 0)) / 3)
             spacing: Theme.spacingLarge
 
-            Text {
-                text: "Jellyfin"
-                color: Theme.accent
-                font.pixelSize: Theme.fontSizeHeadline
-                font.weight: Theme.fontWeightBold
+            // The brand, as in the top bar.
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Theme.spacingSmall + 2
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Theme.tvMode ? 44 : 34
+                    height: width
+                    radius: Math.round(width * 0.3)
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0; color: Qt.lighter(Theme.accent, 1.15) }
+                        GradientStop { position: 1; color: Qt.darker(Theme.accent, 1.25) }
+                    }
+                    Icon {
+                        anchors.centerIn: parent
+                        source: Icons.play
+                        size: Math.round(parent.width * 0.42)
+                        color: Theme.background
+                    }
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTr("Media library")
+                    color: Theme.text
+                    font.pixelSize: Math.round(Theme.fontSizeBody * 1.3)
+                    font.weight: Font.Bold
+                }
             }
 
-            Heading {
+            Column {
                 width: parent.width
-                text: page.step === SignIn.ChooseServer ? qsTr("Connect to a server")
-                    : page.step === SignIn.QuickConnect ? qsTr("Quick Connect")
-                    : page.signIn ? page.signIn.serverName : ""
+                spacing: Theme.spacingTiny
+                Heading {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    text: page.step === SignIn.ChooseServer ? qsTr("Connect to a server")
+                        : page.step === SignIn.QuickConnect ? qsTr("Quick Connect")
+                        : qsTr("Who's watching?")
+                }
+                Text {
+                    width: parent.width
+                    visible: page.step === SignIn.Credentials
+                    horizontalAlignment: Text.AlignHCenter
+                    text: page.signIn && page.signIn.publicUsers.length > 0
+                          ? qsTr("Choose a profile or sign in") : qsTr("Sign in to your account")
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeBody
+                    wrapMode: Text.Wrap
+                }
             }
 
             Text {
@@ -249,13 +326,98 @@ RoutePage {
                     }
                 }
 
-                Text {
+                // The server, and the way to another.
+                Rectangle {
+                    objectName: "loginServer"
                     width: parent.width
-                    text: page.signIn ? page.signIn.serverAddress : ""
-                    color: Theme.textSecondary
-                    font.pixelSize: Theme.fontSizeSmall
-                    elide: Text.ElideMiddle
+                    height: Theme.controlHeight + 8
+                    radius: Theme.radius + 2
+                    color: Qt.alpha(Theme.text, 0.05)
+                    Rectangle {
+                        id: serverDot
+                        x: Theme.spacing
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: Theme.success
+                    }
+                    Text {
+                        anchors.left: serverDot.right
+                        anchors.leftMargin: Theme.spacingSmall
+                        anchors.right: changeServer.left
+                        anchors.rightMargin: Theme.spacingSmall
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: page.signIn ? [page.signIn.serverName, page.signIn.serverAddress].filter((t) => t.length > 0).join(" · ") : ""
+                        color: Theme.text
+                        font.pixelSize: Theme.fontSizeSmall + 1
+                        font.weight: Font.Bold
+                        elide: Text.ElideMiddle
+                    }
+                    T.AbstractButton {
+                        id: changeServer
+                        objectName: "changeServer"
+                        anchors.right: parent.right
+                        anchors.rightMargin: Theme.spacingSmall
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitWidth: implicitContentWidth + leftPadding + rightPadding
+                        implicitHeight: Theme.controlHeight
+                        padding: Theme.spacingSmall
+                        focusPolicy: Qt.StrongFocus
+                        hoverEnabled: true
+                        text: qsTr("Change")
+                        Accessible.name: qsTr("Choose another server")
+                        Keys.onReturnPressed: changeServer.clicked()
+                        Keys.onEnterPressed: changeServer.clicked()
+                        onClicked: page.signIn.back()
+                        contentItem: Text {
+                            text: changeServer.text
+                            color: Theme.accent
+                            font.pixelSize: Theme.fontSizeSmall + 1
+                            font.weight: Font.ExtraBold
+                            font.underline: changeServer.hovered
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        background: FocusFrame { shown: changeServer.visualFocus }
+                    }
                 }
+
+                // The server's users: a click fills the name and asks for the
+                // password; "Other" types another name.
+                Flow {
+                    objectName: "loginUsers"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(parent.width, usersRepeater.count * 88 + 88)
+                    visible: usersRepeater.count > 0
+                    spacing: 0
+                    topPadding: Theme.spacingSmall
+                    bottomPadding: Theme.spacingSmall
+                    Repeater {
+                        id: usersRepeater
+                        model: page.signIn ? page.signIn.publicUsers : []
+                        UserChoice {
+                            required property var modelData
+                            objectName: "loginUser_" + modelData.name
+                            name: modelData.name
+                            selected: user.text === modelData.name
+                            onClicked: {
+                                user.text = modelData.name
+                                password.text = ""
+                                password.forceActiveFocus()
+                            }
+                        }
+                    }
+                    UserChoice {
+                        objectName: "loginUserOther"
+                        name: qsTr("Other")
+                        other: true
+                        onClicked: {
+                            user.text = ""
+                            user.forceActiveFocus()
+                        }
+                    }
+                }
+
                 InputField {
                     id: user
                     objectName: "userName"
@@ -288,11 +450,61 @@ RoutePage {
                         onClicked: page.signIn.startQuickConnect()
                     }
                 }
-                ActionButton {
-                    text: qsTr("Choose another server")
-                    onClicked: page.signIn.back()
-                }
             }
+        }
+    }
+
+    // A user of the server: a round initial and the name under it.
+    component UserChoice: T.AbstractButton {
+        id: choice
+        property string name
+        property bool selected: false
+        property bool other: false
+        readonly property real hue: name.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7) / 360
+        implicitWidth: 88
+        implicitHeight: avatar.height + label.implicitHeight + 14
+        focusPolicy: Qt.StrongFocus
+        hoverEnabled: true
+        Accessible.name: name
+        Keys.onReturnPressed: choice.clicked()
+        Keys.onEnterPressed: choice.clicked()
+        Rectangle {
+            id: avatar
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 2
+            width: 60
+            height: 60
+            radius: 30
+            color: choice.other ? Qt.alpha(Theme.text, 0.08) : "transparent"
+            gradient: choice.other ? null : fill
+            border.width: choice.selected || choice.visualFocus ? 3 : 0
+            border.color: choice.visualFocus ? Theme.focusRing : Theme.text
+            scale: choice.hovered ? 1.05 : 1
+            Behavior on scale { NumberAnimation { duration: 120 } }
+            Gradient {
+                id: fill
+                GradientStop { position: 0; color: Qt.hsla(choice.hue, 0.5, 0.58, 1) }
+                GradientStop { position: 1; color: Qt.hsla((choice.hue + 0.08) % 1, 0.5, 0.42, 1) }
+            }
+            Text {
+                anchors.centerIn: parent
+                text: choice.other ? "+" : choice.name.charAt(0).toUpperCase()
+                color: choice.other ? Theme.textSecondary : "white"
+                font.pixelSize: 24
+                font.weight: Font.Bold
+            }
+        }
+        Text {
+            id: label
+            anchors.top: avatar.bottom
+            anchors.topMargin: 8
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            text: choice.name
+            color: choice.selected ? Theme.text : Theme.textSecondary
+            font.pixelSize: Theme.fontSizeSmall + 1
+            font.weight: Font.Bold
+            elide: Text.ElideRight
         }
     }
 

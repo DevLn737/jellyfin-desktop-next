@@ -321,6 +321,27 @@ namespace jfd::api {
 
   // --- Server ----------------------------------------------------------------
 
+  void JellyfinClient::publicUsers(QObject* context, Callback<QList<UserInfo>> done) {
+    send(Method::Get, QStringLiteral("Users/Public"), {}, std::nullopt, context,
+         [done = std::move(done)](Result<RawResponse> result) {
+           if (!result) {
+             done(result.error());
+             return;
+           }
+           const auto document = QJsonDocument::fromJson(result->body);
+           if (!document.isArray()) {
+             done(invalidResponse(QStringLiteral("Users/Public is not a JSON array")));
+             return;
+           }
+           QList<UserInfo> users;
+           for (const QJsonValue& value : document.array()) {
+             auto user = json::user(value.toObject());
+             if (user) users.append(std::move(*user));
+           }
+           done(std::move(users));
+         });
+  }
+
   void JellyfinClient::publicServerInfo(QObject* context, Callback<PublicServerInfo> done) {
     sendJson(Method::Get, QStringLiteral("System/Info/Public"), {}, std::nullopt, context,
              parsed<PublicServerInfo>(

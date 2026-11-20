@@ -24,12 +24,15 @@ T.ItemDelegate {
                                       : roomState === "paused" ? qsTr("Paused")
                                       : roomState === "waiting" ? qsTr("Waiting for everyone")
                                       : qsTr("Nothing playing")
+    // The tile's hue, from the name.
+    readonly property real hue: text.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7) / 360
     readonly property int memberCount: participants ? participants.length : 0
     readonly property string memberText: memberCount > 0 ? participants.join(", ") : qsTr("Nobody here")
 
-    implicitWidth: Theme.tvMode ? 400 : 280
-    implicitHeight: content.implicitHeight + topPadding + bottomPadding
+    implicitWidth: Theme.tvMode ? 480 : 380
+    implicitHeight: Math.max(content.implicitHeight, tile.height) + topPadding + bottomPadding
     padding: Theme.spacing
+    leftPadding: Theme.spacing + tile.width + Theme.spacing
     focusPolicy: Qt.StrongFocus
     hoverEnabled: true
     Accessible.role: Accessible.Button
@@ -37,6 +40,26 @@ T.ItemDelegate {
 
     Keys.onReturnPressed: card.clicked()
     Keys.onEnterPressed: card.clicked()
+
+    // A tile in the room's own colour (the server shares no picture).
+    Rectangle {
+        id: tile
+        x: Theme.spacing
+        anchors.verticalCenter: parent.verticalCenter
+        width: Theme.tvMode ? 96 : 76
+        height: width
+        radius: Theme.radius + 2
+        gradient: Gradient {
+            GradientStop { position: 0; color: Qt.hsla(card.hue, 0.45, 0.42, 1) }
+            GradientStop { position: 1; color: Qt.hsla((card.hue + 0.11) % 1, 0.5, 0.22, 1) }
+        }
+        Icon {
+            anchors.centerIn: parent
+            source: Icons.group
+            size: Math.round(parent.width * 0.4)
+            color: "white"
+        }
+    }
 
     contentItem: Column {
         id: content
@@ -98,7 +121,7 @@ T.ItemDelegate {
 
     background: Rectangle {
         objectName: "roomCardBackground"
-        radius: Theme.radius
+        radius: Theme.radiusLarge + 2
         // The open room keeps the raised fill: its line needs 3:1 on it.
         color: card.down || (card.hovered && !card.selected) ? card.colors.surfaceHover : card.colors.surfaceRaised
         // The open room: a thin line in the focus ring's colour (3:1 on

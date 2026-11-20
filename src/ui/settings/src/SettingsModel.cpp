@@ -118,6 +118,21 @@ namespace jfd::ui {
     Q_EMIT countChanged();
   }
 
+  QVariantList SettingsSearch::sections() const {
+    QVariantList out;
+    QString last;
+    for (int row = 0; row < rowCount(); ++row) {
+      const QModelIndex at = index(row, 0);
+      const QString id = at.data(SettingsModel::SectionIdRole).toString();
+      if (row > 0 && id == last) continue;
+      last = id;
+      out.append(QVariantMap{{QStringLiteral("id"), id},
+                             {QStringLiteral("title"), at.data(SettingsModel::SectionTitleRole)},
+                             {QStringLiteral("row"), row}});
+    }
+    return out;
+  }
+
   bool SettingsSearch::filterAcceptsRow(int sourceRow, const QModelIndex&) const {
     return m_settings == nullptr || m_settings->matches(sourceRow, m_text);
   }

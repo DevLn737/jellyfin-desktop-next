@@ -98,13 +98,25 @@ FocusScope {
             id: content
             x: Theme.pageMargin
             width: parent.width - 2 * Theme.pageMargin
-            topPadding: Theme.spacingHuge
+            topPadding: Theme.spacingLarge
             bottomPadding: Theme.spacingHuge
             spacing: Theme.spacingLarge
 
-            Heading {
+            Column {
                 width: parent.width
-                text: root.cardOpen && !root.rooms.selectedGone ? root.rooms.selected.name || "" : qsTr("Watch together")
+                spacing: Theme.spacingTiny
+                Heading {
+                    width: parent.width
+                    text: root.cardOpen && !root.rooms.selectedGone ? root.rooms.selected.name || "" : qsTr("Watch together")
+                }
+                Text {
+                    width: parent.width
+                    visible: !root.cardOpen
+                    text: qsTr("Rooms are seen by everyone on this server. The video plays in step for everyone in the room.")
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeBody
+                    wrapMode: Text.Wrap
+                }
             }
 
             Text {
@@ -166,9 +178,12 @@ FocusScope {
                 visible: root.online && root.rooms.available && !root.cardOpen
                 spacing: Theme.spacing
 
-                SectionHeader {
+                Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTr("Rooms on this server")
+                    color: Theme.text
+                    font.pixelSize: Theme.fontSizeLarge + 2
+                    font.weight: Font.ExtraBold
                 }
                 LoadingIndicator {
                     anchors.verticalCenter: parent.verticalCenter

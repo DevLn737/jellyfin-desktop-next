@@ -605,6 +605,13 @@ TEST_CASE("The room card reads well and shows the focus ring in the dark and the
     }
   }
   scene.rooms->select(QString());
+  // Inside a room.
+  scene.window.resize(1280, 720);
+  scene.shell->setSize(QSizeF(1280, 720));
+  scene.joined("b", "Cartoons");
+  pump(300);
+  CHECK(scene.window.grabWindow().save(dir + QStringLiteral("/rooms-light-inside-1280x720.png")));
+  scene.left("b");
   scene.theme->setProperty("colors", ui::depthPalette());
 }
 

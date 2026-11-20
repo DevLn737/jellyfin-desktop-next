@@ -74,7 +74,9 @@ FocusScope {
     Rectangle {
         anchors.fill: parent
         radius: Theme.radius
-        color: row.activeFocus ? Theme.surface : "transparent"
+        color: row.activeFocus ? Theme.surfaceHover : "transparent"
+        border.width: row.activeFocus ? 1 : 0
+        border.color: Qt.alpha(Theme.focusRing, 0.6)
     }
 
     Column {

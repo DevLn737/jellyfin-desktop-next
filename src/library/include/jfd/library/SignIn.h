@@ -41,6 +41,9 @@ namespace jfd::library {
     Q_PROPERTY(bool quickConnectAvailable READ quickConnectAvailable NOTIFY serverChanged)
     Q_PROPERTY(QString quickConnectCode READ quickConnectCode NOTIFY quickConnectCodeChanged)
     Q_PROPERTY(QString userName READ userName NOTIFY stepChanged)
+    // The users the server shows on its sign-in screen: { id, name,
+    // hasPassword }; empty when it hides them or cannot say.
+    Q_PROPERTY(QVariantList publicUsers READ publicUsers NOTIFY publicUsersChanged)
     // False when the system has no credential store: the next start asks
     // for the password again.
     Q_PROPERTY(bool tokenSaved READ tokenSaved NOTIFY stepChanged)
@@ -75,6 +78,7 @@ namespace jfd::library {
     bool quickConnectAvailable() const { return m_quickConnect; }
     QString quickConnectCode() const { return m_quickConnectCode; }
     QString userName() const { return m_userName; }
+    QVariantList publicUsers() const { return m_publicUsers; }
     bool tokenSaved() const { return m_tokenSaved; }
     bool discovering() const;
     QVariantList discoveredServers() const;
@@ -103,6 +107,7 @@ namespace jfd::library {
 
   Q_SIGNALS:
     void stepChanged();
+    void publicUsersChanged();
     void errorTextChanged();
     void serverChanged();
     void quickConnectCodeChanged();
@@ -129,6 +134,7 @@ namespace jfd::library {
     QString m_errorText;
     SavedServer m_server;
     bool m_quickConnect = false;
+    QVariantList m_publicUsers;
     QString m_quickConnectSecret;
     QString m_quickConnectCode;
     QTimer m_poll;
