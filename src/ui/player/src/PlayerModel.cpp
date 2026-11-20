@@ -42,6 +42,9 @@ namespace jfd::ui {
     using core::TrackKind;
 
     constexpr double TicksPerSecond = 1e7;
+    // How long a seek asked of the room may take to come back before the
+    // position stops waiting for it.
+    constexpr qint64 GroupSeekPatienceMs = 5000;
 
     // Fills the host and keeps following its size.
     template <class Video> Video* makeVideo(QQuickItem* host, media::MpvPlayer* player) {
@@ -258,8 +261,19 @@ namespace jfd::ui {
     if (!m_current || live()) return;
     const double clamped = std::max(0.0, duration() > 0 ? std::min(seconds, duration()) : seconds);
     if (const auto position =
-            core::MediaTicks::fromTicks(static_cast<std::int64_t>(clamped * TicksPerSecond)))
+            core::MediaTicks::fromTicks(static_cast<std::int64_t>(clamped * TicksPerSecond))) {
+      if (inGroup()) {
+        m_groupSeek = clamped;
+        m_groupSeekAge.start();
+        Q_EMIT positionChanged();
+      }
       m_runtime.post(core::intent::Seek{*position});
+    }
+  }
+
+  double PlayerModel::position() const {
+    if (m_groupSeek && m_groupSeekAge.elapsed() < GroupSeekPatienceMs) return *m_groupSeek;
+    return m_snapshot.position.seconds();
   }
 
   void PlayerModel::seekBy(double seconds) { seek(position() + seconds); }
@@ -988,6 +1002,11 @@ namespace jfd::ui {
     const bool justEnded = snapshot.phase == PlaybackPhase::Ended &&
                            (newFile || m_snapshot.phase != PlaybackPhase::Ended);
     m_snapshot = snapshot;
+    // The room's seek arrived (the position is where we asked), or it is
+    // not coming: the position is the player's again.
+    if (m_groupSeek && (newFile || !inGroup() || m_groupSeekAge.elapsed() >= GroupSeekPatienceMs ||
+                        std::abs(snapshot.position.seconds() - *m_groupSeek) < 1.0))
+      m_groupSeek.reset();
 
     // Stopped or ended: no more guide polling, unless a channel is opening.
     const bool terminal = snapshot.phase == PlaybackPhase::Idle || snapshot.phase == PlaybackPhase::Ended;

@@ -140,11 +140,32 @@ TEST_CASE("A transcode carries only the tracks it was opened with") {
   CHECK(reopen.audioStreamIndex == 3);
   CHECK(reopen.subtitleStreamIndex == 6);
 
-  // External files are still added to the running transcode.
-  table.select(TrackKind::Audio, 4);
+}
+
+TEST_CASE("A subtitle burned into a transcode is left by a new stream, never drawn over") {
+  Movie movie(api::PlayMethod::Transcode);
+  TrackTable table(movie.source, movie.played);
+  table.selectInitial(4, 6);
+
+  // Another subtitle, even an external file, would show on top of the
+  // burned one: the stream is asked for again with the new choice.
+  const auto other = only<command::Reopen>(table.select(TrackKind::Subtitle, 0));
+  CHECK(other.audioStreamIndex == 4);
+  CHECK(other.subtitleStreamIndex == 0);
+  // Off is a stream without subtitles.
+  table.select(TrackKind::Subtitle, 6);
+  const auto off = only<command::Reopen>(table.select(TrackKind::Subtitle, std::nullopt));
+  CHECK(off.subtitleStreamIndex == -1);
+  // Choosing the burned one again needs nothing.
+  CHECK(only<command::Select>(table.select(TrackKind::Subtitle, 6)).trackId == std::nullopt);
+}
+
+TEST_CASE("External files are added to a running transcode that has no burned subtitle") {
+  Movie movie(api::PlayMethod::Transcode);
+  TrackTable table(movie.source, movie.played);
+  table.selectInitial(4, std::nullopt);
   CHECK(only<command::Add>(table.select(TrackKind::Subtitle, 0)).track.kind == TrackKind::Subtitle);
-  const auto off = only<command::Select>(table.select(TrackKind::Subtitle, std::nullopt));
-  CHECK_FALSE(off.trackId);
+  CHECK_FALSE(only<command::Select>(table.select(TrackKind::Subtitle, std::nullopt)).trackId);
 }
 
 TEST_CASE("Without a known initial audio track the first embedded one plays") {

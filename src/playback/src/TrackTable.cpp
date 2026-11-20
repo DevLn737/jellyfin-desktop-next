@@ -119,6 +119,12 @@ namespace jfd::playback {
 
   std::vector<Command> TrackTable::apply(TrackKind kind) {
     const std::optional<int> wanted = selected(kind);
+    // A subtitle the server drew into the picture stays there whatever mpv
+    // shows on top: anything else, off included, needs a stream without it.
+    if (kind == TrackKind::Subtitle)
+      for (const Entry& entry : m_entries)
+        if (entry.burnedIn && entry.info.streamIndex != wanted.value_or(-1))
+          return {command::Reopen{m_audio, wanted.value_or(-1)}};
     if (!wanted) {
       // Audio is never switched off; without a choice mpv keeps its own.
       if (kind == TrackKind::Audio) return {};

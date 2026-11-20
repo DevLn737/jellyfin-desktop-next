@@ -148,7 +148,9 @@ namespace jfd::ui {
     bool ended() const { return m_snapshot.phase == core::PlaybackPhase::Ended; }
     QString error() const;
     QString title() const;
-    double position() const { return m_snapshot.position.seconds(); }
+    // In a room, a seek asked of the server shows at once and the next step
+    // counts from it, until the room's seek arrives.
+    double position() const;
     double duration() const;
     double rate() const { return m_snapshot.effectiveRate.value(); }
     double baseRate() const {
@@ -398,6 +400,9 @@ namespace jfd::ui {
     bool m_videoSuspended = false;
     QPointer<QQuickItem> m_video;
     std::optional<std::pair<QString, qint64>> m_waitingPlay;
+    // A seek asked of the room (seconds), and since when.
+    std::optional<double> m_groupSeek;
+    QElapsedTimer m_groupSeekAge;
     // An open from elsewhere (a room, a remote) held by the open gate until
     // the video's render context exists; a newer one replaces it.
     std::function<void()> m_waitingOpen;

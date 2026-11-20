@@ -9,12 +9,15 @@
 #include <jfd/ui/InputRouter.h>
 #include <jfd/ui/PlayerModel.h>
 
+#include <QLoggingCategory>
 #include <QQmlEngine>
 #include <QQuickWindow>
 
 namespace jfd::desktop {
 
   namespace {
+    Q_LOGGING_CATEGORY(lcInput, "jfd.app.input")
+
     const QString GamepadKey = QStringLiteral("input/gamepad");
     const QString BackgroundKey = QStringLiteral("input/gamepadInBackground");
     const QString CheckKey = QStringLiteral("input/checkButtons");
@@ -29,7 +32,10 @@ namespace jfd::desktop {
       if (!services.integrations || !services.integrations->bridge) return;
       integrations::MediaSessionBridge& bridge = *services.integrations->bridge;
       switch (action) {
-      case platform::InputAction::PlayPause: bridge.requestCommand(platform::MediaCommand::PlayPause); break;
+      case platform::InputAction::PlayPause:
+        qCInfo(lcInput) << "From the gamepad: PlayPause";
+        bridge.requestCommand(platform::MediaCommand::PlayPause);
+        break;
       case platform::InputAction::SeekForward: bridge.seekBy(seekStepMs(services)); break;
       case platform::InputAction::SeekBack: bridge.seekBy(-seekStepMs(services)); break;
       default: break;

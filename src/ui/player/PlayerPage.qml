@@ -286,6 +286,15 @@ RoutePage {
         poke()
     }
 
+    // Something after the room's current item: Next has somewhere to go.
+    readonly property bool roomHasNext: {
+        if (!player.inGroup) return false
+        const queue = GroupSession.queue
+        for (let i = 0; i < queue.length; ++i)
+            if (queue[i].current) return i < queue.length - 1
+        return false
+    }
+
     function playEpisode(itemId) {
         if (player.inGroup) GroupSession.watchTogether(itemId, "", 0)
         else player.playEpisode(itemId)
@@ -1063,7 +1072,7 @@ RoutePage {
                         objectName: "next"
                         anchors.verticalCenter: parent.verticalCenter
                         // A group's queue is the server's; alone, the series'.
-                        visible: !page.player.live && (page.player.inGroup || page.player.hasNext)
+                        visible: !page.player.live && (page.player.inGroup ? page.roomHasNext : page.player.hasNext)
                         iconSource: PlayerIcons.next
                         toolTipText: qsTr("Next episode")
                         onClicked: page.player.next()

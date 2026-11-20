@@ -765,6 +765,34 @@ TEST_CASE("Alone in a group, the player's pause pauses the video and Play goes o
   REQUIRE(waitFor([&] { return p.playing() && p.model->position() > pausedAt + 1; }, 20000));
 }
 
+TEST_CASE("In a room, a second step of the seek counts from the first before the room answers") {
+  Player p(QStringLiteral("jfd-player-group-steps"), {});
+  const Item movie = findItem(*p.client, QStringLiteral("Movie"));
+  struct Restore {
+    Player& p;
+    QString id;
+    ~Restore() { p.restore(id); }
+  } restore{p, movie.id};
+  SyncPlayApi syncPlay(*p.client);
+
+  p.runtime->createGroup(QStringLiteral("jfd-player-group-steps"));
+  REQUIRE(waitFor([&] { return p.model->inGroup(); }, 20000));
+  REQUIRE(run<Empty>([&](auto done) { syncPlay.setNewQueue({movie.id}, 0, 0, nullptr, done); }).ok());
+  REQUIRE(waitFor([&] { return p.model->active() && !p.model->loading(); }, 60000));
+
+  // Two presses in a row, as on the chapter or seek buttons: the second goes
+  // on from the first, which shows at once.
+  const double start = p.model->position();
+  p.model->seekBy(5);
+  CHECK(p.model->position() == doctest::Approx(start + 5).epsilon(0.001));
+  p.model->seekBy(5);
+  CHECK(p.model->position() == doctest::Approx(start + 10).epsilon(0.001));
+  // The room's seek lands there.
+  REQUIRE(waitFor([&] { return !p.model->loading() && std::abs(p.model->position() - (start + 10)) < 0.5; }, 20000));
+  QTest::qWait(1000);
+  CHECK(std::abs(p.model->position() - (start + 10)) < 0.5);
+}
+
 TEST_CASE("A room's item that opens before the player's video exists waits for it") {
   // mpv opened before the render context existed showed a black picture
   // without subtitles: the first film of a fresh start in a room.
