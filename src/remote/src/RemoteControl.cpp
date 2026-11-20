@@ -15,6 +15,21 @@ namespace jfd::remote {
   namespace {
     Q_LOGGING_CATEGORY(lcRemote, "jfd.remote")
 
+    const char* playstateName(PlaystateCommand command) {
+      switch (command) {
+      case PlaystateCommand::Stop: return "Stop";
+      case PlaystateCommand::Pause: return "Pause";
+      case PlaystateCommand::Unpause: return "Unpause";
+      case PlaystateCommand::NextTrack: return "NextTrack";
+      case PlaystateCommand::PreviousTrack: return "PreviousTrack";
+      case PlaystateCommand::Seek: return "Seek";
+      case PlaystateCommand::Rewind: return "Rewind";
+      case PlaystateCommand::FastForward: return "FastForward";
+      case PlaystateCommand::PlayPause: return "PlayPause";
+      }
+      return "?";
+    }
+
     using Outcome = RemoteControl::Outcome;
     using Arguments = QHash<QString, QString>;
     using core::PlaybackPhase;
@@ -261,6 +276,9 @@ namespace jfd::remote {
   }
 
   RemoteControl::Outcome RemoteControl::playstate(const PlaystateRequest& request) {
+    // Who paused or skipped: the server's commands next to the session's
+    // own inputs in the diagnostic report.
+    qCInfo(lcRemote) << "From the server:" << playstateName(request.command);
     switch (request.command) {
     case PlaystateCommand::Seek: seekTo(*request.seekPositionTicks / core::TicksPerMillisecond); return Outcome::Done;
     case PlaystateCommand::Rewind: seekBy(-RewindMs); return Outcome::Done;

@@ -4,12 +4,27 @@
 #include <jfd/platform/SleepInhibitor.h>
 
 #include <QCoreApplication>
+#include <QLoggingCategory>
 
 #include <algorithm>
 
 namespace jfd::integrations {
 
   namespace {
+    Q_LOGGING_CATEGORY(lcMediaControls, "jfd.integrations.media")
+
+    const char* commandName(platform::MediaCommand command) {
+      using platform::MediaCommand;
+      switch (command) {
+      case MediaCommand::Play: return "Play";
+      case MediaCommand::Pause: return "Pause";
+      case MediaCommand::PlayPause: return "PlayPause";
+      case MediaCommand::Stop: return "Stop";
+      case MediaCommand::Next: return "Next";
+      case MediaCommand::Previous: return "Previous";
+      }
+      return "?";
+    }
     using core::PlaybackPhase;
     using platform::MediaCommand;
     using Status = platform::MediaControlsState::Status;
@@ -123,7 +138,12 @@ namespace jfd::integrations {
   void MediaSessionBridge::addControls(platform::MediaControls* controls) {
     if (!controls) return;
     m_controls.emplace_back(controls);
-    connect(controls, &platform::MediaControls::commandRequested, this, &MediaSessionBridge::command);
+    connect(controls, &platform::MediaControls::commandRequested, this, [this](MediaCommand command) {
+      // The system's media keys and panels: named in the log, so a pause
+      // nobody remembers can be traced.
+      qCInfo(lcMediaControls) << "From the system's media controls:" << commandName(command);
+      this->command(command);
+    });
     connect(controls, &platform::MediaControls::seekRequested, this, &MediaSessionBridge::seek);
     const auto state = mediaControlsState(m_snapshot, currentDetails());
     controls->setState(state);

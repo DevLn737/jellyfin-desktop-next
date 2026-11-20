@@ -143,6 +143,30 @@ TEST_CASE("Outgoing messages of an earlier membership are not sent") {
   CHECK(f.transport.pending.size() == 2);
 }
 
+TEST_CASE("Requests go one at a time, so the server takes them in order; a waiting seek gives way to a newer one") {
+  Fixture f;
+  f.joined();
+  const GroupEpoch epoch = f.client.epoch();
+  const auto at = [](int seconds) { return *MediaTicks::fromMilliseconds(seconds * 1000); };
+  f.client.send(outgoing::RequestSeek{epoch, at(5)});
+  f.client.send(outgoing::RequestSeek{epoch, at(10)});
+  f.client.send(outgoing::RequestSeek{epoch, at(15)});
+  // Sent together, two requests could reach the server in either order.
+  REQUIRE(f.transport.pending.size() == 1);
+  CHECK(f.transport.pending[0].request.path == "/SyncPlay/Seek");
+  CHECK(f.transport.pending[0].request.body.find("50000000") != std::string::npos);
+  f.reply(204);
+  // The seeks pressed meanwhile: only the last.
+  REQUIRE(f.transport.pending.size() == 1);
+  CHECK(f.transport.pending[0].request.body.find("150000000") != std::string::npos);
+  f.client.send(outgoing::RequestPause{epoch});
+  CHECK(f.transport.pending.size() == 1);
+  f.reply(500);
+  // A failed request does not hold up the next.
+  REQUIRE(f.transport.pending.size() == 1);
+  CHECK(f.transport.pending[0].request.path == "/SyncPlay/Pause");
+}
+
 TEST_CASE("A failed rejoin ends the membership the session still holds") {
   Fixture f;
   f.joined();
