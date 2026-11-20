@@ -26,7 +26,7 @@ Row {
     readonly property bool isGroup: groupTypes.indexOf(itemType) >= 0
     readonly property bool downloadable: isGroup || fileTypes.indexOf(itemType) >= 0
     readonly property string downloadState: Downloads.revision >= 0 && itemId.length > 0 ? Downloads.stateOf(itemId) : ""
-    readonly property real progress: downloadState === "downloading" || downloadState === "paused"
+    readonly property real progress: downloadState === "downloading" || downloadState === "paused" || downloadState === "queued"
         ? (Downloads.progressRevision >= 0 ? Downloads.progressOf(itemId) : 0) : 0
     // Downloaded or queued: "Delete" removes it (and stops it).
     readonly property bool hasFiles: downloadState.length > 0
@@ -48,12 +48,9 @@ Row {
         text: {
             const s = actions.downloadState
             const percent = Math.round(actions.progress * 100)
-            if (actions.isGroup) {
-                if (s === "") return qsTr("Download")
-                if (s === "complete") return qsTr("Download more")
-                if (s === "failed") return qsTr("Download failed")
-                return qsTr("Downloading, %1 %").arg(percent)
-            }
+            // A group shows its members' state like one item does: paused
+            // or waiting is not "Downloading".
+            if (actions.isGroup && s === "complete") return qsTr("Download more")
             switch (s) {
             case "complete": return qsTr("Downloaded")
             case "downloading": return qsTr("Downloading, %1 %").arg(percent)

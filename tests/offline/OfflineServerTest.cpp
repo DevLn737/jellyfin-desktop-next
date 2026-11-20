@@ -268,10 +268,65 @@ TEST_CASE("A .part resumes against 12.2 and the file matches; the extras follow"
   for (const auto& track : copy->externalSubtitles)
     CHECK(readAll(track.url.toLocalFile()).contains("-->"));
   // No token anywhere in the download folder.
-  QDirIterator it(store.root(), QDir::Files, QDirIterator::Subdirectories);
+  QDirIterator it(store.root(), QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
   const QByteArray token = stand.client->accessToken().toLatin1();
   while (it.hasNext())
     CHECK_FALSE(readAll(it.next()).contains(token));
+}
+
+TEST_CASE("External audio and subtitles of 12.2 land beside the media, named as on the server") {
+  Stand stand;
+  QJsonObject film;
+  for (const QJsonObject& movie : stand.items(QStringLiteral("Movie")))
+    if (movie.value(QLatin1String("Name")).toString().startsWith(QLatin1String("Voiced Film"))) film = movie;
+  REQUIRE_MESSAGE(!film.isEmpty(), "the stand needs Voiced Film (scripts/test-server/stock-server.sh)");
+  const QJsonObject source = film.value(QLatin1String("MediaSources")).toArray().first().toObject();
+  int externalAudio = 0;
+  for (const auto& value : source.value(QLatin1String("MediaStreams")).toArray())
+    if (value.toObject().value(QLatin1String("Type")).toString() == QLatin1String("Audio") &&
+        value.toObject().value(QLatin1String("IsExternal")).toBool())
+      ++externalAudio;
+  REQUIRE(externalAudio == 2);
+
+  QTemporaryDir dir;
+  DownloadStore store(dir.filePath(QStringLiteral("downloads")));
+  OfflineCatalog catalog(store);
+  DownloadQueue queue(store, catalog, std::make_shared<StorageGuard>());
+  ExtrasDownloader extras(store, catalog);
+  QObject::connect(&queue, &DownloadQueue::completed, &extras, [&](const QString& id) { extras.fetch(id); });
+  bool extrasDone = false;
+  QObject::connect(&extras, &ExtrasDownloader::finished, [&](const QString&, bool) { extrasDone = true; });
+  const QString userId = stand.client->userId();
+  const QByteArray auth = stand.client->authorizationHeader();
+  queue.setAccess(stand.serverId, userId, stand.client->serverUrl(), auth);
+  extras.setAccess(stand.serverId, userId, stand.client->serverUrl(), auth);
+  REQUIRE(queue.enqueueOriginal(film, source) == EnqueueResult::Queued);
+  REQUIRE(waitFor([&] { return extrasDone; }, 120000));
+
+  const auto m = catalog.find(stand.serverId, userId, film.value(QLatin1String("Id")).toString());
+  REQUIRE(m.has_value());
+  CHECK(m->state == ItemState::Complete);
+  const QString base = QStringLiteral("Movies/Voiced Film (2024)/Voiced Film (2024)");
+  CHECK(m->mediaFile == base + QStringLiteral(".mkv"));
+  CHECK(m->audioFiles.size() == 2);
+  CHECK(m->audioSkipped.isEmpty());
+  QStringList audioNames = m->audioFiles.values();
+  audioNames.sort();
+  CHECK(audioNames == QStringList{base + QStringLiteral(".en.mka"), base + QStringLiteral(".ru.mka")});
+  CHECK(m->subtitleFiles.values().contains(base + QStringLiteral(".ru.forced.srt")));
+  for (const QString& file : m->audioFiles) {
+    // Audio only: the tiny picture of the server's answer is gone.
+    const QByteArray data = readAll(store.filePath(*m, file));
+    CHECK(data.size() > 100 * 1024);
+    CHECK_FALSE(data.contains("V_MPEG4"));
+    CHECK(data.contains("A_"));
+  }
+  OfflineLocalSource local(store, catalog);
+  local.setUser(stand.serverId, userId);
+  local.setOnline(false);
+  const auto copy = local.find(m->itemId);
+  REQUIRE(copy.has_value());
+  CHECK(copy->externalAudio.size() == 2);
 }
 
 TEST_CASE("The journal on 12.2: date kept as sent, PlayCount not doubled, the server's newer state wins") {

@@ -74,8 +74,10 @@ namespace jfd::offline {
 
     QString movieName(const QJsonObject& item) {
       QString name = safeFileName(text(item, "Name"));
-      if (const auto year = number(item, "ProductionYear"); year && *year > 0)
-        name += QStringLiteral(" (%1)").arg(*year);
+      if (const auto year = number(item, "ProductionYear"); year && *year > 0) {
+        const QString tag = QStringLiteral("(%1)").arg(*year);
+        if (!name.endsWith(tag)) name += QLatin1Char(' ') + tag;
+      }
       return name;
     }
 
