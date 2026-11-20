@@ -54,6 +54,7 @@ namespace jfd::ui {
     browse.sidebar.text = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Requests"));
     browse.sidebar.translationContext = "Sidebar";
     browse.sidebar.order = 250;
+    browse.sidebar.placement = RouteSpec::Placement::AccountMenu;
     navigator.registerRoute(browse);
 
     RouteSpec title;

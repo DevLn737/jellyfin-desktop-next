@@ -20,7 +20,12 @@ RoutePage {
     // Created once the route is known; the page owns it.
     property LibraryModel library: null
 
-    Component.onCompleted: library = Library.createLibrary(routeArgument, page)
+    // "library" without an id opens the library used last (or the first).
+    property string libraryId
+    Component.onCompleted: {
+        libraryId = routeArgument.length > 0 ? routeArgument : Library.defaultLibraryId()
+        library = Library.createLibrary(libraryId, page)
+    }
 
     // Back from a lost connection: what failed loads again.
     Connections {
@@ -28,7 +33,7 @@ RoutePage {
         function onReconnected() { if (page.library && page.library.errorText.length > 0) page.library.reload() }
     }
 
-    title: Library.libraryName(routeArgument) || (library ? library.name : "") || qsTr("Library")
+    title: Library.libraryName(libraryId) || (library ? library.name : "") || qsTr("Library")
     hasTopBar: true
 
     ColumnLayout {

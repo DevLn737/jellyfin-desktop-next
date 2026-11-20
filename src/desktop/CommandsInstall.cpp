@@ -35,12 +35,12 @@ namespace jfd::desktop {
     customize.run = [navigator] { navigator->navigate(QStringLiteral("customizeHome")); };
     commands->add(std::move(customize));
 
-    // One "Open <name>" for each destination in the sidebar, kept in step
-    // with it as modules register theirs.
+    // One "Open <name>" for each navigation destination, kept in step
+    // with them as modules register theirs.
     auto known = std::make_shared<QSet<QString>>();
     const auto sync = [commands, navigator, known] {
       QSet<QString> now;
-      for (const QVariant& entry : navigator->sidebarEntries()) {
+      for (const QVariant& entry : navigator->navEntries()) {
         const QVariantMap map = entry.toMap();
         const QString route = map.value(QStringLiteral("route")).toString();
         const QString id = NavigatePrefix + route;

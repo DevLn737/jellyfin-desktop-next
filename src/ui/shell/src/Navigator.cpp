@@ -9,6 +9,18 @@ namespace jfd::ui {
 
   namespace {
     Q_LOGGING_CATEGORY(lcNavigator, "jfd.ui.navigator")
+
+    QString placementName(RouteSpec::Placement placement) {
+      switch (placement) {
+      case RouteSpec::Placement::AccountMenu:
+        return QStringLiteral("account");
+      case RouteSpec::Placement::LibraryTab:
+        return QStringLiteral("libraryTab");
+      case RouteSpec::Placement::Primary:
+        break;
+      }
+      return QStringLiteral("primary");
+    }
   } // namespace
 
   QString Navigator::Route::toString() const {
@@ -26,7 +38,8 @@ namespace jfd::ui {
       spec.chrome = chrome;
       registerRoute(spec);
     };
-    const auto addListed = [this](const char* name, const char* icon, const char* text, int order) {
+    const auto addListed = [this](const char* name, const char* icon, const char* text, int order,
+                                  RouteSpec::Placement placement = RouteSpec::Placement::Primary) {
       RouteSpec spec;
       spec.name = QLatin1String(name);
       spec.hasSidebarEntry = true;
@@ -34,19 +47,22 @@ namespace jfd::ui {
       spec.sidebar.text = QString::fromUtf8(text);
       spec.sidebar.translationContext = "Sidebar";
       spec.sidebar.order = order;
+      spec.sidebar.placement = placement;
       registerRoute(spec);
     };
     add("login", false, true, false);
     addListed("home", "home", QT_TRANSLATE_NOOP("Sidebar", "Home"), 100);
     m_routes[QStringLiteral("home")].root = true;
-    add("library", true, false, true);
+    addListed("library", "library", QT_TRANSLATE_NOOP("Sidebar", "Library"), 150);
+    m_routes[QStringLiteral("library")].optionalArgument = true;
     add("item", true, false, true);
     add("collection", true, false, true);
-    addListed("search", "search", QT_TRANSLATE_NOOP("Sidebar", "Search"), 200);
+    addListed("search", "search", QT_TRANSLATE_NOOP("Sidebar", "Search"), 350);
     add("customizeHome", false, false, true);
     add("player", false, false, false);
     addListed("group", "group", QT_TRANSLATE_NOOP("Sidebar", "Watch together"), 300);
-    addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900);
+    addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900,
+              RouteSpec::Placement::AccountMenu);
   }
 
   void Navigator::registerRoute(const RouteSpec& spec) {
@@ -74,8 +90,9 @@ namespace jfd::ui {
     const qsizetype slash = route.indexOf(QLatin1Char('/'));
     Route parsed{slash < 0 ? route : route.left(slash), slash < 0 ? QString() : route.mid(slash + 1)};
     const auto spec = m_routes.constFind(parsed.name);
-    if (spec == m_routes.cend() || spec->takesArgument == parsed.argument.isEmpty() ||
-        parsed.argument.contains(QLatin1Char('/'))) {
+    if (spec == m_routes.cend() || parsed.argument.contains(QLatin1Char('/')) ||
+        (!spec->optionalArgument && spec->takesArgument == parsed.argument.isEmpty()) ||
+        (slash >= 0 && parsed.argument.isEmpty())) {
       return {};
     }
     return parsed;
@@ -136,6 +153,14 @@ namespace jfd::ui {
   }
 
   QVariantList Navigator::sidebarEntries() const {
+    QVariantList entries = navEntries();
+    entries.removeIf([](const QVariant& entry) {
+      return entry.toMap().value(QStringLiteral("route")).toString() == QStringLiteral("library");
+    });
+    return entries;
+  }
+
+  QVariantList Navigator::navEntries() const {
     struct Listed {
       int order;
       qsizetype registered;
@@ -160,7 +185,8 @@ namespace jfd::ui {
       entries.append(QVariantMap{{QStringLiteral("route"), entry.spec->name},
                                  {QStringLiteral("text"), text},
                                  {QStringLiteral("icon"), sidebar.icon},
-                                 {QStringLiteral("order"), sidebar.order}});
+                                 {QStringLiteral("order"), sidebar.order},
+                                 {QStringLiteral("placement"), placementName(sidebar.placement)}});
     }
     return entries;
   }
@@ -199,6 +225,23 @@ namespace jfd::ui {
     }
     if (currentRoute() == parsed.toString()) {
       return true;
+    }
+    if (m_routes.value(parsed.name).optionalArgument) {
+      // One page of this route at most: back to it, then its argument.
+      for (qsizetype i = 0; i < m_stack.size(); ++i) {
+        if (m_stack[i].name != parsed.name) {
+          continue;
+        }
+        while (m_stack.size() > i + 1) {
+          m_stack.removeLast();
+          emitChange(Operation::Pop);
+        }
+        if (!parsed.argument.isEmpty() && parsed.argument != m_stack.last().argument) {
+          m_stack.last() = parsed;
+          emitChange(Operation::Replace);
+        }
+        return true;
+      }
     }
     // Going to a page already in the stack goes back to it instead of
     // stacking a second copy (home -> settings -> search -> settings).

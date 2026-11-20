@@ -138,6 +138,11 @@ namespace jfd::ui {
     Q_INVOKABLE QString routeFor(const QString& itemId, const QString& type) const;
     // A library's title from the home page's list, for the grid's heading.
     Q_INVOKABLE QString libraryName(const QString& libraryId) const;
+    // The library the Library page opens without one named ("library"):
+    // the one opened last, if it is still there, else the first library
+    // with films or series (not music, playlists or Live TV). Empty while
+    // the libraries are unknown.
+    Q_INVOKABLE QString defaultLibraryId() const;
     // "1 h 52 min", "45 min".
     Q_INVOKABLE QString formatRunTime(qint64 ticks) const;
 
@@ -171,6 +176,7 @@ namespace jfd::ui {
   private:
     QString collectionTypeOf(const QString& libraryId) const;
     library::LibraryModel* newModel(QObject* owner) const;
+    void rememberLibrary(const QString& libraryId);
 
     // Filters of the libraries opened this session, when there is no store.
     QJsonObject m_filters;
