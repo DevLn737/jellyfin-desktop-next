@@ -118,6 +118,14 @@
         <translation>Реклама</translation>
     </message>
     <message>
+        <source>Hide stats for nerds</source>
+        <translation>Скрыть статистику для сисадминов</translation>
+    </message>
+    <message>
+        <source>Stats for nerds</source>
+        <translation>Статистика для сисадминов</translation>
+    </message>
+    <message>
         <source>Loading subtitles from the server…</source>
         <translation>Субтитры загружаются с сервера…</translation>
     </message>
@@ -239,6 +247,145 @@
     <message>
         <source>This video has no marked segments.</source>
         <translation>В этом видео нет отмеченных фрагментов.</translation>
+    </message>
+</context>
+<context>
+    <name>StatsOverlay</name>
+    <message>
+        <source>Direct play</source>
+        <translation>Напрямую</translation>
+    </message>
+    <message>
+        <source>Direct stream</source>
+        <translation>Напрямую, с перепаковкой</translation>
+    </message>
+    <message>
+        <source>Transcoding on the server</source>
+        <translation>Перекодирование на сервере</translation>
+    </message>
+    <message>
+        <source>%1 Mbit/s</source>
+        <translation>%1 Мбит/с</translation>
+    </message>
+    <message>
+        <source>Playback</source>
+        <translation>Воспроизведение</translation>
+    </message>
+    <message>
+        <source>Container</source>
+        <translation>Контейнер</translation>
+    </message>
+    <message>
+        <source>%1 fps</source>
+        <translation>%1 к/с</translation>
+    </message>
+    <message>
+        <source>Video</source>
+        <translation>Видео</translation>
+    </message>
+    <message>
+        <source>Hardware decoding</source>
+        <translation>Аппаратное декодирование</translation>
+    </message>
+    <message>
+        <source>off</source>
+        <translation>выключено</translation>
+    </message>
+    <message>
+        <source>Dropped frames</source>
+        <translation>Пропущено кадров</translation>
+    </message>
+    <message>
+        <source>Display</source>
+        <translation>Экран</translation>
+    </message>
+    <message>
+        <source>%1 Hz</source>
+        <translation>%1 Гц</translation>
+    </message>
+    <message>
+        <source>%1 ch</source>
+        <translation>%1 кан.</translation>
+    </message>
+    <message>
+        <source>Viewers in the room</source>
+        <translation>Зрителей в комнате</translation>
+    </message>
+    <message>
+        <source>%1 kHz</source>
+        <translation>%1 кГц</translation>
+    </message>
+    <message>
+        <source>Why</source>
+        <translation>Причина</translation>
+    </message>
+    <message>
+        <source>Audio</source>
+        <translation>Звук</translation>
+    </message>
+    <message>
+        <source>Bitrate</source>
+        <translation>Битрейт</translation>
+    </message>
+    <message>
+        <source>Buffer</source>
+        <translation>Буфер</translation>
+    </message>
+    <message>
+        <source>%1 s</source>
+        <translation>%1 с</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>Сеть</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Скорость</translation>
+    </message>
+    <message>
+        <source>reconnecting</source>
+        <translation>переподключение</translation>
+    </message>
+    <message>
+        <source>Delay to the server</source>
+        <translation>Задержка до сервера</translation>
+    </message>
+    <message>
+        <source>%1 ms</source>
+        <translation>%1 мс</translation>
+    </message>
+    <message>
+        <source>measuring</source>
+        <translation>измеряется</translation>
+    </message>
+    <message>
+        <source>Apart from the room</source>
+        <translation>Расхождение с комнатой</translation>
+    </message>
+    <message>
+        <source>Catching up</source>
+        <translation>Догоняем</translation>
+    </message>
+    <message>
+        <source>by speed</source>
+        <translation>скоростью</translation>
+    </message>
+    <message>
+        <source>by a jump</source>
+        <translation>перемоткой</translation>
+    </message>
+    <message>
+        <source>no</source>
+        <translation>нет</translation>
+    </message>
+    <message>
+        <source>Room speed</source>
+        <translation>Скорость комнаты</translation>
+    </message>
+    <message>
+        <source>Hide statistics</source>
+        <translation>Скрыть статистику</translation>
     </message>
 </context>
 <context>

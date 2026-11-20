@@ -37,6 +37,8 @@ RoutePage {
     property bool osdVisible: true
     // "audio", "subtitles", "tune", "episodes" or "".
     property string openMenu: ""
+    // The statistics overlay (right-click on the video, or I).
+    property bool statsShown: false
     readonly property bool osdShown: osdVisible || openMenu.length > 0 || player.paused || !player.active
 
     title: player.title
@@ -341,9 +343,19 @@ RoutePage {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: page.osdShown ? Qt.ArrowCursor : Qt.BlankCursor
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         onPositionChanged: page.poke()
-        onClicked: {
+        onClicked: (mouse) => {
             page.forceActiveFocus()
+            // The right button: the video's own menu, where the click was.
+            if (mouse.button === Qt.RightButton) {
+                page.openMenu = ""
+                contextAnchor.x = mouse.x
+                contextAnchor.y = mouse.y
+                contextMenu.open()
+                page.poke()
+                return
+            }
             // A click while the display is hidden only brings it back: it
             // was probably meant for a button that had faded out.
             if (page.openMenu.length > 0) page.openMenu = ""
@@ -352,7 +364,8 @@ RoutePage {
         }
         // The first click of a double-click must not pause: the single
         // click waits until a double-click can no longer come.
-        onDoubleClicked: {
+        onDoubleClicked: (mouse) => {
+            if (mouse.button !== Qt.LeftButton) return
             clickTimer.stop()
             page.toggleFullscreen()
         }
@@ -361,6 +374,33 @@ RoutePage {
             objectName: "clickTimer"
             interval: Qt.styleHints.mouseDoubleClickInterval
             onTriggered: page.player.togglePause()
+        }
+        Item {
+            id: contextAnchor
+            width: 1
+            height: 1
+        }
+        PopupMenu {
+            id: contextMenu
+            objectName: "videoContextMenu"
+            anchorItem: contextAnchor
+            entries: [page.statsShown ? qsTr("Hide stats for nerds") : qsTr("Stats for nerds")]
+            onActivated: page.statsShown = !page.statsShown
+        }
+    }
+
+    Loader {
+        id: statsLoader
+        objectName: "statsOverlay"
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: Theme.spacing + page.safeX
+        anchors.topMargin: topBar.height + Theme.spacingSmall
+        active: page.statsShown && page.player.active
+        sourceComponent: StatsOverlay {
+            player: page.player
+            group: page.player.inGroup ? GroupSession : null
+            onCloseRequested: page.statsShown = false
         }
     }
 
@@ -1118,6 +1158,8 @@ RoutePage {
             page.toggleMenu("audio"); break
         case Qt.Key_C:
             page.toggleMenu("subtitles"); break
+        case Qt.Key_I:
+            page.statsShown = !page.statsShown; break
         case Qt.Key_Escape:
         case Qt.Key_Back:
             if (page.openMenu.length > 0) page.openMenu = ""

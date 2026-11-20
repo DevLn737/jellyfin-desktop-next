@@ -24,6 +24,7 @@ qt_add_qml_module(jfd_ui_player
     PlayerPage.qml
     SegmentsMenu.qml
     SpeedButton.qml
+    StatsOverlay.qml
     TracksMenu.qml
     TuneMenu.qml
   RESOURCES
