@@ -118,6 +118,34 @@
         <translation>Пропустить</translation>
     </message>
     <message>
+        <source>Previous episode</source>
+        <translation>Предыдущая серия</translation>
+    </message>
+    <message>
+        <source>Next episode</source>
+        <translation>Следующая серия</translation>
+    </message>
+    <message>
+        <source>Back %1 s</source>
+        <translation>Назад на %1 с</translation>
+    </message>
+    <message>
+        <source>Forward %1 s</source>
+        <translation>Вперёд на %1 с</translation>
+    </message>
+    <message>
+        <source>Previous chapter</source>
+        <translation>Предыдущая глава</translation>
+    </message>
+    <message>
+        <source>Next chapter</source>
+        <translation>Следующая глава</translation>
+    </message>
+    <message>
+        <source>Audio and subtitles (%1)</source>
+        <translation>Аудио и субтитры (%1)</translation>
+    </message>
+    <message>
         <source>Player settings</source>
         <translation>Настройки плеера</translation>
     </message>
@@ -178,28 +206,12 @@
         <translation>Сервер не смог отдать эти субтитры</translation>
     </message>
     <message>
-        <source>Previous</source>
-        <translation>Предыдущая</translation>
-    </message>
-    <message>
         <source>Play</source>
         <translation>Воспроизвести</translation>
     </message>
     <message>
         <source>Pause</source>
         <translation>Пауза</translation>
-    </message>
-    <message>
-        <source>Back 10 seconds</source>
-        <translation>Назад на 10 секунд</translation>
-    </message>
-    <message>
-        <source>Forward 10 seconds</source>
-        <translation>Вперёд на 10 секунд</translation>
-    </message>
-    <message>
-        <source>Next</source>
-        <translation>Следующая</translation>
     </message>
     <message>
         <source>Unmute</source>

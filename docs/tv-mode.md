@@ -26,7 +26,7 @@ keys) and, through the input router, from a gamepad or the phone.
 
 | Key | Everywhere | On-screen keyboard | Player |
 |---|---|---|---|
-| Arrows | Move the focus | Move over the keys; Up from the top row closes it | Display hidden: Left/Right seek 10 s (held: faster), Up/Down show it; shown: move the focus |
+| Arrows | Move the focus | Move over the keys; Up from the top row closes it | Display hidden: Left/Right seek one step, 15 s by default (held: faster), Up/Down show it; shown: move the focus |
 | Enter (Select) | Activate the focused control; on a text field, open the keyboard | Type the key | Display hidden: play/pause; on a button: press it |
 | Esc, Backspace outside a field (Back) | Back to the previous screen (on sign-in: the previous step; on Watch together: an open room card first) | Close it, back on the field | Close the menu, then the display, then the player |
 | Page Up / Page Down | About a page up or down | Erase / space | Live TV: next / previous channel |
@@ -35,8 +35,9 @@ keys) and, through the input router, from a gamepad or the phone.
 | Media keys | Play/pause, next, previous | — | — |
 | Channel Up / Down | — | — | Live TV: next / previous channel |
 
-Seeking in the player in TV mode: a press moves 10 s at once. Held, the steps
-grow (10 s, after about a second 30 s, then 60 s), the timeline shows where
+Seeking in the player in TV mode: a press moves one step at once (Settings,
+Playback, Seek step; 15 s by default). Held, the steps grow (the step, after
+about a second 30 s, then 60 s), the timeline shows where
 playback will go, and one seek follows when the key is let go. In a
 SyncPlay group that is one request to the group, not one per step.
 
@@ -68,7 +69,7 @@ or in Switch mode with Nintendo labels) as an example:
 | Top face button | Y | X | Search (Ctrl+K) |
 | Left face button | X | Y | Not used |
 | Left / right shoulder | LB / RB | L / R | Page Up / Page Down (on the keyboard: erase / space; Live TV: channel) |
-| Left / right trigger | LT / RT | ZL / ZR | Seek back / forward 10 s |
+| Left / right trigger | LT / RT | ZL / ZR | Seek back / forward one step (15 s by default) |
 | Start | Menu (≡) | Start (+) | Play/pause |
 | Back | View (⧉) | Select (−) | Menu key |
 

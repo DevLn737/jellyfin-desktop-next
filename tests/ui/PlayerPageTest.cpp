@@ -233,6 +233,27 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   // Past it, the chapter.
   f.player->seek(400);
   REQUIRE(waitFor([&] { return part->property("text").toString() == QStringLiteral("Part 1"); }, 3000));
+  // The chapter's arrows: back from well into it goes to its start, then
+  // to the one before; there is no next after the last.
+  QQuickItem* chapterNext = find(f.page, "chapterNext");
+  REQUIRE(chapterNext != nullptr);
+  CHECK_FALSE(chapterNext->isVisible());
+  QMetaObject::invokeMethod(f.page, "stepChapter", Q_ARG(QVariant, -1));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - 300) < 1; }, 3000));
+  QMetaObject::invokeMethod(f.page, "stepChapter", Q_ARG(QVariant, -1));
+  REQUIRE(waitFor([&] { return part->property("text").toString() == QStringLiteral("Middle"); }, 3000));
+  CHECK(chapterNext->isVisible());
+  QMetaObject::invokeMethod(f.page, "stepChapter", Q_ARG(QVariant, 1));
+  REQUIRE(waitFor([&] { return part->property("text").toString() == QStringLiteral("Part 1"); }, 3000));
+  // A speed that is not normal shows on the speed button.
+  QQuickItem* speed = find(f.page, "speedButton");
+  REQUIRE(speed != nullptr);
+  CHECK(speed->property("text").toString().isEmpty());
+  f.player->setRate(1.5);
+  REQUIRE(waitFor([&] { return speed->property("text").toString() == QStringLiteral("1.5×"); }, 3000));
+  shoot("player-1280-chapter");
+  f.player->setRate(1);
+  REQUIRE(waitFor([&] { return speed->property("text").toString().isEmpty(); }, 3000));
 
   // Audio and subtitles in one menu: two audio tracks, Off and two subtitles.
   QMetaObject::invokeMethod(f.page, "toggleMenu", Q_ARG(QVariant, QStringLiteral("subtitles")));
@@ -375,8 +396,9 @@ TEST_CASE("Keys seek, change the volume and the delays, and the speed applies al
   f.player->togglePause();
   REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
   const double before = f.player->position();
+  // One step: 15 s by default (Settings, Playback, Seek step).
   press(Qt::Key_Right);
-  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (before + 10)) < 0.5; }, 2000));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (before + 15)) < 0.5; }, 2000));
   press(Qt::Key_Left);
   REQUIRE(waitFor([&] { return std::abs(f.player->position() - before) < 0.5; }, 2000));
 
@@ -725,31 +747,31 @@ TEST_CASE("TV mode: a held arrow seeks faster with one seek, Up shows the displa
   REQUIRE(f.navigator->depth() == 2);
   f.page->forceActiveFocus();
 
-  // Nothing focused on the display: Right seeks 10 s at once.
+  // Nothing focused on the display: Right seeks one step (15 s) at once.
   const double start = f.player->position();
   tap(window, Qt::Key_Right);
-  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (start + 10)) < 0.5; }, 2000));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (start + 15)) < 0.5; }, 2000));
 
-  // Held: 10 s steps, then 30 s; the timeline shows the target, and the one
+  // Held: 15 s steps, then 30 s; the timeline shows the target, and the one
   // seek comes when the key is let go.
   const double held = f.player->position();
   QQuickItem* timeline = find(f.page, "timeline");
   REQUIRE(timeline != nullptr);
   tap(window, Qt::Key_Right);
-  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (held + 10)) < 0.5; }, 2000));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (held + 15)) < 0.5; }, 2000));
   for (int i = 0; i < 12; ++i) tap(window, Qt::Key_Right, true);
-  CHECK(timeline->property("value").toDouble() == doctest::Approx(held + 10 + 9 * 10 + 3 * 30).epsilon(0.01));
-  CHECK(f.player->position() == doctest::Approx(held + 10).epsilon(0.01));
+  CHECK(timeline->property("value").toDouble() == doctest::Approx(held + 15 + 9 * 15 + 3 * 30).epsilon(0.01));
+  CHECK(f.player->position() == doctest::Approx(held + 15).epsilon(0.01));
   QKeyEvent letGo(QEvent::KeyRelease, Qt::Key_Right, Qt::NoModifier);
   QCoreApplication::sendEvent(&window, &letGo);
-  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (held + 190)) < 0.5; }, 2000));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (held + 240)) < 0.5; }, 2000));
 
   // A gamepad's hold sends no release of its own: the seek comes once the
   // repeats stop.
   const double back = f.player->position();
   tap(window, Qt::Key_Left);
   for (int i = 0; i < 3; ++i) tap(window, Qt::Key_Left, true);
-  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (back - 40)) < 0.5; }, 3000));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (back - 60)) < 0.5; }, 3000));
 
   // Up: the display with the timeline focused; its Left and Right seek too.
   f.page->setProperty("osdVisible", false);
@@ -758,7 +780,7 @@ TEST_CASE("TV mode: a held arrow seeks faster with one seek, Up shows the displa
   CHECK(window.activeFocusItem() == timeline);
   const double onTimeline = f.player->position();
   tap(window, Qt::Key_Left);
-  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (onTimeline - 10)) < 0.5; }, 2000));
+  REQUIRE(waitFor([&] { return std::abs(f.player->position() - (onTimeline - 15)) < 0.5; }, 2000));
   CHECK(window.activeFocusItem() == timeline);
 
   // Down: the arrows now move between the display's controls.

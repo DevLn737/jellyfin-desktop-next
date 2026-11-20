@@ -7,6 +7,7 @@
 #include <jfd/settings/SettingsRegistry.h>
 #include <jfd/ui/GamepadStatus.h>
 #include <jfd/ui/InputRouter.h>
+#include <jfd/ui/PlayerModel.h>
 
 #include <QQmlEngine>
 #include <QQuickWindow>
@@ -17,8 +18,10 @@ namespace jfd::desktop {
     const QString GamepadKey = QStringLiteral("input/gamepad");
     const QString BackgroundKey = QStringLiteral("input/gamepadInBackground");
     const QString CheckKey = QStringLiteral("input/checkButtons");
-    // The player's own arrow-key step.
-    constexpr qint64 SeekStepMs = 10'000;
+    // The player's own step (playback/seekStep), as its arrow keys go.
+    qint64 seekStepMs(const AppServices& services) {
+      return services.playerModel ? services.playerModel->seekStep() * qint64(1000) : 15'000;
+    }
 
     // PlayPause and the seek triggers: the media controls' path, so in a
     // group they are requests to the group and they work on every screen.
@@ -27,8 +30,8 @@ namespace jfd::desktop {
       integrations::MediaSessionBridge& bridge = *services.integrations->bridge;
       switch (action) {
       case platform::InputAction::PlayPause: bridge.requestCommand(platform::MediaCommand::PlayPause); break;
-      case platform::InputAction::SeekForward: bridge.seekBy(SeekStepMs); break;
-      case platform::InputAction::SeekBack: bridge.seekBy(-SeekStepMs); break;
+      case platform::InputAction::SeekForward: bridge.seekBy(seekStepMs(services)); break;
+      case platform::InputAction::SeekBack: bridge.seekBy(-seekStepMs(services)); break;
       default: break;
       }
     }

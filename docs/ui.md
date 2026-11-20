@@ -351,11 +351,15 @@ initials, status dot, room name and viewer count) and the time now with
 system's short format; the clock can be turned off).
 
 The bottom bar: the timeline (chapter marks, segment bands, trickplay preview
-with the chapter's name), elapsed time on the left and the time left on the
-right, then previous, the round light play/pause, next, −10 and +10, volume,
-and the part playing (segment, or chapter with "· 2/5"). On the right:
-audio and subtitles (with the subtitles' language), the speed, segments,
-Episodes, the player settings (gear), picture in picture and fullscreen. Skip
+with the chapter's name), then one row of icons. On the left: the round light
+play/pause, previous and next episode, a step back and forward (the circling
+arrows with the step's seconds inside; Settings, Playback, Seek step, 15 s by
+default, which the arrow keys and the gamepad's triggers use too), volume,
+"elapsed / length", and the part playing: the segment, or the chapter between
+‹ and › that jump to the chapter before (from well into one, its start) and
+after. On the right: audio and subtitles, the speed (its icon, with "1.5×"
+beside it when not normal), segments, episodes, the player settings (gear),
+picture in picture and fullscreen. The menus open 12 px above the bar. Skip
 intro/credits sits above the bar on the right.
 
 - **TracksMenu**: audio and subtitles side by side (one column in a narrow

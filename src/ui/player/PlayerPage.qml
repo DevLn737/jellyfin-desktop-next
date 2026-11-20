@@ -52,6 +52,29 @@ RoutePage {
     component OsdButton: IconButton {
         focusPolicy: Qt.TabFocus
     }
+    // A step back or forward: the circling arrow with the seconds inside.
+    component StepButton: OsdButton {
+        id: stepButton
+        property int seconds: 15
+        contentItem: Item {
+            Icon {
+                id: stepIcon
+                anchors.centerIn: parent
+                source: stepButton.iconSource
+                size: Theme.iconSize + 6
+            }
+            // Inside the circle, under the arrow's head.
+            Text {
+                anchors.horizontalCenter: stepIcon.horizontalCenter
+                anchors.verticalCenter: stepIcon.verticalCenter
+                anchors.verticalCenterOffset: Math.round(stepIcon.size * 0.09)
+                text: stepButton.seconds
+                color: Overlay.text
+                font.pixelSize: Math.round(stepIcon.size * (stepButton.seconds >= 100 ? 0.24 : 0.3))
+                font.weight: Font.Bold
+            }
+        }
+    }
 
     // A closed menu gives the keys back to the page, in TV mode to the
     // button that opened it.
@@ -94,21 +117,24 @@ RoutePage {
         return false
     }
 
-    // TV mode's seek: a press goes 10 s at once; held, the steps grow
-    // (10, 30, then 60 s) and the timeline shows where, until let go.
+    // The arrows' seek: a press goes one step (Settings, Playback, Seek
+    // step; 15 s by default); held, the steps grow to 30 then 60 s and the
+    // timeline shows where, until let go.
+    readonly property int stepSeconds: player.seekStep > 0 ? player.seekStep : 15
+
     function seekStep(direction, repeat) {
         if (player.live) return
         // A new press, or a repeat after the last hold ended.
         if (!repeat || !holdTimer.running) {
             holdCount = 0
             seekPending = false
-            seekTarget = Math.max(0, Math.min(player.duration, player.position + 10 * direction))
-            player.seekBy(10 * direction)
+            seekTarget = Math.max(0, Math.min(player.duration, player.position + stepSeconds * direction))
+            player.seekBy(stepSeconds * direction)
             holdTimer.restart()
             return
         }
         holdCount++
-        const step = holdCount < 10 ? 10 : holdCount < 25 ? 30 : 60
+        const step = holdCount < 10 ? stepSeconds : holdCount < 25 ? Math.max(30, stepSeconds) : Math.max(60, stepSeconds)
         seekTarget = Math.max(0, Math.min(player.duration, seekTarget + step * direction))
         seekPending = true
         notify(clock(seekTarget) + " / " + clock(player.duration))
@@ -240,13 +266,24 @@ RoutePage {
         }
         return ""
     }
-    // The chapter that plays and its place: "Chapter name · 2/5".
+    // The chapter that plays (-1 before the first).
     readonly property int chapterIndex: {
         const list = player.chapters
         let found = -1
         for (let i = 0; i < list.length; ++i)
             if (list[i].start <= player.position) found = i
         return found
+    }
+
+    // The chapter before or after the one that plays. Back from well into
+    // a chapter goes to its start first.
+    function stepChapter(direction) {
+        const list = player.chapters
+        let index = chapterIndex + direction
+        if (direction < 0 && chapterIndex >= 0 && player.position - list[chapterIndex].start > 3) index = chapterIndex
+        if (index < 0 || index >= list.length) return
+        player.seek(list[index].start)
+        poke()
     }
 
     function playEpisode(itemId) {
@@ -731,8 +768,8 @@ RoutePage {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: Theme.spacing + page.safeX
-        // Above the whole bar, seek line included.
-        anchors.bottomMargin: bottomBar.height + Theme.spacingSmall
+        // Just above the bar, seek line included.
+        anchors.bottomMargin: bottomBar.height - Theme.spacing + Math.round((Theme.spacing + Theme.spacingSmall) / 2)
         active: page.openMenu.length > 0 && page.openMenu !== "episodes"
         sourceComponent: page.openMenu === "tune" ? tuneMenu
             : page.openMenu === "segments" ? segmentsMenu : trackMenu
@@ -978,34 +1015,8 @@ RoutePage {
                 }
             }
 
-            // Elapsed on the left, what is left on the right.
-            Item {
-                width: parent.width
-                height: timeText.implicitHeight
-                Text {
-                    id: timeText
-                    objectName: "timeText"
-                    anchors.left: parent.left
-                    text: page.player.live ? qsTr("Live") : page.clock(timeline.value)
-                    color: Overlay.text
-                    font.pixelSize: Theme.fontSizeBody
-                    font.weight: Font.Medium
-                    style: Text.Outline
-                    styleColor: "#60000000"
-                }
-                Text {
-                    objectName: "remainingText"
-                    anchors.right: parent.right
-                    visible: page.hasEnd
-                    text: "−" + page.clock(Math.max(0, page.player.duration - timeline.value))
-                    color: Overlay.text
-                    font.pixelSize: Theme.fontSizeBody
-                    font.weight: Font.Medium
-                    style: Text.Outline
-                    styleColor: "#60000000"
-                }
-            }
-
+            // One row under the timeline: playback on the left, the menus
+            // on the right.
             Item {
                 width: parent.width
                 height: playPauseButton.height
@@ -1016,20 +1027,12 @@ RoutePage {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall
 
-                    OsdButton {
-                        objectName: "previous"
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: !page.player.live && !page.player.inGroup && page.player.hasPrevious
-                        iconSource: PlayerIcons.previous
-                        toolTipText: qsTr("Previous")
-                        onClicked: page.player.previous()
-                    }
-                    // Play and pause: the big round light button.
+                    // Play and pause: the round light button.
                     OsdButton {
                         id: playPauseButton
                         objectName: "playPause"
                         anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: Math.round(Theme.controlHeight * 1.4)
+                        implicitWidth: Math.round(Theme.controlHeight * 1.15)
                         implicitHeight: implicitWidth
                         iconSource: page.player.paused ? Icons.play : PlayerIcons.pause
                         toolTipText: page.player.paused ? qsTr("Play") : qsTr("Pause")
@@ -1039,7 +1042,7 @@ RoutePage {
                                 anchors.centerIn: parent
                                 source: playPauseButton.iconSource
                                 color: "#0b0e15"
-                                size: Theme.iconSize + 4
+                                size: Theme.iconSize
                             }
                         }
                         background: Rectangle {
@@ -1047,6 +1050,23 @@ RoutePage {
                             color: playPauseButton.down ? "#d8dce4" : playPauseButton.hovered ? "#ffffff" : "#f2f4f8"
                             FocusFrame { shown: playPauseButton.visualFocus; radius: width / 2 }
                         }
+                    }
+                    OsdButton {
+                        objectName: "previous"
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: !page.player.live && !page.player.inGroup && page.player.hasPrevious
+                        iconSource: PlayerIcons.previous
+                        toolTipText: qsTr("Previous episode")
+                        onClicked: page.player.previous()
+                    }
+                    OsdButton {
+                        objectName: "next"
+                        anchors.verticalCenter: parent.verticalCenter
+                        // A group's queue is the server's; alone, the series'.
+                        visible: !page.player.live && (page.player.inGroup || page.player.hasNext)
+                        iconSource: PlayerIcons.next
+                        toolTipText: qsTr("Next episode")
+                        onClicked: page.player.next()
                     }
                     OsdButton {
                         objectName: "channelDown"
@@ -1064,33 +1084,27 @@ RoutePage {
                         toolTipText: qsTr("Next channel")
                         onClicked: page.changeChannel(1)
                     }
-                    OsdButton {
-                        objectName: "next"
+                    // A step back and forward: the circling arrow with the
+                    // step's seconds inside (Settings, Playback, Seek step).
+                    StepButton {
+                        objectName: "stepBack"
                         anchors.verticalCenter: parent.verticalCenter
-                        // A group's queue is the server's; alone, the series'.
-                        visible: !page.player.live && (page.player.inGroup || page.player.hasNext)
-                        iconSource: PlayerIcons.next
-                        toolTipText: qsTr("Next")
-                        onClicked: page.player.next()
-                    }
-                    SpeedButton {
-                        objectName: "back10"
-                        anchors.verticalCenter: parent.verticalCenter
-                        focusPolicy: Qt.TabFocus
                         // A live channel cannot be sought.
-                        visible: page.width >= 720 && !page.player.live
-                        text: "−10"
-                        toolTipText: qsTr("Back 10 seconds")
-                        onClicked: page.player.seekBy(-10)
+                        visible: !page.player.live
+                        seconds: page.stepSeconds
+                        onClicked: page.player.seekBy(-page.stepSeconds)
+                        iconSource: PlayerIcons.replay
+                        toolTipText: qsTr("Back %1 s").arg(page.stepSeconds)
                     }
-                    SpeedButton {
-                        objectName: "forward10"
+                    StepButton {
+                        objectName: "stepForward"
                         anchors.verticalCenter: parent.verticalCenter
-                        focusPolicy: Qt.TabFocus
-                        visible: page.width >= 720 && !page.player.live
-                        text: "+10"
-                        toolTipText: qsTr("Forward 10 seconds")
-                        onClicked: page.player.seekBy(10)
+                        // A live channel cannot be sought.
+                        visible: !page.player.live
+                        seconds: page.stepSeconds
+                        onClicked: page.player.seekBy(page.stepSeconds)
+                        iconSource: PlayerIcons.forward
+                        toolTipText: qsTr("Forward %1 s").arg(page.stepSeconds)
                     }
                     OsdButton {
                         objectName: "mute"
@@ -1106,7 +1120,7 @@ RoutePage {
                         anchors.verticalCenter: parent.verticalCenter
                         // The mute button stays when the window is narrow.
                         visible: page.width >= 800
-                        width: 110
+                        width: page.tvMode ? 140 : 96
                         from: 0
                         to: 100
                         stepSize: 1
@@ -1117,14 +1131,49 @@ RoutePage {
                             page.poke()
                         }
                     }
-                    // What part is playing: the segment, else the chapter
-                    // and its place among them.
+                    // Where it is and how long it is: "27:01 / 2:58:41".
                     Row {
                         anchors.verticalCenter: parent.verticalCenter
-                        leftPadding: Theme.spacingSmall
-                        spacing: Theme.spacingSmall
+                        leftPadding: Theme.spacing
+                        rightPadding: Theme.spacingSmall
+                        Text {
+                            id: timeText
+                            objectName: "timeText"
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: page.player.live ? qsTr("Live") : page.clock(timeline.value)
+                            color: Overlay.text
+                            font.pixelSize: Theme.fontSizeBody
+                            font.weight: Theme.fontWeightBold
+                            font.features: { "tnum": 1 }
+                        }
+                        Text {
+                            objectName: "durationText"
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: page.hasEnd
+                            text: " / " + page.clock(page.player.duration)
+                            color: Overlay.textSecondary
+                            font.pixelSize: Theme.fontSizeBody
+                            font.features: { "tnum": 1 }
+                        }
+                    }
+                    // What part is playing: the segment, else the chapter,
+                    // with a jump to the chapter before and after.
+                    Row {
+                        id: partRow
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 0
+                        readonly property bool chapters: page.player.segment.length === 0 && page.player.chapters.length > 1
                         visible: partText.part.length > 0
-                                 && rightControls.x - leftControls.x - x >= partText.width + partCount.width + 2 * Theme.spacing
+                                 && rightControls.x - leftControls.x - x >= width + Theme.spacing
+                        OsdButton {
+                            objectName: "chapterPrevious"
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: partRow.chapters
+                            implicitWidth: Math.round(Theme.controlHeight * 0.75)
+                            iconSource: Icons.left
+                            toolTipText: qsTr("Previous chapter")
+                            onClicked: page.stepChapter(-1)
+                        }
                         Text {
                             id: partText
                             objectName: "partText"
@@ -1132,22 +1181,22 @@ RoutePage {
                             readonly property string part: page.player.segment.length > 0
                                 ? page.segmentName(page.player.segment)
                                 : page.player.chapters.length > 0 ? page.player.chapterAt(timeline.value) : ""
+                            leftPadding: partRow.chapters ? 0 : Theme.spacingSmall
                             text: part
                             color: Overlay.text
                             font.pixelSize: Theme.fontSizeBody
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Font.Medium
                             elide: Text.ElideRight
-                            width: Math.min(implicitWidth, 300)
+                            width: Math.min(implicitWidth, 280)
                         }
-                        Text {
-                            id: partCount
-                            objectName: "partCount"
+                        OsdButton {
+                            objectName: "chapterNext"
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: page.player.segment.length === 0 && page.player.chapters.length > 1
-                                     && page.chapterIndex >= 0
-                            text: "· " + (page.chapterIndex + 1) + "/" + page.player.chapters.length
-                            color: Overlay.textSecondary
-                            font.pixelSize: Theme.fontSizeBody
+                            visible: partRow.chapters && page.chapterIndex < page.player.chapters.length - 1
+                            implicitWidth: Math.round(Theme.controlHeight * 0.75)
+                            iconSource: Icons.right
+                            toolTipText: qsTr("Next chapter")
+                            onClicked: page.stepChapter(1)
                         }
                     }
                 }
@@ -1157,28 +1206,26 @@ RoutePage {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall
-                    // Names beside the icons while there is room.
-                    readonly property bool labels: page.width >= 1100
 
-                    SpeedButton {
+                    OsdButton {
                         objectName: "tracksButton"
-                        focusPolicy: Qt.TabFocus
                         anchors.verticalCenter: parent.verticalCenter
                         visible: !page.tvMode
                         iconSource: PlayerIcons.subtitles
-                        // The subtitles' language at a glance.
-                        text: rightControls.labels ? page.subtitleLabel : ""
-                        toolTipText: qsTr("Audio and subtitles")
+                        toolTipText: page.subtitleLabel.length > 0
+                            ? qsTr("Audio and subtitles (%1)").arg(page.subtitleLabel) : qsTr("Audio and subtitles")
                         onClicked: page.toggleMenu(page.openMenu === "audio" ? "audio" : "subtitles")
                     }
+                    // The speed: the icon, with the speed beside it when it
+                    // is not normal. In a group it is everyone's.
                     SpeedButton {
                         objectName: "speedButton"
                         focusPolicy: Qt.TabFocus
-                        // The speed at a glance; in a group it is everyone's.
-                        visible: page.width >= 720 && (!page.player.inGroup || GroupSession.rateSupported)
                         anchors.verticalCenter: parent.verticalCenter
-                        text: page.player.baseRate + "×"
+                        visible: page.width >= 720 && (!page.player.inGroup || GroupSession.rateSupported)
+                        iconSource: PlayerIcons.speed
                         changed: Math.abs(page.player.baseRate - 1) > 0.001
+                        text: changed ? page.player.baseRate + "×" : ""
                         toolTipText: qsTr("Speed")
                         onClicked: page.toggleMenu("tune")
                     }
@@ -1190,13 +1237,11 @@ RoutePage {
                         toolTipText: qsTr("Segments")
                         onClicked: page.toggleMenu("segments")
                     }
-                    SpeedButton {
+                    OsdButton {
                         objectName: "episodes"
-                        focusPolicy: Qt.TabFocus
                         anchors.verticalCenter: parent.verticalCenter
                         visible: page.hasEpisodes && !page.tvMode
                         iconSource: PlayerIcons.episodes
-                        text: rightControls.labels ? qsTr("Episodes") : ""
                         toolTipText: qsTr("Episodes")
                         onClicked: page.toggleMenu("episodes")
                     }
@@ -1288,9 +1333,9 @@ RoutePage {
         case Qt.Key_P:
             page.enterPip(); break
         case Qt.Key_Left:
-            page.player.seekBy(-10); break
+            page.player.seekBy(-page.stepSeconds); break
         case Qt.Key_Right:
-            page.player.seekBy(10); break
+            page.player.seekBy(page.stepSeconds); break
         case Qt.Key_Up:
             page.changeVolume(5); break
         case Qt.Key_Down:

@@ -114,6 +114,7 @@ only reformatted.
 | `src/ui/player/icons/previous.svg` | Material Icons `skip_previous` | Apache-2.0 |
 | `src/ui/player/icons/replay.svg` | Material Icons `replay` | Apache-2.0 |
 | `src/ui/player/icons/segments.svg` | Part of this program: a plain geometric shape, no Material Icons match found | GPL-2.0-or-later |
+| `src/ui/player/icons/speed.svg` | Material Icons `speed` | Apache-2.0 |
 | `src/ui/player/icons/subtitles.svg` | Material Icons `subtitles` | Apache-2.0 |
 | `src/ui/player/icons/tune.svg` | Material Icons `tune` | Apache-2.0 |
 | `src/ui/player/icons/volume.svg` | Material Icons `volume_up` | Apache-2.0 |
