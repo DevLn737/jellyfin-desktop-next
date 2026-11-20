@@ -116,20 +116,27 @@ namespace {
 
 } // namespace
 
-TEST_CASE("Without an address there is no Requests in the sidebar") {
+TEST_CASE("Without an address there is no Requests in the account menu") {
   Scene scene(false);
+  QQuickItem* nav = find(scene.shell, "topNav");
+  REQUIRE(nav != nullptr);
+  const auto inMenu = [nav](const QString& route) {
+    for (const QVariant& entry : nav->property("accountEntries").toList())
+      if (entry.toMap().value(QStringLiteral("route")).toString() == route) return true;
+    return false;
+  };
   CHECK_FALSE(scene.navigator->routeAvailable(QStringLiteral("requests")));
-  CHECK(find(scene.shell, "nav_requests") == nullptr);
-  CHECK(find(scene.shell, "nav_settings") != nullptr);
+  CHECK_FALSE(inMenu(QStringLiteral("requests")));
+  CHECK(inMenu(QStringLiteral("settings")));
   CHECK_FALSE(ui::RequestsUi::service()->configured());
 
   // The address arrives (Settings): the item appears; cleared, it goes.
   scene.service.setAddress(scene.seerr.url().toString());
   QCoreApplication::processEvents();
   CHECK(scene.navigator->routeAvailable(QStringLiteral("requests")));
-  CHECK(scene.until([&] { return find(scene.shell, "nav_requests") != nullptr; }));
+  CHECK(scene.until([&] { return inMenu(QStringLiteral("requests")); }));
   scene.service.setAddress(QString());
-  CHECK(scene.until([&] { return find(scene.shell, "nav_requests") == nullptr; }));
+  CHECK(scene.until([&] { return !inMenu(QStringLiteral("requests")); }));
 }
 
 TEST_CASE("Signed out, the page offers the sign-in and shows no titles") {

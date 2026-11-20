@@ -162,6 +162,9 @@
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
+</context>
+<context>
+    <name>TopNav</name>
     <message>
         <source>Back</source>
         <translation>Назад</translation>
@@ -171,24 +174,28 @@
         <translation>Медиатека</translation>
     </message>
     <message>
-        <source>Menu</source>
-        <translation>Меню</translation>
+        <source>Ctrl K</source>
+        <translation>Ctrl K</translation>
     </message>
     <message>
-        <source>Libraries</source>
-        <translation>Библиотеки</translation>
+        <source>Menu</source>
+        <translation>Меню</translation>
     </message>
     <message>
         <source>Sign out</source>
         <translation>Выйти</translation>
     </message>
     <message>
-        <source>Sign out of this server? Playback stops and the password is asked for again.</source>
-        <translation>Выйти с этого сервера? Воспроизведение остановится, и пароль нужно будет ввести снова.</translation>
+        <source>Leave TV mode</source>
+        <translation>Выйти из ТВ-режима</translation>
     </message>
     <message>
-        <source>Gamepad connected: %1</source>
-        <translation>Подключён геймпад: %1</translation>
+        <source>TV mode</source>
+        <translation>ТВ-режим</translation>
+    </message>
+    <message>
+        <source>Sign out of this server? Playback stops and the password is asked for again.</source>
+        <translation>Выйти с этого сервера? Воспроизведение остановится, и пароль нужно будет ввести снова.</translation>
     </message>
 </context>
 </TS>

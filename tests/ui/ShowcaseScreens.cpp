@@ -606,7 +606,6 @@ namespace {
             AppShell {
                 objectName: "shell"
                 anchors.fill: parent
-                libraries: Library.home ? Library.home.libraries : null
                 accountName: "Анна"
                 accountDetail: "Дом · jellyfin.local"
                 onPaletteRequested: palette.toggle()

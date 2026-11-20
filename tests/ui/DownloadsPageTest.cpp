@@ -34,7 +34,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 // only (a gamepad reaches them as the same keys through InputRouter): the
 // Downloads page (queue actions, tabs, filter, delete with its question),
 // the Download button and its dialog with the total, the button gone
-// without the server's permission, the sidebar entry, and the home page
+// without the server's permission, the navigation entry, and the home page
 // without the server showing the downloads, which play.
 
 using namespace jfd;
@@ -251,7 +251,7 @@ namespace {
 
 } // namespace
 
-TEST_CASE("The Downloads page is in the sidebar and works with the keyboard alone") {
+TEST_CASE("The Downloads page is in the account menu and works with the keyboard alone") {
   Scene scene;
   const QJsonObject q1 = video(1, QStringLiteral("Movie"), QStringLiteral("Alice Waits"), 3000);
   const QJsonObject q2 = video(2, QStringLiteral("Movie"), QStringLiteral("Bob Waits"), 4000);
@@ -266,8 +266,14 @@ TEST_CASE("The Downloads page is in the sidebar and works with the keyboard alon
 
   scene.loadShell();
   scene.navigator->reset(QStringLiteral("home"));
-  // The sidebar entry (order 250).
-  REQUIRE(waitFor([&] { return find(scene.window->contentItem(), QStringLiteral("nav_downloads")) != nullptr; }));
+  // In the account menu of the navigation bar (online).
+  REQUIRE(waitFor([&] {
+    QQuickItem* nav = find(scene.window->contentItem(), QStringLiteral("topNav"));
+    if (nav == nullptr) return false;
+    for (const QVariant& entry : nav->property("accountEntries").toList())
+      if (entry.toMap().value(QStringLiteral("route")).toString() == QStringLiteral("downloads")) return true;
+    return false;
+  }));
 
   QQuickItem* page = scene.open(QStringLiteral("downloads"));
   CHECK(shown(page, QStringLiteral("storageBar")));

@@ -118,7 +118,7 @@ TEST_CASE("Gamepad Back leaves the page; Search opens the palette and Back close
   REQUIRE(pad.attached());
   REQUIRE(pumpUntil([&] { return scene.input.connectedCount() == 1; }));
 
-  // A page that is not a sidebar root, on the placeholder.
+  // A page that is not a root, on the placeholder.
   REQUIRE(scene.navigator->navigate(QStringLiteral("customizeHome")));
   pump(50);
   REQUIRE(scene.navigator->depth() == 2);
@@ -221,7 +221,7 @@ AppShell { Component.onCompleted: Theme.tvMode = true }
 
 } // namespace
 
-TEST_CASE("TV mode with a gamepad alone: d-pad, pages on the shoulder buttons, View to the sidebar, the button check") {
+TEST_CASE("TV mode with a gamepad alone: d-pad, pages on the shoulder buttons, View to the navigation bar, the button check") {
   TvScene scene;
   auto pad = VirtualGamepad::gamepad(0x2dc8, 0x6006, "8BitDo Pro 2");
   REQUIRE(pad.attached());
@@ -237,16 +237,18 @@ TEST_CASE("TV mode with a gamepad alone: d-pad, pages on the shoulder buttons, V
   scene.tap(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
   CHECK(scene.focused().mid(3).toInt() < paged);
 
-  // Left: the sidebar; View (Menu): back to the page and to the sidebar.
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
-  CHECK(scene.focused().startsWith(QLatin1String("nav_")));
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
-  CHECK(scene.focused().startsWith(QLatin1String("row")));
+  // View (Menu): to the bar's entry of the page and back to the page;
+  // Down from the bar returns to the page too.
+  const QString before = scene.focused();
   scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
   CHECK(scene.focused() == QStringLiteral("nav_home"));
   scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
+  CHECK(scene.focused() == before);
+  scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
+  CHECK(scene.focused() == QStringLiteral("nav_home"));
+  scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
   const QString onPage = scene.focused();
-  CHECK(onPage.startsWith(QLatin1String("row")));
+  CHECK(onPage == before);
 
   // The button check: presses show, nothing moves; B twice ends it.
   scene.status->setAvailable(true);

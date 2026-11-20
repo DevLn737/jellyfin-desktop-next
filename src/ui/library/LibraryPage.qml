@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Shell
@@ -43,18 +44,69 @@ RoutePage {
         anchors.topMargin: Theme.spacingLarge
         spacing: Theme.spacingLarge
 
-        PageTopBar {
-            objectName: "libraryTopBar"
-            Layout.fillWidth: true
-        }
-
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing
 
-            Heading {
+            // The libraries, as tabs: the page's own, the others (a music
+            // or Live TV library opens its own section).
+            ListView {
+                id: tabs
+                objectName: "libraryTabs"
+                readonly property bool enterAtCurrent: true
                 Layout.fillWidth: true
-                text: page.title
+                Layout.preferredHeight: Theme.controlHeight + 8
+                orientation: ListView.Horizontal
+                spacing: 2
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: Library.home ? Library.home.libraries : null
+                keyNavigationEnabled: true
+                activeFocusOnTab: true
+                highlightFollowsCurrentItem: false
+                currentIndex: Library.home ? Math.max(0, Library.home.libraries.rowOf(page.libraryId)) : 0
+                delegate: T.ItemDelegate {
+                    id: tab
+                    required property var model
+                    required property int index
+                    readonly property string libraryId: model.itemId || ""
+                    readonly property bool current: libraryId === page.libraryId
+                    objectName: "library_" + libraryId
+                    implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset, implicitContentWidth + leftPadding + rightPadding)
+                    height: tabs.height
+                    leftPadding: 14
+                    rightPadding: 14
+                    focusPolicy: Qt.StrongFocus
+                    hoverEnabled: true
+                    Accessible.name: model.name || ""
+                    Keys.onReturnPressed: tab.clicked()
+                    Keys.onEnterPressed: tab.clicked()
+                    onClicked: if (!current) Navigator.navigate(Library.routeFor(libraryId, model.type || ""))
+                    contentItem: Row {
+                        spacing: Theme.spacingSmall
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: tab.model.name || ""
+                            color: tab.current || tab.hovered ? Theme.text : Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeBody
+                            font.weight: Font.Bold
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: tab.model.childCount > 0
+                            text: String(tab.model.childCount)
+                            color: Theme.textDisabled
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.Bold
+                        }
+                    }
+                    background: Rectangle {
+                        radius: Theme.radius + 3
+                        color: tab.current ? Qt.alpha(Theme.text, 0.12)
+                             : tab.hovered ? Qt.alpha(Theme.text, 0.05) : "transparent"
+                        FocusFrame { shown: tab.visualFocus; inset: 0 }
+                    }
+                }
             }
             Text {
                 objectName: "libraryCount"

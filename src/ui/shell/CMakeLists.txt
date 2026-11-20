@@ -38,7 +38,7 @@ qt_add_qml_module(jfd_ui_shell
     PageTopBar.qml
     PlaceholderPage.qml
     RoutePage.qml
-    Sidebar.qml
+    TopNav.qml
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls)
 target_link_libraries(jfd_ui_shell
   PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::settings jfd::platform

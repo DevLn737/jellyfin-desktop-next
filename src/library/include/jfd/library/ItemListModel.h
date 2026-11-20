@@ -81,7 +81,7 @@ namespace jfd::library {
     void setEntries(QList<Entry> entries);
     // Updates every row of the item; true when one changed.
     bool applyUserData(const api::UserItemData& data);
-    int rowOf(const QString& itemId) const;
+    Q_INVOKABLE int rowOf(const QString& itemId) const;
 
   Q_SIGNALS:
     void countChanged();

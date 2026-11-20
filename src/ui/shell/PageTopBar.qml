@@ -30,7 +30,8 @@ Item {
         IconButton {
             objectName: "topBarBack"
             square: true
-            visible: Navigator.canGoBack
+            // The navigation bar has Back now.
+            visible: false
             iconSource: Icons.back
             toolTipText: qsTr("Back")
             onClicked: Navigator.back()
