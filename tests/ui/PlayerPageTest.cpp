@@ -105,7 +105,7 @@ namespace {
     // What the launcher emits once the server resolved the item, then the
     // intent it posts.
     void open(bool live = false, const QString& itemId = QStringLiteral("episode"),
-              api::PlayMethod method = api::PlayMethod::DirectPlay) {
+              api::PlayMethod method = api::PlayMethod::DirectPlay, const QString& seriesId = {}) {
       session::PlaybackLauncher::Request request;
       request.itemId = itemId;
       api::MediaSource source;
@@ -134,6 +134,10 @@ namespace {
       played.externalSubtitles = {subtitle};
       api::Item item;
       item.id = request.itemId;
+      if (!seriesId.isEmpty()) {
+        item.type = QStringLiteral("Episode");
+        item.seriesId = seriesId;
+      }
       Q_EMIT runtime->launcher().resolved(request, item, source, played);
       core::MediaRequest media = playback::mediaRequest(played, false, core::MediaTicks(), std::nullopt, false);
       media.title = "Episode";
@@ -239,6 +243,86 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   CHECK(find(menu, "subtitleTrack_2") != nullptr);
   CHECK(find(menu, "subtitleTune") != nullptr);
   shoot("player-1280-tracks");
+}
+
+TEST_CASE("The episodes panel shows each episode's still, the watched check and the progress, by season") {
+  // Two seasons: 1x1 watched, 1x2 plays, 2x1 half seen (by position),
+  // 2x2 without a still of its own (the series' backdrop).
+  test::FakeServer server([](const test::HttpRequest& r) {
+    const auto json = [](const char* body) { return test::HttpResponse{200, QByteArray(body), "application/json", 0}; };
+    if (r.path == QStringLiteral("/Shows/series/Episodes"))
+      return json(R"({"TotalRecordCount": 4, "Items": [
+        {"Id": "e11", "Name": "Log", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 1,
+         "RunTimeTicks": 28800000000, "ImageTags": {"Primary": "p11"}, "UserData": {"Played": true}},
+        {"Id": "episode", "Name": "First storm", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 2,
+         "RunTimeTicks": 28800000000, "ImageTags": {"Primary": "p12"}, "UserData": {"Played": false}},
+        {"Id": "e21", "Name": "New tenant", "Type": "Episode", "ParentIndexNumber": 2, "IndexNumber": 1,
+         "RunTimeTicks": 28800000000, "ImageTags": {"Primary": "p21"},
+         "UserData": {"Played": false, "PlaybackPositionTicks": 14400000000}},
+        {"Id": "e22", "Name": "Fog", "Type": "Episode", "ParentIndexNumber": 2, "IndexNumber": 2,
+         "RunTimeTicks": 28800000000, "ParentBackdropItemId": "series", "ParentBackdropImageTags": ["b"],
+         "UserData": {"Played": false}}]})");
+    return test::HttpResponse{404, {}, {}, 0};
+  });
+  Fixture f;
+  f.client.setServerUrl(server.url());
+  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
+  f.open(false, QStringLiteral("episode"), api::PlayMethod::DirectPlay, QStringLiteral("series"));
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
+  REQUIRE(waitFor([&] { return f.player->episodes().size() == 4; }, 5000));
+
+  const QVariantList list = f.player->episodes();
+  const auto entry = [&](int i) { return list[i].toMap(); };
+  CHECK(entry(0).value(QStringLiteral("played")).toBool());
+  CHECK(entry(1).value(QStringLiteral("current")).toBool());
+  CHECK(entry(2).value(QStringLiteral("progress")).toDouble() == doctest::Approx(0.5));
+  CHECK(entry(0).value(QStringLiteral("progress")).toDouble() == doctest::Approx(0.0));
+  CHECK(entry(0).value(QStringLiteral("runTimeTicks")).toLongLong() == 28800000000LL);
+  // The episode's own still; the series' backdrop for the one without.
+  const QString still = entry(0).value(QStringLiteral("imageSource")).toString();
+  CHECK(still.startsWith(QStringLiteral("image://jfd/")));
+  CHECK(still.contains(QStringLiteral("e11")));
+  CHECK(still.contains(QStringLiteral("Primary")));
+  const QString backdrop = entry(3).value(QStringLiteral("imageSource")).toString();
+  CHECK(backdrop.contains(QStringLiteral("series")));
+  CHECK(backdrop.contains(QStringLiteral("Backdrop")));
+
+  const auto visible = [&](QQuickItem* root, const char* name) {
+    int n = 0;
+    const std::function<void(QQuickItem*)> walk = [&](QQuickItem* item) {
+      if (item->objectName() == QLatin1String(name) && item->isVisible()) ++n;
+      for (QQuickItem* child : item->childItems()) walk(child);
+    };
+    walk(root);
+    return n;
+  };
+
+  f.page->setProperty("osdVisible", true);
+  QMetaObject::invokeMethod(f.page, "toggleMenu", Q_ARG(QVariant, QStringLiteral("episodes")));
+  QQuickItem* tabs = nullptr;
+  REQUIRE(waitFor([&] { return (tabs = find(f.page, "episodeSeasonTabs")) != nullptr; }, 2000));
+  CHECK(tabs->isVisible());
+  QQuickItem* watched = find(f.page, "episodesWatched");
+  REQUIRE(watched != nullptr);
+  CHECK(watched->property("text").toString() == QStringLiteral("1 of 4 watched"));
+  // The playing episode's season opens: its two episodes, one with a check.
+  REQUIRE(waitFor([&] { return visible(f.page, "episodeRow") == 2; }, 2000));
+  CHECK(visible(f.page, "episodeStill") == 2);
+  CHECK(visible(f.page, "episodeWatched") == 1);
+  CHECK(visible(f.page, "episodeProgress") == 0);
+  const QString shots = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
+  if (!shots.isEmpty()) {
+    QTest::qWait(300);
+    f.window.grabWindow().save(shots + QStringLiteral("/player-1280-episodes.png"));
+  }
+
+  // The second season's tab: its episodes, the first half seen.
+  QQuickItem* second = nullptr;
+  REQUIRE(waitFor([&] { return (second = find(f.page, "seasonTab_2")) != nullptr; }, 2000));
+  QMetaObject::invokeMethod(second, "clicked");
+  REQUIRE(waitFor([&] { return visible(f.page, "episodeProgress") == 1; }, 2000));
+  CHECK(visible(f.page, "episodeRow") == 2);
+  CHECK(visible(f.page, "episodeWatched") == 0);
 }
 
 TEST_CASE("Delays are rounded to tenths and reset for the next file") {

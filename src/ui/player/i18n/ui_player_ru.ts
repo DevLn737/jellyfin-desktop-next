@@ -4,16 +4,36 @@
 <context>
     <name>EpisodesPanel</name>
     <message>
-        <source>S%1 E%2</source>
-        <translation>С%1 Э%2</translation>
+        <source>Season %1</source>
+        <translation>Сезон %1</translation>
+    </message>
+    <message>
+        <source>Specials</source>
+        <translation>Спецвыпуски</translation>
     </message>
     <message>
         <source>E%1</source>
-        <translation>Э%1</translation>
+        <translation>E%1</translation>
+    </message>
+    <message>
+        <source>%1 min</source>
+        <translation>%1 мин</translation>
     </message>
     <message>
         <source>Episodes</source>
         <translation>Серии</translation>
+    </message>
+    <message>
+        <source>Seasons and episodes</source>
+        <translation>Сезоны и серии</translation>
+    </message>
+    <message>
+        <source>%1 of %2 watched</source>
+        <translation>%1 из %2 просмотрено</translation>
+    </message>
+    <message>
+        <source>Now playing</source>
+        <translation>Сейчас идёт</translation>
     </message>
 </context>
 <context>

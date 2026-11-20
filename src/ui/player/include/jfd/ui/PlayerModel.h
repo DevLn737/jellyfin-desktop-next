@@ -109,7 +109,8 @@ namespace jfd::ui {
     // The clock and the end time in the page's header (a setting).
     Q_PROPERTY(bool showClock READ showClock WRITE setShowClock NOTIFY showClockChanged)
     // The series' episodes in order, for the episodes panel: maps with id,
-    // name, season, number, played and current. Empty for anything but an
+    // name, season, number, played, progress (0-1), runTimeTicks, imageSource
+    // (image://jfd/..., the still) and current. Empty for anything but an
     // episode. In a group the page sends the chosen one to the group's
     // queue (GroupSession.watchTogether) instead of playEpisode.
     Q_PROPERTY(QVariantList episodes READ episodes NOTIFY queueChanged)

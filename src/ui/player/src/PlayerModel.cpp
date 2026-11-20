@@ -2,6 +2,8 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/session/SessionRuntime.h>
+#include <jfd/library/CardImages.h>
+#include <jfd/library/ItemListModel.h>
 #include <jfd/ui/LibraryImageProvider.h>
 
 #include <MpvPlayer.h>
@@ -647,13 +649,22 @@ namespace jfd::ui {
         return;
       }
       const QList<api::Item>& episodes = page->items;
+      // The still on a row of the panel (its widest, in the TV mode),
+      // sharp on a high-density screen.
+      const QSize pixels = library::cardImageSize(library::CardShape::Thumb, 200, 2.0);
       for (const api::Item& episode : episodes) {
-        m_episodes.append(QVariantMap{{QStringLiteral("id"), episode.id},
-                                      {QStringLiteral("name"), episode.name},
-                                      {QStringLiteral("season"), episode.parentIndexNumber.value_or(0)},
-                                      {QStringLiteral("number"), episode.indexNumber.value_or(0)},
-                                      {QStringLiteral("played"), episode.userData.played},
-                                      {QStringLiteral("current"), episode.id == itemId}});
+        // The episode's own still; without one the series' thumb or backdrop.
+        const QUrl image = library::cardImageUrl(m_client, episode, library::CardShape::Thumb, pixels);
+        m_episodes.append(QVariantMap{
+            {QStringLiteral("id"), episode.id},
+            {QStringLiteral("name"), episode.name},
+            {QStringLiteral("season"), episode.parentIndexNumber.value_or(0)},
+            {QStringLiteral("number"), episode.indexNumber.value_or(0)},
+            {QStringLiteral("played"), episode.userData.played},
+            {QStringLiteral("progress"), library::progressOf(episode)},
+            {QStringLiteral("runTimeTicks"), QVariant::fromValue<qint64>(episode.runTimeTicks.value_or(0))},
+            {QStringLiteral("imageSource"), LibraryImageProvider::sourceFor(image)},
+            {QStringLiteral("current"), episode.id == itemId}});
       }
       for (qsizetype i = 0; i < episodes.size(); ++i) {
         if (episodes[i].id != itemId) continue;
