@@ -37,6 +37,8 @@ RoutePage {
     property bool osdVisible: true
     // "audio", "subtitles", "tune", "episodes" or "".
     property string openMenu: ""
+    // The page the settings menu opens on ("subtitles" from the tracks menu).
+    property string tunePage: ""
     // The statistics overlay (right-click on the video, or I).
     property bool statsShown: false
     readonly property bool osdShown: osdVisible || openMenu.length > 0 || player.paused || !player.active
@@ -131,7 +133,7 @@ RoutePage {
 
     // The first control of the open menu.
     function focusMenu() {
-        const menu = menuLoader.item
+        const menu = openMenu === "episodes" ? sheetLoader.item : menuLoader.item
         if (!menu) return
         if (menu.focusFirst !== undefined) {
             menu.focusFirst()
@@ -205,6 +207,47 @@ RoutePage {
         + Math.max(0, player.duration - player.position) / Math.max(0.1, player.baseRate) * 1000)
     // In a group the chosen episode goes to the group's queue.
     readonly property bool hasEpisodes: player.episodes.length > 1
+    // The episode that plays, from the series' list (null for a film).
+    readonly property var currentEpisode: {
+        const list = player.episodes
+        for (let i = 0; i < list.length; ++i)
+            if (list[i].current) return list[i]
+        return null
+    }
+    // An episode's title is "Series – Episode": the series on the first
+    // line, the episode under it.
+    readonly property string mainTitle: {
+        const separator = player.title.indexOf(" – ")
+        return currentEpisode && separator > 0 ? player.title.slice(0, separator) : player.title
+    }
+    readonly property string episodeLine: {
+        const episode = currentEpisode
+        if (!episode) return ""
+        const name = episode.name || ""
+        if (episode.season > 0 && episode.number > 0)
+            return qsTr("Season %1 · Episode %2 «%3»").arg(episode.season).arg(episode.number).arg(name)
+        if (episode.number > 0) return qsTr("Episode %1 «%2»").arg(episode.number).arg(name)
+        return name
+    }
+    // The subtitles that show, short: "Rus" (nothing when off).
+    readonly property string subtitleLabel: {
+        const list = player.subtitleTracks
+        for (let i = 0; i < list.length; ++i) {
+            const track = list[i]
+            if (track.index !== player.subtitleIndex) continue
+            const name = (track.language || track.title || "").toString()
+            return name.length > 0 ? name.charAt(0).toUpperCase() + name.slice(1, 3) : qsTr("On")
+        }
+        return ""
+    }
+    // The chapter that plays and its place: "Chapter name · 2/5".
+    readonly property int chapterIndex: {
+        const list = player.chapters
+        let found = -1
+        for (let i = 0; i < list.length; ++i)
+            if (list[i].start <= player.position) found = i
+        return found
+    }
 
     function playEpisode(itemId) {
         if (player.inGroup) GroupSession.watchTogether(itemId, "", 0)
@@ -518,24 +561,48 @@ RoutePage {
             anchors.rightMargin: Theme.spacing + page.safeX
             spacing: Theme.spacing
 
+            // Back: a round button with a hairline edge.
             OsdButton {
+                id: backButton
+                objectName: "playerBack"
                 iconSource: Icons.back
                 toolTipText: qsTr("Back")
                 onClicked: page.leave()
+                background: Rectangle {
+                    radius: width / 2
+                    color: backButton.down || backButton.hovered ? Overlay.surfaceHover : Qt.alpha(Overlay.surface, 0.35)
+                    border.width: 1
+                    border.color: Overlay.border
+                    FocusFrame { shown: backButton.visualFocus; radius: width / 2 }
+                }
             }
             Column {
                 anchors.verticalCenter: parent.verticalCenter
                 // The clock's room only while it shows.
                 width: Math.max(0, parent.width - Theme.controlHeight - groupOsd.width
                                    - (timeInfo.visible ? timeInfo.width + Theme.spacing : 0) - 3 * Theme.spacing)
+                spacing: 2
                 Text {
+                    objectName: "playerTitle"
                     width: parent.width
                     text: page.player.live && page.player.channelName.length > 0
                           ? (page.player.channelNumber.length > 0 ? page.player.channelNumber + "  " : "")
                             + page.player.channelName
-                          : page.player.title
+                          : page.mainTitle
                     color: Overlay.text
                     font.pixelSize: Theme.fontSizeLarge
+                    font.weight: Font.ExtraBold
+                    elide: Text.ElideRight
+                }
+                // An episode: its season, number and name under the series.
+                Text {
+                    objectName: "playerSubtitle"
+                    width: parent.width
+                    visible: text.length > 0 && !page.player.live
+                    text: page.episodeLine
+                    color: Overlay.textSecondary
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Font.Medium
                     elide: Text.ElideRight
                 }
                 // A channel: the programme on now, its times and progress.
@@ -610,16 +677,17 @@ RoutePage {
         }
     }
 
-    // Skip the intro or the like: on the left over the bar, with a line
+    // Skip the intro or the like: on the right over the bar, with a line
     // showing how much of the part has played.
     ActionButton {
         id: skipButton
         objectName: "skipSegment"
-        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.bottom: bottomBar.top
         anchors.margins: Theme.spacingLarge
-        anchors.leftMargin: Theme.spacingLarge + page.safeX
-        visible: page.player.segment.length > 0
+        anchors.rightMargin: Theme.spacingLarge + page.safeX
+        primary: true
+        visible: page.player.segment.length > 0 && page.openMenu !== "episodes"
         iconSource: PlayerIcons.forward
         text: page.player.segment === "Intro" ? qsTr("Skip intro")
             : page.player.segment === "Outro" ? qsTr("Skip credits")
@@ -665,15 +733,25 @@ RoutePage {
         anchors.rightMargin: Theme.spacing + page.safeX
         // Above the whole bar, seek line included.
         anchors.bottomMargin: bottomBar.height + Theme.spacingSmall
-        active: page.openMenu.length > 0
+        active: page.openMenu.length > 0 && page.openMenu !== "episodes"
         sourceComponent: page.openMenu === "tune" ? tuneMenu
-            : page.openMenu === "episodes" ? episodesMenu
             : page.openMenu === "segments" ? segmentsMenu : trackMenu
+    }
+    // The episodes: a sheet along the bottom, in place of the bar.
+    Loader {
+        id: sheetLoader
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: page.safeY
+        active: page.openMenu === "episodes"
+        sourceComponent: episodesMenu
     }
     // Audio and subtitles together, opened as either.
     Component {
         id: trackMenu
         TracksMenu {
+            availableWidth: page.width - 2 * (Theme.spacing + page.safeX)
             audioTracks: page.player.audioTracks
             subtitleTracks: page.player.subtitleTracks
             audioIndex: page.player.audioIndex
@@ -687,19 +765,21 @@ RoutePage {
                 page.player.selectSubtitle(streamIndex)
                 page.openMenu = ""
             }
-            onTuneRequested: page.toggleMenu("tune")
+            onTuneRequested: {
+                page.tunePage = "subtitles"
+                page.toggleMenu("tune")
+            }
         }
     }
     Component {
         id: episodesMenu
-        EpisodesPanel {
+        EpisodesSheet {
             episodes: page.player.episodes
-            // Between the bars, however short the window is.
-            maximumHeight: page.height - bottomBar.height - topBar.height - 2 * Theme.spacingSmall
             onChosen: (itemId) => {
                 page.playEpisode(itemId)
                 page.openMenu = ""
             }
+            onCloseRequested: page.openMenu = ""
         }
     }
     Component {
@@ -717,6 +797,16 @@ RoutePage {
         id: tuneMenu
         TuneMenu {
             speedAvailable: !page.player.inGroup || GroupSession.rateSupported
+            statsShown: page.statsShown
+            // Once, at the start: the menu goes on from there.
+            Component.onCompleted: {
+                section = page.tunePage
+                page.tunePage = ""
+            }
+            onStatsToggled: {
+                page.statsShown = !page.statsShown
+                page.openMenu = ""
+            }
         }
     }
 
@@ -727,7 +817,7 @@ RoutePage {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         height: column.implicitHeight + 2 * Theme.spacing + page.safeY
-        opacity: page.osdShown ? 1 : 0
+        opacity: page.osdShown && page.openMenu !== "episodes" ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
         gradient: Gradient {
@@ -805,7 +895,7 @@ RoutePage {
             anchors.leftMargin: Theme.spacing + page.safeX
             anchors.rightMargin: Theme.spacing + page.safeX
             anchors.bottomMargin: Theme.spacing + page.safeY
-            spacing: Theme.spacingTiny
+            spacing: Theme.spacingSmall
 
             ValueSlider {
                 id: timeline
@@ -888,37 +978,79 @@ RoutePage {
                 }
             }
 
+            // Elapsed on the left, what is left on the right.
             Item {
                 width: parent.width
-                height: Theme.controlHeight
+                height: timeText.implicitHeight
+                Text {
+                    id: timeText
+                    objectName: "timeText"
+                    anchors.left: parent.left
+                    text: page.player.live ? qsTr("Live") : page.clock(timeline.value)
+                    color: Overlay.text
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Font.Medium
+                    style: Text.Outline
+                    styleColor: "#60000000"
+                }
+                Text {
+                    objectName: "remainingText"
+                    anchors.right: parent.right
+                    visible: page.hasEnd
+                    text: "−" + page.clock(Math.max(0, page.player.duration - timeline.value))
+                    color: Overlay.text
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Font.Medium
+                    style: Text.Outline
+                    styleColor: "#60000000"
+                }
+            }
+
+            Item {
+                width: parent.width
+                height: playPauseButton.height
 
                 Row {
+                    id: leftControls
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingSmall
 
                     OsdButton {
+                        objectName: "previous"
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: !page.player.live && !page.player.inGroup && page.player.hasPrevious
+                        iconSource: PlayerIcons.previous
+                        toolTipText: qsTr("Previous")
+                        onClicked: page.player.previous()
+                    }
+                    // Play and pause: the big round light button.
+                    OsdButton {
                         id: playPauseButton
                         objectName: "playPause"
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitWidth: Math.round(Theme.controlHeight * 1.4)
+                        implicitHeight: implicitWidth
                         iconSource: page.player.paused ? Icons.play : PlayerIcons.pause
                         toolTipText: page.player.paused ? qsTr("Play") : qsTr("Pause")
                         onClicked: page.player.togglePause()
-                    }
-                    OsdButton {
-                        // A live channel cannot be sought.
-                        visible: page.width >= 720 && !page.player.live
-                        iconSource: PlayerIcons.replay
-                        toolTipText: qsTr("Back 10 seconds")
-                        onClicked: page.player.seekBy(-10)
-                    }
-                    OsdButton {
-                        visible: page.width >= 720 && !page.player.live
-                        iconSource: PlayerIcons.forward
-                        toolTipText: qsTr("Forward 10 seconds")
-                        onClicked: page.player.seekBy(10)
+                        contentItem: Item {
+                            Icon {
+                                anchors.centerIn: parent
+                                source: playPauseButton.iconSource
+                                color: "#0b0e15"
+                                size: Theme.iconSize + 4
+                            }
+                        }
+                        background: Rectangle {
+                            radius: width / 2
+                            color: playPauseButton.down ? "#d8dce4" : playPauseButton.hovered ? "#ffffff" : "#f2f4f8"
+                            FocusFrame { shown: playPauseButton.visualFocus; radius: width / 2 }
+                        }
                     }
                     OsdButton {
                         objectName: "channelDown"
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: page.player.live && page.player.canChangeChannel
                         iconSource: PlayerIcons.previous
                         toolTipText: qsTr("Previous channel")
@@ -926,6 +1058,7 @@ RoutePage {
                     }
                     OsdButton {
                         objectName: "channelUp"
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: page.player.live && page.player.canChangeChannel
                         iconSource: PlayerIcons.next
                         toolTipText: qsTr("Next channel")
@@ -933,49 +1066,35 @@ RoutePage {
                     }
                     OsdButton {
                         objectName: "next"
+                        anchors.verticalCenter: parent.verticalCenter
                         // A group's queue is the server's; alone, the series'.
                         visible: !page.player.live && (page.player.inGroup || page.player.hasNext)
                         iconSource: PlayerIcons.next
                         toolTipText: qsTr("Next")
                         onClicked: page.player.next()
                     }
-                    Text {
-                        id: timeText
-                        objectName: "timeText"
+                    SpeedButton {
+                        objectName: "back10"
                         anchors.verticalCenter: parent.verticalCenter
-                        // Hidden when the right-hand buttons need the room.
-                        visible: rightControls.x - timeText.x >= implicitWidth + Theme.spacing
-                        text: page.player.live ? qsTr("Live")
-                                               : page.clock(timeline.value) + " / " + page.clock(page.player.duration)
-                        color: Overlay.text
-                        font.pixelSize: Theme.fontSizeBody
+                        focusPolicy: Qt.TabFocus
+                        // A live channel cannot be sought.
+                        visible: page.width >= 720 && !page.player.live
+                        text: "−10"
+                        toolTipText: qsTr("Back 10 seconds")
+                        onClicked: page.player.seekBy(-10)
                     }
-                    // What part is playing: the segment, else the chapter.
-                    Text {
-                        objectName: "partText"
+                    SpeedButton {
+                        objectName: "forward10"
                         anchors.verticalCenter: parent.verticalCenter
-                        readonly property string part: page.player.segment.length > 0
-                            ? page.segmentName(page.player.segment)
-                            : page.player.chapters.length > 0 ? page.player.chapterAt(timeline.value) : ""
-                        visible: timeText.visible && part.length > 0
-                                 && rightControls.x - x >= implicitWidth + Theme.spacing
-                        leftPadding: Theme.spacingSmall
-                        text: part
-                        color: Overlay.textSecondary
-                        font.pixelSize: Theme.fontSizeBody
-                        elide: Text.ElideRight
-                        width: Math.min(implicitWidth, 260)
+                        focusPolicy: Qt.TabFocus
+                        visible: page.width >= 720 && !page.player.live
+                        text: "+10"
+                        toolTipText: qsTr("Forward 10 seconds")
+                        onClicked: page.player.seekBy(10)
                     }
-                }
-
-                Row {
-                    id: rightControls
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.spacingSmall
-
                     OsdButton {
                         objectName: "mute"
+                        anchors.verticalCenter: parent.verticalCenter
                         iconSource: page.player.muted || page.player.volume === 0 ? PlayerIcons.volumeOff
                                                                                   : PlayerIcons.volume
                         toolTipText: page.player.muted ? qsTr("Unmute") : qsTr("Mute")
@@ -987,7 +1106,7 @@ RoutePage {
                         anchors.verticalCenter: parent.verticalCenter
                         // The mute button stays when the window is narrow.
                         visible: page.width >= 800
-                        width: 96
+                        width: 110
                         from: 0
                         to: 100
                         stepSize: 1
@@ -997,6 +1116,60 @@ RoutePage {
                             page.player.volume = Math.round(value)
                             page.poke()
                         }
+                    }
+                    // What part is playing: the segment, else the chapter
+                    // and its place among them.
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        leftPadding: Theme.spacingSmall
+                        spacing: Theme.spacingSmall
+                        visible: partText.part.length > 0
+                                 && rightControls.x - leftControls.x - x >= partText.width + partCount.width + 2 * Theme.spacing
+                        Text {
+                            id: partText
+                            objectName: "partText"
+                            anchors.verticalCenter: parent.verticalCenter
+                            readonly property string part: page.player.segment.length > 0
+                                ? page.segmentName(page.player.segment)
+                                : page.player.chapters.length > 0 ? page.player.chapterAt(timeline.value) : ""
+                            text: part
+                            color: Overlay.text
+                            font.pixelSize: Theme.fontSizeBody
+                            font.weight: Theme.fontWeightBold
+                            elide: Text.ElideRight
+                            width: Math.min(implicitWidth, 300)
+                        }
+                        Text {
+                            id: partCount
+                            objectName: "partCount"
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: page.player.segment.length === 0 && page.player.chapters.length > 1
+                                     && page.chapterIndex >= 0
+                            text: "· " + (page.chapterIndex + 1) + "/" + page.player.chapters.length
+                            color: Overlay.textSecondary
+                            font.pixelSize: Theme.fontSizeBody
+                        }
+                    }
+                }
+
+                Row {
+                    id: rightControls
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.spacingSmall
+                    // Names beside the icons while there is room.
+                    readonly property bool labels: page.width >= 1100
+
+                    SpeedButton {
+                        objectName: "tracksButton"
+                        focusPolicy: Qt.TabFocus
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: !page.tvMode
+                        iconSource: PlayerIcons.subtitles
+                        // The subtitles' language at a glance.
+                        text: rightControls.labels ? page.subtitleLabel : ""
+                        toolTipText: qsTr("Audio and subtitles")
+                        onClicked: page.toggleMenu(page.openMenu === "audio" ? "audio" : "subtitles")
                     }
                     SpeedButton {
                         objectName: "speedButton"
@@ -1011,39 +1184,40 @@ RoutePage {
                     }
                     OsdButton {
                         objectName: "segmentsButton"
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: page.player.segments.length > 0
                         iconSource: PlayerIcons.segments
                         toolTipText: qsTr("Segments")
                         onClicked: page.toggleMenu("segments")
                     }
-                    OsdButton {
+                    SpeedButton {
                         objectName: "episodes"
+                        focusPolicy: Qt.TabFocus
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: page.hasEpisodes && !page.tvMode
                         iconSource: PlayerIcons.episodes
+                        text: rightControls.labels ? qsTr("Episodes") : ""
                         toolTipText: qsTr("Episodes")
                         onClicked: page.toggleMenu("episodes")
                     }
                     OsdButton {
-                        objectName: "tracksButton"
+                        objectName: "tuneButton"
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: !page.tvMode
-                        iconSource: PlayerIcons.subtitles
-                        toolTipText: qsTr("Audio and subtitles")
-                        onClicked: page.toggleMenu(page.openMenu === "audio" ? "audio" : "subtitles")
-                    }
-                    OsdButton {
-                        visible: !page.tvMode
-                        iconSource: PlayerIcons.tune
-                        toolTipText: qsTr("Playback settings")
+                        iconSource: Icons.settings
+                        toolTipText: qsTr("Player settings")
                         onClicked: page.toggleMenu("tune")
                     }
                     OsdButton {
                         objectName: "pip"
+                        anchors.verticalCenter: parent.verticalCenter
                         visible: page.pipAvailable
                         iconSource: PlayerIcons.pip
                         toolTipText: qsTr("Picture in picture")
                         onClicked: page.enterPip()
                     }
                     OsdButton {
+                        anchors.verticalCenter: parent.verticalCenter
                         iconSource: page.fullscreen ? PlayerIcons.fullscreenExit : PlayerIcons.fullscreen
                         toolTipText: page.fullscreen ? qsTr("Exit fullscreen") : qsTr("Fullscreen")
                         onClicked: page.toggleFullscreen()
@@ -1145,10 +1319,18 @@ RoutePage {
             break
         case Qt.Key_PageUp:
         case Qt.Key_ChannelUp:
+            if (page.openMenu === "episodes" && sheetLoader.item) {
+                sheetLoader.item.stepSeason(-1)
+                break
+            }
             if (!page.player.live) return
             page.changeChannel(1); break
         case Qt.Key_PageDown:
         case Qt.Key_ChannelDown:
+            if (page.openMenu === "episodes" && sheetLoader.item) {
+                sheetLoader.item.stepSeason(1)
+                break
+            }
             if (!page.player.live) return
             page.changeChannel(-1); break
         case Qt.Key_E:

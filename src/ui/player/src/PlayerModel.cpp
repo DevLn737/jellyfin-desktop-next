@@ -192,6 +192,18 @@ namespace jfd::ui {
     Q_EMIT showClockChanged();
   }
 
+  void PlayerModel::setSubtitleSize(int size) {
+    if (size == m_subtitleSize) return;
+    m_subtitleSize = size;
+    Q_EMIT subtitleStyleChanged();
+  }
+
+  void PlayerModel::setSubtitlePlacement(const QString& placement) {
+    if (placement == m_subtitlePlacement) return;
+    m_subtitlePlacement = placement;
+    Q_EMIT subtitleStyleChanged();
+  }
+
   void PlayerModel::setAutoSkip(bool on) {
     if (on == m_skipper.autoSkip()) return;
     m_skipper.setAutoSkip(on);
@@ -658,6 +670,7 @@ namespace jfd::ui {
         m_episodes.append(QVariantMap{
             {QStringLiteral("id"), episode.id},
             {QStringLiteral("name"), episode.name},
+            {QStringLiteral("overview"), episode.overview},
             {QStringLiteral("season"), episode.parentIndexNumber.value_or(0)},
             {QStringLiteral("number"), episode.indexNumber.value_or(0)},
             {QStringLiteral("played"), episode.userData.played},

@@ -583,6 +583,8 @@ namespace jfd::desktop {
     // The setting and the player's own switch stay in step.
     settings::Settings& settings = *services.settings;
     model.setAutoSkip(settings.value(AutoSkipKey).toBool());
+    model.setSubtitleSize(settings.value(SubtitleSection + QLatin1String("size")).toString().toInt());
+    model.setSubtitlePlacement(settings.value(SubtitleSection + QLatin1String("placement")).toString());
     model.setAutoNext(settings.value(AutoNextKey).toBool());
     model.setShowClock(settings.value(ShowClockKey).toBool());
     model.setVolume(settings.value(VolumeKey).toInt());
@@ -634,6 +636,19 @@ namespace jfd::desktop {
                      });
     QObject::connect(&model, &ui::PlayerModel::autoSkipChanged, &settings,
                      [&model, &settings] { settings.setValue(AutoSkipKey, model.autoSkip()); });
+    // The subtitles' size and position, changed in the player or in the
+    // settings, are the same setting.
+    QObject::connect(&settings, &settings::Settings::valueChanged, &model,
+                     [&model](const QString& key, const QVariant& value) {
+                       if (key == SubtitleSection + QLatin1String("size"))
+                         model.setSubtitleSize(value.toString().toInt());
+                       else if (key == SubtitleSection + QLatin1String("placement"))
+                         model.setSubtitlePlacement(value.toString());
+                     });
+    QObject::connect(&model, &ui::PlayerModel::subtitleStyleChanged, &settings, [&model, &settings] {
+      settings.setValue(SubtitleSection + QLatin1String("size"), QString::number(model.subtitleSize()));
+      settings.setValue(SubtitleSection + QLatin1String("placement"), model.subtitlePlacement());
+    });
 
     // A video playing on (the picture-in-picture window outlives the page)
     // would go on as the next user.

@@ -2,7 +2,7 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
-    <name>EpisodesPanel</name>
+    <name>EpisodesSheet</name>
     <message>
         <source>Season %1</source>
         <translation>Сезон %1</translation>
@@ -10,10 +10,6 @@
     <message>
         <source>Specials</source>
         <translation>Спецвыпуски</translation>
-    </message>
-    <message>
-        <source>E%1</source>
-        <translation>E%1</translation>
     </message>
     <message>
         <source>%1 min</source>
@@ -24,16 +20,28 @@
         <translation>Серии</translation>
     </message>
     <message>
-        <source>Seasons and episodes</source>
-        <translation>Сезоны и серии</translation>
+        <source>season</source>
+        <translation>сезон</translation>
+    </message>
+    <message>
+        <source>close</source>
+        <translation>закрыть</translation>
     </message>
     <message>
         <source>%1 of %2 watched</source>
         <translation>%1 из %2 просмотрено</translation>
     </message>
     <message>
-        <source>Now playing</source>
-        <translation>Сейчас идёт</translation>
+        <source>Close</source>
+        <translation>Закрыть</translation>
+    </message>
+    <message>
+        <source>Now</source>
+        <translation>Сейчас</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Следующая</translation>
     </message>
 </context>
 <context>
@@ -110,12 +118,28 @@
         <translation>Пропустить</translation>
     </message>
     <message>
+        <source>Player settings</source>
+        <translation>Настройки плеера</translation>
+    </message>
+    <message>
         <source>Audio</source>
         <translation>Звук</translation>
     </message>
     <message>
         <source>Subtitles</source>
         <translation>Субтитры</translation>
+    </message>
+    <message>
+        <source>Season %1 · Episode %2 «%3»</source>
+        <translation>Сезон %1 · Серия %2 «%3»</translation>
+    </message>
+    <message>
+        <source>Episode %1 «%2»</source>
+        <translation>Серия %1 «%2»</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Вкл.</translation>
     </message>
     <message>
         <source>Intro</source>
@@ -152,6 +176,10 @@
     <message>
         <source>The server could not give these subtitles</source>
         <translation>Сервер не смог отдать эти субтитры</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>Предыдущая</translation>
     </message>
     <message>
         <source>Play</source>
@@ -196,10 +224,6 @@
     <message>
         <source>Audio and subtitles</source>
         <translation>Аудио и субтитры</translation>
-    </message>
-    <message>
-        <source>Playback settings</source>
-        <translation>Настройки воспроизведения</translation>
     </message>
     <message>
         <source>Picture in picture</source>
@@ -439,8 +463,8 @@
         <translation>Субтитры</translation>
     </message>
     <message>
-        <source>Subtitle style and delay</source>
-        <translation>Стиль и задержка субтитров</translation>
+        <source>Subtitle size, position and delay</source>
+        <translation>Размер, положение и задержка субтитров</translation>
     </message>
 </context>
 <context>
@@ -450,24 +474,68 @@
         <translation>с</translation>
     </message>
     <message>
+        <source>Subtitles: look and delay</source>
+        <translation>Субтитры: вид и задержка</translation>
+    </message>
+    <message>
+        <source>Player settings</source>
+        <translation>Настройки плеера</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Quality (converted by the server)</source>
+        <translation>Качество (сервер перекодирует)</translation>
+    </message>
+    <message>
+        <source>Speed (for everyone)</source>
+        <translation>Скорость (для всех)</translation>
+    </message>
+    <message>
+        <source>Skip intros and credits</source>
+        <translation>Пропускать заставки и титры</translation>
+    </message>
+    <message>
+        <source>Hide stats for nerds</source>
+        <translation>Скрыть статистику для сисадминов</translation>
+    </message>
+    <message>
+        <source>Stats for nerds</source>
+        <translation>Статистика для сисадминов</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Размер</translation>
+    </message>
+    <message>
+        <source>Position</source>
+        <translation>Положение</translation>
+    </message>
+    <message>
+        <source>Bottom</source>
+        <translation>Внизу</translation>
+    </message>
+    <message>
+        <source>Top</source>
+        <translation>Вверху</translation>
+    </message>
+    <message>
+        <source>Delay</source>
+        <translation>Задержка</translation>
+    </message>
+    <message>
+        <source>Size and position apply to plain subtitles (SRT, VTT); more in Settings.</source>
+        <translation>Размер и положение действуют на обычные субтитры (SRT, VTT); остальное в настройках.</translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Сбросить</translation>
     </message>
     <message>
-        <source>Playback</source>
-        <translation>Воспроизведение</translation>
-    </message>
-    <message>
         <source>Speed</source>
         <translation>Скорость</translation>
-    </message>
-    <message>
-        <source>Speed (for everyone in the group)</source>
-        <translation>Скорость (для всех в группе)</translation>
-    </message>
-    <message>
-        <source>Quality (the server converts this video)</source>
-        <translation>Качество (сервер перекодирует это видео)</translation>
     </message>
     <message>
         <source>Quality</source>
@@ -478,20 +546,32 @@
         <translation>Исходное</translation>
     </message>
     <message>
+        <source>Default</source>
+        <translation>Обычный</translation>
+    </message>
+    <message>
+        <source>Small</source>
+        <translation>Мелкий</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>Средний</translation>
+    </message>
+    <message>
+        <source>Large</source>
+        <translation>Крупный</translation>
+    </message>
+    <message>
+        <source>Huge</source>
+        <translation>Огромный</translation>
+    </message>
+    <message>
         <source>%1 Mbit/s</source>
         <translation>%1 Мбит/с</translation>
     </message>
     <message>
-        <source>Subtitle delay</source>
-        <translation>Задержка субтитров</translation>
-    </message>
-    <message>
         <source>Audio delay</source>
         <translation>Задержка звука</translation>
-    </message>
-    <message>
-        <source>Skip intros and credits automatically</source>
-        <translation>Пропускать заставки и титры автоматически</translation>
     </message>
 </context>
 </TS>

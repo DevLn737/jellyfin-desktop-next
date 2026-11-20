@@ -4,9 +4,9 @@ import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 
-// Audio and subtitles in one panel: the audio tracks, then the subtitles
-// with "Off", each with its codec on the right and a check on the one
-// playing, and at the bottom "Subtitle style and delay" (the playback
+// Audio and subtitles in one panel: the audio tracks beside the subtitles
+// (with "Off"), each with its codec on the right and a check on the one
+// playing, and at the bottom the subtitles' look and delay (the player
 // settings). `tracks` lists are PlayerSession track entries. `focusSubtitles`
 // puts the focus on the subtitles part first (opened as Subtitles).
 Rectangle {
@@ -41,67 +41,97 @@ Rectangle {
     }
 
     objectName: "tracksMenu"
-    width: 380
-    height: Math.min(column.implicitHeight + 2 * Theme.spacing, 520)
+    // Two columns side by side; one under the other in a narrow window.
+    // The room the page has for the menu.
+    property real availableWidth: 1000
+    readonly property bool narrow: availableWidth < 2 * 300 + 3 * Theme.spacing
+    readonly property real columnWidth: narrow ? 340 : 300
+    width: (narrow ? columnWidth : 2 * columnWidth + Theme.spacing) + 2 * Theme.spacing
+    height: Math.min(body.implicitHeight + footer.height + 3 * Theme.spacing, 520)
     radius: Theme.radiusLarge
     color: Overlay.surface
     border.color: Overlay.border
 
     Flickable {
         id: flick
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: footer.top
         anchors.margins: Theme.spacing
-        contentHeight: column.implicitHeight
+        anchors.bottomMargin: Theme.spacingSmall
+        contentHeight: body.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        Column {
-            id: column
-            width: parent.width
-            spacing: 2
+        Grid {
+            id: body
+            columns: menu.narrow ? 1 : 2
+            columnSpacing: Theme.spacing
+            rowSpacing: Theme.spacingSmall
 
-            SectionLabel { text: qsTr("Audio") }
-            Repeater {
-                id: audioRows
-                model: menu.audioTracks
-                delegate: TrackRow {
-                    objectName: "audioTrack_" + index
-                    width: column.width
-                    text: menu.label(modelData)
-                    selected: modelData.index === menu.audioIndex
-                    onClicked: menu.audioChosen(modelData.index)
+            Column {
+                id: audioColumn
+                width: menu.columnWidth
+                spacing: 2
+
+                SectionLabel { text: qsTr("Audio") }
+                Repeater {
+                    id: audioRows
+                    model: menu.audioTracks
+                    delegate: TrackRow {
+                        objectName: "audioTrack_" + index
+                        width: audioColumn.width
+                        text: menu.label(modelData)
+                        selected: modelData.index === menu.audioIndex
+                        onClicked: menu.audioChosen(modelData.index)
+                    }
                 }
-            }
-            Text {
-                visible: menu.audioTracks.length === 0
-                leftPadding: Theme.spacing
-                text: qsTr("No tracks")
-                color: Overlay.textSecondary
-                font.pixelSize: Theme.fontSizeBody
-            }
-
-            Rule { width: column.width }
-            SectionLabel { text: qsTr("Subtitles") }
-            Repeater {
-                id: subtitleRows
-                model: [{ index: -1, off: true, codec: "" }].concat(menu.subtitleTracks)
-                delegate: TrackRow {
-                    objectName: "subtitleTrack_" + index
-                    width: column.width
-                    text: menu.label(modelData)
-                    selected: modelData.index === menu.subtitleIndex
-                    onClicked: menu.subtitleChosen(modelData.index)
+                Text {
+                    visible: menu.audioTracks.length === 0
+                    leftPadding: Theme.spacing
+                    text: qsTr("No tracks")
+                    color: Overlay.textSecondary
+                    font.pixelSize: Theme.fontSizeBody
                 }
             }
 
-            Rule { width: column.width }
-            ListItem {
-                objectName: "subtitleTune"
-                width: column.width
-                text: qsTr("Subtitle style and delay")
-                trailingText: "›"
-                onClicked: menu.tuneRequested()
+            Column {
+                id: subtitleColumn
+                width: menu.columnWidth
+                spacing: 2
+
+                SectionLabel { text: qsTr("Subtitles") }
+                Repeater {
+                    id: subtitleRows
+                    model: [{ index: -1, off: true, codec: "" }].concat(menu.subtitleTracks)
+                    delegate: TrackRow {
+                        objectName: "subtitleTrack_" + index
+                        width: subtitleColumn.width
+                        text: menu.label(modelData)
+                        selected: modelData.index === menu.subtitleIndex
+                        onClicked: menu.subtitleChosen(modelData.index)
+                    }
+                }
             }
+        }
+    }
+
+    Column {
+        id: footer
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: Theme.spacing
+        anchors.topMargin: 0
+        spacing: Theme.spacingSmall
+        Rule { width: footer.width }
+        ListItem {
+            objectName: "subtitleTune"
+            width: footer.width
+            text: qsTr("Subtitle size, position and delay")
+            trailingText: "›"
+            onClicked: menu.tuneRequested()
         }
     }
 

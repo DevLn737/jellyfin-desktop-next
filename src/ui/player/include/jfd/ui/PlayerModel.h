@@ -101,6 +101,11 @@ namespace jfd::ui {
     // Seconds; positive delays subtitles or audio. Local to this client.
     Q_PROPERTY(double subtitleDelay READ subtitleDelay WRITE setSubtitleDelay NOTIFY delaysChanged)
     Q_PROPERTY(double audioDelay READ audioDelay WRITE setAudioDelay NOTIFY delaysChanged)
+    // The subtitles' look, kept in the settings (subtitles/size and
+    // subtitles/placement): mpv's sub-font-size (-1 the default) and
+    // "" (bottom centre) or "center,top". The application stores them.
+    Q_PROPERTY(int subtitleSize READ subtitleSize WRITE setSubtitleSize NOTIFY subtitleStyleChanged)
+    Q_PROPERTY(QString subtitlePlacement READ subtitlePlacement WRITE setSubtitlePlacement NOTIFY subtitleStyleChanged)
     // Outside a group: the series' next and previous episodes, if any.
     // At the end of an episode the next one plays when autoNext is on.
     Q_PROPERTY(bool hasNext READ hasNext NOTIFY queueChanged)
@@ -184,6 +189,10 @@ namespace jfd::ui {
     bool autoSkip() const { return m_skipper.autoSkip(); }
     void setAutoSkip(bool on);
     bool autoNext() const { return m_autoNext; }
+    int subtitleSize() const { return m_subtitleSize; }
+    void setSubtitleSize(int size);
+    QString subtitlePlacement() const { return m_subtitlePlacement; }
+    void setSubtitlePlacement(const QString& placement);
     // Preferred languages and subtitle mode, for files opened from now on.
     void setTrackDefaults(playback::TrackDefaults defaults) { m_trackPreference.setDefaults(std::move(defaults)); }
     void setAutoNext(bool on);
@@ -273,6 +282,7 @@ namespace jfd::ui {
     void segmentChanged();
     void segmentsChanged();
     void autoSkipChanged();
+    void subtitleStyleChanged();
     void autoNextChanged();
     void showClockChanged();
     void volumeChanged();
@@ -345,6 +355,8 @@ namespace jfd::ui {
     playback::TrackPreference m_trackPreference;
     bool m_autoNext = true;
     bool m_showClock = true;
+    int m_subtitleSize = -1;
+    QString m_subtitlePlacement;
     void applyDeviceProfile();
 
     api::DeviceProfileOptions m_profileOptions;

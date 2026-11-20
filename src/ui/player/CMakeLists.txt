@@ -17,7 +17,7 @@ qt_add_qml_module(jfd_ui_player
   URI Jfd.Ui.Player
   VERSION 1.0
   QML_FILES
-    EpisodesPanel.qml
+    EpisodesSheet.qml
     HdrScene.qml
     PlayerIcons.qml
     PipWindow.qml
@@ -43,6 +43,8 @@ qt_add_qml_module(jfd_ui_player
     icons/tune.svg
     icons/volume.svg
     icons/volumeOff.svg
+    icons-dark/forward.svg
+    icons-dark/pause.svg
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell Jfd.Ui.Group)
 target_link_libraries(jfd_ui_player
   PUBLIC Qt6::Core Qt6::Quick Qt6::Qml jfd::session_runtime jfd::playback jfd::media_backend jfd::platform
