@@ -9,9 +9,9 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   the same drawing as its twin in `icons`, with a dark fill for light themes.
   The `licenses_check` test fails when an icon file has no row here or a row
   names a file that is gone.
-- **Manrope** typeface (`src/ui/theme/fonts`: Regular, Medium, SemiBold, Bold),
-  [SIL Open Font License 1.1](src/ui/theme/fonts/LICENSE-Manrope.txt),
-  copyright 2018 The Manrope Project Authors. Embedded unmodified; the licence
+- **Nunito** typeface (`src/ui/theme/fonts`: Regular, Medium, SemiBold, Bold,
+  ExtraBold, Black), [SIL Open Font License 1.1](src/ui/theme/fonts/LICENSE-Nunito.txt),
+  copyright 2014 The Nunito Project Authors. Embedded unmodified; the licence
   text ships with the font files.
 - **SDL3** 3.4.20 (gamepad input: the joystick, gamepad and HIDAPI
   subsystems only), [zlib licence](packaging/licenses/SDL3.txt) (copyright

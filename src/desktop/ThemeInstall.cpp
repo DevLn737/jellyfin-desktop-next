@@ -25,8 +25,8 @@ namespace jfd::desktop {
 
     constexpr QLatin1String FilePrefix{"file:"};
     constexpr int DefaultRadius = 6;
-    constexpr int DepthRadius = 10;
-    constexpr QLatin1String DepthFont{"Manrope"};
+    constexpr int DepthRadius = 12;
+    constexpr QLatin1String DepthFont{"Nunito"};
 
     QString themeId(const QString& fileName) {
       return QFileInfo(fileName).completeBaseName();
@@ -144,10 +144,10 @@ namespace jfd::desktop {
         m_window(window) {
     Q_ASSERT(m_theme != nullptr && m_overlay != nullptr);
     m_systemFont = QGuiApplication::font();
-    // Manrope, the typeface of the default look, ships in the program (SIL
+    // Nunito, the typeface of the default look, ships in the program (SIL
     // OFL 1.1). If it cannot be loaded the system font is used.
-    for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold"}) {
-      const QString path = QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Manrope-") + QLatin1String(weight) + QStringLiteral(".ttf");
+    for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold", "ExtraBold", "Black"}) {
+      const QString path = QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Nunito-") + QLatin1String(weight) + QStringLiteral(".ttf");
       if (QFontDatabase::addApplicationFont(path) >= 0) {
         m_depthFontLoaded = true;
       } else {
@@ -273,7 +273,7 @@ namespace jfd::desktop {
     m_theme->setProperty("colors", palette);
     m_theme->setProperty("radiusOverride", radius);
     m_theme->setProperty("fontFamilyOverride", font);
-    // Every text takes the application font, so the theme's family (Manrope
+    // Every text takes the application font, so the theme's family (Nunito
     // for "Depth") reaches all of them; without one, the system font.
     QFont appFont = m_systemFont;
     if (!font.isEmpty()) appFont.setFamilies({font});

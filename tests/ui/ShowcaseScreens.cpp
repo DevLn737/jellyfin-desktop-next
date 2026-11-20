@@ -578,15 +578,15 @@ namespace {
         QLocale::setDefault(QLocale(language));
       }
       // The default look, as the application sets it (ThemeInstall).
-      for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold"})
-        QFontDatabase::addApplicationFont(QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Manrope-") +
+      for (const char* weight : {"Regular", "Medium", "SemiBold", "Bold", "ExtraBold", "Black"})
+        QFontDatabase::addApplicationFont(QStringLiteral(":/qt/qml/Jfd/Ui/Theme/fonts/Nunito-") +
                                           QLatin1String(weight) + QStringLiteral(".ttf"));
-      QGuiApplication::setFont(QFont(QStringLiteral("Manrope")));
+      QGuiApplication::setFont(QFont(QStringLiteral("Nunito")));
       QObject* theme = engine.singletonInstance<QObject*>("Jfd.Ui.Theme", "Theme");
       REQUIRE(theme != nullptr);
       theme->setProperty("colors", ui::depthPalette());
-      theme->setProperty("radiusOverride", 10);
-      theme->setProperty("fontFamilyOverride", QStringLiteral("Manrope"));
+      theme->setProperty("radiusOverride", 12);
+      theme->setProperty("fontFamilyOverride", QStringLiteral("Nunito"));
       REQUIRE(screens->install(engine, *navigator));
       screens->ui()->setPlayHandler([](const QString&, qint64) {});
       api::JellyfinClient& client = screens->client();
