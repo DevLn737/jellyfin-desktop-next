@@ -183,7 +183,17 @@ TEST_CASE("Our client creates a group, plays its item and follows another member
   runtime.post(core::intent::Pause{});
   REQUIRE(waitFor([&] { return latest.phase == core::PlaybackPhase::Paused &&
                                latest.group->state == core::GroupState::Paused; }, 20000));
-  const auto pausedAt = latest.position.milliseconds();
+  // The group's Pause names its position and lands on a timer after the
+  // group state changes: we seek there (up to a frame or two from where we
+  // paused). Measure from the position once that seek is done.
+  auto pausedAt = latest.position.milliseconds();
+  REQUIRE(waitFor([&] {
+    const auto before = latest.position.milliseconds();
+    QTest::qWait(400);
+    const bool still = latest.position.milliseconds() == before;
+    pausedAt = latest.position.milliseconds();
+    return still;
+  }, 10000));
   QTest::qWait(1500);
   CHECK(std::abs(latest.position.milliseconds() - pausedAt) < 100);
   runtime.post(core::intent::Play{});
