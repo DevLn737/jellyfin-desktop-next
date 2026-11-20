@@ -852,6 +852,13 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
   CHECK(waitFor([&] { return list->property("contentY").toDouble() > 100; }, Timeout));
   CHECK(waitFor([&] { return show.item("settingsSection_diagnostics")->property("current").toBool(); }, Timeout));
   show.screenshot(QStringLiteral("settings-1600-diagnostics"));
+  // An update ready to install: the toast over the settings.
+  QMetaObject::invokeMethod(show.window->findChild<QQuickItem*>(QStringLiteral("shell")), "showLink", Q_ARG(QVariant, QStringLiteral("Version 0.0.2 is ready to install.")),
+                            Q_ARG(QVariant, QStringLiteral("Restart and update")),
+                            Q_ARG(QVariant, QUrl(QStringLiteral("jfd-test-update:restart"))));
+  waitFor([] { return false; }, 400);
+  show.screenshot(QStringLiteral("settings-1600-update-toast"));
+  QMetaObject::invokeMethod(show.window->findChild<QQuickItem*>(QStringLiteral("toast")), "hide");
   show.find("settingsSearch")->setProperty("text", QStringLiteral("цвет"));
   CHECK(waitFor([&] { return list->property("count").toInt() > 0 && list->property("count").toInt() < all; }, Timeout));
   show.resize(1600, 900);

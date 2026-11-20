@@ -37,6 +37,7 @@ qt_add_qml_module(jfd_ui_controls
     ToggleIconButton.qml
     ToggleSwitch.qml
     ToolTipLabel.qml
+    ToolTips.js
     ValueSlider.qml
   RESOURCES
     icons/back.svg

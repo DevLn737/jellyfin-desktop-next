@@ -138,7 +138,7 @@ first next time. While it is open the player's keys do not reach the player.
 | `ListItem` | `text`, `subtitle`, `trailingText`, `iconSource`, `highlighted`, `clicked()` |
 | `SectionHeader`, `Heading` | text styles for a group title and a page title |
 | `AppDialog` | `title`, `text`, `acceptText`, `rejectText`, `open()`, `accepted()`, `rejected()` |
-| `Toast` | `show(text, kind)` with kind "info" or "error"; use the shell's |
+| `Toast` | `show(text, kind, linkText, link)` with kind "info" or "error"; a card in the bottom right corner, the link as a button; use the shell's |
 | `LoadingIndicator` | `running` |
 | `FocusFrame` | the keyboard focus ring; `shown: control.visualFocus` |
 | `GlassPanel` | a translucent panel with a hairline edge (`popup: true` for menus); nearly solid with simplified effects |
@@ -483,7 +483,9 @@ hint says to use the window menu's Always on top, and the title is fixed
 - In the player, the audio, subtitle and settings menus open just above the
   button row. A tooltip that would not fit below its button shows above it;
   tooltips are drawn on the window's content item and kept inside the
-  window, so clipping lists cannot cut them.
+  window, so clipping lists cannot cut them. Only one shows at a time: the
+  first after a short wait, the next one along a row at once, and a tooltip
+  that goes hides without a fade.
 - The player's bar buttons and timeline take focus only from Tab: after a
   click, Space and the arrows are still the player's keys. A single click on
   the video waits for the double-click time (a double-click only toggles

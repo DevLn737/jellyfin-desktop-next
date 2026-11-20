@@ -114,6 +114,8 @@ namespace jfd::desktop {
                            integrations.updates->available()->page);
       });
       QObject::connect(&updater, &Updater::restartRequested, &window, [&services, &integrations, &window, &updater] {
+        qCInfo(lcIntegrations) << "Restart and update chosen, ready:" << updater.readyVersion()
+                               << "busy:" << integrations.busy;
         if (integrations.busy) {
           integrations.offerWhenIdle = true;
           callShell(window, "showMessage",
@@ -124,8 +126,13 @@ namespace jfd::desktop {
         const QString route = services.navigator ? services.navigator->currentRoute() : QString();
         if (updater.apply(route)) {
           qCInfo(lcIntegrations) << "Restarting into" << updater.readyVersion();
+          // The installer waits for this process to end. Quit, not only
+          // close the window: another top-level window (picture in picture)
+          // would keep the program, and so the installer, waiting.
           window.close();
+          QCoreApplication::quit();
         } else {
+          qCWarning(lcIntegrations) << "Could not start the update of" << updater.readyVersion();
           callShell(window, "showError",
                     QCoreApplication::translate("Integrations", "The update could not be installed."));
         }

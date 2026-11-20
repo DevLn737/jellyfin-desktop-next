@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Jfd.Ui.Theme
+import "ToolTips.js" as ToolTips
 
 // A small label shown below its parent after a short hover, or above it when
 // there is no room below in the window (the player's bottom bar). The label
@@ -32,7 +33,39 @@ Item {
         bubble.x = Math.max(tip.margin, Math.min(overlay.width - bubble.width - tip.margin, centred))
     }
 
-    onShownChanged: if (shown) place()
+    // One tooltip at a time: a new one takes over at once, without a fade.
+    // The first waits a moment; one that follows within a second of the
+    // last does not (moving the pointer along a row of buttons).
+    property bool active: false
+    function takeOver() {
+        if (ToolTips.current && ToolTips.current !== tip) ToolTips.current.active = false
+        ToolTips.current = tip
+        active = true
+        place()
+    }
+    function release() {
+        if (ToolTips.current === tip) {
+            ToolTips.current = null
+            ToolTips.lastHidden = Date.now()
+        }
+        delay.stop()
+        active = false
+    }
+    onShownChanged: {
+        if (!shown) {
+            release()
+            return
+        }
+        if (ToolTips.current !== null || Date.now() - ToolTips.lastHidden < 1000) takeOver()
+        else delay.restart()
+    }
+    Component.onDestruction: release()
+
+    Timer {
+        id: delay
+        interval: 450
+        onTriggered: if (tip.shown) tip.takeOver()
+    }
 
     Rectangle {
         id: bubble
@@ -53,14 +86,12 @@ Item {
         visible: opacity > 0 && tip.visible && tip.text.length > 0
 
         states: State {
-            when: tip.shown
+            when: tip.active
             PropertyChanges { bubble.opacity: 1 }
         }
         transitions: Transition {
-            SequentialAnimation {
-                PauseAnimation { duration: tip.shown ? 500 : 0 }
-                NumberAnimation { property: "opacity"; duration: Theme.durationFast }
-            }
+            to: "*"
+            NumberAnimation { property: "opacity"; duration: tip.active ? Theme.durationFast : 0 }
         }
 
         Text {
