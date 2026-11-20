@@ -233,6 +233,11 @@ namespace jfd::api::json {
         i.chapters.append({*start, text(c, "Name")});
     }
     readUserData(o.value(QLatin1String("UserData")).toObject(), i.userData);
+    const QJsonObject providers = o.value(QLatin1String("ProviderIds")).toObject();
+    for (auto id = providers.begin(); id != providers.end(); ++id)
+      if (id.value().isString() && !id.value().toString().trimmed().isEmpty())
+        i.providerIds.insert(id.key(), id.value().toString().trimmed());
+    i.currentProgramName = text(o.value(QLatin1String("CurrentProgram")).toObject(), "Name");
     if (i.id.isEmpty()) return invalid(QStringLiteral("Item has no Id"));
     return i;
   }
@@ -261,6 +266,18 @@ namespace jfd::api::json {
     }
     page.totalRecordCount = static_cast<int>(page.items.size());
     return page;
+  }
+
+  Result<QUrl> firstRemoteImage(const QJsonObject& o) {
+    // The server lists them best first (its language, then the rating).
+    for (const auto& value : o.value(QLatin1String("Images")).toArray()) {
+      const QJsonObject image = value.toObject();
+      for (const char* key : {"ThumbnailUrl", "Url"}) {
+        const QUrl url(text(image, key));
+        if (url.isValid() && url.scheme() == QLatin1String("https") && !url.host().isEmpty()) return url;
+      }
+    }
+    return QUrl();
   }
 
   Result<UserItemData> userItemData(const QJsonObject& o) {

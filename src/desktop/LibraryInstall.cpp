@@ -1,5 +1,6 @@
 #include "AppServices.h"
 
+#include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
@@ -132,6 +133,8 @@ namespace jfd::desktop {
                      services.navigator, [&screens, navigator](const QString& key) {
                        if (key == settings::keys::CustomizeHome) {
                          navigator->navigate(QStringLiteral("customizeHome"));
+                       } else if (key == integrations::keys::DiscordChoose) {
+                         navigator->navigate(QStringLiteral("discordPrivacy"));
                        } else if (key == settings::keys::SignOut) {
                          screens.signIn().signOut();
                        } else if (key == settings::keys::ChangeServer) {

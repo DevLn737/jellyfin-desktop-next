@@ -58,6 +58,8 @@ namespace jfd::integrations {
         state.artist = details->artist;
         state.album = details->album;
       }
+      else if (details->kind == PresenceInfo::Kind::LiveTv)
+        state.subtitle = details->program;
       else if (details->year > 0)
         state.subtitle = QString::number(details->year);
     }
@@ -84,7 +86,14 @@ namespace jfd::integrations {
       info.episode = details->episode;
       info.episodeEnd = details->episodeEnd;
       info.year = details->year;
+      info.genres = details->genres;
+      info.rating = details->rating;
+      info.program = details->program;
       info.poster = details->publicPoster;
+      info.externalPoster = details->externalPoster;
+      info.links = details->links;
+      info.libraryIds = details->libraryIds;
+      info.librariesKnown = details->librariesKnown;
     }
     return info;
   }

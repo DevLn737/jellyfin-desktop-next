@@ -36,8 +36,18 @@ namespace jfd::integrations {
     std::optional<int> episode;
     std::optional<int> episodeEnd;
     int year = 0;
+    QStringList genres;
+    std::optional<double> rating;
+    QString program; // Live TV: what is on now.
     QUrl artUrl;       // Media controls; must load without credentials.
     QUrl publicPoster; // Discord: publicPosterUrl() or empty.
+    // Discord: the poster on a metadata provider's host (TMDB, ...), when
+    // the server found one; and the links for friends.
+    QUrl externalPoster;
+    QList<PresenceLink> links;
+    // The item's library and the folders above it (Items/{id}/Ancestors).
+    QStringList libraryIds;
+    bool librariesKnown = false;
     // The app's queue, used outside a group; a group always has both.
     bool hasNext = false;
     bool hasPrevious = false;

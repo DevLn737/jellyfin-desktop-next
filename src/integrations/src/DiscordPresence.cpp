@@ -14,6 +14,29 @@ namespace jfd::integrations {
     }
   } // namespace
 
+  bool presenceAllowed(const PresenceInfo& info, const PresencePrivacy& privacy) {
+    if (privacy.hidden) return false;
+    switch (info.kind) {
+    case PresenceInfo::Kind::Movie:
+      if (!privacy.movies) return false;
+      break;
+    case PresenceInfo::Kind::Episode:
+      if (!privacy.series) return false;
+      break;
+    case PresenceInfo::Kind::Music:
+      if (!privacy.music) return false;
+      break;
+    case PresenceInfo::Kind::LiveTv:
+      if (!privacy.liveTv) return false;
+      break;
+    }
+    if (privacy.hiddenLibraries.isEmpty()) return true;
+    if (!info.librariesKnown) return false;
+    for (const QString& id : info.libraryIds)
+      if (privacy.hiddenLibraries.contains(id)) return false;
+    return true;
+  }
+
   DiscordPresence::DiscordPresence(QStringList endpoints, QObject* parent)
       : QObject(parent), m_ipc(std::move(endpoints)) {
     // Keeps the paused position and the group size current between changes.
@@ -38,10 +61,17 @@ namespace jfd::integrations {
     publish();
   }
 
+  void DiscordPresence::setPrivacy(const PresencePrivacy& privacy) {
+    if (privacy == m_privacy) return;
+    m_privacy = privacy;
+    publish();
+  }
+
   void DiscordPresence::update(const std::optional<PresenceInfo>& info) {
     if (!info) {
       m_info.reset();
       m_start = 0;
+      m_pausedSince = 0;
       m_positionClock.invalidate();
       publish();
       return;
@@ -49,6 +79,7 @@ namespace jfd::integrations {
     if (m_info) {
       const qint64 expected =
           m_info->positionMs + (m_info->playing && m_positionClock.isValid() ? m_positionClock.elapsed() : 0);
+      if (!sameItem(*m_info, *info)) m_pausedSince = 0;
       if (!sameItem(*m_info, *info) || std::abs(info->positionMs - expected) > SeekThresholdMs) m_start = 0;
     }
     m_info = info;
@@ -63,10 +94,22 @@ namespace jfd::integrations {
     }
     PresenceInfo now = *m_info;
     if (now.playing && m_positionClock.isValid()) now.positionMs += m_positionClock.elapsed();
-    if (!m_showPoster) now.poster = QUrl();
+    if (!m_showPoster) {
+      now.poster = QUrl();
+      now.externalPoster = QUrl();
+    }
     const qint64 seconds = m_now();
     m_start = presenceStart(m_start, now.positionMs, now.playing, seconds);
-    m_ipc.setActivity(buildActivity(now, m_start));
+    const bool paused = !now.playing && !now.buffering;
+    if (!paused)
+      m_pausedSince = 0;
+    else if (m_pausedSince == 0)
+      m_pausedSince = seconds;
+    if (!presenceAllowed(now, m_privacy) || (paused && seconds - m_pausedSince >= PauseHideSeconds)) {
+      m_ipc.setActivity({});
+      return;
+    }
+    m_ipc.setActivity(buildActivity(now, m_start, PresenceStyle{m_privacy.showTitle}));
   }
 
 } // namespace jfd::integrations

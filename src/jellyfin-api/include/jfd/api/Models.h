@@ -10,6 +10,7 @@
 #include <QList>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 
 #include <cstdint>
 #include <optional>
@@ -205,6 +206,11 @@ namespace jfd::api {
     std::optional<int> recursiveItemCount;
     QList<ItemChapter> chapters;
     UserItemData userData;
+    // IDs in other databases ("Imdb", "Tmdb", "MusicBrainzAlbum", ...); the
+    // single-item request carries them.
+    QHash<QString, QString> providerIds;
+    // A live TV channel: what is on now (the single-item request).
+    QString currentProgramName;
   };
 
   struct ItemPage {
@@ -320,6 +326,8 @@ namespace jfd::api {
     Result<ItemPage> itemPage(const QJsonObject& object);
     // A bare JSON array of items, as Items/Latest answers.
     Result<ItemPage> itemArray(const QJsonArray& array);
+    // Items/{id}/RemoteImages: the first image's address, empty when none.
+    Result<QUrl> firstRemoteImage(const QJsonObject& o);
     Result<UserItemData> userItemData(const QJsonObject& object);
     Result<ItemFilters> itemFilters(const QJsonObject& object);
     Result<QList<MediaSegment>> mediaSegments(const QJsonObject& object);

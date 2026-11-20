@@ -128,6 +128,11 @@ namespace jfd::ui {
     navigator.registerPage(QStringLiteral("item"), page("ItemPage"));
     navigator.registerPage(QStringLiteral("search"), page("SearchPage"));
     navigator.registerPage(QStringLiteral("customizeHome"), page("CustomizeHomePage"));
+    // "What to show in Discord", from Settings → Integrations.
+    RouteSpec discordPrivacy;
+    discordPrivacy.name = QStringLiteral("discordPrivacy");
+    discordPrivacy.page = page("DiscordPrivacyPage");
+    navigator.registerRoute(discordPrivacy);
 
     // Live TV: listed only when the server has it for this user.
     RouteSpec liveTv;

@@ -170,6 +170,14 @@ namespace jfd::api {
 
     void items(const ItemQuery& query, QObject* context, Callback<ItemPage> done);
     void item(const QString& itemId, QObject* context, Callback<Item> done);
+    // GET Items/{id}/Ancestors: the folders above an item, its library
+    // among them.
+    void ancestors(const QString& itemId, QObject* context, Callback<ItemPage> done);
+    // GET Items/{id}/RemoteImages: the first image of `type` the server's
+    // metadata providers (TMDB, MusicBrainz, ...) offer, on their own public
+    // hosts; empty when none. Any signed-in user may ask; the server asks
+    // the providers, so it can take seconds.
+    void remoteImage(const QString& itemId, const QString& type, QObject* context, Callback<QUrl> done);
     void seasons(const QString& seriesId, QObject* context, Callback<ItemPage> done);
     void episodes(const QString& seriesId, const QString& seasonId, QObject* context,
                   Callback<ItemPage> done);

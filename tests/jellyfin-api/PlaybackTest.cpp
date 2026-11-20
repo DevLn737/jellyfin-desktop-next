@@ -203,6 +203,32 @@ TEST_CASE("Item parsing tolerates missing optional fields and rejects a missing 
   CHECK_FALSE(json::itemPage(QJsonDocument::fromJson(R"({"TotalRecordCount": 1})").object()));
 }
 
+TEST_CASE("Provider ids, a channel's program and the first remote image are read") {
+  auto channel = json::item(QJsonDocument::fromJson(R"({
+    "Id": "c1", "Name": "One", "Type": "TvChannel",
+    "ProviderIds": {"Imdb": "tt1", "Tmdb": " 42 ", "Empty": "", "Number": 5},
+    "CurrentProgram": {"Name": "News"}
+  })")
+                                .object());
+  REQUIRE(channel);
+  CHECK(channel->providerIds.value(QStringLiteral("Imdb")) == QStringLiteral("tt1"));
+  CHECK(channel->providerIds.value(QStringLiteral("Tmdb")) == QStringLiteral("42"));
+  CHECK_FALSE(channel->providerIds.contains(QStringLiteral("Empty")));
+  CHECK_FALSE(channel->providerIds.contains(QStringLiteral("Number")));
+  CHECK(channel->currentProgramName == QStringLiteral("News"));
+
+  auto image = json::firstRemoteImage(QJsonDocument::fromJson(R"({"Images": [
+    {"Url": "http://insecure.example/a.jpg"},
+    {"Url": "https://image.tmdb.org/t/p/original/b.jpg", "ThumbnailUrl": "https://image.tmdb.org/t/p/w500/b.jpg"}
+  ], "TotalRecordCount": 2})")
+                                          .object());
+  REQUIRE(image);
+  CHECK(image->toString() == QStringLiteral("https://image.tmdb.org/t/p/w500/b.jpg"));
+  image = json::firstRemoteImage(QJsonDocument::fromJson(R"({"Images": []})").object());
+  REQUIRE(image);
+  CHECK(image->isEmpty());
+}
+
 namespace {
   // A Live TV channel's PlaybackInfo with AutoOpenLiveStream, as the 12.2
   // extras stand answers it for an M3U channel: the opened stream sits on
