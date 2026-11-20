@@ -192,6 +192,13 @@ namespace jfd::ui {
     Q_EMIT showClockChanged();
   }
 
+  void PlayerModel::setSeekStep(int seconds) {
+    seconds = qBound(1, seconds, 600);
+    if (seconds == m_seekStep) return;
+    m_seekStep = seconds;
+    Q_EMIT seekStepChanged();
+  }
+
   void PlayerModel::setSubtitleSize(int size) {
     if (size == m_subtitleSize) return;
     m_subtitleSize = size;

@@ -113,6 +113,8 @@ namespace jfd::ui {
     Q_PROPERTY(bool autoNext READ autoNext WRITE setAutoNext NOTIFY autoNextChanged)
     // The clock and the end time in the page's header (a setting).
     Q_PROPERTY(bool showClock READ showClock WRITE setShowClock NOTIFY showClockChanged)
+    // The arrows' and the step buttons' jump in seconds (playback/seekStep).
+    Q_PROPERTY(int seekStep READ seekStep WRITE setSeekStep NOTIFY seekStepChanged)
     // The series' episodes in order, for the episodes panel: maps with id,
     // name, season, number, played, progress (0-1), runTimeTicks, imageSource
     // (image://jfd/..., the still) and current. Empty for anything but an
@@ -198,6 +200,8 @@ namespace jfd::ui {
     void setAutoNext(bool on);
     bool showClock() const { return m_showClock; }
     void setShowClock(bool on);
+    int seekStep() const { return m_seekStep; }
+    void setSeekStep(int seconds);
     double subtitleDelay() const { return m_subtitleDelay; }
     void setSubtitleDelay(double seconds);
     double audioDelay() const { return m_audioDelay; }
@@ -285,6 +289,7 @@ namespace jfd::ui {
     void subtitleStyleChanged();
     void autoNextChanged();
     void showClockChanged();
+    void seekStepChanged();
     void volumeChanged();
     void maxBitrateChanged();
     void delaysChanged();
@@ -355,6 +360,7 @@ namespace jfd::ui {
     playback::TrackPreference m_trackPreference;
     bool m_autoNext = true;
     bool m_showClock = true;
+    int m_seekStep = 15;
     int m_subtitleSize = -1;
     QString m_subtitlePlacement;
     void applyDeviceProfile();

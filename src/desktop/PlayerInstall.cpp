@@ -32,6 +32,7 @@ namespace jfd::desktop {
     const QString VolumeKey = QStringLiteral("playback/defaultVolume");
     const QString AutoNextKey = QStringLiteral("playback/autoNextEpisode");
     const QString ShowClockKey = QStringLiteral("playback/showClock");
+    const QString SeekStepKey = QStringLiteral("playback/seekStep");
     const QString HwdecKey = QStringLiteral("playback/hardwareDecoding");
     const QString RefreshRateSwitchKey = QStringLiteral("playback/refreshRateSwitch");
     const QString RefreshRateSettleKey = QStringLiteral("playback/refreshRateSettleMs");
@@ -435,6 +436,19 @@ namespace jfd::desktop {
         "PlayerSettings", "The time now and when the video ends, at the top of the player.");
     section.settings.append(showClock);
 
+    settings::SettingDescriptor seekStep;
+    seekStep.key = QStringLiteral("seekStep");
+    seekStep.type = settings::SettingType::Int;
+    seekStep.defaultValue = 15;
+    seekStep.minimum = 5;
+    seekStep.maximum = 120;
+    seekStep.step = 5;
+    seekStep.unit = QT_TRANSLATE_NOOP("PlayerSettings", "s");
+    seekStep.label = QT_TRANSLATE_NOOP("PlayerSettings", "Seek step");
+    seekStep.description = QT_TRANSLATE_NOOP(
+        "PlayerSettings", "How far the arrow keys and the player's back and forward buttons jump.");
+    section.settings.append(seekStep);
+
     settings::SettingDescriptor volume;
     volume.key = QStringLiteral("defaultVolume");
     volume.type = settings::SettingType::Int;
@@ -587,6 +601,7 @@ namespace jfd::desktop {
     model.setSubtitlePlacement(settings.value(SubtitleSection + QLatin1String("placement")).toString());
     model.setAutoNext(settings.value(AutoNextKey).toBool());
     model.setShowClock(settings.value(ShowClockKey).toBool());
+    model.setSeekStep(settings.value(SeekStepKey).toInt());
     model.setVolume(settings.value(VolumeKey).toInt());
     media::MpvPlayer* player = services.player.get();
     if (player != nullptr) {
@@ -626,6 +641,7 @@ namespace jfd::desktop {
                          model.setTrackDefaults(trackDefaults(settings));
                        else if (key == AutoNextKey) model.setAutoNext(value.toBool());
                        else if (key == ShowClockKey) model.setShowClock(value.toBool());
+                       else if (key == SeekStepKey) model.setSeekStep(value.toInt());
                        else if (key == RefreshRateSwitchKey) model.setRefreshRateSwitch(value.toBool());
                        else if (player == nullptr) return;
                        else if (key == HwdecKey) player->setStringProperty("hwdec", value.toString().toUtf8());

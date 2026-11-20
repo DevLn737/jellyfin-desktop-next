@@ -39,6 +39,7 @@ qt_add_qml_module(jfd_ui_player
     icons/previous.svg
     icons/replay.svg
     icons/segments.svg
+    icons/speed.svg
     icons/subtitles.svg
     icons/tune.svg
     icons/volume.svg

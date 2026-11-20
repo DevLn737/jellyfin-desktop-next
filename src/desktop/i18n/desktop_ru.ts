@@ -521,6 +521,18 @@
         <translation>Предпочитать HEVC при перекодировании</translation>
     </message>
     <message>
+        <source>s</source>
+        <translation>с</translation>
+    </message>
+    <message>
+        <source>Seek step</source>
+        <translation>Шаг перемотки</translation>
+    </message>
+    <message>
+        <source>How far the arrow keys and the player&apos;s back and forward buttons jump.</source>
+        <translation>На сколько перематывают стрелки и кнопки назад и вперёд в плеере.</translation>
+    </message>
+    <message>
         <source>HDR on HDR displays</source>
         <translation>HDR на HDR-экранах</translation>
     </message>
