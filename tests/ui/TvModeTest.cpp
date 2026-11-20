@@ -499,15 +499,19 @@ Item {
   CHECK(types >= 15);
 }
 
-TEST_CASE("A drop-down list keeps Up and Down for the focus in TV mode, for its value otherwise") {
+TEST_CASE("A drop-down list gives Up and Down to the focus, opens on Enter and closes on Back unchanged") {
   Scene scene(R"(
 import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Shell
 import Jfd.Ui.Controls
 Item {
+  id: root
+  property int escapes: 0
+  property int changes: 0
   function setTvMode(on) { Theme.tvMode = on }
   SpatialNavigation.enabled: true
+  Keys.onEscapePressed: root.escapes++
   Column {
     spacing: 8
     ActionButton { objectName: "above"; text: "Above" }
@@ -515,6 +519,7 @@ Item {
       objectName: "choice"
       model: [{ value: "a", label: "A" }, { value: "b", label: "B" }, { value: "c", label: "C" }]
       currentIndex: 1
+      onActivated: root.changes++
     }
     ActionButton { objectName: "below"; text: "Below" }
   }
@@ -523,19 +528,59 @@ Item {
   QQuickWindow& window = scene.window;
   QQuickItem* choice = scene.item(QStringLiteral("choice"));
   REQUIRE(choice != nullptr);
-  choice->forceActiveFocus(Qt::TabFocusReason);
-  tap(window, Qt::Key_Down);
-  CHECK(choice->property("currentIndex").toInt() == 2);
-  CHECK(focusName(window) == QStringLiteral("choice"));
+  QObject* popup = choice->property("popup").value<QObject*>();
+  REQUIRE(popup != nullptr);
+  // A gamepad on the desktop, without TV mode, as well as in TV mode.
+  for (const bool tv : {false, true}) {
+    CAPTURE(tv);
+    scene.setTvMode(tv);
+    pump(20);
+    SpatialNavigation::focusItem(scene.item(QStringLiteral("above")));
+    // Passing over the list neither opens it nor changes it.
+    tap(window, Qt::Key_Down);
+    CHECK(focusName(window) == QStringLiteral("choice"));
+    CHECK(choice->property("visualFocus").toBool());
+    tap(window, Qt::Key_Down);
+    CHECK(focusName(window) == QStringLiteral("below"));
+    tap(window, Qt::Key_Up);
+    CHECK(focusName(window) == QStringLiteral("choice"));
+    tap(window, Qt::Key_Up);
+    CHECK(focusName(window) == QStringLiteral("above"));
+    CHECK_FALSE(popup->property("visible").toBool());
+    CHECK(choice->property("currentIndex").toInt() == 1);
 
-  scene.setTvMode(true);
-  tap(window, Qt::Key_Down);
-  CHECK(focusName(window) == QStringLiteral("below"));
-  tap(window, Qt::Key_Up);
-  CHECK(focusName(window) == QStringLiteral("choice"));
-  tap(window, Qt::Key_Up);
-  CHECK(focusName(window) == QStringLiteral("above"));
-  CHECK(choice->property("currentIndex").toInt() == 2);
+    // A opens it; there Up and Down are its entries; B closes it with no
+    // change, the focus stays on it and the page does not go back.
+    tap(window, Qt::Key_Down);
+    tap(window, Qt::Key_Return);
+    pump(20);
+    REQUIRE(popup->property("visible").toBool());
+    tap(window, Qt::Key_Down);
+    CHECK(choice->property("highlightedIndex").toInt() == 2);
+    tap(window, Qt::Key_Escape);
+    pump(250);
+    CHECK_FALSE(popup->property("visible").toBool());
+    CHECK(choice->property("currentIndex").toInt() == 1);
+    CHECK(focusName(window) == QStringLiteral("choice"));
+    CHECK(scene.root->property("escapes").toInt() == 0);
+    // And the arrows leave it again.
+    tap(window, Qt::Key_Down);
+    CHECK(focusName(window) == QStringLiteral("below"));
+    CHECK(scene.root->property("changes").toInt() == 0);
+
+    // A, Down and A choose.
+    SpatialNavigation::focusItem(choice);
+    tap(window, Qt::Key_Return);
+    pump(20);
+    tap(window, Qt::Key_Down);
+    tap(window, Qt::Key_Return);
+    pump(250);
+    CHECK_FALSE(popup->property("visible").toBool());
+    CHECK(choice->property("currentIndex").toInt() == 2);
+    CHECK(scene.root->property("changes").toInt() == 1);
+    choice->setProperty("currentIndex", 1);
+    scene.root->setProperty("changes", 0);
+  }
 }
 
 namespace {
@@ -596,12 +641,14 @@ TEST_CASE("PageDown over a drop-down list moves the focus a page and never chang
   CHECK(scene.root->property("changes").toInt() == 0);
 }
 
-TEST_CASE("In TV mode Down from the last visible drop-down goes on to the setting below the list's edge") {
+TEST_CASE("Down from the last visible drop-down goes on to the setting below the list's edge, in TV mode or not") {
+  for (const bool tv : {false, true}) {
+  CAPTURE(tv);
   Scene scene(SettingsListQml);
   QQuickWindow& window = scene.window;
   QQuickItem* list = scene.item(QStringLiteral("settings"));
   REQUIRE(list != nullptr);
-  scene.setTvMode(true);
+  scene.setTvMode(tv);
   pump(20);
   // Rows 0 to 5 fill the list; row 6 is under its edge.
   SpatialNavigation::focusItem(scene.item(QStringLiteral("choice5")));
@@ -620,6 +667,117 @@ TEST_CASE("In TV mode Down from the last visible drop-down goes on to the settin
   tap(window, Qt::Key_Up);
   CHECK(focusName(window) == QStringLiteral("choice11"));
   CHECK(scene.root->property("changes").toInt() == 0);
+  }
+}
+
+namespace {
+
+  // Home: a button above, then rows of cards (CardRow in a vertical list),
+  // each row remembering its own card.
+  constexpr auto CardRowsQml = R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Shell
+import Jfd.Ui.Controls
+Item {
+  function setTvMode(on) { Theme.tvMode = on }
+  SpatialNavigation.enabled: true
+  Column {
+    width: parent.width
+    ActionButton {
+      objectName: "top"
+      text: "Top"
+      x: 300
+      KeyNavigation.down: rows
+    }
+    ListView {
+      id: rows
+      objectName: "rows"
+      width: parent.width; height: 560
+      clip: true
+      spacing: 20
+      keyNavigationEnabled: true
+      model: 4
+      delegate: CardRow {
+        id: row
+        required property int index
+        objectName: "row" + index
+        width: rows.width
+        focus: ListView.isCurrentItem
+        cardHeight: 150
+        model: 12
+        delegate: PosterCard {
+          required property int index
+          objectName: "r" + row.index + "c" + index
+          title: "Card " + index
+          cardWidth: 90
+          shape: "thumb"
+        }
+      }
+    }
+  }
+}
+)";
+
+  int column(const QQuickWindow& window) { return focusName(window).section(QLatin1Char('c'), 1).toInt(); }
+  int rowOf(const QQuickWindow& window) { return focusName(window).mid(1).section(QLatin1Char('c'), 0, 0).toInt(); }
+
+} // namespace
+
+TEST_CASE("Up and Down between rows of cards go straight, and the focused card shows it") {
+  for (const bool tv : {false, true}) {
+    CAPTURE(tv);
+    Scene scene(CardRowsQml, QSize(1000, 700));
+    scene.setTvMode(tv);
+    pump(30);
+    QQuickWindow& window = scene.window;
+    // The second row remembers its 7th card from before.
+    scene.item(QStringLiteral("row1"))->setProperty("currentIndex", 7);
+    SpatialNavigation::focusItem(scene.item(QStringLiteral("r0c0")));
+    REQUIRE(focusName(window) == QStringLiteral("r0c0"));
+    // Right along the row (the row's own keys): each card shows the focus.
+    for (int i = 1; i <= 2; ++i) {
+      tap(window, Qt::Key_Right);
+      pump(10);
+      CHECK(column(window) == i);
+      CHECK(window.activeFocusItem()->property("visualFocus").toBool());
+    }
+    const auto centreX = [&]() {
+      QQuickItem* item = window.activeFocusItem();
+      return item->mapToScene(QPointF(item->width() / 2, 0)).x();
+    };
+    double before = centreX();
+    // Down: the card under it, not the remembered one.
+    tap(window, Qt::Key_Down);
+    pump(10);
+    CHECK(rowOf(window) == 1);
+    CHECK(column(window) == 2);
+    CHECK(std::abs(centreX() - before) < 30);
+    CHECK(window.activeFocusItem()->property("visualFocus").toBool());
+    tap(window, Qt::Key_Down);
+    pump(10);
+    CHECK(rowOf(window) == 2);
+    CHECK(column(window) == 2);
+    tap(window, Qt::Key_Right);
+    pump(300);
+    before = centreX();
+    tap(window, Qt::Key_Up);
+    pump(10);
+    CHECK(rowOf(window) == 1);
+    CHECK(std::abs(centreX() - before) < 30);
+    CHECK(window.activeFocusItem()->property("visualFocus").toBool());
+    // From the button above the rows: the card under the button.
+    SpatialNavigation::focusItem(scene.item(QStringLiteral("top")));
+    scene.item(QStringLiteral("rows"))->setProperty("currentIndex", 0);
+    scene.item(QStringLiteral("row0"))->setProperty("currentIndex", 0);
+    pump(300);
+    before = centreX();
+    tap(window, Qt::Key_Down);
+    pump(10);
+    CHECK(rowOf(window) == 0);
+    CHECK(std::abs(centreX() - before) < 60);
+    CHECK(window.activeFocusItem()->property("visualFocus").toBool());
+  }
 }
 
 TEST_CASE("In TV mode PageDown goes through a card grid to its end, scrolling, and arrows still leave at its edges") {

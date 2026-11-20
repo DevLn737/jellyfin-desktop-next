@@ -4,9 +4,10 @@ import Jfd.Ui.Controls
 import Jfd.Ui.Group
 
 // The group badge for the player's OSD: a dot (green in sync, amber while
-// catching up, red when the connection to the group is lost), the number
-// of viewers and, while playing, how far we are from the group. Hidden
-// outside a group.
+// catching up, red when the connection to the group is lost) and the
+// number of viewers. How far we are from the group and the delay to the
+// server are in the player's statistics (right-click). Hidden outside a
+// group.
 Rectangle {
     id: osd
 
@@ -52,12 +53,8 @@ Rectangle {
             objectName: "memberCount"
             anchors.verticalCenter: parent.verticalCenter
             text: {
-                let line = qsTr("Together: %n viewer(s)", "", osd.viewers)
-                if (!osd.group.connected)
-                    return line + ", " + qsTr("reconnecting")
-                if (osd.group.hasDrift)
-                    line += ", " + qsTr("%1 ms apart").arg(Math.abs(osd.group.driftMs))
-                return line
+                const line = qsTr("Together: %n viewer(s)", "", osd.viewers)
+                return osd.group.connected ? line : line + ", " + qsTr("reconnecting")
             }
             color: Overlay.text
             font.pixelSize: Theme.fontSizeSmall

@@ -37,7 +37,11 @@ namespace {
         [this](std::optional<int> audio, std::optional<int> subtitle) {
           selections.emplace_back(audio, subtitle);
         },
+        [this] { ++loadingChanges; },
+        [this](TrackKind kind) { failures.push_back(kind); },
     }};
+    int loadingChanges = 0;
+    std::vector<TrackKind> failures;
     core::EpochCounter<core::MediaEpochTag> files;
     core::MediaEpoch epoch = files.advance();
     core::SessionSnapshot snapshot;
@@ -75,16 +79,26 @@ namespace {
     }
 
     // What the session lists after the adds posted so far.
+    // (One entry per add, in order, as the session keeps them.)
     void listAdds() {
+      std::size_t adds = 0;
       for (const auto& input : posted)
         if (const auto* add = std::get_if<core::intent::AddExternalTrack>(&input)) {
-          const bool listed = std::any_of(
-              snapshot.externalTracks.begin(), snapshot.externalTracks.end(),
-              [&](const core::ExternalTrackState& s) { return s.track.url == add->track.url; });
-          if (listed) continue;
+          if (++adds <= snapshot.externalTracks.size()) continue;
           core::ExternalTrackState state;
           state.track = add->track;
           snapshot.externalTracks.push_back(state);
+        }
+      controller.snapshotChanged(snapshot);
+    }
+
+    // Answers the newest entry for this URL.
+    void answerLatest(const char* url, Status status, std::optional<int> trackId = std::nullopt) {
+      for (auto it = snapshot.externalTracks.rbegin(); it != snapshot.externalTracks.rend(); ++it)
+        if (it->track.url == url) {
+          it->status = status;
+          it->trackId = trackId;
+          break;
         }
       controller.snapshotChanged(snapshot);
     }
@@ -132,9 +146,34 @@ TEST_CASE("A failed external audio file falls back and is reported") {
   CHECK(std::get<core::intent::AddExternalTrack>(f.posted.front()).track.url == AudioUrl);
   f.listAdds();
   f.answer(AudioUrl, Status::Failed);
+  // Asked once more first.
+  CHECK(f.last<core::intent::AddExternalTrack>().track.url == AudioUrl);
+  CHECK(f.failures.empty());
+  f.listAdds();
+  f.answerLatest(AudioUrl, Status::Failed);
   CHECK(f.last<core::intent::SelectTrack>().trackId == 1);
   CHECK(f.selections.back().first == 3);
   CHECK(f.controller.table().failed(1));
+  CHECK(f.failures == std::vector<TrackKind>{TrackKind::Audio});
+}
+
+TEST_CASE("Subtitles the server gives late: loading while asked, a second try, then shown") {
+  Fixture f;
+  f.controller.begin(f.epoch, f.source, f.played, 3, std::nullopt);
+  f.controller.select(TrackKind::Subtitle, 0);
+  CHECK(f.controller.table().loading(TrackKind::Subtitle));
+  CHECK(f.loadingChanges == 1);
+  f.listAdds();
+  // A proxy gave up waiting for the server (504).
+  f.answer(SubtitleUrl, Status::Failed);
+  CHECK(f.last<core::intent::AddExternalTrack>().track.url == SubtitleUrl);
+  CHECK(f.controller.table().loading(TrackKind::Subtitle));
+  f.listAdds();
+  f.answerLatest(SubtitleUrl, Status::Added, 9);
+  CHECK(f.last<core::intent::SelectTrack>().trackId == 9);
+  CHECK_FALSE(f.controller.table().loading(TrackKind::Subtitle));
+  CHECK(f.loadingChanges == 2);
+  CHECK(f.failures.empty());
 }
 
 TEST_CASE("Snapshots of another file are ignored") {

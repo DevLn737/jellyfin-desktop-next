@@ -15,10 +15,6 @@
         <source>reconnecting</source>
         <translation>переподключение</translation>
     </message>
-    <message>
-        <source>%1 ms apart</source>
-        <translation>разница %1 мс</translation>
-    </message>
 </context>
 <context>
     <name>GroupPage</name>

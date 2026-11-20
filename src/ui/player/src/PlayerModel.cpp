@@ -18,6 +18,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScreen>
+#include <QUrlQuery>
 #include <QVariantMap>
 
 #include <algorithm>
@@ -105,6 +106,12 @@ namespace jfd::ui {
               m_reporter.setTracks(audio, subtitle);
               Q_EMIT tracksChanged();
             },
+            [this] { Q_EMIT tracksChanged(); },
+            [this](TrackKind kind) {
+              qCInfo(lcPlayer) << "external" << (kind == TrackKind::Audio ? "audio" : "subtitles")
+                               << "could not be loaded";
+              Q_EMIT trackLoadFailed(kind == TrackKind::Subtitle);
+            },
         }),
         m_skipper([&runtime](core::SessionInput input) { runtime.post(std::move(input)); }),
         m_liveTv(client) {
@@ -154,7 +161,7 @@ namespace jfd::ui {
   bool PlayerModel::paused() const { return m_snapshot.phase == PlaybackPhase::Paused; }
 
   bool PlayerModel::loading() const {
-    return m_waitingPlay || m_waitingDisplay || m_snapshot.phase == PlaybackPhase::Loading ||
+    return m_waitingPlay || m_waitingOpen || m_waitingDisplay || m_snapshot.phase == PlaybackPhase::Loading ||
            m_snapshot.phase == PlaybackPhase::Buffering;
   }
 
@@ -275,6 +282,52 @@ namespace jfd::ui {
     return m_current ? api::playMethodName(m_current->stream.method) : QString();
   }
 
+  // The server names its reasons in the transcoding URL, for example
+  // "SubtitleCodecNotSupported,AudioCodecNotSupported".
+  static QString transcodeReasons(const api::MediaSource& source) {
+    return QUrlQuery(QUrl(source.transcodingUrl).query())
+        .queryItemValue(QStringLiteral("TranscodeReasons"), QUrl::FullyDecoded);
+  }
+
+  QVariantMap PlayerModel::stats() const {
+    QVariantMap stats;
+    if (!m_current) return stats;
+    stats.insert(QStringLiteral("method"), playMethod());
+    if (m_current->stream.method == api::PlayMethod::Transcode) {
+      const QString reasons = transcodeReasons(m_current->source);
+      if (!reasons.isEmpty()) stats.insert(QStringLiteral("transcodeReasons"), reasons);
+    }
+    if (!m_current->source.container.isEmpty())
+      stats.insert(QStringLiteral("container"), m_current->source.container);
+    if (!m_player) return stats;
+    // mpv's name for each value; one it does not have is left out.
+    const auto read = [&](const char* key, const char* property) {
+      const QVariant value = m_player->property(property);
+      if (value.isValid() && !value.isNull() && !(value.typeId() == QMetaType::QString && value.toString().isEmpty()))
+        stats.insert(QString::fromLatin1(key), value);
+    };
+    read("videoCodec", "video-format");
+    read("width", "video-params/w");
+    read("height", "video-params/h");
+    read("fps", "estimated-vf-fps");
+    if (!stats.contains(QStringLiteral("fps"))) read("fps", "container-fps");
+    read("displayFps", "display-fps");
+    read("hwdec", "hwdec-current");
+    read("videoBitrate", "video-bitrate");
+    read("audioCodec", "audio-codec-name");
+    read("channels", "audio-params/channel-count");
+    read("sampleRate", "audio-params/samplerate");
+    read("audioBitrate", "audio-bitrate");
+    read("cacheSeconds", "demuxer-cache-duration");
+    read("cacheSpeed", "cache-speed");
+    read("speed", "speed");
+    const QVariant output = m_player->property("frame-drop-count");
+    const QVariant decoder = m_player->property("decoder-frame-drop-count");
+    if (output.isValid() || decoder.isValid())
+      stats.insert(QStringLiteral("droppedFrames"), output.toLongLong() + decoder.toLongLong());
+    return stats;
+  }
+
   void PlayerModel::setVolume(int volume) {
     volume = std::clamp(volume, 0, 100);
     if (volume == m_volume) return;
@@ -376,6 +429,7 @@ namespace jfd::ui {
   // is not the video player's to stop.
   void PlayerModel::stop() {
     m_waitingPlay.reset();
+    m_waitingOpen = nullptr;
     m_runtime.launcher().cancel();
     restoreDisplay();
     if (m_current) m_runtime.post(core::intent::Stop{});
@@ -432,8 +486,18 @@ namespace jfd::ui {
     setWaitingDisplay(false);
   }
 
-  void PlayerModel::beforeOpen(const session::PlaybackLauncher::Request&, const api::Item& item,
+  void PlayerModel::beforeOpen(const session::PlaybackLauncher::Request& request, const api::Item& item,
                                const api::MediaSource& source, std::function<void()> open) {
+    // mpv opens its video output only once the render context exists: a
+    // video opened before the player page first showed (a room's item,
+    // opened as the page appears) would stay black and without subtitles.
+    // play() waits on its own; this catches the opens it does not start.
+    if (m_player && !m_videoReady && item.mediaType != QLatin1String("Audio")) {
+      m_waitingOpen = [this, request, item, source, open = std::move(open)]() mutable {
+        beforeOpen(request, item, source, std::move(open));
+      };
+      return;
+    }
     const std::optional<double> frameRate = videoFrameRate(source);
     const std::optional<QString> screen = fullscreenScreen();
     if (!m_displayModes || !m_refreshRateSwitch || item.mediaType == QLatin1String("Audio") || !frameRate ||
@@ -517,6 +581,7 @@ namespace jfd::ui {
       m_videoSuspended = false;
       m_player->setStringProperty("vid", "auto");
     }
+    if (auto waiting = std::exchange(m_waitingOpen, nullptr)) waiting();
     if (auto waiting = std::exchange(m_waitingPlay, std::nullopt))
       m_runtime.play(waiting->first, waiting->second);
   }
@@ -531,6 +596,10 @@ namespace jfd::ui {
       return;
     }
     m_pending = Pending{request, source, stream};
+    // Why the server transcodes, for the diagnostic report.
+    if (stream.method == api::PlayMethod::Transcode)
+      qCInfo(lcPlayer) << "the server transcodes" << request.itemId << "reasons:"
+                       << transcodeReasons(source);
     loadEpisodes(item);
     loadTrickplay(request.itemId);
     if (m_segmentsItem != request.itemId) {

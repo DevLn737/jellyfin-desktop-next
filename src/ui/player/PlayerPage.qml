@@ -37,6 +37,8 @@ RoutePage {
     property bool osdVisible: true
     // "audio", "subtitles", "tune", "episodes" or "".
     property string openMenu: ""
+    // The statistics overlay (right-click on the video, or I).
+    property bool statsShown: false
     readonly property bool osdShown: osdVisible || openMenu.length > 0 || player.paused || !player.active
 
     title: player.title
@@ -341,9 +343,19 @@ RoutePage {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: page.osdShown ? Qt.ArrowCursor : Qt.BlankCursor
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         onPositionChanged: page.poke()
-        onClicked: {
+        onClicked: (mouse) => {
             page.forceActiveFocus()
+            // The right button: the video's own menu, where the click was.
+            if (mouse.button === Qt.RightButton) {
+                page.openMenu = ""
+                contextAnchor.x = mouse.x
+                contextAnchor.y = mouse.y
+                contextMenu.open()
+                page.poke()
+                return
+            }
             // A click while the display is hidden only brings it back: it
             // was probably meant for a button that had faded out.
             if (page.openMenu.length > 0) page.openMenu = ""
@@ -352,7 +364,8 @@ RoutePage {
         }
         // The first click of a double-click must not pause: the single
         // click waits until a double-click can no longer come.
-        onDoubleClicked: {
+        onDoubleClicked: (mouse) => {
+            if (mouse.button !== Qt.LeftButton) return
             clickTimer.stop()
             page.toggleFullscreen()
         }
@@ -361,6 +374,33 @@ RoutePage {
             objectName: "clickTimer"
             interval: Qt.styleHints.mouseDoubleClickInterval
             onTriggered: page.player.togglePause()
+        }
+        Item {
+            id: contextAnchor
+            width: 1
+            height: 1
+        }
+        PopupMenu {
+            id: contextMenu
+            objectName: "videoContextMenu"
+            anchorItem: contextAnchor
+            entries: [page.statsShown ? qsTr("Hide stats for nerds") : qsTr("Stats for nerds")]
+            onActivated: page.statsShown = !page.statsShown
+        }
+    }
+
+    Loader {
+        id: statsLoader
+        objectName: "statsOverlay"
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: Theme.spacing + page.safeX
+        anchors.topMargin: topBar.height + Theme.spacingSmall
+        active: page.statsShown && page.player.active
+        sourceComponent: StatsOverlay {
+            player: page.player
+            group: page.player.inGroup ? GroupSession : null
+            onCloseRequested: page.statsShown = false
         }
     }
 
@@ -407,6 +447,45 @@ RoutePage {
         font.pixelSize: Theme.fontSizeLarge
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
+    }
+
+    // External subtitles the server is still preparing, or could not give:
+    // said near the top, where subtitles do not go.
+    Rectangle {
+        id: trackStatus
+        objectName: "trackStatus"
+        property bool failedShown: false
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Theme.controlHeight + 2 * Theme.spacingLarge
+        visible: page.player.subtitleLoading || failedShown
+        width: trackStatusText.implicitWidth + 2 * Theme.spacingLarge
+        height: trackStatusText.implicitHeight + Theme.spacing
+        radius: height / 2
+        color: Overlay.background
+        Text {
+            id: trackStatusText
+            objectName: "trackStatusText"
+            anchors.centerIn: parent
+            text: page.player.subtitleLoading ? qsTr("Loading subtitles from the server…")
+                                              : qsTr("The server could not give these subtitles")
+            color: Overlay.text
+            font.pixelSize: Theme.fontSizeBody
+        }
+        Timer {
+            id: failedTimer
+            interval: 6000
+            onTriggered: trackStatus.failedShown = false
+        }
+        Connections {
+            target: page.player
+            function onTrackLoadFailed(subtitles) {
+                if (!subtitles)
+                    return
+                trackStatus.failedShown = true
+                failedTimer.restart()
+            }
+        }
     }
 
     // Top bar.
@@ -1079,6 +1158,8 @@ RoutePage {
             page.toggleMenu("audio"); break
         case Qt.Key_C:
             page.toggleMenu("subtitles"); break
+        case Qt.Key_I:
+            page.statsShown = !page.statsShown; break
         case Qt.Key_Escape:
         case Qt.Key_Back:
             if (page.openMenu.length > 0) page.openMenu = ""

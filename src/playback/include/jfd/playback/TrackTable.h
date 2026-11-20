@@ -80,9 +80,18 @@ namespace jfd::playback {
 
     std::vector<Command> trackAdded(std::uint64_t key, int trackId);
     std::vector<Command> trackFailed(std::uint64_t key);
+    // The type of a pending add, empty for an unknown key.
+    std::optional<TrackKind> pendingKind(std::uint64_t key) const;
 
     // Tracks that failed to load are left out of menus.
     bool failed(int streamIndex) const;
+    // Whether the chosen track of this type is an external file still
+    // loading (the server may take minutes to extract a subtitle).
+    bool loading(TrackKind kind) const;
+    // An external file is asked for this many times before it counts as
+    // failed: a server still extracting it, behind a proxy that gave up
+    // (504), usually has it the second time.
+    static constexpr int MaxAttempts = 2;
 
   private:
     struct Entry {
@@ -96,6 +105,7 @@ namespace jfd::playback {
       // A transcode's subtitle drawn into the picture by the server.
       bool burnedIn = false;
       bool failed = false;
+      int failures = 0;
       std::uint64_t pendingKey = 0;
     };
 

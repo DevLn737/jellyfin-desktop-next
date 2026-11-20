@@ -104,7 +104,8 @@ namespace {
 
     // What the launcher emits once the server resolved the item, then the
     // intent it posts.
-    void open(bool live = false, const QString& itemId = QStringLiteral("episode"), const QString& seriesId = {}) {
+    void open(bool live = false, const QString& itemId = QStringLiteral("episode"),
+              api::PlayMethod method = api::PlayMethod::DirectPlay, const QString& seriesId = {}) {
       session::PlaybackLauncher::Request request;
       request.itemId = itemId;
       api::MediaSource source;
@@ -114,7 +115,10 @@ namespace {
                              stream(3, "Audio"), stream(4, "Subtitle")};
       api::PlaybackStream played;
       played.url = QUrl(QStringLiteral("https://srv/Videos/episode/stream"));
-      played.method = api::PlayMethod::DirectPlay;
+      played.method = method;
+      if (method == api::PlayMethod::Transcode)
+        source.transcodingUrl = QStringLiteral(
+            "/videos/episode/master.m3u8?MediaSourceId=source&TranscodeReasons=VideoCodecNotSupported%2CSubtitleCodecNotSupported");
       played.itemId = request.itemId;
       played.mediaSourceId = source.id;
       if (live) {
@@ -263,7 +267,7 @@ TEST_CASE("The episodes panel shows each episode's still, the watched check and 
   Fixture f;
   f.client.setServerUrl(server.url());
   f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
-  f.open(false, QStringLiteral("episode"), QStringLiteral("series"));
+  f.open(false, QStringLiteral("episode"), api::PlayMethod::DirectPlay, QStringLiteral("series"));
   REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
   REQUIRE(waitFor([&] { return f.player->episodes().size() == 4; }, 5000));
 
@@ -836,4 +840,65 @@ TEST_CASE("TV mode: Select plays and pauses; on a channel the display focuses pl
   CHECK(f.player->channelName() == QStringLiteral("Test Channel 3"));
   tap(window, Qt::Key_PageDown);
   CHECK(f.player->channelName() == QStringLiteral("Test Channel 2"));
+}
+
+TEST_CASE("Right-click on the video shows the statistics; I hides them; a transcode names its reasons") {
+  Fixture f;
+  f.open(false, QStringLiteral("episode"), api::PlayMethod::Transcode);
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  // Without mpv only what the server said.
+  const QVariantMap stats = f.player->stats();
+  CHECK(stats.value(QStringLiteral("method")).toString() == QStringLiteral("Transcode"));
+  CHECK(stats.value(QStringLiteral("transcodeReasons")).toString() ==
+        QStringLiteral("VideoCodecNotSupported,SubtitleCodecNotSupported"));
+
+  QQuickItem* overlay = find(f.page, "statsOverlay");
+  REQUIRE(overlay != nullptr);
+  CHECK_FALSE(f.page->property("statsShown").toBool());
+  QObject* menu = f.page->findChild<QObject*>(QStringLiteral("videoContextMenu"));
+  REQUIRE(menu != nullptr);
+
+  // A right click opens the video's menu and does not pause.
+  const QPoint middle(640, 300);
+  QTest::mouseMove(&f.window, middle);
+  QTest::mouseClick(&f.window, Qt::RightButton, Qt::NoModifier, middle);
+  REQUIRE(waitFor([&] { return menu->property("visible").toBool(); }, 2000));
+  CHECK(menu->property("entries").toStringList() == QStringList{QStringLiteral("Stats for nerds")});
+  QMetaObject::invokeMethod(menu, "close");
+  QMetaObject::invokeMethod(menu, "activated", Q_ARG(int, 0));
+  REQUIRE(waitFor([&] { return f.page->property("statsShown").toBool() && find(f.page, "statsGrid") != nullptr; }, 2000));
+  CHECK_FALSE(f.player->paused());
+
+  // The lines name the play method and its reasons.
+  QStringList values;
+  const std::function<void(QQuickItem*)> collect = [&](QQuickItem* item) {
+    if (item->objectName() == QLatin1String("statValue")) values << item->property("text").toString();
+    for (QQuickItem* child : item->childItems()) collect(child);
+  };
+  REQUIRE(waitFor([&] {
+    values.clear();
+    collect(overlay);
+    return !values.isEmpty();
+  }, 2000));
+  CHECK(values.contains(QStringLiteral("Transcoding on the server")));
+  CHECK(values.contains(QStringLiteral("VideoCodecNotSupported, SubtitleCodecNotSupported")));
+  if (const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS"); !dir.isEmpty()) {
+    QTest::qWait(300);
+    f.window.grabWindow().save(dir + QStringLiteral("/player-stats.png"));
+  }
+
+  // I hides them and shows them again.
+  f.page->forceActiveFocus();
+  const auto press = [&](int key) {
+    QKeyEvent pressEvent(QEvent::KeyPress, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&f.window, &pressEvent);
+    QKeyEvent releaseEvent(QEvent::KeyRelease, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&f.window, &releaseEvent);
+  };
+  press(Qt::Key_I);
+  CHECK_FALSE(f.page->property("statsShown").toBool());
+  CHECK(find(f.page, "statsGrid") == nullptr);
+  press(Qt::Key_I);
+  CHECK(f.page->property("statsShown").toBool());
+  CHECK(menu->property("entries").toStringList() == QStringList{QStringLiteral("Hide stats for nerds")});
 }

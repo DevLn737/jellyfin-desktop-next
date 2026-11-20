@@ -52,8 +52,11 @@ namespace jfd::library {
       LogoUrlRole,
       // A library's or folder's number of items, when the server gave it.
       ChildCountRole,
+      // Why a home banner item is there: "resume", "nextUp" or "latest";
+      // empty on other lists.
+      FeaturedReasonRole,
       // Models that add roles of their own start after this one.
-      LastRole = ChildCountRole,
+      LastRole = FeaturedReasonRole,
     };
     Q_ENUM(Role)
 
@@ -62,6 +65,7 @@ namespace jfd::library {
       QUrl imageUrl;
       QUrl backdropUrl = {};
       QUrl logoUrl = {};
+      QString featuredReason = {};
     };
 
     using QAbstractListModel::QAbstractListModel;

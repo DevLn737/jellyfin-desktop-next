@@ -137,6 +137,19 @@ namespace jfd::playback {
                           entry->info.title.toStdString(), entry->info.language.toStdString()}}};
   }
 
+  std::optional<TrackKind> TrackTable::pendingKind(std::uint64_t key) const {
+    const auto pending = m_pending.find(key);
+    if (pending == m_pending.end()) return std::nullopt;
+    return pending->second.first;
+  }
+
+  bool TrackTable::loading(TrackKind kind) const {
+    const std::optional<int> wanted = selected(kind);
+    if (!wanted) return false;
+    const Entry* entry = find(kind, *wanted);
+    return entry != nullptr && entry->pendingKey != 0;
+  }
+
   std::vector<Command> TrackTable::trackAdded(std::uint64_t key, int trackId) {
     const auto pending = m_pending.find(key);
     if (pending == m_pending.end()) return {};
@@ -157,8 +170,10 @@ namespace jfd::playback {
     m_pending.erase(pending);
     Entry* entry = find(kind, index);
     entry->pendingKey = 0;
-    entry->failed = true;
     std::optional<int>& wanted = kind == TrackKind::Audio ? m_audio : m_subtitle;
+    // Asked again while still wanted: apply() adds it anew.
+    if (++entry->failures < MaxAttempts) return wanted == index ? apply(kind) : std::vector<Command>{};
+    entry->failed = true;
     if (wanted != index) return {};
     // Falls back to an audio track the stream carries; subtitles go off.
     wanted.reset();

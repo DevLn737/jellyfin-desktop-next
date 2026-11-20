@@ -109,14 +109,20 @@ TEST_CASE("A track that fails to load leaves the menu, and audio falls back") {
   Movie movie;
   TrackTable table(movie.source, movie.played);
   const auto add = only<command::Add>(table.select(TrackKind::Audio, 1));
-  CHECK(only<command::Select>(table.trackFailed(add.key)).trackId == 1);
+  // The first failure asks again (a server still preparing the file).
+  const auto again = only<command::Add>(table.trackFailed(add.key));
+  CHECK_FALSE(table.failed(1));
+  CHECK(table.loading(TrackKind::Audio));
+  CHECK(only<command::Select>(table.trackFailed(again.key)).trackId == 1);
+  CHECK_FALSE(table.loading(TrackKind::Audio));
   CHECK(table.selected(TrackKind::Audio) == 3);
   CHECK(table.failed(1));
   CHECK(table.tracks(TrackKind::Audio).size() == 2);
   CHECK(table.select(TrackKind::Audio, 1).empty());
 
   const auto subtitle = only<command::Add>(table.select(TrackKind::Subtitle, 0));
-  CHECK_FALSE(only<command::Select>(table.trackFailed(subtitle.key)).trackId);
+  const auto subtitleAgain = only<command::Add>(table.trackFailed(subtitle.key));
+  CHECK_FALSE(only<command::Select>(table.trackFailed(subtitleAgain.key)).trackId);
   CHECK_FALSE(table.selected(TrackKind::Subtitle));
 }
 
@@ -150,4 +156,34 @@ TEST_CASE("Without a known initial audio track the first embedded one plays") {
   CHECK(table.selected(TrackKind::Audio) == 3);
   CHECK_FALSE(std::get<command::Select>(initial[1]).trackId);
   CHECK_FALSE(table.selected(TrackKind::Subtitle));
+}
+
+TEST_CASE("A subtitle the server is slow to give loads on the second try; meanwhile it shows as loading") {
+  Movie movie;
+  TrackTable table(movie.source, movie.played);
+  const auto first = only<command::Add>(table.select(TrackKind::Subtitle, 0));
+  CHECK(table.loading(TrackKind::Subtitle));
+  // Choosing it again while it loads asks nothing more.
+  CHECK(table.select(TrackKind::Subtitle, 0).empty());
+  // A proxy gave up (504): asked again, and this time it comes.
+  const auto second = only<command::Add>(table.trackFailed(first.key));
+  CHECK(second.key != first.key);
+  CHECK(table.loading(TrackKind::Subtitle));
+  CHECK(only<command::Select>(table.trackAdded(second.key, 5)).trackId == 5);
+  CHECK_FALSE(table.loading(TrackKind::Subtitle));
+  CHECK_FALSE(table.failed(0));
+  CHECK(table.selected(TrackKind::Subtitle) == 0);
+}
+
+TEST_CASE("A failed add no longer wanted is not asked again until chosen") {
+  Movie movie;
+  TrackTable table(movie.source, movie.played);
+  const auto first = only<command::Add>(table.select(TrackKind::Subtitle, 0));
+  CHECK_FALSE(only<command::Select>(table.select(TrackKind::Subtitle, std::nullopt)).trackId);
+  CHECK(table.trackFailed(first.key).empty());
+  CHECK_FALSE(table.failed(0));
+  // Chosen again later: a new add, the last allowed.
+  const auto second = only<command::Add>(table.select(TrackKind::Subtitle, 0));
+  CHECK_FALSE(only<command::Select>(table.trackFailed(second.key)).trackId);
+  CHECK(table.failed(0));
 }

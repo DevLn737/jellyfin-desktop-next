@@ -75,7 +75,9 @@ T.AbstractButton {
         radius: card.shape === "circle" ? width / 2 : Theme.radius
         color: colors.surfaceRaised
         clip: true
-        scale: card.hovered || card.visualFocus ? 1.03 : 1
+        // Only under the pointer: a focused card in the first place of a row
+        // would grow past the row's clipped edge, ring and all.
+        scale: card.hovered && !card.visualFocus ? 1.03 : 1
         Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
 
         Image {
@@ -228,7 +230,19 @@ T.AbstractButton {
             }
         }
 
-        FocusFrame { shown: card.visualFocus }
+    }
+
+    // Over the image (which clips its children), grown with it, and inside
+    // its edge: a row of cards clips at its own edges too.
+    FocusFrame {
+        objectName: "cardFocusFrame"
+        shown: card.visualFocus
+        inside: true
+        // Light on any poster, with the accent's halo inside.
+        ringColor: colors.text
+        anchors.fill: frame
+        scale: frame.scale
+        radius: frame.radius
     }
 
     // A round button on the image: dark glass, or the accent when `filled`

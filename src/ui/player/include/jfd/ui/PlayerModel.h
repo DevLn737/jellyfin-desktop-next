@@ -90,6 +90,9 @@ namespace jfd::ui {
     // Jellyfin stream indices; -1 when none (subtitles off).
     Q_PROPERTY(int audioIndex READ audioIndex NOTIFY tracksChanged)
     Q_PROPERTY(int subtitleIndex READ subtitleIndex NOTIFY tracksChanged)
+    // The chosen subtitles are a file the server is still preparing (it can
+    // take minutes for a transcoded film).
+    Q_PROPERTY(bool subtitleLoading READ subtitleLoading NOTIFY tracksChanged)
     // The skippable segment playing now ("Intro", "Outro", ...), or empty.
     Q_PROPERTY(QString segment READ segment NOTIFY segmentChanged)
     // The file's media segments, in order: {type, start, end} in seconds.
@@ -169,6 +172,7 @@ namespace jfd::ui {
     QVariantList audioTracks() const { return tracks(core::TrackKind::Audio); }
     QVariantList subtitleTracks() const { return tracks(core::TrackKind::Subtitle); }
     int audioIndex() const { return m_tracks.table().selected(core::TrackKind::Audio).value_or(-1); }
+    bool subtitleLoading() const { return m_tracks.table().loading(core::TrackKind::Subtitle); }
     int subtitleIndex() const {
       return m_tracks.table().selected(core::TrackKind::Subtitle).value_or(-1);
     }
@@ -232,6 +236,13 @@ namespace jfd::ui {
     // (image://jfd/...) and x, y, width, height the thumbnail inside it.
     // Empty without trickplay.
     Q_INVOKABLE QVariantMap trickplayFrame(double seconds) const;
+    // What the player's statistics overlay shows, read from mpv now:
+    // method (the server's play method), container, videoCodec, width,
+    // height, fps, displayFps, hwdec, droppedFrames, videoBitrate,
+    // audioCodec, channels, sampleRate, audioBitrate (bits per second),
+    // cacheSeconds, cacheSpeed (bytes per second) and speed. A value mpv
+    // does not know (yet) is left out. Empty with nothing playing.
+    Q_INVOKABLE QVariantMap stats() const;
 
     // The display's refresh rate follows the video (docs/display-refresh-
     // rate.md): with a switcher set and the switch on, a video opened while
@@ -275,6 +286,8 @@ namespace jfd::ui {
     void liveInfoChanged();
     // A play request could not be resolved, or the renderer failed.
     void failed(const QString& message);
+    // The chosen external subtitles (or audio) could not be loaded.
+    void trackLoadFailed(bool subtitles);
 
   private:
     struct Pending {
@@ -367,6 +380,9 @@ namespace jfd::ui {
     bool m_videoSuspended = false;
     QPointer<QQuickItem> m_video;
     std::optional<std::pair<QString, qint64>> m_waitingPlay;
+    // An open from elsewhere (a room, a remote) held by the open gate until
+    // the video's render context exists; a newer one replaces it.
+    std::function<void()> m_waitingOpen;
 
     api::LiveTvApi m_liveTv;
     std::function<QDateTime()> m_clock;
