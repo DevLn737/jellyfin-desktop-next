@@ -1,5 +1,7 @@
 #include <jfd/offline/OfflineCatalog.h>
 
+#include <QSet>
+
 namespace jfd::offline {
 
   QString OfflineCatalog::key(const QString& serverId, const QString& userId,
@@ -14,6 +16,25 @@ namespace jfd::offline {
     for (const ItemManifest& m : manifests)
       m_items.insert(key(m.serverId, m.userId, m.itemId), m);
     return m_items.size();
+  }
+
+  qsizetype OfflineCatalog::migrateLegacy() {
+    QSet<QString> taken;
+    QList<ItemManifest> legacy;
+    for (const ItemManifest& m : std::as_const(m_items)) {
+      if (m.format == 1) {
+        legacy.append(m);
+        continue;
+      }
+      taken.insert(m.mediaFile.toLower());
+    }
+    qsizetype moved = 0;
+    for (const ItemManifest& m : std::as_const(legacy))
+      if (const auto now = m_store.migrate(m, taken)) {
+        update(*now);
+        ++moved;
+      }
+    return moved;
   }
 
   std::optional<ItemManifest> OfflineCatalog::find(const QString& serverId, const QString& userId,

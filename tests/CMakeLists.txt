@@ -163,7 +163,7 @@ if(TARGET jfd_jellyfin_api)
     # (offline/FakeFileServer.h); the kill test runs jfd_offline_killee.
     jfd_add_qt_test(jfd_offline_tests offline/StoreTest.cpp offline/DownloadTest.cpp
       offline/CatalogTest.cpp offline/KillTest.cpp offline/JournalTest.cpp offline/ControllerTest.cpp
-      offline/TranscodeTest.cpp)
+      offline/TranscodeTest.cpp offline/LibraryTest.cpp)
     target_link_libraries(jfd_offline_tests PRIVATE jfd::offline Qt6::WebSockets)
     add_executable(jfd_offline_killee offline/Killee.cpp)
     target_link_libraries(jfd_offline_killee PRIVATE jfd::offline)

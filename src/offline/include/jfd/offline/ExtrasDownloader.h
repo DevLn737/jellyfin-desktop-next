@@ -17,9 +17,12 @@ class QNetworkReply;
 // The small files a downloaded item needs to play and show without the
 // server, fetched once its media file is complete:
 //
-//   subs/<index>.<srt|ass|ssa|vtt>  external text subtitles (embedded ones,
-//                                   and the fonts of embedded ASS, are in the
-//                                   media file of an original)
+//   <media name>.<lang>.<srt|ass|ssa|vtt>
+//                                   external text subtitles beside the media
+//                                   in the library (format 2; subs/<index>.
+//                                   <ext> in the item folder for format 1).
+//                                   Embedded ones, and the fonts of embedded
+//                                   ASS, are in the media file of an original
 //   images/<Type>                   Primary, Backdrop (the first), Logo and
 //                                   Thumb, at card and backdrop size
 //   lyrics.json                     a track's lyrics (Audio/{id}/Lyrics)

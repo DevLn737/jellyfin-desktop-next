@@ -265,7 +265,8 @@ TEST_CASE("A compressed copy: segments joined into one file, the manifest descri
   const auto m = h.manifest(id);
   REQUIRE(m);
   CHECK(m->state == ItemState::Complete);
-  CHECK(m->mediaFile == QStringLiteral("media.mp4"));
+  CHECK(m->mediaFile.endsWith(QStringLiteral(".mp4")));
+  CHECK(m->format == 2);
   CHECK(m->expectedSize == server.expectedFile().size());
   CHECK(m->transcode.preset == QStringLiteral("video-1080p"));
   CHECK(m->transcode.audioStreamIndex == 2);
@@ -322,7 +323,7 @@ TEST_CASE("A compressed copy's text subtitles, embedded ones too, become files; 
   const auto copy = local.find(id);
   REQUIRE(copy);
   CHECK_FALSE(copy->original);
-  CHECK(copy->path.endsWith(QStringLiteral("media.mp4")));
+  CHECK(copy->path.endsWith(QStringLiteral(".mp4")));
   CHECK(copy->source.container == QStringLiteral("mp4"));
   REQUIRE(copy->externalSubtitles.size() == 2);
   CHECK(copy->externalSubtitles.at(0).streamIndex == 3);

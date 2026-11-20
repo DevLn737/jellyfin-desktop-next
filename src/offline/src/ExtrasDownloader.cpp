@@ -1,6 +1,7 @@
 #include <jfd/offline/ExtrasDownloader.h>
 
 #include <jfd/api/Downloads.h>
+#include <jfd/offline/LibraryNaming.h>
 
 #include <QDir>
 #include <QFileInfo>
@@ -74,6 +75,15 @@ namespace jfd::offline {
     const auto have = [&dir](const QString& file) {
       return !file.isEmpty() && QFileInfo::exists(dir + QLatin1Char('/') + file);
     };
+    // Subtitles: beside the media in the library (format 2), named the
+    // way Jellyfin and players match them to the video.
+    const auto haveSidecar = [this, &m](const QString& file) {
+      return !file.isEmpty() && QFileInfo::exists(m_store.filePath(m, file));
+    };
+    QStringList used = m.subtitleFiles.values() + m.audioFiles.values();
+    const QString mediaBase =
+        m.mediaFile.left(m.mediaFile.size() - QFileInfo(m.mediaFile).suffix().size() - 1);
+    const bool library = m.format != 1 && !m.mediaFile.startsWith(QLatin1Char('.'));
     const QString sourceId = m.mediaSource.value(QLatin1String("Id")).toString(m.itemId);
 
     const QJsonArray streams = m.mediaSource.value(QLatin1String("MediaStreams")).toArray();
@@ -85,11 +95,22 @@ namespace jfd::offline {
       if (format.isEmpty()) continue;
       const int index = stream.value(QLatin1String("Index")).toInt(-1);
       if (index < 0) continue;
-      if (have(m.subtitleFiles.value(index))) continue;
+      if (haveSidecar(m.subtitleFiles.value(index))) continue;
       Task task;
       task.kind = Task::Kind::Subtitle;
       task.streamIndex = index;
-      task.file = QStringLiteral("subs/%1.%2").arg(index).arg(format);
+      if (library) {
+        task.file = sidecarPath(mediaBase,
+                                sidecarSuffix(stream, m.mediaSource.value(QLatin1String("Path")).toString()),
+                                format, used);
+        used.append(task.file);
+      } else if (m.format != 1) {
+        // The media is still inside the item folder (not moved yet).
+        task.file = QDir(m_store.root()).relativeFilePath(m_store.itemDir(m)) +
+                    QStringLiteral("/subs/%1.%2").arg(index).arg(format);
+      } else {
+        task.file = QStringLiteral("subs/%1.%2").arg(index).arg(format);
+      }
       task.url = api::subtitleDownloadUrl(m_serverUrl, m.itemId, sourceId, index, format);
       tasks.append(task);
     }
@@ -177,8 +198,14 @@ namespace jfd::offline {
     m_reply = nullptr;
     const Task task = m_tasks.takeFirst();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if (status >= 200 && status < 300) {
-      const QString path = m_store.itemDir(m_manifest) + QLatin1Char('/') + task.file;
+    if (!m_catalog.find(m_serverId, m_userId, m_current)) {
+      // Deleted meanwhile: write nothing, or its folder comes back.
+      m_tasks.clear();
+      m_failed = true;
+    } else if (status >= 200 && status < 300) {
+      const QString path = task.kind == Task::Kind::Subtitle
+                               ? m_store.filePath(m_manifest, task.file)
+                               : m_store.itemDir(m_manifest) + QLatin1Char('/') + task.file;
       QDir().mkpath(QFileInfo(path).absolutePath());
       QSaveFile file(path);
       const QByteArray body = reply->readAll();

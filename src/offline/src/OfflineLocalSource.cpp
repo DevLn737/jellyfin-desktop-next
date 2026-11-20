@@ -42,14 +42,17 @@ namespace jfd::offline {
         stream.deliveryUrl.clear();
         continue;
       }
-      const QString file = manifest->subtitleFiles.value(stream.index);
-      if (stream.type != QLatin1String("Subtitle") || file.isEmpty()) continue;
-      const QString subtitlePath = dir + QLatin1Char('/') + file;
-      if (!QFileInfo(subtitlePath).isFile()) continue;
-      copy.externalSubtitles.append({stream.index, QUrl::fromLocalFile(subtitlePath), stream.codec,
-                                     stream.language,
-                                     stream.displayTitle.isEmpty() ? stream.title : stream.displayTitle,
-                                     stream.isDefault, stream.isForced});
+      const bool audio = stream.type == QLatin1String("Audio");
+      if (!audio && stream.type != QLatin1String("Subtitle")) continue;
+      const QString file =
+          audio ? manifest->audioFiles.value(stream.index) : manifest->subtitleFiles.value(stream.index);
+      if (file.isEmpty()) continue;
+      const QString sidecar = m_store.filePath(*manifest, file);
+      if (!QFileInfo(sidecar).isFile()) continue;
+      (audio ? copy.externalAudio : copy.externalSubtitles)
+          .append({stream.index, QUrl::fromLocalFile(sidecar), stream.codec, stream.language,
+                   stream.displayTitle.isEmpty() ? stream.title : stream.displayTitle, stream.isDefault,
+                   stream.isForced});
     }
     if (!manifest->segmentsFile.isEmpty())
       if (const auto body = readObject(dir + QLatin1Char('/') + manifest->segmentsFile))

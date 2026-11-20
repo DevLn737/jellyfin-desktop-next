@@ -18,7 +18,9 @@ add_library(jfd_offline STATIC
   src/ExtrasDownloader.cpp
   src/HlsPlaylist.cpp
   src/JournalReportSink.cpp
+  src/LibraryNaming.cpp
   src/Manifest.cpp
+  src/MatroskaAudio.cpp
   src/OfflineCatalog.cpp
   src/OfflineLocalSource.cpp
   src/OfflineSync.cpp
@@ -34,7 +36,9 @@ add_library(jfd_offline STATIC
   include/jfd/offline/ExtrasDownloader.h
   include/jfd/offline/HlsPlaylist.h
   include/jfd/offline/JournalReportSink.h
+  include/jfd/offline/LibraryNaming.h
   include/jfd/offline/Manifest.h
+  include/jfd/offline/MatroskaAudio.h
   include/jfd/offline/OfflineCatalog.h
   include/jfd/offline/OfflineLocalSource.h
   include/jfd/offline/OfflineSync.h

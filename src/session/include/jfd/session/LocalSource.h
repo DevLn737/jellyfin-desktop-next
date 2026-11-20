@@ -24,6 +24,8 @@ namespace jfd::session {
     // External subtitle files next to it (url: QUrl::fromLocalFile). Embedded
     // tracks, and the fonts of embedded ASS subtitles, are inside the file.
     QList<api::ExternalTrack> externalSubtitles;
+    // External audio tracks next to it (the server's "Film.ru.mka" files).
+    QList<api::ExternalTrack> externalAudio;
     // Intros and credits, for skipping without the server.
     QList<api::MediaSegment> segments;
     // The original file, byte for byte. A compressed copy (3.10b) numbers

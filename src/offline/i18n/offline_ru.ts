@@ -143,6 +143,10 @@
         <translation>Пауза</translation>
     </message>
     <message>
+        <source>Audio track %1 of %2</source>
+        <translation>Звуковая дорожка %1 из %2</translation>
+    </message>
+    <message>
         <source>Connection lost, trying again</source>
         <translation>Связь прервалась, повторяем</translation>
     </message>

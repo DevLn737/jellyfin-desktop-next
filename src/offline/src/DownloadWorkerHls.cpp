@@ -9,6 +9,7 @@
 #include <jfd/api/Downloads.h>
 
 #include <QCryptographicHash>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -255,7 +256,8 @@ namespace jfd::offline {
       return;
     }
     if (QFileInfo::exists(t.job.finalPath)) QFile::remove(t.job.finalPath);
-    if (!QFile::rename(t.job.partPath, t.job.finalPath)) {
+    if (!QDir().mkpath(QFileInfo(t.job.finalPath).path()) ||
+        !QFile::rename(t.job.partPath, t.job.finalPath)) {
       finish(t.job.key, TransferOutcome::DiskError);
       return;
     }

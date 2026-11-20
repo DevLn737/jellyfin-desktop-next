@@ -64,6 +64,15 @@ SRT
       -metadata:s:a:0 language=jpn -metadata:s:a:1 language=rus -metadata:s:s:0 language=eng \
       "/media/Movies/Test Movie (2024)/Test Movie (2024).mkv"
     cp /tmp/sub.srt "/media/Movies/Test Movie (2024)/Test Movie (2024).ru.srt"
+    # A film with external audio tracks and a forced subtitle beside it, for
+    # the download tests (jfd_offline_server_tests); sorts after Test Movie.
+    v="/media/Movies/Voiced Film (2024)"
+    mkdir -p "$v"
+    $ff -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=24 -f lavfi -i sine=frequency=330 -t 20 \
+      -c:v libx264 -preset ultrafast -c:a aac -b:a 64k "$v/Voiced Film (2024).mkv"
+    $ff -loglevel error -y -f lavfi -i sine=frequency=550 -t 20 -c:a aac -b:a 64k "$v/Voiced Film (2024).ru.mka"
+    $ff -loglevel error -y -f lavfi -i sine=frequency=660 -t 20 -c:a ac3 -b:a 96k "$v/Voiced Film (2024).en.ac3"
+    cp /tmp/sub.srt "$v/Voiced Film (2024).ru.forced.srt"
     # Episodes run past the 5-minute minimum the server needs for resume points.
     for e in 01 02; do
       $ff -loglevel error -y -f lavfi -i testsrc2=size=160x120:rate=5 -f lavfi -i sine=frequency=330 \

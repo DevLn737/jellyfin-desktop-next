@@ -81,7 +81,7 @@ namespace jfd::offline {
 
   QJsonObject toJson(const ItemManifest& m) {
     QJsonObject o;
-    o.insert(QStringLiteral("format"), ItemManifest::FormatVersion);
+    o.insert(QStringLiteral("format"), m.format == 1 ? 1 : ItemManifest::FormatVersion);
     o.insert(QStringLiteral("serverId"), m.serverId);
     o.insert(QStringLiteral("userId"), m.userId);
     o.insert(QStringLiteral("itemId"), m.itemId);
@@ -102,6 +102,7 @@ namespace jfd::offline {
       o.insert(QStringLiteral("transcode"), scrubSecrets(transcode));
     }
     o.insert(QStringLiteral("mediaFile"), m.mediaFile);
+    if (m.mediaComplete) o.insert(QStringLiteral("mediaComplete"), true);
     // Whole bytes fit a double exactly up to 2^53 (8 PiB).
     o.insert(QStringLiteral("expectedSize"), static_cast<double>(m.expectedSize));
     if (!m.resumeValidator.isEmpty())
@@ -116,6 +117,17 @@ namespace jfd::offline {
       for (auto it = m.subtitleFiles.begin(); it != m.subtitleFiles.end(); ++it)
         subtitles.insert(QString::number(it.key()), it.value());
       o.insert(QStringLiteral("subtitleFiles"), subtitles);
+    }
+    if (!m.audioFiles.isEmpty()) {
+      QJsonObject audio;
+      for (auto it = m.audioFiles.begin(); it != m.audioFiles.end(); ++it)
+        audio.insert(QString::number(it.key()), it.value());
+      o.insert(QStringLiteral("audioFiles"), audio);
+    }
+    if (!m.audioSkipped.isEmpty()) {
+      QJsonArray skipped;
+      for (const int index : m.audioSkipped) skipped.append(index);
+      o.insert(QStringLiteral("audioSkipped"), skipped);
     }
     if (!m.imageFiles.isEmpty()) {
       QJsonObject images;
@@ -135,9 +147,10 @@ namespace jfd::offline {
   }
 
   std::optional<ItemManifest> manifestFromJson(const QJsonObject& o) {
-    if (o.value(QLatin1String("format")).toInt() != ItemManifest::FormatVersion)
-      return std::nullopt;
+    const int format = o.value(QLatin1String("format")).toInt();
+    if (format != 1 && format != ItemManifest::FormatVersion) return std::nullopt;
     ItemManifest m;
+    m.format = format;
     m.serverId = o.value(QLatin1String("serverId")).toString();
     m.userId = o.value(QLatin1String("userId")).toString();
     m.itemId = o.value(QLatin1String("itemId")).toString();
@@ -162,6 +175,7 @@ namespace jfd::offline {
           bytes > 0 && bytes < 9007199254740992.0 ? static_cast<std::int64_t>(bytes) : 0;
     }
     m.mediaFile = o.value(QLatin1String("mediaFile")).toString();
+    m.mediaComplete = format != 1 && o.value(QLatin1String("mediaComplete")).toBool();
     const double size = o.value(QLatin1String("expectedSize")).toDouble();
     m.expectedSize = size > 0 && size < 9007199254740992.0 ? static_cast<std::int64_t>(size) : 0;
     m.resumeValidator = o.value(QLatin1String("resumeValidator")).toString();
@@ -172,17 +186,31 @@ namespace jfd::offline {
     m.item = o.value(QLatin1String("item")).toObject();
     m.mediaSource = o.value(QLatin1String("mediaSource")).toObject();
     m.userData = o.value(QLatin1String("userData")).toObject();
-    // Files of the item are names inside its folder: nothing that climbs out.
+    // Files of the item are relative paths inside its folder (or, format 2,
+    // the download folder): nothing that climbs out.
     const auto inside = [](const QString& file) {
-      return !file.isEmpty() && !file.contains(QLatin1String("..")) &&
-             !file.startsWith(QLatin1Char('/')) && !file.contains(QLatin1Char('\\')) &&
-             !file.contains(QLatin1Char(':'));
+      if (file.isEmpty() || file.contains(QLatin1Char('\\')) || file.contains(QLatin1Char(':')))
+        return false;
+      for (const QString& part : file.split(QLatin1Char('/')))
+        if (part.isEmpty() || part == QLatin1String(".") || part == QLatin1String("..")) return false;
+      return true;
     };
+    if (!m.mediaFile.isEmpty() && !inside(m.mediaFile)) m.mediaFile.clear();
     const QJsonObject subtitles = o.value(QLatin1String("subtitleFiles")).toObject();
     for (auto it = subtitles.begin(); it != subtitles.end(); ++it) {
       bool ok = false;
       const int index = it.key().toInt(&ok);
       if (ok && inside(it.value().toString())) m.subtitleFiles.insert(index, it.value().toString());
+    }
+    if (format != 1) {
+      const QJsonObject audio = o.value(QLatin1String("audioFiles")).toObject();
+      for (auto it = audio.begin(); it != audio.end(); ++it) {
+        bool ok = false;
+        const int index = it.key().toInt(&ok);
+        if (ok && inside(it.value().toString())) m.audioFiles.insert(index, it.value().toString());
+      }
+      for (const QJsonValue& index : o.value(QLatin1String("audioSkipped")).toArray())
+        if (index.isDouble() && !m.audioSkipped.contains(index.toInt())) m.audioSkipped.append(index.toInt());
     }
     const QJsonObject images = o.value(QLatin1String("imageFiles")).toObject();
     for (auto it = images.begin(); it != images.end(); ++it)

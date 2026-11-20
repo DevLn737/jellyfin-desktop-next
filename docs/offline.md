@@ -39,27 +39,69 @@ transcodes, the downloader joins the HLS segments into one file (see
 
 ## Folder layout
 
+Downloads form a readable library, the way Jellyfin and Kodi name their
+files, so other players (mpv, VLC, Kodi) and a Jellyfin library pointed at
+the folder find the external subtitles and audio by themselves:
+
 ```
-<download folder>/<serverId>/<userId>/<itemId>/item.json
-                                              /media.part     while downloading
-                                              /media.<ext>    once complete (media.mp4 for a compressed copy)
-                                              /subs/<index>.<srt|ass|ssa|vtt>
-                                              /images/<Primary|Backdrop|Logo|Thumb>
-                                              /lyrics.json    a track's lyrics
-                                              /segments.json  a video's intros and credits
+<download folder>/Movies/Name (2024)/Name (2024).mkv
+                                    /Name (2024).ru.forced.srt     external subtitles
+                                    /Name (2024).ru.mka            external audio tracks
+                 /Shows/Series/Season 01/Series - S01E02 - Title.mkv  (+ the same sidecars)
+                 /Music/Album Artist/Album/01 - Title.flac
+                 /Videos/Name/Name.mp4                               other videos
+                 /Audiobooks/Book/Chapter.m4b
+                 /.jellyfin-desktop/<serverId>/<userId>/<itemId>/item.json
+                                                                /media.part    while downloading
+                                                                /audio-<n>.part
+                                                                /images/<Primary|Backdrop|Logo|Thumb>
+                                                                /lyrics.json   a track's lyrics
+                                                                /segments.json a video's intros and credits
 ```
 
-Names are ids (checked to be `[A-Za-z0-9-]`), never titles. The extension
-comes from the source's container. An item is complete only when its
-manifest says so, and that is written after the file's size was checked and
-`media.part` renamed. A process killed between the rename and the manifest
-is repaired at the next start (the file is there with the expected size and
-no `.part`).
+`LibraryNaming.h` makes the names: characters Windows forbids are replaced,
+trailing dots and spaces dropped, device names (`CON`, `NUL`) prefixed; an
+episode's title is left out when it only repeats the number. A sidecar keeps
+the server's own suffix when the server's file starts with the video's name
+(`Show S01E02.ru.forced.srt` -> `<our name>.ru.forced.srt`); otherwise it is
+made from the stream: `[title.]language[.default][.forced][.sdh]`. Two items
+that would get the same name: the second gets ` [<first 8 of its id>]`. The
+internal folder is hidden (a leading dot; the hidden attribute on Windows).
+
+An item is complete only when its manifest says so, and that is written
+after the file's size was checked, `media.part` renamed into the library and
+the external audio tracks fetched. A process killed between the rename and
+the manifest is repaired at the next start (the file is there with the
+expected size and no `.part`). Deleting a download deletes its library
+files and the library folders left empty.
+
+Older downloads (format 1, everything in `<download
+folder>/<serverId>/<userId>/<itemId>`) move to this layout at start-up
+(`OfflineCatalog::migrateLegacy`): the item folder into `.jellyfin-desktop`,
+the media and subtitles into the library. A file that cannot be moved (open
+in another program) stays in the item folder, and the manifest points there.
 
 Windows: Qt's own file access handles paths past 260 characters.
 `DownloadStore::externalPath` gives mpv the `\\?\` form of such paths.
 
-## Manifest (`item.json`, format 1)
+### External audio tracks
+
+Jellyfin 12.2 cannot hand out an external audio file (`Film.ru.mka` beside
+the film) as it is: `Audio/{id}/stream` and audio-only HLS pass no `-map`
+to ffmpeg, which then takes the video's own audio whatever
+`audioStreamIndex` says (checked on the stand, 2026-11-20). A video stream
+maps the external track correctly. So the queue, once the media is in, asks
+for each external audio track `Videos/{id}/stream.mkv` with
+`audioCodec=copy`, `audioStreamIndex=<n>` and a 32-pixel, 1 fps H.264
+picture (`api::externalAudioDownloadUrl`), with a new `playSessionId` each
+time (12.2 names a transcode's file after its query), and
+`extractMatroskaAudio` drops the picture: the result is the track's own
+packets, bit for bit, in a `.mka` with Cues. The server decodes the video
+once for it. A track the server refuses (no transcoding allowed) is skipped
+for good (`audioSkipped`); the item completes without it. Compressed copies
+carry their one audio track inside and fetch none.
+
+## Manifest (`item.json`, formats 1 and 2)
 
 `serverId`, `userId`, `itemId`, `state` (`queued`, `paused`, `failed`,
 `complete`), `quality` (`original` or `compressed`), `mediaFile`, `expectedSize`,
@@ -73,6 +115,12 @@ Step 2 adds, all optional (older manifests read as before):
 `lyricsFile`, `segmentsFile`, `extrasComplete`, `removedOnServer`,
 `changedOnServer` and `refreshedAt`. File names must stay inside the item
 folder (no `..`, no absolute paths); others are ignored.
+
+Format 2 (the library layout) adds `mediaComplete` (the media is in, the
+external audio tracks are being fetched), `audioFiles` (stream index ->
+file) and `audioSkipped`; `mediaFile`, `subtitleFiles` and `audioFiles`
+are then relative to the download folder. A format 1 reader skips format 2
+manifests (an older app version leaves them alone).
 
 Step 3 adds `parents` (optional): the ids of the season, series, album,
 playlist or collection the item was downloaded with, so a playlist or
@@ -382,7 +430,7 @@ While downloading, `mediaSource` is the server's source. Once complete it
 describes the copy (`compressedMediaSource`): `Container: mp4`, its `Size`,
 the preset's `Bitrate`, and the streams that are in it: the video, the one
 audio track, and the text subtitles (embedded or not) as external files
-that `ExtrasDownloader` fetches by index (`subs/<index>.<ext>`). Picture
+that `ExtrasDownloader` fetches beside the copy (`<name>.<language>.<ext>`). Picture
 subtitles and fonts are not in a compressed copy. Stream indexes stay the
 server's, so the track menu, built from `MediaStreams` as for originals,
 maps the audio to mpv's first audio track and adds the subtitle files.

@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QJsonObject>
+#include <QList>
 #include <QMap>
 #include <QString>
 #include <QStringList>
@@ -61,7 +62,15 @@ namespace jfd::offline {
   };
 
   struct ItemManifest {
-    static constexpr int FormatVersion = 1;
+    // Format 1: the media and its subtitles inside the item folder
+    // (<root>/<serverId>/<userId>/<itemId>/media.mkv). Format 2: the item
+    // folder is <root>/.jellyfin-desktop/<serverId>/<userId>/<itemId>, and the
+    // media and its sidecars are in the readable library under the root
+    // (LibraryNaming.h); mediaFile, subtitleFiles and audioFiles are relative
+    // to the root. Format 1 items are moved to format 2 at start-up
+    // (DownloadStore::migrate).
+    static constexpr int FormatVersion = 2;
+    int format = 1;
 
     QString serverId;
     QString userId;
@@ -78,8 +87,13 @@ namespace jfd::offline {
     QJsonObject item;
     QJsonObject mediaSource;
     QJsonObject userData;
-    // The media file's name inside the item folder ("media.mkv").
+    // The media file: its name inside the item folder ("media.mkv", format
+    // 1), or its path in the library ("Shows/Series/Season 01/Series -
+    // S01E02 - Title.mkv", format 2).
     QString mediaFile;
+    // Format 2: the media file is complete, and the external audio tracks
+    // (audioFiles) are being fetched; the item is Complete once they are in.
+    bool mediaComplete = false;
     // Expected size in bytes: MediaSourceInfo.Size, else the server's
     // Content-Length / Content-Range total once a download started. 0 when
     // unknown.
@@ -95,6 +109,12 @@ namespace jfd::offline {
     // (ExtrasDownloader), as paths relative to the item folder:
     // external subtitles by their MediaStreams index ("subs/0.srt"),
     QMap<int, QString> subtitleFiles;
+    // external audio tracks by their MediaStreams index, as Matroska audio
+    // next to the media ("....ru.mka"; format 2, originals only; fetched by
+    // the queue before the item is complete), and the external audio
+    // tracks the server would not give (skipped for good),
+    QMap<int, QString> audioFiles;
+    QList<int> audioSkipped;
     // images by type ("Primary", "Backdrop", "Logo", "Thumb" ->
     // "images/Primary"),
     QMap<QString, QString> imageFiles;
