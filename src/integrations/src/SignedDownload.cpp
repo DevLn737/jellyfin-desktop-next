@@ -1,6 +1,7 @@
 #include <jfd/integrations/SignedDownload.h>
 
 #include <QFile>
+#include <QFileInfo>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -87,7 +88,7 @@ namespace jfd::integrations {
     const QString signaturePath = path + QStringLiteral(".minisig");
     const QUrl signatureUrl = signature.url;
     const qint64 signatureSize = signature.size;
-    download(file.url, path, file.size, [this, path, signaturePath, signatureUrl, signatureSize, assetName, key] {
+    auto checkSignature = [this, path, signaturePath, signatureUrl, signatureSize, assetName, key] {
       download(signatureUrl, signaturePath, signatureSize, [this, path, signaturePath, assetName, key] {
         QFile signatureFile(signaturePath);
         QFile data(path);
@@ -105,7 +106,16 @@ namespace jfd::integrations {
         Done finished = std::move(m_done);
         if (finished) finished(QString());
       });
-    });
+    };
+    // A file of the right size already there (downloaded before a restart):
+    // only the signature is fetched, and a file that does not match it is
+    // removed, so the next attempt downloads it again.
+    const QFileInfo existing(path);
+    if (file.size > 0 && existing.isFile() && existing.size() == file.size) {
+      checkSignature();
+      return;
+    }
+    download(file.url, path, file.size, checkSignature);
   }
 
 } // namespace jfd::integrations

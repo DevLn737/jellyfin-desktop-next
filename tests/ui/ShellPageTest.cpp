@@ -5,6 +5,8 @@
 #include <jfd/ui/ThemePalette.h>
 
 #include <QColor>
+#include <QDesktopServices>
+#include <QTest>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QQmlComponent>
@@ -699,4 +701,99 @@ Item {
       CHECK(window.grabWindow().save(file));
     }
   }
+}
+
+
+TEST_CASE("The toast's link button opens its link, and the toast is a card of its own") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  window.resize(1280, 720);
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Controls
+Item {
+  width: 1280; height: 720
+  Toast { id: toast; objectName: "toast" }
+  // Stands in for the app's handler of the update links.
+  property QtObject sink: QtObject {
+    property var opened: []
+    function open(link: url) { opened = opened.concat([link.toString()]) }
+  }
+  function show() { toast.show("Version 9 is ready to install.", "info", "Restart and update", "jfd-test-update:restart") }
+}
+)");
+  auto* root = qobject_cast<QQuickItem*>(object.get());
+  root->setParentItem(window.contentItem());
+  window.show();
+  REQUIRE(QTest::qWaitForWindowExposed(&window));
+  auto* sink = root->property("sink").value<QObject*>();
+  REQUIRE(sink != nullptr);
+  QDesktopServices::setUrlHandler(QStringLiteral("jfd-test-update"), sink, "open");
+  QMetaObject::invokeMethod(root, "show");
+  QQuickItem* toast = find(root, "toast");
+  REQUIRE(toast != nullptr);
+  QQuickItem* button = find(toast, "toastLink");
+  REQUIRE(button != nullptr);
+  QTest::qWait(400);
+  // The text and the button sit inside the card, side by side.
+  QQuickItem* text = find(toast, "toastText");
+  REQUIRE(text != nullptr);
+  const QRectF card = toast->mapRectToScene(QRectF(0, 0, toast->width(), toast->height()));
+  const QRectF textRect = text->mapRectToScene(QRectF(0, 0, text->width(), text->height()));
+  const QRectF buttonRect = button->mapRectToScene(QRectF(0, 0, button->width(), button->height()));
+  CHECK(card.contains(textRect));
+  CHECK(card.contains(buttonRect));
+  CHECK_FALSE(textRect.intersects(buttonRect));
+  CHECK(toast->property("color").value<QColor>().alpha() == 255);
+  // A click on the button opens the link.
+  QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, buttonRect.center().toPoint());
+  QTest::qWait(100);
+  QDesktopServices::unsetUrlHandler(QStringLiteral("jfd-test-update"));
+  const QStringList opened = sink->property("opened").toStringList();
+  REQUIRE(opened.size() == 1);
+  CHECK(opened.first() == QStringLiteral("jfd-test-update:restart"));
+}
+
+
+TEST_CASE("Tooltips: one at a time, the next one along a row at once") {
+  QQmlEngine engine;
+  QQuickWindow window;
+  window.resize(640, 420);
+  auto object = create(engine, R"(
+import QtQuick
+import Jfd.Ui.Controls
+Item {
+  width: 640; height: 420
+  property alias first: first
+  property alias second: second
+  Item { x: 100; y: 100; width: 40; height: 40; ToolTipLabel { id: first; text: "Audio and subtitles" } }
+  Item { x: 150; y: 100; width: 40; height: 40; ToolTipLabel { id: second; text: "Episodes" } }
+}
+)");
+  auto* root = qobject_cast<QQuickItem*>(object.get());
+  root->setParentItem(window.contentItem());
+  window.show();
+  REQUIRE(QTest::qWaitForWindowExposed(&window));
+  auto* first = root->property("first").value<QQuickItem*>();
+  auto* second = root->property("second").value<QQuickItem*>();
+  const auto bubbleShown = [](QQuickItem* tip) { return tip->property("active").toBool(); };
+  // The first waits a moment.
+  first->setProperty("shown", true);
+  QTest::qWait(100);
+  CHECK_FALSE(bubbleShown(first));
+  QTest::qWait(600);
+  CHECK(bubbleShown(first));
+  // The pointer moves on: the next shows at once and the first is gone,
+  // even before its own hover has ended.
+  second->setProperty("shown", true);
+  CHECK(bubbleShown(second));
+  CHECK_FALSE(bubbleShown(first));
+  first->setProperty("shown", false);
+  CHECK(bubbleShown(second));
+  second->setProperty("shown", false);
+  CHECK_FALSE(bubbleShown(second));
+  // Back within a second: no wait either.
+  first->setProperty("shown", true);
+  CHECK(bubbleShown(first));
+  first->setProperty("shown", false);
 }

@@ -110,6 +110,43 @@ TEST_CASE("A signed MSI is downloaded into the state directory") {
   CHECK_FALSE(QFile::exists(msi.fileName() + QStringLiteral(".minisig")));
 }
 
+TEST_CASE("An MSI downloaded before a restart is checked again, not downloaded again") {
+  QTemporaryDir dir;
+  const QString folder = install(dir);
+  const QString state = dir.filePath(QStringLiteral("state"));
+  REQUIRE(QDir().mkpath(state));
+  const QString msi = state + QStringLiteral("/") + MsiUpdater::assetName(QStringLiteral("0.2.0"));
+  REQUIRE(write(msi, newMsi));
+  QStringList asked;
+  FakeServer server([&](const HttpRequest& request) {
+    asked.append(request.path);
+    return HttpResponse{200, request.path == QStringLiteral("/a") ? newMsi : msiSignature, "application/octet-stream"};
+  });
+  QNetworkAccessManager network;
+  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKey(testKey));
+  const Outcome outcome = prepare(updater, release(server, msiSignature));
+  CHECK_MESSAGE(outcome.failure.isEmpty(), outcome.failure.toStdString());
+  CHECK(outcome.ready == QStringLiteral("0.2.0"));
+  CHECK(asked == QStringList{QStringLiteral("/s")});
+
+  // A file of that size that the signature does not match is removed, and
+  // the next attempt downloads it.
+  QTemporaryDir other;
+  const QString otherFolder = install(other);
+  const QString otherState = other.filePath(QStringLiteral("state"));
+  REQUIRE(QDir().mkpath(otherState));
+  const QString broken = otherState + QStringLiteral("/") + MsiUpdater::assetName(QStringLiteral("0.2.0"));
+  QByteArray tampered = newMsi;
+  tampered[0] = char(tampered[0] ^ 1);
+  REQUIRE(write(broken, tampered));
+  MsiUpdater second(&network, otherFolder + QStringLiteral("/app.exe"), otherFolder, otherState, parsePublicKey(testKey));
+  CHECK(prepare(second, release(server, msiSignature)).failure.startsWith(QStringLiteral("signature check failed")));
+  CHECK_FALSE(QFile::exists(broken));
+  asked.clear();
+  CHECK(prepare(second, release(server, msiSignature)).ready == QStringLiteral("0.2.0"));
+  CHECK(asked.contains(QStringLiteral("/a")));
+}
+
 TEST_CASE("A verified MSI replaces the downloads of older versions, a failed one keeps them") {
   QTemporaryDir dir;
   const QString folder = install(dir);

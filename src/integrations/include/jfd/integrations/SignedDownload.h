@@ -42,7 +42,9 @@ namespace jfd::integrations {
     // Downloads file to path and its signature to path + ".minisig", and
     // checks it against key as the release file assetName. On success the
     // file is at path and the signature is gone; on failure neither is left.
-    // One download at a time.
+    // A file already at path with the release file's size (one downloaded
+    // before the program restarted) is checked against a fresh signature
+    // instead of being downloaded again. One download at a time.
     void start(const ReleaseAsset& file, const ReleaseAsset& signature, const QString& path,
                const QString& assetName, const MinisignPublicKey& key, Done done);
 
