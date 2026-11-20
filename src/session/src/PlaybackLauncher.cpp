@@ -38,6 +38,7 @@ namespace jfd::session {
     stream.itemId = request.itemId;
     stream.mediaSourceId = copy.source.id;
     stream.externalSubtitles = copy.externalSubtitles;
+    stream.externalAudio = copy.externalAudio;
     // A file plays all its tracks: the player selects, nothing is reopened.
     const Request withTracks = preload ? request : withChosenTracks(request, copy.item, copy.source);
     openResolved(serial, withTracks, copy.item, copy.source, stream, preload);

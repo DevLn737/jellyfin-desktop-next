@@ -23,6 +23,10 @@ namespace jfd::offline {
 
     // Rebuilds the index from disk; returns the number of items.
     qsizetype load();
+    // Moves the items of the old layout (format 1) to the readable library
+    // (DownloadStore::migrate); returns how many moved. Call after load(),
+    // before the queue starts.
+    qsizetype migrateLegacy();
 
     qsizetype size() const { return m_items.size(); }
     std::optional<ItemManifest> find(const QString& serverId, const QString& userId,

@@ -11,6 +11,7 @@
 #include <QList>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
@@ -74,6 +75,10 @@ namespace jfd::offline {
     std::int64_t total = 0;
     // Why it failed.
     QueueProblem problem = QueueProblem::None;
+    // The media is in; external audio track `audioTrack` (from 1) of
+    // `audioTracks` is being fetched. 0 while the media downloads.
+    int audioTrack = 0;
+    int audioTracks = 0;
   };
 
   enum class EnqueueResult {
@@ -171,6 +176,9 @@ namespace jfd::offline {
       // What to do when the running transfer reports Cancelled.
       enum class AfterStop { Requeue, Pause, Remove } afterStop = AfterStop::Requeue;
       QTimer* retryTimer = nullptr;
+      // The MediaStreams index of the external audio track being fetched,
+      // -1 while the media file is.
+      int audioRunning = -1;
     };
 
     void reload();
@@ -185,6 +193,11 @@ namespace jfd::offline {
     std::int64_t committedBytes(const Entry& next) const;
 
     EnqueueResult admit(ItemManifest manifest);
+    // Library paths already used by downloads (lower case).
+    QSet<QString> takenLibraryFiles() const;
+    // The media is in: fetch the external audio tracks next, or complete.
+    void mediaDone(Entry& entry);
+    void complete(Entry& entry);
     bool compressedActive() const;
     void onTranscodeStarted(const QString& key, const QJsonObject& state);
     void onSegmentWritten(const QString& key, int segmentsDone, qint64 partBytes);
@@ -204,6 +217,8 @@ namespace jfd::offline {
     QByteArray m_authorization;
 
     QHash<QString, Entry> m_entries;
+    // Item id -> the library path of the external audio track being fetched.
+    QHash<QString, QString> m_pendingAudioFile;
     QStringList m_order;
     QueueProblem m_problem = QueueProblem::None;
     int m_maxParallel = 1;

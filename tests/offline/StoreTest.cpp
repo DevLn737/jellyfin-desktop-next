@@ -69,7 +69,7 @@ TEST_CASE("The manifest keeps the server's JSON but no token, TranscodingUrl or 
 
 TEST_CASE("Manifests of an unknown format or without ids are not read") {
   CHECK_FALSE(manifestFromJson(QJsonObject{}));
-  CHECK_FALSE(manifestFromJson(QJsonObject{{QStringLiteral("format"), 2},
+  CHECK_FALSE(manifestFromJson(QJsonObject{{QStringLiteral("format"), 3},
                                            {QStringLiteral("serverId"), ServerId},
                                            {QStringLiteral("userId"), UserId},
                                            {QStringLiteral("itemId"), itemIdFor(1)},

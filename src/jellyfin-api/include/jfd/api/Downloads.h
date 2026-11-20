@@ -98,6 +98,15 @@ namespace jfd::api {
   // an external subtitle file, as the server keeps it.
   QUrl subtitleDownloadUrl(const QUrl& serverUrl, const QString& itemId,
                            const QString& mediaSourceId, int streamIndex, const QString& format);
+  // GET Videos/{itemId}/stream.mkv for an external audio file (a "Film.ru.mka"
+  // the server keeps beside the video): the track copied as it is, with a
+  // 32-pixel, 1 fps picture (12.2 has no audio-only request that maps an
+  // external track; offline::extractMatroskaAudio drops the picture). Each
+  // request needs its own `playSessionId`: 12.2 names the transcode's file
+  // after the query, and an audio-only one ignored the track index.
+  QUrl externalAudioDownloadUrl(const QUrl& serverUrl, const QString& itemId,
+                                const QString& mediaSourceId, int streamIndex,
+                                const QString& playSessionId);
   // The file format to ask for a text subtitle codec ("subrip" -> "srt",
   // "ass", "ssa", "webvtt" -> "vtt"); empty for picture subtitles (PGS,
   // VobSub) and unknown codecs, which are not downloaded.
