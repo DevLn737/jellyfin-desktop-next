@@ -14,6 +14,7 @@
 #include "../support/FakeServer.h"
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/library/HomeModel.h>
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/ui/LibraryScreens.h>
@@ -561,6 +562,7 @@ namespace {
       navigator->setPlaceholderPage(QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
       // The settings screen, on the common sections.
       REQUIRE(settings::registerCommonSections(m_registry));
+      REQUIRE(integrations::registerIntegrationsSettings(m_registry));
       m_settings = std::make_unique<settings::Settings>(m_registry, m_dir.filePath(QStringLiteral("settings.ini")));
       auto* appSettings = engine.singletonInstance<ui::AppSettings*>("Jfd.Ui.Settings", "AppSettings");
       REQUIRE(appSettings != nullptr);
@@ -638,6 +640,7 @@ namespace {
       return nullptr;
     }
     QQuickItem* item(const char* name) const { return findItem(page(), QString::fromLatin1(name)); }
+    settings::Settings& settings() { return *m_settings; }
 
     void resize(int width, int height) {
       window->resize(width, height);
@@ -856,4 +859,32 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
   show.find("settingsSearch")->setProperty("text", QStringLiteral("zzzz"));
   CHECK(waitFor([&] { return list->property("count").toInt() == 0; }, Timeout));
   CHECK(show.find("settingsNothingFound")->property("visible").toBool());
+}
+
+TEST_CASE("Discord: what to show, by kind and by library") {
+  Showcase show;
+  show.resize(1600, 900);
+  show.navigator->navigate(QStringLiteral("settings"));
+  REQUIRE(waitFor([&] { return show.item("settingsSection_integrations") != nullptr; }, Timeout));
+  QMetaObject::invokeMethod(show.item("settingsSection_integrations"), "clicked");
+  waitFor([] { return false; }, 400);
+  show.screenshot(QStringLiteral("settings-1600-discord"));
+
+  REQUIRE(show.navigator->navigate(QStringLiteral("discordPrivacy")));
+  REQUIRE(waitFor([&] { return show.item("discordLibrary_movies_switch") != nullptr; }, Timeout));
+  CHECK(show.item("discordKind_discordMusic_switch")->property("checked").toBool());
+  CHECK(show.item("discordLibrary_movies_switch")->property("checked").toBool());
+  show.screenshot(QStringLiteral("discord-privacy-1600"));
+
+  // Switching a library off stores its id; switching a kind off stores false.
+  QMetaObject::invokeMethod(show.item("discordLibrary_movies_switch"), "toggle");
+  QMetaObject::invokeMethod(show.item("discordLibrary_movies_switch"), "toggled");
+  CHECK(waitFor([&] {
+    return show.settings().value(integrations::keys::DiscordHiddenLibraries).toString() == QStringLiteral("movies");
+  }, Timeout));
+  CHECK_FALSE(show.item("discordLibrary_movies_switch")->property("checked").toBool());
+  QMetaObject::invokeMethod(show.item("discordKind_discordMusic_switch"), "toggle");
+  QMetaObject::invokeMethod(show.item("discordKind_discordMusic_switch"), "toggled");
+  CHECK(waitFor([&] { return show.settings().value(integrations::keys::DiscordMusic) == QVariant(false); }, Timeout));
+  show.screenshot(QStringLiteral("discord-privacy-1600-off"));
 }

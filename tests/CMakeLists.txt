@@ -494,7 +494,7 @@ if(JFD_BUILD_APP)
     target_link_libraries(jfd_ui_showcase_tests PRIVATE
       jfd_ui_theme jfd_ui_themeplugin jfd_ui_controls jfd_ui_controlsplugin
       jfd_ui_shell jfd_ui_shellplugin jfd_ui_library jfd_ui_libraryplugin
-      jfd_ui_settings jfd_ui_settingsplugin jfd::settings
+      jfd_ui_settings jfd_ui_settingsplugin jfd::settings jfd::integrations
       Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
     target_compile_options(jfd_ui_showcase_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_showcase_tests COMMAND jfd_ui_showcase_tests)

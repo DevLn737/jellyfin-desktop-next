@@ -126,6 +126,45 @@
     </message>
 </context>
 <context>
+    <name>DiscordPrivacyPage</name>
+    <message>
+        <source>What to show in Discord</source>
+        <translation>Что показывать в Discord</translation>
+    </message>
+    <message>
+        <source>What is switched off is never shown on your Discord status.</source>
+        <translation>То, что выключено, никогда не появится в вашем статусе Discord.</translation>
+    </message>
+    <message>
+        <source>Movies</source>
+        <translation>Фильмы</translation>
+    </message>
+    <message>
+        <source>Series</source>
+        <translation>Сериалы</translation>
+    </message>
+    <message>
+        <source>Music</source>
+        <translation>Музыка</translation>
+    </message>
+    <message>
+        <source>TV channels</source>
+        <translation>Телеканалы</translation>
+    </message>
+    <message>
+        <source>Libraries</source>
+        <translation>Библиотеки</translation>
+    </message>
+    <message>
+        <source>The libraries appear here once you are signed in.</source>
+        <translation>Библиотеки появятся здесь после входа.</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>Готово</translation>
+    </message>
+</context>
+<context>
     <name>DownloadActions</name>
     <message>
         <source>Download</source>

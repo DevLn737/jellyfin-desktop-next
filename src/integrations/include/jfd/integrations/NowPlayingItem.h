@@ -13,4 +13,8 @@ namespace jfd::integrations {
   // episode the poster is its series'. The queue flags are left false.
   NowPlayingDetails nowPlayingDetails(const api::Item& item, const api::JellyfinClient& client);
 
+  // The item whose poster stands for this one: an episode's series, a
+  // track's album, else the item itself.
+  QString posterItemId(const api::Item& item);
+
 } // namespace jfd::integrations

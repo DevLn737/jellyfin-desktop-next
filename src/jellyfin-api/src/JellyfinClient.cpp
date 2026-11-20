@@ -541,6 +541,32 @@ namespace jfd::api {
              parsed<Item>(std::move(done), json::item));
   }
 
+  void JellyfinClient::ancestors(const QString& itemId, QObject* context, Callback<ItemPage> done) {
+    send(Method::Get, QStringLiteral("Items/%1/Ancestors").arg(itemId), userQuery(), std::nullopt, context,
+         [done = std::move(done)](Result<RawResponse> result) {
+           if (!result) {
+             done(result.error());
+             return;
+           }
+           const auto document = QJsonDocument::fromJson(result->body);
+           if (!document.isArray()) {
+             done(invalidResponse(QStringLiteral("Items/Ancestors is not a JSON array")));
+             return;
+           }
+           done(json::itemArray(document.array()));
+         });
+  }
+
+  void JellyfinClient::remoteImage(const QString& itemId, const QString& type, QObject* context,
+                                   Callback<QUrl> done) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("type"), type);
+    query.addQueryItem(QStringLiteral("limit"), QStringLiteral("1"));
+    query.addQueryItem(QStringLiteral("includeAllLanguages"), QStringLiteral("false"));
+    sendJson(Method::Get, QStringLiteral("Items/%1/RemoteImages").arg(itemId), query, std::nullopt, context,
+             parsed<QUrl>(std::move(done), json::firstRemoteImage));
+  }
+
   void JellyfinClient::seasons(const QString& seriesId, QObject* context, Callback<ItemPage> done) {
     QUrlQuery query = userQuery();
     query.addQueryItem(QStringLiteral("fields"), ItemFields);

@@ -8,6 +8,10 @@
         <translation>Сериал</translation>
     </message>
     <message>
+        <source>TV</source>
+        <translation>ТВ</translation>
+    </message>
+    <message>
         <source>Movie</source>
         <translation>Фильм</translation>
     </message>
@@ -32,6 +36,10 @@
         <translation>Пауза</translation>
     </message>
     <message>
+        <source>Live</source>
+        <translation>Прямой эфир</translation>
+    </message>
+    <message>
         <source>Watching together (%1)</source>
         <translation>Смотрим вместе (%1)</translation>
     </message>
@@ -51,12 +59,60 @@
         <translation>Показывать постер в Discord</translation>
     </message>
     <message>
-        <source>Discord loads the poster from your server, so people who see your status can see the server&apos;s address. Only for servers with a public https address.</source>
-        <translation>Discord загружает постер с вашего сервера, поэтому те, кто видит ваш статус, увидят и адрес сервера. Только для серверов с публичным адресом https.</translation>
-    </message>
-    <message>
         <source>The Discord app on this computer shows the title, and &quot;Watching together&quot; in a group.</source>
         <translation>Приложение Discord на этом компьютере покажет название, а в группе — «Смотрим вместе».</translation>
+    </message>
+    <message>
+        <source>Hide from Discord for now</source>
+        <translation>Пока не показывать в Discord</translation>
+    </message>
+    <message>
+        <source>Nothing is shown until you turn this off. The player&apos;s settings menu has the same switch.</source>
+        <translation>Ничего не показывается, пока вы это не выключите. Такой же переключатель есть в меню настроек плеера.</translation>
+    </message>
+    <message>
+        <source>What Discord shows</source>
+        <translation>Что показывать в Discord</translation>
+    </message>
+    <message>
+        <source>Title, episode and time</source>
+        <translation>Название, серию и время</translation>
+    </message>
+    <message>
+        <source>Only &quot;Watching a movie&quot;, no title</source>
+        <translation>Только «Смотрит фильм», без названия</translation>
+    </message>
+    <message>
+        <source>Show movies in Discord</source>
+        <translation>Показывать фильмы в Discord</translation>
+    </message>
+    <message>
+        <source>Show series in Discord</source>
+        <translation>Показывать сериалы в Discord</translation>
+    </message>
+    <message>
+        <source>Show music in Discord</source>
+        <translation>Показывать музыку в Discord</translation>
+    </message>
+    <message>
+        <source>Show TV channels in Discord</source>
+        <translation>Показывать телеканалы в Discord</translation>
+    </message>
+    <message>
+        <source>Libraries hidden from Discord</source>
+        <translation>Библиотеки, скрытые из Discord</translation>
+    </message>
+    <message>
+        <source>Choose what to show in Discord</source>
+        <translation>Выбрать, что показывать в Discord</translation>
+    </message>
+    <message>
+        <source>Movies, series, music and TV, and libraries that are never shown.</source>
+        <translation>Фильмы, сериалы, музыка и ТВ, а также библиотеки, которые никогда не показываются.</translation>
+    </message>
+    <message>
+        <source>The poster comes from the open databases your server uses (TMDB, MusicBrainz). When they have none, Discord loads it from your server, and people who see your status can see the server&apos;s address; that works only for servers with a public https address.</source>
+        <translation>Постер берётся из открытых баз, которыми пользуется ваш сервер (TMDB, MusicBrainz). Если там его нет, Discord загружает постер с вашего сервера, и те, кто видит ваш статус, увидят адрес сервера; это работает только для серверов с публичным адресом https.</translation>
     </message>
     <message>
         <source>Check for updates at startup</source>

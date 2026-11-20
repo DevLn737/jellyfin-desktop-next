@@ -147,6 +147,66 @@ namespace jfd::desktop {
       startUpdates(services, window, *integrations.appImage);
 #endif
     }
+    integrations::PresencePrivacy presencePrivacy(const settings::Settings& settings) {
+      using namespace integrations;
+      PresencePrivacy privacy;
+      privacy.hidden = settings.value(keys::DiscordHidden).toBool();
+      privacy.showTitle = settings.value(keys::DiscordDetail).toString() != QLatin1String("kind");
+      privacy.movies = settings.value(keys::DiscordMovies).toBool();
+      privacy.series = settings.value(keys::DiscordSeries).toBool();
+      privacy.music = settings.value(keys::DiscordMusic).toBool();
+      privacy.liveTv = settings.value(keys::DiscordLiveTv).toBool();
+      for (const QString& id :
+           settings.value(keys::DiscordHiddenLibraries).toString().split(QLatin1Char(','), Qt::SkipEmptyParts))
+        privacy.hiddenLibraries.insert(id.trimmed());
+      return privacy;
+    }
+
+    // Changes the details of the item that plays, if it still plays, and
+    // publishes them.
+    void amendDetails(IntegrationServices& integrations, const QString& item,
+                      const std::function<void(integrations::NowPlayingDetails&)>& change) {
+      if (!integrations.details || integrations.detailsItem != item) return;
+      change(*integrations.details);
+      integrations.bridge->setDetails(*integrations.details);
+    }
+
+    // What Discord needs beyond the item: its library (to hide it), its
+    // series' links, and a poster on a public host. Asked only while the
+    // card is on.
+    void fetchPresenceDetails(IntegrationServices& integrations, const settings::Settings& settings,
+                              api::JellyfinClient& client, const api::Item& item) {
+      if (!settings.value(integrations::keys::Discord).toBool()) return;
+      QObject* context = integrations.bridge.get();
+      const QString id = item.id;
+      client.ancestors(id, context, [&integrations, id](api::Result<api::ItemPage> result) {
+        if (!result) {
+          qCInfo(lcIntegrations) << "No library for the item that plays:" << result.error().message;
+          return;
+        }
+        QStringList ids;
+        for (const api::Item& folder : result->items) ids.append(folder.id);
+        amendDetails(integrations, id, [&ids](integrations::NowPlayingDetails& details) {
+          details.libraryIds = ids;
+          details.librariesKnown = true;
+        });
+      });
+      if (item.type == QLatin1String("Episode") && !item.seriesId.isEmpty())
+        client.item(item.seriesId, context, [&integrations, id](api::Result<api::Item> series) {
+          if (!series) return;
+          const auto links = integrations::presenceLinks(integrations::PresenceInfo::Kind::Episode, series->providerIds);
+          amendDetails(integrations, id, [&links](integrations::NowPlayingDetails& details) { details.links = links; });
+        });
+      if (item.type != QLatin1String("TvChannel") && settings.value(integrations::keys::DiscordPoster).toBool())
+        client.remoteImage(integrations::posterItemId(item), QStringLiteral("Primary"), context,
+                           [&integrations, id](api::Result<QUrl> poster) {
+                             if (!poster || poster->isEmpty()) return;
+                             const QUrl url = *poster;
+                             amendDetails(integrations, id, [&url](integrations::NowPlayingDetails& details) {
+                               details.externalPoster = url;
+                             });
+                           });
+    }
   } // namespace
 
   void installIntegrations(AppServices& services, QQmlEngine&) {
@@ -166,12 +226,15 @@ namespace jfd::desktop {
 
     settings::Settings& settings = *services.settings;
     integrations.presence.setShowPoster(settings.value(integrations::keys::DiscordPoster).toBool());
+    integrations.presence.setPrivacy(presencePrivacy(settings));
     integrations.presence.configure(settings.value(integrations::keys::Discord).toBool());
     QObject::connect(&settings, &settings::Settings::valueChanged, &integrations.presence,
-                     [&integrations](const QString& key, const QVariant& value) {
+                     [&integrations, &settings](const QString& key, const QVariant& value) {
                        if (key == integrations::keys::Discord) integrations.presence.configure(value.toBool());
                        if (key == integrations::keys::DiscordPoster)
                          integrations.presence.setShowPoster(value.toBool());
+                       if (key.startsWith(QLatin1String("integrations/discord")))
+                         integrations.presence.setPrivacy(presencePrivacy(settings));
                      });
   }
 
@@ -186,7 +249,8 @@ namespace jfd::desktop {
                            integrations::MediaSessionBridge::Post post, api::JellyfinClient& client) {
     IntegrationServices& integrations = *services.integrations;
     integrations.post = std::move(post);
-    integrations.subscription = hub.subscribe([&integrations, &client](const core::SessionSnapshot& snapshot) {
+    const settings::Settings& settings = *services.settings;
+    integrations.subscription = hub.subscribe([&integrations, &client, &settings](const core::SessionSnapshot& snapshot) {
       const bool busy = snapshot.group.has_value() ||
                         (snapshot.phase != core::PlaybackPhase::Idle && snapshot.phase != core::PlaybackPhase::Ended &&
                          snapshot.phase != core::PlaybackPhase::Failed);
@@ -196,7 +260,7 @@ namespace jfd::desktop {
       const QString item = QString::fromStdString(snapshot.item.value());
       if (!item.isEmpty() && item != integrations.detailsItem) {
         integrations.detailsItem = item;
-        client.item(item, integrations.bridge.get(), [&integrations, &client](api::Result<api::Item> result) {
+        client.item(item, integrations.bridge.get(), [&integrations, &client, &settings](api::Result<api::Item> result) {
           if (!result) {
             qCInfo(lcIntegrations) << "No details for the item that plays:" << result.error().message;
             return;
@@ -205,6 +269,7 @@ namespace jfd::desktop {
           if (integrations.completeDetails) integrations.completeDetails(details);
           integrations.details = details;
           integrations.bridge->setDetails(std::move(details));
+          fetchPresenceDetails(integrations, settings, client, *result);
         });
       }
       integrations.bridge->update(snapshot);

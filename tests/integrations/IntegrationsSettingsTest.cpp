@@ -98,3 +98,53 @@ TEST_CASE("A track shows its artists and album, with the album's cover") {
   CHECK(details.artUrl.path() == QStringLiteral("/jellyfin/Items/album1/Images/Primary"));
   CHECK(QUrlQuery(details.artUrl).queryItemValue(QStringLiteral("tag")) == QStringLiteral("covertag"));
 }
+
+TEST_CASE("Discord shows everything until the user hides something") {
+  jfd::settings::SettingsRegistry registry;
+  REQUIRE(registerIntegrationsSettings(registry));
+  QTemporaryDir dir;
+  jfd::settings::Settings settings(registry, dir.filePath(QStringLiteral("settings.ini")));
+  CHECK(settings.value(keys::DiscordHidden) == QVariant(false));
+  CHECK(settings.value(keys::DiscordDetail) == QVariant(QStringLiteral("full")));
+  for (const QLatin1String kind : {keys::DiscordMovies, keys::DiscordSeries, keys::DiscordMusic, keys::DiscordLiveTv})
+    CHECK(settings.value(kind) == QVariant(true));
+  CHECK(settings.value(keys::DiscordHiddenLibraries).toString().isEmpty());
+  CHECK(settings.setValue(keys::DiscordDetail, QStringLiteral("kind")));
+  CHECK(settings.setValue(keys::DiscordHiddenLibraries, QStringLiteral("a,b")));
+}
+
+TEST_CASE("A movie's links come from its ids; a channel shows what is on") {
+  jfd::api::JellyfinClient client(jfd::api::ClientIdentity{});
+  client.setServerUrl(QUrl(QStringLiteral("https://media.example.org")));
+
+  jfd::api::Item movie;
+  movie.id = QStringLiteral("movie1");
+  movie.type = QStringLiteral("Movie");
+  movie.genres = {QStringLiteral("Drama")};
+  movie.communityRating = 8.1;
+  movie.providerIds = {{QStringLiteral("Imdb"), QStringLiteral("tt0111161")}};
+  auto details = nowPlayingDetails(movie, client);
+  REQUIRE(details.links.size() == 1);
+  CHECK(details.links[0].label == QStringLiteral("IMDb"));
+  CHECK(details.genres == QStringList{QStringLiteral("Drama")});
+  CHECK(details.rating == 8.1);
+  CHECK(posterItemId(movie) == QStringLiteral("movie1"));
+
+  jfd::api::Item episode;
+  episode.id = QStringLiteral("episode1");
+  episode.type = QStringLiteral("Episode");
+  episode.seriesId = QStringLiteral("series1");
+  episode.providerIds = movie.providerIds;
+  // An episode's links are its series', filled in later.
+  CHECK(nowPlayingDetails(episode, client).links.isEmpty());
+  CHECK(posterItemId(episode) == QStringLiteral("series1"));
+
+  jfd::api::Item channel;
+  channel.id = QStringLiteral("channel1");
+  channel.type = QStringLiteral("TvChannel");
+  channel.name = QStringLiteral("Channel One");
+  channel.currentProgramName = QStringLiteral("News");
+  details = nowPlayingDetails(channel, client);
+  CHECK(details.kind == PresenceInfo::Kind::LiveTv);
+  CHECK(details.program == QStringLiteral("News"));
+}
