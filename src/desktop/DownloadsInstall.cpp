@@ -129,6 +129,8 @@ namespace jfd::desktop {
                                                            downloads.store, downloads.catalog);
     const qsizetype count = downloads.catalog.load();
     qCInfo(lcDownloads) << count << "downloaded items in the catalog";
+    if (const qsizetype moved = downloads.catalog.migrateLegacy(); moved > 0)
+      qCInfo(lcDownloads) << moved << "downloads moved to the library layout";
     applyLimits(downloads, settings);
     downloads.local.setPreferLocal(settings.value(offline::keys::PreferLocal).toBool());
     downloads.local.setOnline(online(services));

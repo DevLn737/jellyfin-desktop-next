@@ -199,6 +199,8 @@ namespace jfd::offline {
       return problemText(status != nullptr ? status->problem : QueueProblem::Network);
     if (status != nullptr && status->activity == Activity::RetryWait)
       return tr("Connection lost, trying again");
+    if (status != nullptr && status->activity == Activity::Transferring && status->audioTrack > 0)
+      return tr("Audio track %1 of %2").arg(status->audioTrack).arg(status->audioTracks);
     if (status != nullptr && status->activity == Activity::Transferring) {
       if (status->total > 0)
         return tr("%1 of %2").arg(formatBytesText(status->bytesOnDisk), formatBytesText(status->total));

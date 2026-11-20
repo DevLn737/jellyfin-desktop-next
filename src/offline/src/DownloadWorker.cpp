@@ -3,6 +3,7 @@
 #include "DownloadTransfer.h"
 
 #include <jfd/api/Downloads.h>
+#include <jfd/offline/MatroskaAudio.h>
 
 #include <QDir>
 #include <QFileInfo>
@@ -275,7 +276,20 @@ namespace jfd::offline {
       return;
     }
     if (QFileInfo::exists(t.job.finalPath)) QFile::remove(t.job.finalPath);
-    if (!QFile::rename(t.job.partPath, t.job.finalPath)) {
+    QDir().mkpath(QFileInfo(t.job.finalPath).path());
+    if (t.job.audioOnly) {
+      QString why;
+      if (!extractMatroskaAudio(t.job.partPath, t.job.finalPath, t.job.audioLanguage, &why)) {
+        // Still playable with its tiny picture; better than nothing.
+        qCWarning(lcDownload) << "keeping the audio track with its picture:" << why;
+        if (!QFile::rename(t.job.partPath, t.job.finalPath)) {
+          finish(key, TransferOutcome::DiskError);
+          return;
+        }
+      } else {
+        QFile::remove(t.job.partPath);
+      }
+    } else if (!QFile::rename(t.job.partPath, t.job.finalPath)) {
       finish(key, TransferOutcome::DiskError);
       return;
     }

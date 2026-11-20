@@ -161,6 +161,25 @@ namespace jfd::api {
                                      .arg(itemId, mediaSourceId, QString::number(streamIndex), format));
   }
 
+  QUrl externalAudioDownloadUrl(const QUrl& serverUrl, const QString& itemId,
+                                const QString& mediaSourceId, int streamIndex,
+                                const QString& playSessionId) {
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("static"), QStringLiteral("false"));
+    query.addQueryItem(QStringLiteral("mediaSourceId"), mediaSourceId);
+    query.addQueryItem(QStringLiteral("audioStreamIndex"), QString::number(streamIndex));
+    query.addQueryItem(QStringLiteral("audioCodec"), QStringLiteral("copy"));
+    query.addQueryItem(QStringLiteral("videoCodec"), QStringLiteral("h264"));
+    query.addQueryItem(QStringLiteral("allowVideoStreamCopy"), QStringLiteral("false"));
+    query.addQueryItem(QStringLiteral("maxWidth"), QStringLiteral("32"));
+    query.addQueryItem(QStringLiteral("maxHeight"), QStringLiteral("32"));
+    query.addQueryItem(QStringLiteral("maxFramerate"), QStringLiteral("1"));
+    query.addQueryItem(QStringLiteral("videoBitRate"), QStringLiteral("10000"));
+    query.addQueryItem(QStringLiteral("subtitleMethod"), QStringLiteral("Drop"));
+    query.addQueryItem(QStringLiteral("playSessionId"), playSessionId);
+    return serverPath(serverUrl, QStringLiteral("Videos/%1/stream.mkv").arg(itemId), query);
+  }
+
   QString textSubtitleFormat(const QString& codec) {
     const QString c = codec.toLower();
     if (c == QLatin1String("subrip") || c == QLatin1String("srt")) return QStringLiteral("srt");

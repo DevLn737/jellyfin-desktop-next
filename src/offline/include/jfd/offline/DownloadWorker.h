@@ -78,6 +78,12 @@ namespace jfd::offline {
     // If-Range for the bytes already in partPath; empty: start over.
     QString resumeValidator;
 
+    // An external audio track (api::externalAudioDownloadUrl): the
+    // downloaded Matroska is turned into audio only (extractMatroskaAudio)
+    // instead of being renamed; `audioLanguage` goes on its track.
+    bool audioOnly = false;
+    QString audioLanguage;
+
     // Set for a compressed copy.
     struct Transcode {
       // POST Items/{id}/PlaybackInfo?userId=.. and its body
