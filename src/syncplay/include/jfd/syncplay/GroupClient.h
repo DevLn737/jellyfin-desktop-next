@@ -8,6 +8,7 @@
 #include <jfd/syncplay/TimeSync.h>
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -82,6 +83,7 @@ namespace jfd::syncplay {
     void rejoin(int attempt);
     void later(WallTicks delay, std::function<void()> task);
     void sendReport(const SyncPlayMessage& message, bool retried);
+    void sendNextRequest();
 
     Transport& m_transport;
     Clock& m_clock;
@@ -94,6 +96,10 @@ namespace jfd::syncplay {
     std::uint64_t m_rejoinSerial = 0;
     // Advances with every Ready or Buffering sent: only the newest is retried.
     std::uint64_t m_reportSerial = 0;
+    // The member's requests (play, pause, seek, rate...), one at a time: sent
+    // together, the server may take them in either order.
+    std::deque<SyncPlayMessage> m_requests;
+    bool m_requestInFlight = false;
     bool m_connectionLost = false;
     TimeSync m_timeSync;
     ClockOffset m_offset;

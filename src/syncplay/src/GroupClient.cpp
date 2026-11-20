@@ -225,13 +225,34 @@ namespace jfd::syncplay {
       sendReport(message, false);
       return;
     }
-    const bool rateRequest = std::holds_alternative<outgoing::RequestPlaybackRate>(message);
-    m_transport.request(requestFor(message), [this, epoch, rateRequest,
-                                              alive = std::weak_ptr<int>(m_alive)](int status,
-                                                                                   std::string body) {
-      if (alive.expired() || !rateRequest || succeeded(status)) return;
-      m_sink(group::RateChangeRejected{epoch, status, parseUnsupportedParticipants(body)});
-    });
+    // A seek still waiting its turn is replaced by a newer one: only where
+    // the member stopped pressing matters.
+    if (std::holds_alternative<outgoing::RequestSeek>(message) && !m_requests.empty() &&
+        std::holds_alternative<outgoing::RequestSeek>(m_requests.back()))
+      m_requests.back() = message;
+    else
+      m_requests.push_back(message);
+    sendNextRequest();
+  }
+
+  void GroupClient::sendNextRequest() {
+    while (!m_requestInFlight && !m_requests.empty()) {
+      const SyncPlayMessage message = m_requests.front();
+      m_requests.pop_front();
+      const GroupEpoch epoch = std::visit([](const auto& m) { return m.epoch; }, message);
+      if (!m_inGroup || epoch != m_epoch) continue;
+      const bool rateRequest = std::holds_alternative<outgoing::RequestPlaybackRate>(message);
+      m_requestInFlight = true;
+      m_transport.request(requestFor(message), [this, epoch, rateRequest,
+                                                alive = std::weak_ptr<int>(m_alive)](int status,
+                                                                                     std::string body) {
+        if (alive.expired()) return;
+        m_requestInFlight = false;
+        if (rateRequest && !succeeded(status))
+          m_sink(group::RateChangeRejected{epoch, status, parseUnsupportedParticipants(body)});
+        sendNextRequest();
+      });
+    }
   }
 
   // The group waits for our Ready: a lost one is sent again once (its When

@@ -790,6 +790,8 @@ TEST_CASE("In a room, a second step of the seek counts from the first before the
   // The room's seek lands there.
   REQUIRE(waitFor([&] { return !p.model->loading() && std::abs(p.model->position() - (start + 10)) < 0.5; }, 20000));
   QTest::qWait(1000);
+  if (std::abs(p.model->position() - (start + 10)) >= 0.5)
+    for (const auto& line : p.runtime->journal().lines()) MESSAGE(line);
   CHECK(std::abs(p.model->position() - (start + 10)) < 0.5);
 }
 
