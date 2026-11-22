@@ -37,7 +37,9 @@ T.ComboBox {
             openedByEnter = false
     }
 
-    implicitWidth: 220
+    // Wide enough for the chosen entry's text (within reason), so the box
+    // does not cut it.
+    implicitWidth: Math.max(220, Math.min(360, labelMetrics.advanceWidth(control.displayText) + leftPadding + rightPadding + 2))
     implicitHeight: Theme.controlHeight
     leftPadding: Theme.spacing
     rightPadding: Theme.spacing + Theme.iconSize
@@ -46,23 +48,63 @@ T.ComboBox {
     valueRole: "value"
     font.pixelSize: Theme.fontSizeBody
 
+    // The widest label, so the open list shows every one in full.
+    FontMetrics { id: labelMetrics; font: control.font }
+    readonly property real widestLabel: {
+        let widest = 0
+        const items = control.model
+        const count = items ? (items.length !== undefined ? items.length : 0) : 0
+        for (let i = 0; i < count; ++i) {
+            const label = items[i] && items[i].label !== undefined ? items[i].label : items[i]
+            widest = Math.max(widest, labelMetrics.advanceWidth(String(label)))
+        }
+        return Math.ceil(widest)
+    }
+
     delegate: T.ItemDelegate {
         id: option
+        objectName: "choiceOption"
         required property var modelData
         required property int index
         width: ListView.view ? ListView.view.width : implicitWidth
-        implicitHeight: Theme.controlHeight
+        implicitHeight: Math.max(Theme.controlHeight, optionText.implicitHeight + 2 * Theme.spacingSmall)
         leftPadding: Theme.spacing
+        rightPadding: Theme.spacing
         highlighted: control.highlightedIndex === index
+        hoverEnabled: true
         contentItem: Text {
+            id: optionText
             text: option.modelData.label
             color: colors.text
             font: control.font
             verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+            // Wider than the window allows: on more lines, never cut.
+            wrapMode: Text.Wrap
         }
-        background: Rectangle {
-            color: option.highlighted ? colors.surfaceHover : "transparent"
+        background: Item {
+            Rectangle {
+                visible: option.index > 0
+                x: Theme.spacingSmall
+                width: parent.width - 2 * Theme.spacingSmall
+                height: 1
+                color: Qt.alpha(colors.text, 0.14)
+            }
+            Rectangle {
+                objectName: "choiceHighlight"
+                anchors.fill: parent
+                radius: Theme.radius
+                color: option.highlighted ? Qt.alpha(colors.accent, 0.28) : "transparent"
+                border.width: option.highlighted ? 1 : 0
+                border.color: Qt.alpha(colors.accent, 0.7)
+                Rectangle {
+                    visible: option.highlighted
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 3
+                    height: parent.height - 2 * Theme.spacingSmall
+                    radius: 1.5
+                    color: colors.accent
+                }
+            }
         }
     }
 
@@ -90,21 +132,40 @@ T.ComboBox {
     }
 
     popup: T.Popup {
+        objectName: "choicePopup"
         y: control.height + Theme.spacingTiny
-        width: control.width
-        implicitHeight: Math.min(contentItem.implicitHeight, 320)
+        // Wider than the box: right edges lined up (the boxes sit at the
+        // right of their rows).
+        x: width > control.width ? control.width - width : 0
+        // As wide as the longest entry (at least the box), inside the window;
+        // `margins` keeps it there, sliding it left if need be.
+        width: {
+            const window = control.Window.window
+            const room = window ? window.width - 2 * Theme.spacingSmall : 100000
+            const wanted = control.widestLabel + 2 * Theme.spacing + 2 * padding + 2
+            return Math.min(room, Math.max(control.width, wanted))
+        }
+        // A templated Popup has no height of its own: the list's plus the
+        // padding (without it the list is a few pixels short and scrolls,
+        // and moving the pointer over the entries jerks it up and down).
+        implicitHeight: Math.min(contentItem.implicitHeight + topPadding + bottomPadding, 360)
         padding: Theme.spacingTiny
+        margins: Theme.spacingSmall
 
         contentItem: ListView {
             clip: true
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
+            // Only a list longer than the popup scrolls to the entry.
+            highlightFollowsCurrentItem: false
+            highlightRangeMode: ListView.NoHighlightRange
             boundsBehavior: Flickable.StopAtBounds
+            onCurrentIndexChanged: if (contentHeight > height && currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
         }
 
         background: Rectangle {
-            radius: Theme.radius
+            radius: Theme.radiusLarge
             color: colors.surfaceRaised
             border.color: colors.border
         }

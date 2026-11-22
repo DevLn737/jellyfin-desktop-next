@@ -239,6 +239,15 @@ namespace jfd::ui {
       item->setProperty("focusReason", int(Qt::TabFocusReason));
     }
 
+    // The popup (its item in the window's overlay) around `item`, or nullptr.
+    QQuickItem* popupAround(QQuickItem* item) {
+      for (QQuickItem* node = item; node; node = node->parentItem()) {
+        QQuickItem* parent = node->parentItem();
+        if (parent && parent->inherits("QQuickOverlay")) return node;
+      }
+      return nullptr;
+    }
+
     QPointF centreIn(QQuickItem* item, QQuickItem* reference) {
       return item->mapToItem(reference, QPointF(item->width() / 2, item->height() / 2));
     }
@@ -257,6 +266,27 @@ namespace jfd::ui {
   }
 
   QQuickItem* SpatialNavigation::item() const { return qobject_cast<QQuickItem*>(parent()); }
+
+  QQuickItem* SpatialNavigation::scopeFor(QQuickItem* focused) const {
+    QQuickItem* attachee = item();
+    if (!attachee) return nullptr;
+    if (!focused || focused == attachee || attachee->isAncestorOf(focused)) return attachee;
+    // An open popup of this window (a menu, the filters, a dialog) is a
+    // scope of its own: arrows move among its controls.
+    if (focused->window() == attachee->window()) return popupAround(focused);
+    return nullptr;
+  }
+
+  void SpatialNavigation::watchPopup(QQuickItem* popup) {
+    if (!popup || m_popups.contains(popup)) return;
+    m_popups.append(popup);
+    // Keys nobody in the popup took reach its item (the overlay's child),
+    // not the attached one.
+    popup->installEventFilter(this);
+    connect(popup, &QObject::destroyed, this, [this, popup] {
+      m_popups.removeIf([popup](const QPointer<QQuickItem>& p) { return p.isNull() || p.data() == popup; });
+    });
+  }
 
   void SpatialNavigation::setEnabled(bool enabled) {
     if (m_enabled == enabled) return;
@@ -357,9 +387,11 @@ namespace jfd::ui {
   }
 
   bool SpatialNavigation::move(Direction direction) {
-    QQuickItem* scope = item();
-    QQuickWindow* window = scope ? scope->window() : nullptr;
+    QQuickItem* attachee = item();
+    QQuickWindow* window = attachee ? attachee->window() : nullptr;
     if (!window) return false;
+    QQuickItem* scope = scopeFor(window->activeFocusItem());
+    if (!scope) return false;
     QQuickItem* next = findNext(scope, window->activeFocusItem(), direction);
     if (!next) return false;
     focusItem(next);
@@ -367,18 +399,20 @@ namespace jfd::ui {
   }
 
   bool SpatialNavigation::step(Direction direction) {
-    QQuickItem* scope = item();
-    QQuickWindow* window = scope ? scope->window() : nullptr;
+    QQuickItem* attachee = item();
+    QQuickWindow* window = attachee ? attachee->window() : nullptr;
     QQuickItem* focused = window ? window->activeFocusItem() : nullptr;
-    if (focused && scope->isAncestorOf(focused) && stepInView(focused, direction)) return true;
+    QQuickItem* scope = scopeFor(focused);
+    if (focused && scope && scope->isAncestorOf(focused) && stepInView(focused, direction)) return true;
     return move(direction);
   }
 
   bool SpatialNavigation::movePage(Direction direction) {
-    QQuickItem* scope = item();
-    QQuickWindow* window = scope ? scope->window() : nullptr;
+    QQuickItem* attachee = item();
+    QQuickWindow* window = attachee ? attachee->window() : nullptr;
     QQuickItem* start = window ? window->activeFocusItem() : nullptr;
-    if (!start || !scope->isAncestorOf(start)) return false;
+    QQuickItem* scope = scopeFor(start);
+    if (!start || !scope || !scope->isAncestorOf(start)) return false;
     const bool vertical = direction == Up || direction == Down;
     // Only where something scrolls: elsewhere the arrows may mean other
     // things (the player's Up and Down are the volume).
@@ -412,10 +446,12 @@ namespace jfd::ui {
   }
 
   void SpatialNavigation::onFocusChanged() {
-    // Only for keys: a click focuses what is already in view.
-    if (!m_enabled || !m_fromKeys || !m_window || m_aligning) return;
+    if (!m_enabled || !m_window) return;
     QQuickItem* focused = m_window->activeFocusItem();
-    QQuickItem* scope = item();
+    QQuickItem* scope = scopeFor(focused);
+    if (focused && scope && scope != item()) watchPopup(scope);
+    // Only for keys: a click focuses what is already in view.
+    if (!m_fromKeys || m_aligning) return;
     if (!focused || !scope || !scope->isAncestorOf(focused)) return;
     if (alignInRow(focused)) return;
     showAsKeyFocus(focused);
@@ -479,8 +515,8 @@ namespace jfd::ui {
   bool SpatialNavigation::handleKey(QKeyEvent* event, bool fromWindow) {
     const Qt::KeyboardModifiers modifiers = event->modifiers() & ~Qt::KeypadModifier;
     if (modifiers != Qt::NoModifier) return false;
-    QQuickItem* scope = item();
-    QQuickWindow* window = scope ? scope->window() : nullptr;
+    QQuickItem* attachee = item();
+    QQuickWindow* window = attachee ? attachee->window() : nullptr;
     if (!window) return false;
     const int key = event->key();
     Direction direction = Left;
@@ -488,7 +524,8 @@ namespace jfd::ui {
       // Keys a control gives up (navigationKeys) move the focus before the
       // control sees them, even when there is nowhere to go.
       QQuickItem* focused = window->activeFocusItem();
-      if (!focused || !scope->isAncestorOf(focused) || !directionOfKey(key, &direction)) return false;
+      QQuickItem* scope = scopeFor(focused);
+      if (!focused || !scope || !scope->isAncestorOf(focused) || !directionOfKey(key, &direction)) return false;
       QVariant keys = focused->property("navigationKeys");
       if (!keys.isValid()) return false;
       // A QML `var` property holds a JavaScript array.
