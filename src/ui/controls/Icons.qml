@@ -8,6 +8,8 @@ QtObject {
     readonly property url search: Qt.resolvedUrl("icons/search.svg")
     readonly property url group: Qt.resolvedUrl("icons/group.svg")
     readonly property url settings: Qt.resolvedUrl("icons/settings.svg")
+    readonly property url tv: Qt.resolvedUrl("icons/tv.svg")
+    readonly property url logout: Qt.resolvedUrl("icons/logout.svg")
     readonly property url back: Qt.resolvedUrl("icons/back.svg")
     readonly property url close: Qt.resolvedUrl("icons/close.svg")
     readonly property url play: Qt.resolvedUrl("icons/play.svg")

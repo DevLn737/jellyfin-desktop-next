@@ -61,6 +61,8 @@ only reformatted.
 | `src/ui/controls/icons/more.svg` | Material Icons `more_horiz` | Apache-2.0 |
 | `src/ui/controls/icons/search.svg` | Material Icons `search` | Apache-2.0 |
 | `src/ui/controls/icons/settings.svg` | Material Icons `settings` | Apache-2.0 |
+| `src/ui/controls/icons/tv.svg` | Material Icons `tv` | Apache-2.0 |
+| `src/ui/controls/icons/logout.svg` | Material Icons `exit_to_app` | Apache-2.0 |
 | `src/ui/controls/icons/up.svg` | Material Icons `keyboard_arrow_up` | Apache-2.0 |
 | `src/ui/controls/icons-dark/back.svg` | Material Icons `arrow_back` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/check.svg` | Material Icons `check` (dark fill) | Apache-2.0 |
@@ -89,6 +91,8 @@ only reformatted.
 | `src/ui/controls/icons-dark/more.svg` | Material Icons `more_horiz` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/search.svg` | Material Icons `search` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/settings.svg` | Material Icons `settings` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/tv.svg` | Material Icons `tv` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/logout.svg` | Material Icons `exit_to_app` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/up.svg` | Material Icons `keyboard_arrow_up` (dark fill) | Apache-2.0 |
 | `src/ui/library/icons/livetv.svg` | Material Icons `live_tv` | Apache-2.0 |
 | `src/ui/music/icons/expand.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
