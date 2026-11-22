@@ -349,7 +349,7 @@ FocusScope {
         objectName: "accountMenu"
         anchorItem: account
         alignRight: true
-        width: 260
+        minimumWidth: 260
         readonly property int tvIndex: bar.accountEntries.length
         entries: bar.accountEntries.map((entry) => entry.text)
                  .concat([Theme.tvMode ? qsTr("Leave TV mode") : qsTr("TV mode"), qsTr("Sign out")])

@@ -21,6 +21,7 @@
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/settings/Settings.h>
+#include <jfd/ui/InputRouter.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/SettingsModel.h>
 #include <jfd/ui/ThemePalette.h>
@@ -549,6 +550,9 @@ namespace {
   class Showcase {
   public:
     Showcase() : server(handle) {
+      // As the app draws text (main.cpp); JFD_TEXT_RENDERING=qt for the old look.
+      QQuickWindow::setTextRenderType(qgetenv("JFD_TEXT_RENDERING") == "qt" ? QQuickWindow::QtTextRendering
+                                                                           : QQuickWindow::NativeTextRendering);
       ui::LibraryScreens::Config config;
       config.identity.version = QStringLiteral("0.0.1");
       config.identity.device = QStringLiteral("showcase");
@@ -830,6 +834,23 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   }, Timeout));
   CHECK(waitFor([&] { return show.find("libraryFilters")->property("visible").toBool(); }, Timeout));
   show.screenshot(QStringLiteral("library-1600-filters"));
+  {
+    // In the open filters a gamepad's d-pad goes from list to list (the
+    // popup is outside the shell, but served the same), and a list's Up
+    // and Down do not change it.
+    ui::InputRouter router;
+    router.setWindow(show.window);
+    auto* played = qobject_cast<QQuickItem*>(show.find("libraryPlayed"));
+    REQUIRE(played != nullptr);
+    played->forceActiveFocus(Qt::TabFocusReason);
+    REQUIRE(waitFor([&] { return played->hasActiveFocus(); }, Timeout));
+    const int before = played->property("currentIndex").toInt();
+    router.route(platform::InputAction::Down, false);
+    CHECK(waitFor([&] { return !played->hasActiveFocus() && show.window->activeFocusItem() != nullptr; }, Timeout));
+    CHECK(played->property("currentIndex").toInt() == before);
+    router.route(platform::InputAction::Up, false);
+    CHECK(waitFor([&] { return played->hasActiveFocus(); }, Timeout));
+  }
   REQUIRE(chip != nullptr);
   QMetaObject::invokeMethod(chip, "clicked");
   CHECK_FALSE(library->property("favoritesOnly").toBool());
@@ -894,4 +915,91 @@ TEST_CASE("Discord: what to show, by kind and by library") {
   QMetaObject::invokeMethod(show.item("discordKind_discordMusic_switch"), "toggled");
   CHECK(waitFor([&] { return show.settings().value(integrations::keys::DiscordMusic) == QVariant(false); }, Timeout));
   show.screenshot(QStringLiteral("discord-privacy-1600-off"));
+}
+
+namespace {
+  QQuickItem* findComboBox(QQuickItem* item) {
+    if (item == nullptr || !item->isVisible()) return nullptr;
+    if (item->inherits("QQuickComboBox")) return item;
+    for (QQuickItem* child : item->childItems())
+      if (QQuickItem* found = findComboBox(child)) return found;
+    return nullptr;
+  }
+} // namespace
+
+TEST_CASE("Menus by gamepad: the account menu and a drop-down list, lit entries with lines between") {
+  Showcase show;
+  show.resize(1280, 800);
+  REQUIRE(waitFor([&] { return show.screens->home().featured()->count() == 5; }, Timeout));
+  ui::InputRouter router;
+  router.setWindow(show.window);
+
+  // The account button, reached by the d-pad; A opens its menu with the
+  // first entry lit and focused.
+  auto* account = show.window->findChild<QQuickItem*>(QStringLiteral("topNavAccount"));
+  REQUIRE(account != nullptr);
+  account->forceActiveFocus(Qt::TabFocusReason);
+  auto* menu = show.window->findChild<QObject*>(QStringLiteral("accountMenu"));
+  REQUIRE(menu != nullptr);
+  router.route(platform::InputAction::Select, false);
+  REQUIRE(waitFor([&] { return menu->property("opened").toBool(); }, Timeout));
+  REQUIRE(waitFor([&] {
+    QQuickItem* focused = show.window->activeFocusItem();
+    return focused != nullptr && focused->objectName() == QStringLiteral("popupEntry");
+  }, Timeout));
+  const QStringList entries = menu->property("entries").toStringList();
+  REQUIRE(entries.size() >= 3);
+  router.route(platform::InputAction::Down, false);
+  CHECK(show.window->activeFocusItem()->property("text").toString() == entries.at(1));
+  show.screenshot(QStringLiteral("account-menu-gamepad"));
+  // Up from the first entry goes round to the last.
+  router.route(platform::InputAction::Up, false);
+  router.route(platform::InputAction::Up, false);
+  CHECK(show.window->activeFocusItem()->property("text").toString() == entries.last());
+  // B closes it; the focus is back on the account button.
+  router.route(platform::InputAction::Back, false);
+  REQUIRE(waitFor([&] { return !menu->property("visible").toBool(); }, Timeout));
+  CHECK(waitFor([&] { return show.window->activeFocusItem() == account; }, Timeout));
+  // A again and Down to the second entry, A: it goes there.
+  router.route(platform::InputAction::Select, false);
+  REQUIRE(waitFor([&] { return menu->property("opened").toBool(); }, Timeout));
+  router.route(platform::InputAction::Down, false);
+  router.route(platform::InputAction::Select, false);
+  CHECK(waitFor([&] { return !menu->property("visible").toBool(); }, Timeout));
+  CHECK(waitFor([&] { return show.navigator->currentName() != QStringLiteral("home"); }, Timeout));
+
+  // A drop-down list with a long entry: the list is as wide as its longest
+  // entry, so nothing is cut.
+  show.navigator->navigate(QStringLiteral("settings"));
+  REQUIRE(waitFor([&] { return show.item("settingsSection_integrations") != nullptr; }, Timeout));
+  QMetaObject::invokeMethod(show.item("settingsSection_integrations"), "clicked");
+  Showcase::settle(400);
+  QQuickItem* combo = findComboBox(show.page());
+  REQUIRE(combo != nullptr);
+  auto* popup = combo->property("popup").value<QObject*>();
+  REQUIRE(popup != nullptr);
+  // The settings list keeps the focus on its current row: make the row
+  // with the list current first.
+  QQuickItem* settingsList = show.item("settingsList");
+  REQUIRE(settingsList != nullptr);
+  for (QQuickItem* n = combo; n && n->parentItem(); n = n->parentItem()) {
+    if (n->parentItem()->parentItem() == settingsList) {
+      settingsList->setProperty("currentIndex", n->property("index"));
+      break;
+    }
+  }
+  settingsList->forceActiveFocus(Qt::TabFocusReason);
+  combo->forceActiveFocus(Qt::TabFocusReason);
+  REQUIRE(waitFor([&] { return combo->hasActiveFocus(); }, Timeout));
+  router.route(platform::InputAction::Select, false);
+  REQUIRE(waitFor([&] { return popup->property("opened").toBool(); }, Timeout));
+  CHECK(popup->property("width").toDouble() >= combo->width());
+  // The list is not shorter than its entries: it never scrolls under the pointer.
+  auto* list = popup->property("contentItem").value<QQuickItem*>();
+  REQUIRE(list != nullptr);
+  CHECK(list->height() + 0.5 >= list->property("contentHeight").toDouble());
+  router.route(platform::InputAction::Down, false);
+  show.screenshot(QStringLiteral("settings-choice-open"));
+  router.route(platform::InputAction::Back, false);
+  CHECK(waitFor([&] { return !popup->property("visible").toBool(); }, Timeout));
 }

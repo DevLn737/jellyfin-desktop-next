@@ -6,3 +6,9 @@
 # GObject manager for the life of the process.
 leak:libpxbackend-1.0.so
 leak:libproxy.so
+
+# Qt Quick's native text (QQuickWindow::NativeTextRendering, main.cpp): each
+# font engine it draws with keeps a glyph cache that holds a reference back
+# to the engine, so Qt never frees the engine (one per font face) or its
+# FreeType glyphs at exit. Allocated inside Qt only.
+leak:QFontconfigDatabase::fontEngine
