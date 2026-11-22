@@ -3,11 +3,13 @@ import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Group
 
-// The group pill for the player's OSD: the first viewers' initials, a dot
-// (green in sync, amber while catching up, red when the connection to the
-// group is lost), the room's name and the number of viewers. How far we are from the group and the delay to the
-// server are in the player's statistics (right-click). Hidden outside a
-// group.
+// The group pill for the player's OSD, kept small: the first three
+// viewers' initials, overlapping, with a dot on the last (green in sync,
+// amber while catching up, red when the connection to the group is lost),
+// and the number of viewers. The room's name is in the room's page and in
+// the tooltip-free accessible name. How far we are from the group and the
+// delay to the server are in the player's statistics (right-click). Hidden
+// outside a group.
 Rectangle {
     id: osd
 
@@ -36,7 +38,8 @@ Rectangle {
     border.width: 1
     border.color: Overlay.border
     Accessible.role: Accessible.StaticText
-    Accessible.name: label.text
+    Accessible.name: (osd.group.groupName.length > 0 ? qsTr("Room «%1»").arg(osd.group.groupName) : qsTr("Together"))
+                     + " · " + label.text
 
     Row {
         id: row
@@ -44,16 +47,25 @@ Rectangle {
         spacing: Theme.spacingSmall
 
         // The first three viewers' initials, overlapping.
-        Row {
+        Item {
+            id: avatars
             anchors.verticalCenter: parent.verticalCenter
-            spacing: -6
+            readonly property int size: 24
+            readonly property int step: 16
+            readonly property int shown: Math.max(1, Math.min(3, osd.viewers))
+            width: size + (shown - 1) * step
+            height: size
             Repeater {
                 model: osd.group.participants.slice(0, 3)
                 delegate: Rectangle {
                     required property string modelData
-                    width: 24
-                    height: 24
-                    radius: 12
+                    required property int index
+                    x: index * avatars.step
+                    // The first on top, the others tucked under it.
+                    z: 3 - index
+                    width: avatars.size
+                    height: avatars.size
+                    radius: avatars.size / 2
                     color: osd.avatarColor(modelData)
                     border.width: 2
                     border.color: Overlay.surface
@@ -66,24 +78,26 @@ Rectangle {
                     }
                 }
             }
-        }
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            width: 8
-            height: 8
-            radius: 4
-            color: osd.dotColor
-            Behavior on color { ColorAnimation { duration: Theme.durationNormal } }
+            // The state of the sync, on the stack's corner.
+            Rectangle {
+                objectName: "groupSyncDot"
+                z: 4
+                x: avatars.width - width + 1
+                y: avatars.height - height + 1
+                width: 10
+                height: 10
+                radius: 5
+                color: osd.dotColor
+                border.width: 2
+                border.color: Overlay.surface
+                Behavior on color { ColorAnimation { duration: Theme.durationNormal } }
+            }
         }
         Text {
             id: label
             objectName: "memberCount"
             anchors.verticalCenter: parent.verticalCenter
-            text: {
-                const name = osd.group.groupName.length > 0 ? qsTr("Room «%1»").arg(osd.group.groupName) : qsTr("Together")
-                const line = name + " · " + osd.viewers
-                return osd.group.connected ? line : line + ", " + qsTr("reconnecting")
-            }
+            text: osd.group.connected ? String(osd.viewers) : osd.viewers + " · " + qsTr("reconnecting")
             color: Overlay.text
             font.pixelSize: Theme.fontSizeSmall
             font.weight: Theme.fontWeightBold

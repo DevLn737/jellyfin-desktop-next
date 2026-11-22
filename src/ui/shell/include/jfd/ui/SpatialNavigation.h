@@ -24,6 +24,10 @@
 // beats a nearer one off to the side). A focus scope with focusable items
 // inside (a row of cards, a field) is entered, not focused as a whole.
 // PageUp and PageDown move a page's height (gamepad shoulder buttons).
+// An open popup (a menu, the library's filters, a dialog: items in the
+// window's overlay, outside the attached item) is served the same way, its
+// own controls being the candidates, so arrows and a gamepad never get
+// stuck in one.
 //
 // When the focus lands inside a ListView or GridView, the view's
 // currentIndex follows, so the view's own key handling continues from
@@ -100,6 +104,11 @@ namespace jfd::ui {
 
   private:
     QQuickItem* item() const;
+    // The attached item for focus under it, the open popup around the
+    // focus for focus in one (popups live in the window's overlay, outside
+    // the shell), else nullptr.
+    QQuickItem* scopeFor(QQuickItem* focused) const;
+    void watchPopup(QQuickItem* popup);
     void attachToWindow();
     void onFocusChanged();
     // After a vertical key: the card of the row the focus entered nearest
@@ -118,6 +127,7 @@ namespace jfd::ui {
     std::optional<Direction> m_keyDirection;
     bool m_aligning = false;
     QMetaObject::Connection m_focusConnection;
+    QList<QPointer<QQuickItem>> m_popups;
   };
 
 } // namespace jfd::ui

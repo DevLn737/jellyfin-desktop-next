@@ -15,6 +15,8 @@ T.ItemDelegate {
     // Keeps the icon's room without an icon, so rows of a list where only
     // some have one (the playing episode's check) line up.
     property bool reserveIcon: false
+    // A title too long for the row takes more lines instead of being cut.
+    property bool wrapText: false
     readonly property bool iconShown: iconSource.toString().length > 0 || reserveIcon
 
     implicitWidth: 400
@@ -52,7 +54,8 @@ T.ItemDelegate {
                     text: item.text
                     color: item.enabled ? colors.text : colors.textDisabled
                     font.pixelSize: Theme.fontSizeBody
-                    elide: Text.ElideRight
+                    wrapMode: item.wrapText ? Text.Wrap : Text.NoWrap
+                    elide: item.wrapText ? Text.ElideNone : Text.ElideRight
                 }
                 Text {
                     width: parent.width

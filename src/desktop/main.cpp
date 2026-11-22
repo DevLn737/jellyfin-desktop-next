@@ -234,6 +234,16 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  // Text drawn by the system's rasteriser (DirectWrite on Windows, FreeType
+  // on Linux), hinted to the pixel grid: Qt Quick's default distance-field
+  // text is soft at body sizes, regular and lighter weights most, and more
+  // so at fractional scales (125 %, 150 %). JFD_TEXT_RENDERING=qt (or curve)
+  // brings the other renderers back for a comparison.
+  const QByteArray textRendering = qgetenv("JFD_TEXT_RENDERING");
+  QQuickWindow::setTextRenderType(textRendering == "qt"      ? QQuickWindow::QtTextRendering
+                                  : textRendering == "curve" ? QQuickWindow::CurveTextRendering
+                                                             : QQuickWindow::NativeTextRendering);
+
   int exitCode = 0;
   QElapsedTimer shutdown;
   {
