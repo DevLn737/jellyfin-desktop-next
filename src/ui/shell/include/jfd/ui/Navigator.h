@@ -29,6 +29,9 @@ namespace jfd::ui {
       // Ascending; ties keep the order of registration.
       int order = 0;
       Placement placement = Placement::Primary;
+      // A shorter text for the top bar's pill (same translation context);
+      // empty: `text`.
+      QString shortText = {};
     };
 
     QString name;

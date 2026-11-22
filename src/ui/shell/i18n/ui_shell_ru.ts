@@ -163,6 +163,10 @@
         <translation>Смотреть вместе</translation>
     </message>
     <message>
+        <source>Together</source>
+        <translation>Вместе</translation>
+    </message>
+    <message>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
