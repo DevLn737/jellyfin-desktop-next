@@ -31,6 +31,7 @@
 #include <QGuiApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
+#include <QFont>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTimer>
@@ -234,15 +235,24 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // Text drawn by the system's rasteriser (DirectWrite on Windows, FreeType
-  // on Linux), hinted to the pixel grid: Qt Quick's default distance-field
-  // text is soft at body sizes, regular and lighter weights most, and more
-  // so at fractional scales (125 %, 150 %). JFD_TEXT_RENDERING=qt (or curve)
-  // brings the other renderers back for a comparison.
-  const QByteArray textRendering = qgetenv("JFD_TEXT_RENDERING");
-  QQuickWindow::setTextRenderType(textRendering == "qt"      ? QQuickWindow::QtTextRendering
-                                  : textRendering == "curve" ? QQuickWindow::CurveTextRendering
-                                                             : QQuickWindow::NativeTextRendering);
+  // How text is drawn (Appearance > Text rendering; JFD_TEXT_RENDERING
+  // overrides it for a comparison). Qt's distance-field text is the default:
+  // the system rasteriser with full hinting made Nunito uneven on Windows.
+  QString textRendering = qEnvironmentVariable("JFD_TEXT_RENDERING");
+  if (textRendering.isEmpty()) textRendering = services.settings->value(settings::keys::TextRendering).toString();
+  if (textRendering == QLatin1String("sharp") || textRendering == QLatin1String("hinted") ||
+      textRendering == QLatin1String("native")) {
+    QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+    // Unhinted keeps the letters' own widths and spacing.
+    QFont font = QGuiApplication::font();
+    font.setHintingPreference(textRendering == QLatin1String("hinted") ? QFont::PreferFullHinting
+                                                                       : QFont::PreferNoHinting);
+    QGuiApplication::setFont(font);
+  } else if (textRendering == QLatin1String("curve")) {
+    QQuickWindow::setTextRenderType(QQuickWindow::CurveTextRendering);
+  } else {
+    QQuickWindow::setTextRenderType(QQuickWindow::QtTextRendering);
+  }
 
   int exitCode = 0;
   QElapsedTimer shutdown;

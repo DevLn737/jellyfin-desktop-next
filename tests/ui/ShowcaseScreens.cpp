@@ -550,9 +550,10 @@ namespace {
   class Showcase {
   public:
     Showcase() : server(handle) {
-      // As the app draws text (main.cpp); JFD_TEXT_RENDERING=qt for the old look.
-      QQuickWindow::setTextRenderType(qgetenv("JFD_TEXT_RENDERING") == "qt" ? QQuickWindow::QtTextRendering
-                                                                           : QQuickWindow::NativeTextRendering);
+      // As the app draws text by default (main.cpp); JFD_TEXT_RENDERING=sharp
+      // for the system's rasteriser.
+      QQuickWindow::setTextRenderType(qgetenv("JFD_TEXT_RENDERING") == "sharp" ? QQuickWindow::NativeTextRendering
+                                                                              : QQuickWindow::QtTextRendering);
       ui::LibraryScreens::Config config;
       config.identity.version = QStringLiteral("0.0.1");
       config.identity.device = QStringLiteral("showcase");

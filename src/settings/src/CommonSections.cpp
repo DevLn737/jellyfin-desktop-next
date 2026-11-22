@@ -176,6 +176,22 @@ namespace jfd::settings {
       };
       section.settings.append(effects);
 
+      SettingDescriptor textRendering;
+      textRendering.key = key(keys::TextRendering);
+      textRendering.type = SettingType::Choice;
+      textRendering.defaultValue = QStringLiteral("smooth");
+      textRendering.label = QT_TRANSLATE_NOOP("CommonSettings", "Text rendering");
+      textRendering.description = QT_TRANSLATE_NOOP(
+          "CommonSettings", "Try another if the text looks blurry or uneven on your screen.");
+      textRendering.choices = {
+          {QStringLiteral("smooth"), QT_TRANSLATE_NOOP("CommonSettings", "Smooth (default)")},
+          {QStringLiteral("sharp"), QT_TRANSLATE_NOOP("CommonSettings", "System")},
+          {QStringLiteral("hinted"), QT_TRANSLATE_NOOP("CommonSettings", "System, snapped to pixels")},
+          {QStringLiteral("curve"), QT_TRANSLATE_NOOP("CommonSettings", "Vector")},
+      };
+      textRendering.requiresRestart = true;
+      section.settings.append(textRendering);
+
       SettingDescriptor homeSections;
       homeSections.key = key(keys::HomeSections);
       homeSections.type = SettingType::String;
