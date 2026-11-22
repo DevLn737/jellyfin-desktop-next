@@ -38,6 +38,10 @@ namespace jfd::settings {
     // "auto" (on with integrated or software graphics), "on", "off".
     // (Was interface/effects.)
     inline constexpr QLatin1String Effects{"appearance/effects"};
+    // How text is drawn (at startup): "smooth" (Qt's own, distance fields),
+    // "sharp" (the system's rasteriser, no hinting), "hinted" (the system's,
+    // snapped to the pixel grid) or "curve" (Qt's curve renderer).
+    inline constexpr QLatin1String TextRendering{"appearance/textRendering"};
     // The home screen's rows: a JSON array of section ids in the user's
     // order, a hidden one with "-" in front (hidden setting).
     inline constexpr QLatin1String HomeSections{"appearance/homeSections"};
