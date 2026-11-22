@@ -133,6 +133,17 @@ FocusScope {
                 anchors.verticalCenter: parent.verticalCenter
                 size: Theme.tvMode ? 40 : 32
             }
+            // The name beside the mark, so the corner reads as the app's.
+            Text {
+                objectName: "topNavWordmark"
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !bar.iconsOnly
+                text: "Jellyfin"
+                color: Theme.text
+                font.pixelSize: Theme.tvMode ? 26 : 19
+                font.weight: Font.ExtraBold
+                font.letterSpacing: -0.2
+            }
         }
     }
 
@@ -333,6 +344,7 @@ FocusScope {
         alignRight: true
         readonly property var routes: bar.primaryEntries.concat(bar.accountEntries)
         entries: routes.map((entry) => entry.text).concat([qsTr("Sign out")])
+        icons: routes.map((entry) => bar.iconFor(entry.icon)).concat([Icons.logout])
         currentIndex: bar.currentIndexIn(routes)
         onActivated: (index) => {
             if (index === routes.length)
@@ -353,6 +365,7 @@ FocusScope {
         readonly property int tvIndex: bar.accountEntries.length
         entries: bar.accountEntries.map((entry) => entry.text)
                  .concat([Theme.tvMode ? qsTr("Leave TV mode") : qsTr("TV mode"), qsTr("Sign out")])
+        icons: bar.accountEntries.map((entry) => bar.iconFor(entry.icon)).concat([Icons.tv, Icons.logout])
         currentIndex: bar.currentIndexIn(bar.accountEntries)
         onActivated: (index) => {
             if (index < tvIndex)

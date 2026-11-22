@@ -52,6 +52,8 @@ qt_add_qml_module(jfd_ui_controls
     icons/play.svg
     icons/search.svg
     icons/settings.svg
+    icons/tv.svg
+    icons/logout.svg
     icons/up.svg
     icons/down.svg
     icons/delete.svg
@@ -85,6 +87,8 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/play.svg
     icons-dark/search.svg
     icons-dark/settings.svg
+    icons-dark/tv.svg
+    icons-dark/logout.svg
     icons-dark/up.svg
     icons-dark/down.svg
     icons-dark/left.svg
