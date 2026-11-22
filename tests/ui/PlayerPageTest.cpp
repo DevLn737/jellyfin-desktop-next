@@ -1,5 +1,6 @@
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
+#include "../support/ShowcaseLook.h"
 #include "../support/VirtualBackend.h"
 
 #include <jfd/api/DeviceProfile.h>
@@ -14,6 +15,11 @@
 #include <jfd/ui/PlayerSession.h>
 
 #include <QDateTime>
+#include <QImage>
+#include <QLinearGradient>
+#include <QPainter>
+#include <QPainterPath>
+#include <QTemporaryDir>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QQmlComponent>
@@ -105,7 +111,8 @@ namespace {
     // What the launcher emits once the server resolved the item, then the
     // intent it posts.
     void open(bool live = false, const QString& itemId = QStringLiteral("episode"),
-              api::PlayMethod method = api::PlayMethod::DirectPlay, const QString& seriesId = {}) {
+              api::PlayMethod method = api::PlayMethod::DirectPlay, const QString& seriesId = {},
+              const QString& title = QStringLiteral("Episode")) {
       session::PlaybackLauncher::Request request;
       request.itemId = itemId;
       api::MediaSource source;
@@ -140,7 +147,7 @@ namespace {
       }
       Q_EMIT runtime->launcher().resolved(request, item, source, played);
       core::MediaRequest media = playback::mediaRequest(played, false, core::MediaTicks(), std::nullopt, false);
-      media.title = "Episode";
+      media.title = title.toStdString();
       runtime->post(core::intent::Open{media});
     }
   };
@@ -946,4 +953,109 @@ TEST_CASE("Right-click on the video shows the statistics; I hides them; a transc
   press(Qt::Key_I);
   CHECK(f.page->property("statsShown").toBool());
   CHECK(menu->property("entries").toStringList() == QStringList{QStringLiteral("Hide stats for nerds")});
+}
+
+// The player as the README shows it: a still in place of the video, the
+// application's font, Russian, the display over an episode of a series.
+// Saved only with JFD_UI_SCREENSHOTS=<dir> (readme-player-1600.png).
+TEST_CASE("The display over a series episode, in Russian, as the README shows it") {
+  test::FakeServer server([](const test::HttpRequest& r) {
+    const auto json = [](const char* body) { return test::HttpResponse{200, QByteArray(body), "application/json", 0}; };
+    if (r.path == QStringLiteral("/Items/episode"))
+      return json(R"({"Id": "episode", "Name": "Новый жилец", "Chapters": [
+        {"StartPositionTicks": 0, "Name": "Пролог"},
+        {"StartPositionTicks": 1200000000, "Name": "Шторм"},
+        {"StartPositionTicks": 3600000000, "Name": "Берег"}]})");
+    if (r.path == QStringLiteral("/Shows/series/Episodes"))
+      return json(R"({"TotalRecordCount": 3, "Items": [
+        {"Id": "e1", "Name": "Журнал", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 1,
+         "RunTimeTicks": 28800000000, "UserData": {"Played": true}},
+        {"Id": "e2", "Name": "Первый шторм", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 2,
+         "RunTimeTicks": 28800000000, "UserData": {"Played": true}},
+        {"Id": "episode", "Name": "Новый жилец", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 3,
+         "RunTimeTicks": 28800000000, "UserData": {"Played": false}}]})");
+    if (r.path == QStringLiteral("/MediaSegments/episode")) return json(R"({"Items": []})");
+    return test::HttpResponse{404, {}, {}, 0};
+  });
+
+  test::ShowcaseLook look;
+  Fixture f;
+  test::ShowcaseLook::apply(f.engine);
+  f.client.setServerUrl(server.url());
+  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
+  f.open(false, QStringLiteral("episode"), api::PlayMethod::DirectPlay, QStringLiteral("series"),
+         QStringLiteral("Хроники маяка – Новый жилец"));
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
+  REQUIRE(waitFor([&] { return f.player->episodes().size() == 3; }, 5000));
+  REQUIRE(waitFor([&] { return f.player->chapters().size() == 3; }, 5000));
+  CHECK(f.page->property("mainTitle").toString() == QStringLiteral("Хроники маяка"));
+  CHECK(f.page->property("episodeLine").toString().contains(QStringLiteral("«Новый жилец»")));
+
+  const QString shots = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
+  if (shots.isEmpty()) return;
+  // A still under the page in place of the video: the page's black fill
+  // hidden, a night sea scene behind it.
+  constexpr int Width = 1600;
+  constexpr int Height = 900;
+  for (QQuickItem* child : f.page->childItems())
+    if (child->property("color").value<QColor>() == QColor(Qt::black) && child->width() == f.page->width())
+      child->setVisible(false);
+  QImage still(Width, Height, QImage::Format_RGB32);
+  {
+    QPainter p(&still);
+    p.setRenderHint(QPainter::Antialiasing);
+    QLinearGradient sky(0, 0, 0, Height);
+    sky.setColorAt(0, QColor::fromHsv(215, 120, 60));
+    sky.setColorAt(0.55, QColor::fromHsv(200, 90, 140));
+    sky.setColorAt(1, QColor::fromHsv(190, 70, 120));
+    p.fillRect(still.rect(), sky);
+    QRadialGradient glow(Width * 0.68, Height * 0.3, Height * 0.5);
+    glow.setColorAt(0, QColor(255, 240, 220, 210));
+    glow.setColorAt(0.12, QColor(255, 230, 200, 120));
+    glow.setColorAt(1, QColor(255, 255, 255, 0));
+    p.fillRect(still.rect(), glow);
+    for (int layer = 0; layer < 4; ++layer) {
+      QPainterPath hills;
+      const double base = Height * (0.58 + 0.1 * layer);
+      hills.moveTo(0, Height);
+      hills.lineTo(0, base);
+      for (int x = 0; x <= Width; x += Width / 64) {
+        const double y = base - Height * 0.06 * std::sin(1.3 * layer + x * (2.0 + layer) / Width * 3.14) -
+                         Height * 0.02 * std::sin(2.1 * layer + x * 9.0 / Width);
+        hills.lineTo(x, y);
+      }
+      hills.lineTo(Width, Height);
+      hills.closeSubpath();
+      p.fillPath(hills, QColor::fromHsv((205 + 8 * layer) % 360, 110 + 20 * layer, 100 - 20 * layer));
+    }
+    // The lighthouse on the nearest hill, its beam across the sky.
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(20, 26, 36));
+    p.drawPolygon(QPolygonF{{QPointF(300, 640), QPointF(318, 470), QPointF(342, 470), QPointF(360, 640)}});
+    p.setBrush(QColor(255, 236, 190));
+    p.drawRect(QRectF(314, 448, 32, 22));
+    QLinearGradient beam(330, 459, 1100, 360);
+    beam.setColorAt(0, QColor(255, 240, 200, 150));
+    beam.setColorAt(1, QColor(255, 240, 200, 0));
+    p.setBrush(beam);
+    p.drawPolygon(QPolygonF{{QPointF(330, 452), QPointF(1150, 300), QPointF(1150, 440), QPointF(330, 466)}});
+  }
+  QTemporaryDir dir;
+  REQUIRE(dir.isValid());
+  const QString stillFile = dir.filePath(QStringLiteral("still.png"));
+  REQUIRE(still.save(stillFile));
+  QQmlComponent imageComponent(&f.engine);
+  imageComponent.setData("import QtQuick\nImage { fillMode: Image.PreserveAspectCrop; z: -1 }", QUrl());
+  std::unique_ptr<QObject> imageObject(imageComponent.create());
+  auto* image = qobject_cast<QQuickItem*>(imageObject.get());
+  REQUIRE(image != nullptr);
+  image->setProperty("source", QUrl::fromLocalFile(stillFile));
+  image->setParentItem(f.window.contentItem());
+  image->setSize(QSizeF(Width, Height));
+  f.window.resize(Width, Height);
+  f.page->setSize(QSizeF(Width, Height));
+  f.player->seek(252);
+  f.page->setProperty("osdVisible", true);
+  QTest::qWait(600);
+  f.window.grabWindow().save(shots + QStringLiteral("/readme-player-1600.png"));
 }

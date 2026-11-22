@@ -1,5 +1,6 @@
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
+#include "../support/ShowcaseLook.h"
 #include "../support/VirtualBackend.h"
 
 #include <jfd/api/DeviceProfile.h>
@@ -9,10 +10,15 @@
 #include <jfd/music/MusicPlayer.h>
 #include <jfd/playback/StreamPlan.h>
 #include <jfd/session/SessionRuntime.h>
+#include <jfd/library/ImageCache.h>
+#include <jfd/ui/LibraryImageProvider.h>
 #include <jfd/ui/MusicUi.h>
 #include <jfd/ui/Navigator.h>
 
+#include <QBuffer>
 #include <QElapsedTimer>
+#include <QImage>
+#include <QPainter>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -20,6 +26,7 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QTemporaryDir>
 #include <QtQml/qqmlextensionplugin.h>
 
 #include <memory>
@@ -338,4 +345,103 @@ Item {
   CHECK(waitFor([&] { return !f.player->available(); }));
   QMetaObject::invokeMethod(root, "go");
   CHECK(root->property("started").toInt() == 1);
+}
+
+// The music page as the README shows it: Russian, the application's font
+// and palette, albums with drawn covers. Saved only with
+// JFD_UI_SCREENSHOTS=<dir> (readme-music-1600.png).
+TEST_CASE("The music overview in Russian with covers, as the README shows it") {
+  struct Album {
+    const char* name;
+    const char* artist;
+    int hue;
+  };
+  static const Album albums[] = {
+      {"Северное сияние", "Полярный экспресс", 190}, {"Огни большого города", "Ночные трамваи", 330},
+      {"Тихий океан", "Лагуна", 200},               {"Медленный рассвет", "Кира Ветрова", 30},
+      {"Электричка", "Станция Мир", 260},           {"Песни ветра", "Ансамбль «Берег»", 150},
+      {"Неон", "Синтетика", 290},                   {"Дом у реки", "Лагуна", 100},
+      {"Последний рейс", "Ночные трамваи", 10},     {"Лёд", "Полярный экспресс", 210}};
+  constexpr int Count = int(std::size(albums));
+  const auto cover = [](int hue, int seed) {
+    QImage image(300, 300, QImage::Format_RGB32);
+    QPainter p(&image);
+    p.setRenderHint(QPainter::Antialiasing);
+    QLinearGradient back(0, 0, 300, 300);
+    back.setColorAt(0, QColor::fromHsv(hue, 150, 200));
+    back.setColorAt(1, QColor::fromHsv((hue + 40) % 360, 200, 70));
+    p.fillRect(image.rect(), back);
+    p.setPen(Qt::NoPen);
+    for (int i = 0; i < 4; ++i) {
+      p.setBrush(QColor::fromHsv((hue + 25 * i) % 360, 90, 255, 70));
+      const int r = 50 + ((seed * 37 + i * 53) % 90);
+      p.drawEllipse(QPoint((seed * 71 + i * 97) % 300, (seed * 43 + i * 61) % 300), r, r);
+    }
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "PNG");
+    return bytes;
+  };
+  Fixture f;
+  f.server.setHandler([&](const test::HttpRequest& request) {
+    const QString path = request.path;
+    if (path.contains(QLatin1String("/Images/"))) {
+      const QString id = path.section(QLatin1Char('/'), 2, 2);
+      const int index = id.mid(1).toInt() % Count;
+      return test::HttpResponse{200, cover(albums[index].hue, index + 1), "image/png", 0};
+    }
+    if (path.endsWith(QLatin1String("/UserViews")))
+      return test::json(R"({"Items": [{"Id": "lib", "Name": "Музыка", "Type": "CollectionFolder",
+                            "CollectionType": "music"}], "TotalRecordCount": 1})");
+    if (!path.endsWith(QLatin1String("/Items"))) return test::json(R"({"Items": [], "TotalRecordCount": 0})");
+    const bool tracks = request.query.queryItemValue(QStringLiteral("includeItemTypes")) == QLatin1String("Audio");
+    const int total = tracks ? 412 : 38;
+    QJsonArray out;
+    for (int i = 0; i < Count; ++i) {
+      const Album& a = albums[tracks ? (i * 3) % Count : i];
+      const QString album = QStringLiteral("a%1").arg(tracks ? (i * 3) % Count : i);
+      QJsonObject o{{QStringLiteral("Id"), tracks ? QStringLiteral("t%1").arg(i) : album},
+                    {QStringLiteral("Name"), QString::fromUtf8(tracks ? a.name : a.name)},
+                    {QStringLiteral("Type"), tracks ? QStringLiteral("Audio") : QStringLiteral("MusicAlbum")},
+                    {QStringLiteral("AlbumArtist"), QString::fromUtf8(a.artist)},
+                    {QStringLiteral("Artists"), QJsonArray{QString::fromUtf8(a.artist)}},
+                    {QStringLiteral("RunTimeTicks"), 1800000000LL},
+                    {QStringLiteral("ImageTags"), QJsonObject{{QStringLiteral("Primary"), QStringLiteral("p")}}}};
+      if (tracks) {
+        o.insert(QStringLiteral("AlbumId"), album);
+        o.insert(QStringLiteral("AlbumPrimaryImageTag"), QStringLiteral("p"));
+      }
+      out.append(o);
+    }
+    return test::json(QJsonDocument(QJsonObject{{QStringLiteral("Items"), out},
+                                                {QStringLiteral("TotalRecordCount"), total},
+                                                {QStringLiteral("StartIndex"), 0}})
+                          .toJson(QJsonDocument::Compact));
+  });
+  test::ShowcaseLook look;
+  test::ShowcaseLook::apply(f.engine);
+  // The covers through the application's image provider.
+  QTemporaryDir images;
+  REQUIRE(images.isValid());
+  library::ImageCache cache(f.client, images.path());
+  f.engine.addImageProvider(QLatin1String(ui::LibraryImageProvider::Id),
+                            new ui::LibraryImageProvider(cache, std::make_shared<ui::TextureBudget>(64LL << 20)));
+  QQuickWindow window;
+  window.resize(1600, 560);
+  window.setColor(QColor(QStringLiteral("#0b0e15")));
+  auto page = f.create(R"(
+import QtQuick
+import Jfd.Ui.Music
+MusicPage { width: 1600; height: 560 }
+)");
+  auto* item = qobject_cast<QQuickItem*>(page.get());
+  item->setParentItem(window.contentItem());
+  window.show();
+  REQUIRE(find(item, "musicOverview") != nullptr);
+  REQUIRE(find(item, "musicRecentlyAdded") != nullptr);
+  const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
+  if (dir.isEmpty()) return;
+  waitFor([] { return false; }, 1500);
+  window.grabWindow().save(dir + QStringLiteral("/readme-music-1600.png"));
 }

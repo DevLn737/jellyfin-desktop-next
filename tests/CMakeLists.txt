@@ -438,7 +438,7 @@ if(JFD_BUILD_APP)
     target_include_directories(jfd_ui_player_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_player_tests PRIVATE
       jfd_ui_player jfd_ui_playerplugin jfd_ui_group jfd_ui_groupplugin
-      jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shell jfd_ui_shellplugin
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shell jfd_ui_shellplugin
       jfd::session_runtime Qt6::Gui Qt6::Quick doctest Qt6::Test)
     target_compile_options(jfd_ui_player_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_player_tests COMMAND jfd_ui_player_tests)
@@ -453,7 +453,7 @@ if(JFD_BUILD_APP)
     target_include_directories(jfd_ui_music_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_music_tests PRIVATE
       jfd_ui_music jfd_ui_musicplugin jfd_ui_library jfd_ui_libraryplugin
-      jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
+      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
       jfd::session_runtime Qt6::Gui Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
     target_compile_options(jfd_ui_music_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_music_tests COMMAND jfd_ui_music_tests)
