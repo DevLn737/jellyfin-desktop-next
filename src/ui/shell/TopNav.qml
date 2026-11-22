@@ -219,7 +219,7 @@ FocusScope {
                         Text {
                             visible: !bar.iconsOnly
                             anchors.verticalCenter: parent.verticalCenter
-                            text: entry.modelData.text
+                            text: entry.modelData.shortText || entry.modelData.text
                             color: entry.current || entry.hovered ? Theme.text : Theme.textSecondary
                             font.pixelSize: Theme.fontSizeBody - 1
                             font.weight: entry.current ? Font.Bold : Font.DemiBold

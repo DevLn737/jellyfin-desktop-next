@@ -62,6 +62,8 @@ namespace jfd::ui {
               RouteSpec::Placement::AccountMenu);
     add("player", false, false, false);
     addListed("group", "group", QT_TRANSLATE_NOOP("Sidebar", "Watch together"), 300);
+    // The pill's word: the full one stood out beside the others.
+    m_routes[QStringLiteral("group")].sidebar.shortText = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Together"));
     addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900,
               RouteSpec::Placement::AccountMenu);
   }
@@ -183,8 +185,14 @@ namespace jfd::ui {
       const QString text = sidebar.translationContext
                                ? QCoreApplication::translate(sidebar.translationContext, sidebar.text.toUtf8().constData())
                                : sidebar.text;
+      const QString shortText =
+          sidebar.shortText.isEmpty() ? text
+          : sidebar.translationContext
+              ? QCoreApplication::translate(sidebar.translationContext, sidebar.shortText.toUtf8().constData())
+              : sidebar.shortText;
       entries.append(QVariantMap{{QStringLiteral("route"), entry.spec->name},
                                  {QStringLiteral("text"), text},
+                                 {QStringLiteral("shortText"), shortText},
                                  {QStringLiteral("icon"), sidebar.icon},
                                  {QStringLiteral("order"), sidebar.order},
                                  {QStringLiteral("placement"), placementName(sidebar.placement)}});
