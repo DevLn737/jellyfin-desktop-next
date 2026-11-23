@@ -263,6 +263,40 @@ TEST_CASE("The navigator keeps a stack and tells the view what to do") {
   CHECK(changes.at(1).at(0).value<Navigator::Operation>() == Navigator::Operation::Push);
 }
 
+TEST_CASE("A long walk through item pages keeps at most MaxDepth pages, home first and the newest") {
+  Navigator navigator;
+  QSignalSpy changes(&navigator, &Navigator::stackChanged);
+  CHECK(navigator.reset(QStringLiteral("home")));
+  for (int i = 1; i < Navigator::MaxDepth; ++i) CHECK(navigator.navigate(QStringLiteral("item/%1").arg(i)));
+  CHECK(navigator.depth() == Navigator::MaxDepth);
+  CHECK(changes.last().at(0).value<Navigator::Operation>() == Navigator::Operation::Push);
+
+  // One more: the oldest items go, home and the newest stay.
+  CHECK(navigator.navigate(QStringLiteral("item/%1").arg(Navigator::MaxDepth)));
+  CHECK(navigator.depth() == Navigator::TrimmedDepth);
+  CHECK(changes.last().at(0).value<Navigator::Operation>() == Navigator::Operation::Rebuild);
+  const QStringList stack = navigator.stack();
+  CHECK(stack.first() == QStringLiteral("home"));
+  CHECK(stack.last() == QStringLiteral("item/%1").arg(Navigator::MaxDepth));
+  CHECK(stack.at(1) == QStringLiteral("item/%1").arg(Navigator::MaxDepth - Navigator::TrimmedDepth + 2));
+  // The view gets every page with its properties, bottom first.
+  const QVariantList pages = navigator.pages();
+  REQUIRE(pages.size() == 2 * Navigator::TrimmedDepth);
+  CHECK(pages.at(1).toMap().value(QStringLiteral("route")).toString() == QStringLiteral("home"));
+  CHECK(pages.last().toMap().value(QStringLiteral("route")).toString() == stack.last());
+
+  // Back walks the kept pages down to home.
+  for (int i = 1; i < Navigator::TrimmedDepth; ++i) CHECK(navigator.back());
+  CHECK(navigator.currentRoute() == QStringLiteral("home"));
+  CHECK_FALSE(navigator.back());
+
+  // Many more pages never grow it past the limit.
+  for (int i = 0; i < 200; ++i) {
+    CHECK(navigator.navigate(QStringLiteral("item/x%1").arg(i)));
+    CHECK(navigator.depth() <= Navigator::MaxDepth);
+  }
+}
+
 TEST_CASE("Geometry round-trips through the settings text") {
   const QRect rect(-100, 20, 1280, 800);
   CHECK(decodeGeometry(encodeGeometry(rect)) == rect);

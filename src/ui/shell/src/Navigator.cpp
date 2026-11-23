@@ -263,6 +263,14 @@ namespace jfd::ui {
         return true;
       }
     }
+    if (m_stack.size() >= MaxDepth) {
+      // The first page and the newest ones; the view rebuilds from them
+      // with only the new page loaded.
+      m_stack.remove(1, m_stack.size() - (TrimmedDepth - 1));
+      m_stack.append(parsed);
+      emitChange(Operation::Rebuild);
+      return true;
+    }
     m_stack.append(parsed);
     emitChange(Operation::Push);
     return true;
@@ -303,6 +311,15 @@ namespace jfd::ui {
     m_stack.removeLast();
     emitChange(Operation::Pop);
     return true;
+  }
+
+  QVariantList Navigator::pages() const {
+    QVariantList out;
+    for (const Route& route : m_stack) {
+      out.append(pageFor(route.name));
+      out.append(propertiesFor(route));
+    }
+    return out;
   }
 
   void Navigator::replay() {
