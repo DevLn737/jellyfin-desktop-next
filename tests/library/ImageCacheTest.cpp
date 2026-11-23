@@ -3,8 +3,11 @@
 #include <jfd/library/ImageCache.h>
 
 #include <QBuffer>
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QTemporaryDir>
 
@@ -151,11 +154,15 @@ TEST_CASE("The disk cache survives a restart and stays under its limit") {
                     nullptr, [&done](const QImage&) { done = true; });
       REQUIRE(waitFor([&] { return done; }, 10000));
     }
+    // Files are written and trimmed on the disk worker.
+    cache.waitForDisk();
+    CHECK(cache.diskBytes() > 0);
     CHECK(cache.diskBytes() <= limits.diskBytes);
   }
   const auto requests = f.server.requests().size();
   ImageCache again(f.client, dir.path(), limits);
-  CHECK(again.diskBytes() > 0);
+  // The folder is counted off the GUI thread, a moment after the start.
+  CHECK(waitFor([&] { return again.diskBytes() > 0; }, 5000));
   QImage image;
   bool delivered = false;
   again.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(last)), QSize(20, 30),
@@ -175,6 +182,76 @@ TEST_CASE("The disk cache survives a restart and stays under its limit") {
   again.request(at(f, QStringLiteral("/Items/%1/Images/Primary").arg(last)), QSize(20, 30),
                 nullptr, [&](const QImage& i) { again2 = i; });
   CHECK_FALSE(again2.isNull());
+}
+
+TEST_CASE("Trimming the disk cache removes the least recently used files, not the oldest written") {
+  Images images;
+  LibraryFixture f([&images](const HttpRequest& r) { return images(r); });
+  QTemporaryDir dir;
+  const qint64 fileSize = png(800, 1200).size();
+  ImageCache::Limits limits;
+  // Room for three files: a fourth trims down to 90 %, which removes two.
+  limits.diskBytes = fileSize * 3 + 10;
+  limits.parallelDownloads = 1;
+  const auto url = [&](int i) { return at(f, QStringLiteral("/Items/%1/Images/Primary").arg(i)); };
+  const auto path = [&](int i) {
+    const QByteArray hash = QCryptographicHash::hash(ImageCache::cacheKey(url(i)).toUtf8(), QCryptographicHash::Sha1);
+    return QDir(dir.path()).filePath(QString::fromLatin1(hash.toHex()));
+  };
+  const auto load = [&](ImageCache& cache, int i) {
+    bool done = false;
+    QImage image;
+    cache.request(url(i), QSize(20, 30), nullptr, [&](const QImage& got) {
+      image = got;
+      done = true;
+    });
+    REQUIRE(waitFor([&] { return done; }, 10000));
+    CHECK_FALSE(image.isNull());
+  };
+
+  ImageCache cache(f.client, dir.path(), limits);
+  for (int i = 0; i < 3; ++i) load(cache, i);
+  cache.waitForDisk();
+  // Written an hour apart: 0 first, 2 last.
+  const QDateTime now = QDateTime::currentDateTimeUtc();
+  for (int i = 0; i < 3; ++i) {
+    QFile file(path(i));
+    REQUIRE(file.open(QIODevice::ReadWrite));
+    REQUIRE(file.setFileTime(now.addSecs((i - 3) * 3600), QFileDevice::FileModificationTime));
+  }
+  // 0 is used again (from disk, not from memory or the server).
+  cache.clearMemory();
+  const auto requests = f.server.requests().size();
+  load(cache, 0);
+  CHECK(f.server.requests().size() == requests);
+  CHECK(QFileInfo(path(0)).lastModified().toUTC() > now.addSecs(-60));
+  // A new image goes over the limit: 1 and 2 go, 0 stays.
+  load(cache, 3);
+  cache.waitForDisk();
+  CHECK(QFile::exists(path(0)));
+  CHECK_FALSE(QFile::exists(path(1)));
+  CHECK_FALSE(QFile::exists(path(2)));
+  CHECK(QFile::exists(path(3)));
+  CHECK(cache.diskBytes() <= limits.diskBytes);
+}
+
+TEST_CASE("A disk cache over its limit at start is counted and trimmed off the GUI thread") {
+  Images images;
+  LibraryFixture f([&images](const HttpRequest& r) { return images(r); });
+  QTemporaryDir dir;
+  const QByteArray blob(1000, 'x');
+  for (int i = 0; i < 20; ++i) {
+    QFile file(QDir(dir.path()).filePath(QStringLiteral("f%1").arg(i)));
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    file.write(blob);
+  }
+  ImageCache::Limits limits;
+  limits.diskBytes = 10'000;
+  ImageCache cache(f.client, dir.path(), limits);
+  cache.waitForDisk();
+  CHECK(cache.diskBytes() <= 9'000);
+  CHECK(cache.diskBytes() > 0);
+  CHECK(QDir(dir.path()).entryList(QDir::Files).size() == 9);
 }
 
 TEST_CASE("A corrupt file in the disk cache is fetched from the server again") {

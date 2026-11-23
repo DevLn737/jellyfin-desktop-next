@@ -1,4 +1,5 @@
 #include "AppServices.h"
+#include "Logging.h"
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/diagnostics/Crash.h>
@@ -289,6 +290,8 @@ namespace jfd::desktop {
               input.settings.emplace_back(std8(full), std8(services.settings->value(full).toString()));
             }
           }
+          // The lines still buffered go in too.
+          flushLogFile();
           input.log = readTail(services.logDirectory + QStringLiteral("/jellyfin-desktop.log"));
           input.previousLog = readTail(services.logDirectory + QStringLiteral("/jellyfin-desktop.old.log"));
           if (services.session) {

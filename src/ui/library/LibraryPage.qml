@@ -78,8 +78,13 @@ RoutePage {
                 id: tabsFrame
                 objectName: "libraryTabsFrame"
                 readonly property int padding: 5
-                readonly property real maxWidth: parent.width - toolbar.width - Theme.spacing
-                Layout.preferredWidth: tabs.width + 2 * padding
+                // As wide as the tabs, narrower when the toolbar needs the
+                // room; the list takes its width from the frame (sizing the
+                // frame from the list made the row lay itself out again).
+                Layout.fillWidth: true
+                Layout.minimumWidth: 2 * padding
+                Layout.preferredWidth: tabs.contentWidth + 2 * padding
+                Layout.maximumWidth: tabs.contentWidth + 2 * padding
                 Layout.preferredHeight: tabs.height + 2 * padding
                 radius: Theme.radiusLarge + 2
                 color: Qt.alpha(Theme.text, 0.04)
@@ -92,7 +97,7 @@ RoutePage {
                     readonly property bool enterAtCurrent: true
                     anchors.verticalCenter: parent.verticalCenter
                     x: tabsFrame.padding
-                    width: Math.min(contentWidth, tabsFrame.maxWidth - 2 * tabsFrame.padding)
+                    width: Math.max(0, tabsFrame.width - 2 * tabsFrame.padding)
                     height: Theme.controlHeight + 4
                     orientation: ListView.Horizontal
                     spacing: 2

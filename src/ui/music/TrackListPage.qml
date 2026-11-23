@@ -53,9 +53,12 @@ RoutePage {
                 color: Theme.surfaceRaised
                 clip: true
                 Image {
+                    objectName: "musicCover"
                     anchors.fill: parent
                     asynchronous: true
                     fillMode: Image.PreserveAspectCrop
+                    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
                     source: Library.image(page.item.imageUrl)
                 }
             }
@@ -185,8 +188,18 @@ RoutePage {
                 onRemoveRequested: page.list.removeEntry(index)
             }
             LoadingIndicator {
+                objectName: "musicLoading"
                 anchors.centerIn: parent
                 visible: page.list.loading && page.list.count === 0
+            }
+            StateMessage {
+                objectName: "musicEmpty"
+                anchors.centerIn: parent
+                width: Math.min(parent.width, implicitWidth)
+                visible: page.list.loaded && page.list.count === 0 && page.list.errorText.length === 0
+                kind: "empty"
+                title: page.trackKind === "playlistTracks" ? qsTr("This playlist is empty.")
+                                                           : qsTr("No tracks on this album.")
             }
         }
     }

@@ -1,16 +1,15 @@
 #include <jfd/library/ItemListModel.h>
 
+#include <QCoreApplication>
+
 #include <algorithm>
 
 namespace jfd::library {
 
   namespace {
     QString subtitleFor(const api::Item& item) {
-      if (item.type == QLatin1String("Episode") && item.indexNumber) {
-        if (item.parentIndexNumber)
-          return QStringLiteral("S%1:E%2").arg(*item.parentIndexNumber).arg(*item.indexNumber);
-        return QStringLiteral("E%1").arg(*item.indexNumber);
-      }
+      if (item.type == QLatin1String("Episode") && item.indexNumber)
+        return episodeNumber(item.parentIndexNumber, item.indexNumber);
       if (item.type == QLatin1String("Audio")) {
         if (!item.artists.isEmpty()) return item.artists.join(QStringLiteral(", "));
         if (!item.albumArtist.isEmpty()) return item.albumArtist;
@@ -20,6 +19,12 @@ namespace jfd::library {
       return {};
     }
   } // namespace
+
+  QString episodeNumber(std::optional<int> season, std::optional<int> episode) {
+    if (!episode) return {};
+    if (season) return QCoreApplication::translate("EpisodeNumber", "S%1:E%2").arg(*season).arg(*episode);
+    return QCoreApplication::translate("EpisodeNumber", "E%1").arg(*episode);
+  }
 
   double progressOf(const api::Item& item) {
     if (item.userData.played) return 0.0;
@@ -104,6 +109,8 @@ namespace jfd::library {
       return e->logoUrl;
     case FeaturedReasonRole:
       return e->featuredReason;
+    case IndexNumberRole:
+      return item.type == QLatin1String("Episode") && item.indexNumber ? QVariant(*item.indexNumber) : QVariant();
     default:
       return {};
     }
@@ -137,7 +144,8 @@ namespace jfd::library {
             {BackdropUrlRole, "backdropUrl"},
             {LogoUrlRole, "logoUrl"},
             {ChildCountRole, "childCount"},
-            {FeaturedReasonRole, "featuredReason"}};
+            {FeaturedReasonRole, "featuredReason"},
+            {IndexNumberRole, "indexNumber"}};
   }
 
   const ItemListModel::Entry* ItemListModel::entry(int row) const {
@@ -150,6 +158,7 @@ namespace jfd::library {
     m_entries = std::move(entries);
     endResetModel();
     Q_EMIT countChanged();
+    countPlayed();
   }
 
   bool ItemListModel::applyUserData(const api::UserItemData& data) {
@@ -161,6 +170,7 @@ namespace jfd::library {
       Q_EMIT dataChanged(index(row), index(row));
       changed = true;
     }
+    if (changed) countPlayed();
     return changed;
   }
 
@@ -168,6 +178,21 @@ namespace jfd::library {
     for (int row = 0; row < count(); ++row)
       if (m_entries[row].item.id == itemId) return row;
     return -1;
+  }
+
+  int ItemListModel::firstUnplayedRow() const {
+    for (int row = 0; row < count(); ++row)
+      if (!m_entries[row].item.userData.played) return row;
+    return 0;
+  }
+
+  void ItemListModel::countPlayed() {
+    const auto played = std::count_if(m_entries.cbegin(), m_entries.cend(),
+                                      [](const Entry& e) { return e.item.userData.played; });
+    const int n = static_cast<int>(played);
+    if (n == m_playedCount) return;
+    m_playedCount = n;
+    Q_EMIT playedCountChanged();
   }
 
 } // namespace jfd::library

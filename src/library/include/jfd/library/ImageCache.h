@@ -35,7 +35,12 @@ namespace jfd::library {
   //
   // Files are read from disk and decoded on a small worker pool, never on
   // the cache's thread, so a fast scroll over cached posters does not cost
-  // frames; only the bookkeeping runs on the cache's thread.
+  // frames; only the bookkeeping runs on the cache's thread. The disk
+  // cache's own upkeep (the scan of its folder at start, writing new files
+  // and trimming to the limit) runs one job at a time on a worker thread of
+  // its own, so neither startup nor a scroll that crosses the limit waits
+  // for the file system. Reading a file marks it used, so trimming removes
+  // the least recently used files first.
   //
   // Requests are queued newest first with a few running at once, so while
   // the user scrolls the cards now on screen load before the ones scrolled
@@ -94,7 +99,11 @@ namespace jfd::library {
 
     qint64 memoryBytes() const { return m_memory.totalCost(); }
     qint64 memoryLimit() const { return m_limits.memoryBytes; }
-    qint64 diskBytes() const { return m_diskBytes; }
+    // What the disk cache holds, as its worker last counted it (0 until the
+    // first scan at start has finished).
+    qint64 diskBytes() const;
+    // Waits for the disk worker's jobs queued so far (tests and shutdown).
+    void waitForDisk();
     int pendingDownloads() const { return static_cast<int>(m_queue.size()); }
     int runningDownloads() const { return static_cast<int>(m_running.size()); }
     void clearMemory() { m_memory.clear(); }
@@ -143,14 +152,15 @@ namespace jfd::library {
     void start(const QString& key);
     QString diskPath(const QString& key) const;
     void writeDisk(const QString& key, const QByteArray& data);
-    void trimDisk();
+    struct Disk;
 
     api::JellyfinClient& m_client;
     QNetworkAccessManager* m_network = nullptr;
     Limits m_limits;
     QDir m_disk;
     bool m_hasDisk = false;
-    qint64 m_diskBytes = 0;
+    // The disk cache's byte count and limit, used by its worker's jobs.
+    std::shared_ptr<Disk> m_diskState;
     QCache<QString, QImage> m_memory;
     QHash<QString, Fetch> m_fetches;
     // Keys waiting for a download slot, newest last.
@@ -162,6 +172,8 @@ namespace jfd::library {
     std::shared_ptr<Gate> m_gate;
     // Declared last: destroyed (and waited for) first.
     QThreadPool m_pool;
+    // One thread: the scan, writes and trims run in order.
+    QThreadPool m_diskPool;
   };
 
 } // namespace jfd::library

@@ -27,6 +27,17 @@
         <source>Albums</source>
         <translation>Альбомы</translation>
     </message>
+    <message>
+        <source>No albums by this artist.</source>
+        <translation>У этого исполнителя нет альбомов.</translation>
+    </message>
+</context>
+<context>
+    <name>GenrePage</name>
+    <message>
+        <source>No albums in this genre.</source>
+        <translation>В этом жанре нет альбомов.</translation>
+    </message>
 </context>
 <context>
     <name>GroupHint</name>
@@ -342,6 +353,14 @@
     <message>
         <source>Favorite</source>
         <translation>В избранное</translation>
+    </message>
+    <message>
+        <source>This playlist is empty.</source>
+        <translation>Этот плейлист пуст.</translation>
+    </message>
+    <message>
+        <source>No tracks on this album.</source>
+        <translation>В этом альбоме нет треков.</translation>
     </message>
 </context>
 <context>

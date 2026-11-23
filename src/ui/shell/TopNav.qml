@@ -95,7 +95,9 @@ FocusScope {
         objectName: "topNavFill"
         anchors.fill: parent
         color: Theme.background
-        opacity: bar.transparent ? 0 : 0.96
+        // Solid means solid: at 96 % the page's buttons showed through
+        // as ghosts while scrolling under the bar.
+        opacity: bar.transparent ? 0 : 1
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
         Rectangle {
             anchors.bottom: parent.bottom

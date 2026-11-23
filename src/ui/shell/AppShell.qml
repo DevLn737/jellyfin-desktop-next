@@ -199,6 +199,16 @@ FocusScope {
                 stack.clear(Basic.StackView.Immediate)
                 stack.push(page, properties, Basic.StackView.Immediate)
                 break
+            case Navigator.Rebuild:
+                // A trimmed stack: pages given by URL are created when they
+                // become current, so only the new top page loads now.
+                stack.clear(Basic.StackView.Immediate)
+                const pages = Navigator.pages()
+                const items = []
+                for (let i = 0; i < pages.length; ++i)
+                    items.push(i % 2 === 0 ? String(pages[i]) : pages[i])
+                stack.push(items, Basic.StackView.Immediate)
+                break
             }
             if (stack.currentItem)
                 stack.currentItem.forceActiveFocus()

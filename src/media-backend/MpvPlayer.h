@@ -3,6 +3,7 @@
 #include "MpvHandle.h"
 
 #include <QElapsedTimer>
+#include <QHash>
 #include <QList>
 #include <QPair>
 #include <QStringList>
@@ -76,6 +77,17 @@ public:
   // Reads any mpv property synchronously (diagnostics only).
   QVariant property(const char* name) const;
 
+  // Diagnostics values kept up by mpv instead of read on demand: watch()
+  // observes the named properties (each read once now, so the first view
+  // is complete) and watched() answers from the last values mpv sent, so a
+  // view that polls them (the stats overlay, once a second) never waits
+  // for the core. unwatchAll() stops observing when the view closes.
+  void watch(const QList<QByteArray>& names);
+  void unwatchAll();
+  bool watching() const { return !m_watched.isEmpty(); }
+  // Invalid for a property not watched or that mpv does not have now.
+  QVariant watched(const char* name) const;
+
   // Sees every mpv event after this object has handled it, then an
   // MPV_EVENT_NONE once the queue is drained. For the core::MediaBackend
   // adapter, which owns the command replies, hooks and properties it
@@ -112,6 +124,9 @@ private:
 
   MpvHandle m_mpv;
   EventListener m_listener;
+  // Watched properties by name, in observation order (their reply ids).
+  QList<QByteArray> m_watchedNames;
+  QHash<QByteArray, QVariant> m_watched;
   QList<QPair<QByteArray, std::uint64_t>> m_hooks;
   bool m_paused = false;
   double m_position = 0;

@@ -270,6 +270,39 @@ TEST_CASE("Settings reach mpv as properties while it runs") {
   CHECK(player.property("sub-font-size").toDouble() == doctest::Approx(60));
 }
 
+TEST_CASE("Watched diagnostics properties are kept up by mpv, without a read per poll") {
+  MpvPlayer player {headless()};
+  player.setDoubleProperty("speed", 1.0);
+  player.watch({"speed", "sub-font-size", "no-such-property"});
+  CHECK(player.watching());
+  // Read once when watching starts.
+  CHECK(player.watched("speed").toDouble() == doctest::Approx(1.0));
+  CHECK_FALSE(player.watched("no-such-property").isValid());
+  // Then mpv's change events keep the values: no synchronous read.
+  player.setDoubleProperty("speed", 1.5);
+  player.setDoubleProperty("sub-font-size", 61);
+  QDeadlineTimer deadline(5000);
+  while ((player.watched("speed").toDouble() != 1.5 || player.watched("sub-font-size").toDouble() != 61) &&
+         !deadline.hasExpired())
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  CHECK(player.watched("speed").toDouble() == doctest::Approx(1.5));
+  CHECK(player.watched("sub-font-size").toDouble() == doctest::Approx(61));
+  // The player's own properties are not disturbed by the watched ones.
+  CHECK_FALSE(player.paused());
+
+  // Not watched any more: nothing kept, and later changes are not followed.
+  player.unwatchAll();
+  CHECK_FALSE(player.watching());
+  CHECK_FALSE(player.watched("speed").isValid());
+  player.setDoubleProperty("speed", 2.0);
+  QDeadlineTimer settle(300);
+  while (!settle.hasExpired()) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  CHECK_FALSE(player.watched("speed").isValid());
+  // Watching again starts from the current value.
+  player.watch({"speed"});
+  CHECK(player.watched("speed").toDouble() == doctest::Approx(2.0));
+}
+
 namespace {
   // Two short tones: a queued file has something to follow.
   constexpr const char* Tone = "av://lavfi:sine=frequency=440:duration=1.2";

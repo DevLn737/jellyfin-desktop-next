@@ -4,7 +4,10 @@
 
 #include <QAbstractListModel>
 #include <QList>
+#include <QString>
 #include <QUrl>
+
+#include <optional>
 
 namespace jfd::library {
 
@@ -13,12 +16,18 @@ namespace jfd::library {
   // User data from an update (a favorite answer, UserDataChanged) applied
   // over what a listing said.
   api::UserItemData mergeUserData(const api::UserItemData& old, const api::UserItemData& update);
+  // An episode's short number in the interface language: "S1:E3", or "E3"
+  // without a season; empty without an episode number.
+  QString episodeNumber(std::optional<int> season, std::optional<int> episode);
 
   // A list of items for QML: a row of cards, the seasons or episodes of a
   // series, search results.
   class ItemListModel : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+    // How many rows are played, kept up as user data changes (a season's
+    // "3 of 600 watched" without walking its delegates).
+    Q_PROPERTY(int playedCount READ playedCount NOTIFY playedCountChanged)
 
   public:
     enum Role {
@@ -55,8 +64,10 @@ namespace jfd::library {
       // Why a home banner item is there: "resume", "nextUp" or "latest";
       // empty on other lists.
       FeaturedReasonRole,
+      // An episode's number in its season; empty for other items.
+      IndexNumberRole,
       // Models that add roles of their own start after this one.
-      LastRole = FeaturedReasonRole,
+      LastRole = IndexNumberRole,
     };
     Q_ENUM(Role)
 
@@ -82,12 +93,19 @@ namespace jfd::library {
     // Updates every row of the item; true when one changed.
     bool applyUserData(const api::UserItemData& data);
     Q_INVOKABLE int rowOf(const QString& itemId) const;
+    int playedCount() const { return m_playedCount; }
+    // The first row not played; 0 when every row is (or there are none).
+    Q_INVOKABLE int firstUnplayedRow() const;
 
   Q_SIGNALS:
     void countChanged();
+    void playedCountChanged();
 
   private:
+    void countPlayed();
+
     QList<Entry> m_entries;
+    int m_playedCount = 0;
   };
 
 } // namespace jfd::library

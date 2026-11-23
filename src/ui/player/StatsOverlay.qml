@@ -88,6 +88,8 @@ Rectangle {
     border.color: Overlay.border
 
     Component.onCompleted: refresh()
+    // mpv keeps the values up only while the overlay is open.
+    Component.onDestruction: player.stopStats()
 
     Timer {
         interval: 1000

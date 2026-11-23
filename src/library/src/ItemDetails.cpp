@@ -72,9 +72,7 @@ namespace jfd::library {
   }
   QString ItemDetails::subtitle() const {
     if (!m_item || !is(*m_item, "Episode") || !m_item->indexNumber) return {};
-    if (m_item->parentIndexNumber)
-      return QStringLiteral("S%1:E%2").arg(*m_item->parentIndexNumber).arg(*m_item->indexNumber);
-    return QStringLiteral("E%1").arg(*m_item->indexNumber);
+    return episodeNumber(m_item->parentIndexNumber, m_item->indexNumber);
   }
   bool ItemDetails::played() const {
     return m_item && m_item->userData.played;
@@ -93,9 +91,7 @@ namespace jfd::library {
   }
   QString ItemDetails::playTargetSubtitle() const {
     if (!m_target || !is(*m_target, "Episode") || !m_target->indexNumber) return {};
-    if (m_target->parentIndexNumber)
-      return QStringLiteral("S%1:E%2").arg(*m_target->parentIndexNumber).arg(*m_target->indexNumber);
-    return QStringLiteral("E%1").arg(*m_target->indexNumber);
+    return episodeNumber(m_target->parentIndexNumber, m_target->indexNumber);
   }
   qint64 ItemDetails::playTargetRunTimeTicks() const {
     return m_target ? m_target->runTimeTicks.value_or(0) : 0;

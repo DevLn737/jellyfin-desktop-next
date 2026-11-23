@@ -212,6 +212,7 @@ namespace jfd::ui {
     beginResetModel();
     m_pages.clear();
     m_total = 0;
+    m_loaded = false;
     endResetModel();
     Q_EMIT countChanged();
     setError({});
@@ -249,6 +250,7 @@ namespace jfd::ui {
       const int total = isWhole() ? static_cast<int>(entries.size()) : result->totalRecordCount;
       // The page first, so the rows that appear already have their data.
       m_pages.insert(page, std::move(entries));
+      if (page == 0) m_loaded = true;
       setTotal(total);
       const int first = page * pageSize();
       const int last = std::min(first + static_cast<int>(m_pages[page].size()), m_total) - 1;

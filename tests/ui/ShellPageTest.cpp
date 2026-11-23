@@ -113,6 +113,50 @@ TEST_CASE("The mini player strip shows under the pages wherever the shell shows 
   CHECK(settingsInMenu);
 }
 
+TEST_CASE("A trimmed page stack keeps one live page and loads the others on Back") {
+  QQmlEngine engine;
+  auto* navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
+  REQUIRE(navigator != nullptr);
+  navigator->setPlaceholderPage(QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
+  navigator->reset(QStringLiteral("home"));
+
+  QQuickWindow window;
+  window.resize(1000, 700);
+  auto object = create(engine, "import QtQuick\nimport Jfd.Ui.Shell\nAppShell { width: 1000; height: 700 }");
+  auto* shell = qobject_cast<QQuickItem*>(object.get());
+  shell->setParentItem(window.contentItem());
+  window.show();
+  QQuickItem* stack = find(shell, "pageStack");
+  REQUIRE(stack != nullptr);
+  const auto loaded = [stack](int index) {
+    QQuickItem* item = nullptr;
+    // get(index) does not load (StackView.DontLoad): null for a page not
+    // created yet.
+    QMetaObject::invokeMethod(stack, "get", Q_RETURN_ARG(QQuickItem*, item), Q_ARG(int, index));
+    return item != nullptr;
+  };
+  const auto current = [stack] {
+    auto* item = stack->property("currentItem").value<QQuickItem*>();
+    return item == nullptr ? QString() : item->property("route").toString();
+  };
+
+  for (int i = 1; i <= ui::Navigator::MaxDepth; ++i) navigator->navigate(QStringLiteral("item/%1").arg(i));
+  CHECK(stack->property("depth").toInt() == ui::Navigator::TrimmedDepth);
+  CHECK(current() == QStringLiteral("item/%1").arg(ui::Navigator::MaxDepth));
+  // Only the page on top was made.
+  int live = 0;
+  for (int i = 0; i < ui::Navigator::TrimmedDepth; ++i) live += loaded(i) ? 1 : 0;
+  CHECK(live == 1);
+
+  // Back creates the page under it from its route.
+  CHECK(navigator->back());
+  CHECK(QTest::qWaitFor([&] { return current() == QStringLiteral("item/%1").arg(ui::Navigator::MaxDepth - 1); }));
+  CHECK(stack->property("depth").toInt() == ui::Navigator::TrimmedDepth - 1);
+  while (navigator->back()) {}
+  CHECK(QTest::qWaitFor([&] { return current() == QStringLiteral("home"); }));
+  CHECK(stack->property("depth").toInt() == 1);
+}
+
 TEST_CASE("Card shapes: poster, thumb, square and circle") {
   QQmlEngine engine;
   auto object = create(engine, R"(

@@ -4,6 +4,7 @@
 #include <QMetaObject>
 
 #include <atomic>
+#include <utility>
 #include <vector>
 
 namespace jfd::media {
@@ -17,6 +18,9 @@ enum PropertyId : std::uint64_t {
   MediaTitle,
   Avsync,
 };
+
+// Reply ids of watched properties: WatchBase + their index.
+constexpr std::uint64_t WatchBase = 0x6a66700000;
 
 QVariant nodeToVariant(const mpv_node& node)
 {
@@ -234,6 +238,42 @@ QVariant MpvPlayer::property(const char* name) const
   return result;
 }
 
+void MpvPlayer::watch(const QList<QByteArray>& names)
+{
+  if (!m_mpv)
+    return;
+  for (const QByteArray& name : names)
+  {
+    if (m_watched.contains(name))
+      continue;
+    qsizetype index = m_watchedNames.indexOf(name);
+    if (index < 0)
+    {
+      index = m_watchedNames.size();
+      m_watchedNames.append(name);
+    }
+    m_watched.insert(name, property(name.constData()));
+    mpv_observe_property(m_mpv.get(), WatchBase + std::uint64_t(index), name.constData(), MPV_FORMAT_NODE);
+  }
+}
+
+void MpvPlayer::unwatchAll()
+{
+  if (!m_mpv)
+    return;
+  for (const QByteArray& name : std::as_const(m_watchedNames))
+    if (m_watched.contains(name))
+      mpv_unobserve_property(m_mpv.get(), WatchBase + std::uint64_t(m_watchedNames.indexOf(name)));
+  // The names keep their ids, so a late event of an old observation still
+  // finds its name (and is dropped: it is no longer watched).
+  m_watched.clear();
+}
+
+QVariant MpvPlayer::watched(const char* name) const
+{
+  return m_watched.value(QByteArray(name));
+}
+
 void MpvPlayer::drainEvents()
 {
   if (!m_mpv)
@@ -248,8 +288,21 @@ void MpvPlayer::drainEvents()
         m_listener(*event);
       return;
     case MPV_EVENT_PROPERTY_CHANGE:
-      handleProperty(*static_cast<const mpv_event_property*>(event->data));
+    {
+      const auto& property = *static_cast<const mpv_event_property*>(event->data);
+      if (event->reply_userdata >= WatchBase && event->reply_userdata < WatchBase + std::uint64_t(m_watchedNames.size()))
+      {
+        // A watched property, as a node: not one of this object's own.
+        const QByteArray& name = m_watchedNames[qsizetype(event->reply_userdata - WatchBase)];
+        if (m_watched.contains(name))
+          m_watched[name] = property.format == MPV_FORMAT_NODE && property.data
+                              ? nodeToVariant(*static_cast<const mpv_node*>(property.data))
+                              : QVariant();
+        break;
+      }
+      handleProperty(property);
       break;
+    }
     case MPV_EVENT_PLAYBACK_RESTART:
       if (m_awaitingFirstFrame)
       {

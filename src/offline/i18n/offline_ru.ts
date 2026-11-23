@@ -85,6 +85,13 @@
     </message>
 </context>
 <context>
+    <name>EpisodeNumber</name>
+    <message>
+        <source>S%1:E%2</source>
+        <translation>С%1:Э%2</translation>
+    </message>
+</context>
+<context>
     <name>jfd::offline::DownloadsController</name>
     <message>
         <source>Downloads are paused.</source>
