@@ -44,11 +44,13 @@ void touch(const fs::path& file, const std::string& text = "x")
   std::ofstream(file, std::ios::binary) << text;
 }
 
+#ifndef _WIN32
 std::string readAll(const fs::path& file)
 {
   std::ifstream in(file, std::ios::binary);
   return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 }
+#endif
 
 } // namespace
 

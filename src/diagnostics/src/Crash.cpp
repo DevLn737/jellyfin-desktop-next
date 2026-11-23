@@ -250,8 +250,7 @@ bool installCrashHandler(const fs::path& folder, const std::string& stamp, const
   const std::wstring path = (folder / (name + ".dmp")).wstring();
   if (path.size() + 1 > std::size(dumpPath))
     return false;
-  std::copy(path.begin(), path.end(), dumpPath);
-  dumpPath[path.size()] = L'\0';
+  std::memcpy(dumpPath, path.c_str(), (path.size() + 1) * sizeof(wchar_t));
   SetUnhandledExceptionFilter(onUnhandledException);
   std::signal(SIGABRT, onAbort);
   return true;
