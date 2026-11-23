@@ -63,7 +63,7 @@ namespace jfd::ui {
     add("player", false, false, false);
     addListed("group", "group", QT_TRANSLATE_NOOP("Sidebar", "Watch together"), 300);
     // The pill's word: the full one stood out beside the others.
-    m_routes[QStringLiteral("group")].sidebar.shortText = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Together"));
+    m_routes[QStringLiteral("group")].sidebar.shortText = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Rooms"));
     addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900,
               RouteSpec::Placement::AccountMenu);
   }
