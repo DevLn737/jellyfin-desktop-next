@@ -64,6 +64,18 @@ only reformatted.
 | `src/ui/controls/icons/tv.svg` | Material Icons `tv` | Apache-2.0 |
 | `src/ui/controls/icons/logout.svg` | Material Icons `exit_to_app` | Apache-2.0 |
 | `src/ui/controls/icons/up.svg` | Material Icons `keyboard_arrow_up` | Apache-2.0 |
+| `src/ui/controls/icons/subtitles.svg` | Material Icons `subtitles` | Apache-2.0 |
+| `src/ui/controls/icons/audio.svg` | Material Icons `volume_up` | Apache-2.0 |
+| `src/ui/controls/icons/window.svg` | Material Icons `desktop_windows` | Apache-2.0 |
+| `src/ui/controls/icons/music.svg` | Material Icons `music_note` | Apache-2.0 |
+| `src/ui/controls/icons/link.svg` | Material Icons `link` | Apache-2.0 |
+| `src/ui/controls/icons/palette.svg` | Material Icons `palette` | Apache-2.0 |
+| `src/ui/controls/icons-dark/subtitles.svg` | Material Icons `subtitles` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/audio.svg` | Material Icons `volume_up` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/window.svg` | Material Icons `desktop_windows` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/music.svg` | Material Icons `music_note` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/link.svg` | Material Icons `link` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/palette.svg` | Material Icons `palette` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/back.svg` | Material Icons `arrow_back` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/check.svg` | Material Icons `check` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/close.svg` | Material Icons `close` (dark fill) | Apache-2.0 |
