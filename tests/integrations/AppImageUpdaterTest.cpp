@@ -96,7 +96,7 @@ TEST_CASE("A signed AppImage is downloaded next to the running one") {
                         "application/octet-stream"};
   });
   QNetworkAccessManager network;
-  AppImageUpdater updater(&network, app, dir.filePath(QStringLiteral("state")), parsePublicKey(testKey));
+  AppImageUpdater updater(&network, app, dir.filePath(QStringLiteral("state")), parsePublicKeys(testKey));
   REQUIRE(updater.supported());
 
   const Outcome outcome = prepare(updater, release(server));
@@ -119,7 +119,7 @@ TEST_CASE("A tampered download is rejected and removed") {
                         "application/octet-stream"};
   });
   QNetworkAccessManager network;
-  AppImageUpdater updater(&network, app, dir.filePath(QStringLiteral("state")), parsePublicKey(testKey));
+  AppImageUpdater updater(&network, app, dir.filePath(QStringLiteral("state")), parsePublicKeys(testKey));
   const Outcome outcome = prepare(updater, release(server));
   CHECK(outcome.failure.startsWith(QStringLiteral("signature check failed")));
   CHECK(updater.readyVersion().isEmpty());
@@ -137,7 +137,7 @@ TEST_CASE("A short download or a release without a signature is not installed") 
                         "application/octet-stream"};
   });
   QNetworkAccessManager network;
-  AppImageUpdater updater(&network, app, dir.filePath(QStringLiteral("state")), parsePublicKey(testKey));
+  AppImageUpdater updater(&network, app, dir.filePath(QStringLiteral("state")), parsePublicKeys(testKey));
   CHECK(prepare(updater, release(server, 1000)).failure.startsWith(QStringLiteral("download incomplete")));
 
   Release unsigned_ = release(server);
@@ -150,9 +150,9 @@ TEST_CASE("Without a release key or outside an AppImage nothing is installed") {
   const QString app = dir.filePath(QStringLiteral("Jellyfin.AppImage"));
   REQUIRE(write(app, "old", true));
   QNetworkAccessManager network;
-  CHECK_FALSE(AppImageUpdater(&network, app, dir.path(), std::nullopt).supported());
-  CHECK_FALSE(AppImageUpdater(&network, QString(), dir.path(), parsePublicKey(testKey)).supported());
-  CHECK(AppImageUpdater(&network, app, dir.path(), parsePublicKey(testKey)).supported());
+  CHECK_FALSE(AppImageUpdater(&network, app, dir.path(), MinisignKeys{}).supported());
+  CHECK_FALSE(AppImageUpdater(&network, QString(), dir.path(), parsePublicKeys(testKey)).supported());
+  CHECK(AppImageUpdater(&network, app, dir.path(), parsePublicKeys(testKey)).supported());
 }
 
 TEST_CASE("The new version confirms its start and the old file is removed") {
@@ -187,7 +187,7 @@ TEST_CASE("A new version that exits or hangs without confirming is rolled back")
 
     // The old version, started again, says which update failed.
     QNetworkAccessManager network;
-    AppImageUpdater updater(&network, app, dir.path(), parsePublicKey(testKey));
+    AppImageUpdater updater(&network, app, dir.path(), parsePublicKeys(testKey));
     const auto state = updater.confirmStart(QStringLiteral("0.1.0"));
     CHECK(state.kind == AppImageUpdater::StartState::Kind::RolledBack);
     CHECK(state.version == QStringLiteral("0.2.0"));
@@ -201,7 +201,7 @@ TEST_CASE("The updated version confirms and gets the screen to reopen") {
   const QString marker = dir.filePath(QStringLiteral("update-pending.json"));
   pending(marker);
   QNetworkAccessManager network;
-  AppImageUpdater updater(&network, dir.filePath(QStringLiteral("app")), dir.path(), parsePublicKey(testKey));
+  AppImageUpdater updater(&network, dir.filePath(QStringLiteral("app")), dir.path(), parsePublicKeys(testKey));
   const auto state = updater.confirmStart(QStringLiteral("0.2.0"));
   CHECK(state.kind == AppImageUpdater::StartState::Kind::Updated);
   CHECK(state.route == QStringLiteral("item/42"));
@@ -251,7 +251,7 @@ TEST_CASE("The next version starts without the AppImage's entries but with the u
 
 TEST_CASE("Restart links are recognised by their scheme") {
   QNetworkAccessManager network;
-  AppImageUpdater updater(&network, QString(), QString(), std::nullopt);
+  AppImageUpdater updater(&network, QString(), QString(), MinisignKeys{});
   int restarts = 0;
   QObject::connect(&updater, &AppImageUpdater::restartRequested, [&] { ++restarts; });
   updater.handleUrl(QUrl(QStringLiteral("jellyfin-desktop-update:restart")));

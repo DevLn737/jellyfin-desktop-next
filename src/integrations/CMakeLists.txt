@@ -5,8 +5,17 @@
 # The minisign public key release files are signed with ("RW..." line of the
 # .pub file). Without it the client checks for updates but installs none.
 set(JFD_RELEASE_PUBLIC_KEY "" CACHE STRING "minisign public key of the release files")
-if(NOT JFD_RELEASE_PUBLIC_KEY STREQUAL "" AND NOT JFD_RELEASE_PUBLIC_KEY MATCHES "^RW[A-Za-z0-9+/]+$")
-  message(FATAL_ERROR "JFD_RELEASE_PUBLIC_KEY is not a minisign public key: ${JFD_RELEASE_PUBLIC_KEY}")
+# A second trusted key, for a key rotation: clients built with it also accept
+# releases signed with the next key, so the signing key can change later
+# without stranding them. Empty outside a rotation.
+set(JFD_RELEASE_NEXT_PUBLIC_KEY "" CACHE STRING "minisign public key of future release files (key rotation)")
+foreach(variable JFD_RELEASE_PUBLIC_KEY JFD_RELEASE_NEXT_PUBLIC_KEY)
+  if(NOT ${variable} STREQUAL "" AND NOT ${variable} MATCHES "^RW[A-Za-z0-9+/]+$")
+    message(FATAL_ERROR "${variable} is not a minisign public key: ${${variable}}")
+  endif()
+endforeach()
+if(JFD_RELEASE_PUBLIC_KEY STREQUAL "" AND NOT JFD_RELEASE_NEXT_PUBLIC_KEY STREQUAL "")
+  message(FATAL_ERROR "JFD_RELEASE_NEXT_PUBLIC_KEY needs JFD_RELEASE_PUBLIC_KEY")
 endif()
 configure_file(src/ReleaseKey.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/ReleaseKey.h @ONLY)
 

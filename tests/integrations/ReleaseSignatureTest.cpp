@@ -105,3 +105,50 @@ TEST_CASE("A signature from another key, a legacy one or a broken file is reject
   CHECK_FALSE(check(msi, "", msiName).valid);
   CHECK_FALSE(check(msi, "untrusted comment: x\nRUR8\ntrusted comment: x\nHinF\n", msiName).valid);
 }
+
+// Key rotation: a client built with the current and the next key accepts
+// releases signed with either, and picks the key by the signature's key id.
+TEST_CASE("A key list accepts a signature from any of its keys") {
+  const MinisignKeys keys = parsePublicKeys(QByteArray("RWR805Y5+HyWC88PFRZwmQiH2B1OUjW2sVhRiL0YGJ/eKlWhWeCzjBeQ ") +
+                                            otherKey);
+  REQUIRE(keys.size() == 2);
+  for (const char* signature : {msiSignature, msiOtherKeySignature}) {
+    QByteArray data = msi;
+    QBuffer buffer(&data);
+    REQUIRE(buffer.open(QIODevice::ReadOnly));
+    const SignatureCheck result = verifyReleaseFile(buffer, signature, QString::fromLatin1(msiName), keys);
+    CHECK_MESSAGE(result.valid, result.error.toStdString());
+  }
+
+  // Only the current key: a release signed with the next one is refused.
+  const MinisignKeys current = parsePublicKeys("RWR805Y5+HyWC88PFRZwmQiH2B1OUjW2sVhRiL0YGJ/eKlWhWeCzjBeQ");
+  REQUIRE(current.size() == 1);
+  QByteArray data = msi;
+  QBuffer buffer(&data);
+  REQUIRE(buffer.open(QIODevice::ReadOnly));
+  CHECK(verifyReleaseFile(buffer, msiOtherKeySignature, QString::fromLatin1(msiName), current).error ==
+        QStringLiteral("signed with another key"));
+
+  // A tampered file still fails with the right key picked from the list.
+  QByteArray tampered = msi;
+  tampered[3] = 'X';
+  QBuffer tamperedBuffer(&tampered);
+  REQUIRE(tamperedBuffer.open(QIODevice::ReadOnly));
+  CHECK_FALSE(verifyReleaseFile(tamperedBuffer, msiOtherKeySignature, QString::fromLatin1(msiName), keys).valid);
+
+  // No keys: nothing is trusted.
+  QByteArray none = msi;
+  QBuffer noneBuffer(&none);
+  REQUIRE(noneBuffer.open(QIODevice::ReadOnly));
+  CHECK_FALSE(verifyReleaseFile(noneBuffer, msiSignature, QString::fromLatin1(msiName), MinisignKeys{}).valid);
+}
+
+TEST_CASE("Key lists parse separators, drop duplicates and refuse a bad entry") {
+  const QByteArray current("RWR805Y5+HyWC88PFRZwmQiH2B1OUjW2sVhRiL0YGJ/eKlWhWeCzjBeQ");
+  CHECK(parsePublicKeys(current + "," + otherKey).size() == 2);
+  CHECK(parsePublicKeys(current + " ; " + otherKey + "\n").size() == 2);
+  CHECK(parsePublicKeys(current + " " + current).size() == 1);
+  CHECK(parsePublicKeys(" ").empty());
+  CHECK(parsePublicKeys("").empty());
+  CHECK(parsePublicKeys(current + " RWR805Y5+HyWC88PFRZwmQiH2B1OUjW2sVhRiL0YGJ").empty());
+}

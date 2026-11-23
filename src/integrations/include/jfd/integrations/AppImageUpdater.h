@@ -36,7 +36,7 @@ namespace jfd::integrations {
     // appImage: the running file ($APPIMAGE); empty when not run as an
     // AppImage. stateDirectory: where the pending-update marker lives.
     AppImageUpdater(QNetworkAccessManager* network, QString appImage, QString stateDirectory,
-                    std::optional<MinisignPublicKey> key, QObject* parent = nullptr);
+                    MinisignKeys keys, QObject* parent = nullptr);
 
     // An AppImage with a release key built in, in a folder it can write to.
     bool supported() const;
@@ -85,7 +85,7 @@ namespace jfd::integrations {
     QNetworkAccessManager* m_network;
     QString m_appImage;
     QString m_stateDirectory;
-    std::optional<MinisignPublicKey> m_key;
+    MinisignKeys m_keys;
     QString m_readyVersion;
     QString m_preparing;
     SignedDownload m_download;

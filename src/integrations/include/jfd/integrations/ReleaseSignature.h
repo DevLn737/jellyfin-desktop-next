@@ -6,6 +6,8 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
+#include <vector>
 
 class QIODevice;
 
@@ -23,10 +25,20 @@ namespace jfd::integrations {
   // with its "untrusted comment:" line.
   std::optional<MinisignPublicKey> parsePublicKey(QByteArrayView text);
 
-  // The key release files are signed with, built into the client
-  // (JFD_RELEASE_PUBLIC_KEY). None in builds made without it: such a client
-  // installs no update.
-  std::optional<MinisignPublicKey> releasePublicKey();
+  // The keys a release file may be signed with. More than one only during a
+  // key rotation.
+  using MinisignKeys = std::vector<MinisignPublicKey>;
+
+  // Key lines ("RW...") separated by white space, commas or semicolons; the
+  // same key twice counts once. Empty when any entry is not a key, so a
+  // mistyped list trusts nothing rather than part of it.
+  MinisignKeys parsePublicKeys(QByteArrayView text);
+
+  // The keys release files are signed with, built into the client: the
+  // current one (JFD_RELEASE_PUBLIC_KEY) and, during a key rotation, the next
+  // one (JFD_RELEASE_NEXT_PUBLIC_KEY). Empty in builds made without them: such
+  // a client installs no update.
+  const MinisignKeys& releasePublicKeys();
 
   struct SignatureCheck {
     bool valid = false;
@@ -38,10 +50,15 @@ namespace jfd::integrations {
   // default "ED") are accepted; both the file's and the trusted comment's
   // signatures must hold.
   SignatureCheck verifySignature(QIODevice& data, QByteArrayView signatureFile, const MinisignPublicKey& key);
+  // The same with the key the signature names (its key id) out of keys.
+  SignatureCheck verifySignature(QIODevice& data, QByteArrayView signatureFile,
+                                 std::span<const MinisignPublicKey> keys);
 
   // verifySignature, and the trusted comment must name the file
   // ("file:<fileName>"), so a validly signed file can't stand in for another.
   SignatureCheck verifyReleaseFile(QIODevice& data, QByteArrayView signatureFile, const QString& fileName,
                                    const MinisignPublicKey& key);
+  SignatureCheck verifyReleaseFile(QIODevice& data, QByteArrayView signatureFile, const QString& fileName,
+                                   std::span<const MinisignPublicKey> keys);
 
 } // namespace jfd::integrations

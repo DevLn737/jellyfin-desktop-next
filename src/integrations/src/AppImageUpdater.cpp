@@ -64,12 +64,12 @@ exec "$app"
   }
 
   AppImageUpdater::AppImageUpdater(QNetworkAccessManager* network, QString appImage, QString stateDirectory,
-                                   std::optional<MinisignPublicKey> key, QObject* parent)
+                                   MinisignKeys keys, QObject* parent)
       : QObject(parent), m_network(network), m_appImage(std::move(appImage)),
-        m_stateDirectory(std::move(stateDirectory)), m_key(key), m_download(network, this) {}
+        m_stateDirectory(std::move(stateDirectory)), m_keys(std::move(keys)), m_download(network, this) {}
 
   bool AppImageUpdater::supported() const {
-    if (m_appImage.isEmpty() || !m_key) return false;
+    if (m_appImage.isEmpty() || m_keys.empty()) return false;
     const QFileInfo file(m_appImage);
     return file.isFile() && QFileInfo(file.absolutePath()).isWritable();
   }
@@ -89,7 +89,7 @@ exec "$app"
     }
     m_preparing = release.version;
     const QString part = m_appImage + QStringLiteral(".new.part");
-    m_download.start(*file, *signature, part, name, *m_key, [this, part](const QString& error) {
+    m_download.start(*file, *signature, part, name, m_keys, [this, part](const QString& error) {
       if (!error.isEmpty()) {
         m_preparing.clear();
         Q_EMIT failed(error);
