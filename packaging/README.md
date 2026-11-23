@@ -22,7 +22,10 @@ Built by `.github/workflows/package.yml`; every version used is pinned in
    that it needs no elevation, the files, shortcuts and registry key, runs the
    installed app's smoke test with only Windows on `PATH`, reinstalls the same
    version, uninstalls, and checks that nothing is left (and that the profile is
-   kept, or removed with `REMOVEPROFILE=1`).
+   kept, or removed with `REMOVEPROFILE=1`). Uninstalling empties the install
+   folder only when it is the default one: a folder chosen with
+   `INSTALLFOLDER=`, or one the remembered registry value was changed to,
+   keeps the files the installer did not put there (checked too).
 5. [windows/test-msi-update.ps1](windows/test-msi-update.ps1) runs the
    client's own update script ([apply-update.ps1](../src/integrations/apply-update.ps1),
    built into `MsiUpdater`) against real packages: an older MSI of the same

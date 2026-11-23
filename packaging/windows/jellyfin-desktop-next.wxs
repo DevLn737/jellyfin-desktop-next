@@ -41,10 +41,20 @@
 
     <!-- util:RemoveFolderEx runs before the directories are resolved, so it
          takes paths from properties set early: the install folder remembered
-         in the registry, and the profile folders only with REMOVEPROFILE=1. -->
+         in the registry, and the profile folders only with REMOVEPROFILE=1.
+         The remembered folder is removed with everything in it only when it
+         is our own default folder: any program of the user can write that
+         registry value, and INSTALLFOLDER=... may have put the program into
+         a folder that holds other files. Elsewhere only the installed files
+         go (and the folders they leave empty). -->
     <Property Id="REMEMBEREDINSTALLFOLDER">
       <RegistrySearch Id="InstallFolderSearch" Root="HKCU" Key="$(var.RegistryKey)" Name="InstallFolder" Type="raw" />
     </Property>
+    <SetProperty Id="DEFAULTINSTALLFOLDER" Value="[LocalAppDataFolder]Programs\$(var.ProductName)\" After="AppSearch"
+                 Sequence="execute" />
+    <SetProperty Id="OWNINSTALLFOLDER" Value="[REMEMBEREDINSTALLFOLDER]" After="SetDEFAULTINSTALLFOLDER"
+                 Sequence="execute"
+                 Condition="REMEMBEREDINSTALLFOLDER AND DEFAULTINSTALLFOLDER AND REMEMBEREDINSTALLFOLDER ~= DEFAULTINSTALLFOLDER" />
     <SetProperty Id="LOCALPROFILEFOLDER" Value="[LocalAppDataFolder]$(var.ProductName)\" After="AppSearch"
                  Sequence="execute" Condition="REMOVEPROFILE=1" />
     <SetProperty Id="ROAMINGPROFILEFOLDER" Value="[AppDataFolder]$(var.ProductName)\" After="AppSearch"
@@ -64,7 +74,7 @@
                   Target="[INSTALLFOLDER]$(var.ExeName)" WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="InstallFolder" Type="string"
                        Value="[INSTALLFOLDER]" KeyPath="yes" />
-        <util:RemoveFolderEx Id="RemoveInstallFolder" On="uninstall" Property="REMEMBEREDINSTALLFOLDER" />
+        <util:RemoveFolderEx Id="RemoveInstallFolder" On="uninstall" Property="OWNINSTALLFOLDER" />
         <!-- Qt's AppDataLocation, AppLocalDataLocation and CacheLocation for this application name. -->
         <util:RemoveFolderEx Id="RemoveLocalProfile" On="uninstall" Property="LOCALPROFILEFOLDER" />
         <util:RemoveFolderEx Id="RemoveRoamingProfile" On="uninstall" Property="ROAMINGPROFILEFOLDER" />
