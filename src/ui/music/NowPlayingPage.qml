@@ -66,6 +66,9 @@ RoutePage {
                         anchors.fill: parent
                         asynchronous: true
                         fillMode: Image.PreserveAspectCrop
+                        // The largest the cover gets, so a resize keeps it.
+                        sourceSize.width: Math.ceil(360 * Screen.devicePixelRatio)
+                        sourceSize.height: Math.ceil(360 * Screen.devicePixelRatio)
                         source: Library.image(Music.coverUrl(page.track.imageItemId || "", page.track.imageTag || "", 360))
                     }
                 }

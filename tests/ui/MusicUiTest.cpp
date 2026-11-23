@@ -22,6 +22,7 @@
 #include <QQuickWindow>
 #include <QtQml/qqmlextensionplugin.h>
 
+#include <atomic>
 #include <memory>
 
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
@@ -49,8 +50,21 @@ namespace {
     return nullptr;
   }
 
+  // The artist "broken" fails while this is set; "lonely" has no albums.
+  std::atomic<bool> brokenArtist{true};
+
   test::HttpResponse items(const test::HttpRequest& request) {
     const QString path = request.path;
+    for (const char* artist : {"lonely", "broken"})
+      if (path.endsWith(QLatin1String("/Items/") + QLatin1String(artist)))
+        return test::json(QJsonDocument(QJsonObject{{QStringLiteral("Id"), QLatin1String(artist)},
+                                                    {QStringLiteral("Name"), QStringLiteral("Someone")},
+                                                    {QStringLiteral("Type"), QStringLiteral("MusicArtist")}})
+                              .toJson(QJsonDocument::Compact));
+    const QString artistId = request.query.queryItemValue(QStringLiteral("albumArtistIds"));
+    if (artistId == QLatin1String("lonely") || path.contains(QLatin1String("/Playlists/")))
+      return test::json(R"({"Items": [], "TotalRecordCount": 0})");
+    if (artistId == QLatin1String("broken") && brokenArtist) return {500, {}};
     if (path.endsWith(QLatin1String("/UserViews"))) {
       return test::json(R"({"Items": [{"Id": "lib", "Name": "Music", "Type": "CollectionFolder",
                             "CollectionType": "music"}], "TotalRecordCount": 1})");
@@ -266,6 +280,95 @@ MiniPlayer { }
   CHECK(waitFor([&] { return qFuzzyCompare(volume->property("value").toDouble(), 40.0); }));
   QMetaObject::invokeMethod(volume, "moved");
   CHECK(f.player->volume() == 40);
+}
+
+TEST_CASE("An artist page says it is loading, has no albums, or failed with a way to try again") {
+  Fixture f;
+  QQuickWindow window;
+  window.resize(1280, 720);
+  window.show();
+
+  // No albums: an empty message instead of a blank grid.
+  auto lonely = f.create(R"(
+import QtQuick
+import Jfd.Ui.Music
+ArtistPage { width: 1280; height: 720; routeArgument: "lonely" }
+)");
+  auto* page = qobject_cast<QQuickItem*>(lonely.get());
+  page->setParentItem(window.contentItem());
+  QQuickItem* empty = find(page, "musicEmpty");
+  REQUIRE(empty != nullptr);
+  CHECK(waitFor([&] { return empty->isVisible(); }));
+  CHECK_FALSE(find(page, "musicError")->isVisible());
+  CHECK_FALSE(find(page, "musicLoading")->isVisible());
+  CHECK(find(page, "artistImage")->property("sourceSize").toSize().width() > 0);
+  if (const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS"); !dir.isEmpty()) {
+    waitFor([] { return false; }, 300);
+    window.grabWindow().save(dir + QStringLiteral("/music-1280-artist-empty.png"));
+  }
+  page->setParentItem(nullptr);
+
+  // A failed listing: the error with Try again, which loads it again.
+  brokenArtist = true;
+  auto broken = f.create(R"(
+import QtQuick
+import Jfd.Ui.Music
+ArtistPage { width: 1280; height: 720; routeArgument: "broken" }
+)");
+  page = qobject_cast<QQuickItem*>(broken.get());
+  page->setParentItem(window.contentItem());
+  QQuickItem* error = find(page, "musicError");
+  REQUIRE(error != nullptr);
+  CHECK(waitFor([&] { return error->isVisible(); }));
+  CHECK_FALSE(find(page, "musicEmpty")->isVisible());
+  QQuickItem* retry = find(error, "stateRetry");
+  REQUIRE(retry != nullptr);
+  CHECK(retry->isVisible());
+  if (const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS"); !dir.isEmpty()) {
+    waitFor([] { return false; }, 300);
+    window.grabWindow().save(dir + QStringLiteral("/music-1280-artist-error.png"));
+  }
+  brokenArtist = false;
+  QMetaObject::invokeMethod(retry, "clicked");
+  CHECK(waitFor([&] { return !error->isVisible(); }));
+  QQuickItem* grid = find(page, "musicGrid");
+  REQUIRE(grid != nullptr);
+  CHECK(waitFor([&] { return grid->property("count").toInt() == Albums; }));
+  CHECK_FALSE(find(page, "musicEmpty")->isVisible());
+}
+
+TEST_CASE("A genre page and a playlist page say when they have nothing") {
+  Fixture f;
+  QQuickWindow window;
+  window.resize(1280, 720);
+  window.show();
+  auto genre = f.create(R"(
+import QtQuick
+import Jfd.Ui.Music
+GenrePage { width: 1280; height: 720; routeArgument: "Polka" }
+)");
+  auto* page = qobject_cast<QQuickItem*>(genre.get());
+  page->setParentItem(window.contentItem());
+  // The fake library has albums of every genre.
+  QQuickItem* grid = find(page, "musicGrid");
+  REQUIRE(grid != nullptr);
+  CHECK(waitFor([&] { return grid->property("count").toInt() == Albums; }));
+  CHECK_FALSE(find(page, "musicEmpty")->isVisible());
+  CHECK_FALSE(find(page, "musicError")->isVisible());
+  page->setParentItem(nullptr);
+
+  // A playlist without tracks (the fake server lists none for it).
+  auto playlist = f.create(R"(
+import QtQuick
+import Jfd.Ui.Music
+PlaylistPage { width: 1280; height: 720; routeArgument: "lonely" }
+)");
+  page = qobject_cast<QQuickItem*>(playlist.get());
+  page->setParentItem(window.contentItem());
+  QQuickItem* empty = find(page, "musicEmpty");
+  REQUIRE(empty != nullptr);
+  CHECK(waitFor([&] { return empty->isVisible(); }));
+  CHECK(find(page, "musicCover")->property("sourceSize").toSize().width() > 0);
 }
 
 TEST_CASE("Now Playing keeps its controls on screen on a short window and the track menu is the app's menu") {

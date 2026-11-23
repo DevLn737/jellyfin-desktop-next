@@ -44,6 +44,9 @@ namespace jfd::ui {
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
+    // The first page of the current query has answered (an empty list is
+    // then really empty, not still loading).
+    Q_PROPERTY(bool loaded READ loaded NOTIFY loadingChanged)
     // The loaded tracks' length in seconds (an album's or playlist's).
     Q_PROPERTY(double totalSeconds READ totalSeconds NOTIFY countChanged)
 
@@ -105,6 +108,7 @@ namespace jfd::ui {
 
     int count() const { return m_total; }
     bool loading() const { return !m_inFlight.isEmpty(); }
+    bool loaded() const { return m_loaded; }
     QString errorText() const { return m_errorText; }
     double totalSeconds() const;
     int loadedPages() const { return static_cast<int>(m_pages.size()); }
@@ -162,6 +166,7 @@ namespace jfd::ui {
 
     quint64 m_generation = 0;
     bool m_reloadScheduled = false;
+    bool m_loaded = false;
     int m_total = 0;
     struct Entry {
       api::Item item;
