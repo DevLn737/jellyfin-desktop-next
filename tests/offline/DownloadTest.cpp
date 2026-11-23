@@ -464,14 +464,26 @@ TEST_CASE("A complete download whose file was deleted or cut short shows as fail
   CHECK(h->queue->status(cut)->problem == QueueProblem::MediaMissing);
   CHECK(h->queue->status(kept)->state == ItemState::Complete);
 
-  // Retry downloads them again, whole.
+  // The whole file put back outside the app: complete again at the next
+  // start.
+  {
+    QFile file(h->mediaPath(cut));
+    REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    REQUIRE(file.write(cutContent) == cutContent.size());
+  }
+  h->open(server.url());
+  CHECK(h->queue->status(cut)->state == ItemState::Complete);
+  CHECK(h->queue->order() == QStringList{gone});
+
+  // Retry downloads the missing one again, whole.
+  const int requestsBefore = int(server.requests().size());
   h->completed.clear();
   h->queue->retry(gone);
-  h->queue->retry(cut);
-  REQUIRE(waitFor([&] { return h->completed.size() == 2; }, 10000));
+  REQUIRE(waitFor([&] { return h->completed.size() == 1; }, 10000));
   CHECK(fileSha(h->mediaPath(gone)) == FakeFileServer::sha256(goneContent));
   CHECK(fileSha(h->mediaPath(cut)) == FakeFileServer::sha256(cutContent));
-  CHECK(h->catalog.find(ServerId, UserId, cut)->state == ItemState::Complete);
+  CHECK(h->catalog.find(ServerId, UserId, gone)->state == ItemState::Complete);
+  CHECK(int(server.requests().size()) == requestsBefore + 1);
 
   // A download folder that is not there (a drive not connected) marks
   // nothing.

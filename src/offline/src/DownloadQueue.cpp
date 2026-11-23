@@ -169,8 +169,10 @@ namespace jfd::offline {
       // renamed only once every segment is in.
       const bool compressed = m.quality == QLatin1String("compressed");
       const qint64 mediaSize = media.isEmpty() ? 0 : QFileInfo(media).size();
+      // A copy that was complete before (completedAt: its file went missing
+      // and came back) has its exact size in the manifest.
       if (!m.mediaComplete && !QFileInfo::exists(m_store.partPath(m)) && mediaSize > 0 &&
-          (compressed || (m.expectedSize > 0 && mediaSize == m.expectedSize))) {
+          ((compressed && !m.completedAt.isValid()) || (m.expectedSize > 0 && mediaSize == m.expectedSize))) {
         if (compressed) {
           m.mediaSource = compressedMediaSource(m.mediaSource, m.transcode, mediaSize);
           m.expectedSize = mediaSize;
