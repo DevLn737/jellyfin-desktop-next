@@ -35,6 +35,9 @@ namespace jfd::core {
     ReconcilerSettings reconciler;
     // How long a load or group seek may take to become ready (contract: 30 s).
     WallTicks readyDeadline = std::chrono::seconds(30);
+    // How long a correction seek (Sync) may take: after it drift correction
+    // and the group's buffering report decide again.
+    WallTicks syncReadyDeadline = std::chrono::seconds(5);
     // Correction pauses after a command or a skip, as in Jellyfin Web
     // (half the maximum speed-correction drift).
     WallTicks correctionCooldown = std::chrono::milliseconds(1500);
@@ -84,6 +87,20 @@ namespace jfd::core {
       std::optional<MediaTicks> duration;
       std::optional<PlaybackRate> appliedRate;
       std::vector<ExternalTrackRequest> tracks;
+      // Opened by the automatic reopen after a stream error: no second one
+      // until it has played on for a while.
+      bool reopened = false;
+      // A group seek that did not become ready was issued once more.
+      bool seekRetried = false;
+      // When the pending seek was issued, for the seek latency estimate.
+      std::optional<LocalInstant> seekIssuedAt;
+    };
+
+    // A reopen asked for after a stream error, until its Open arrives.
+    struct Reopen {
+      ItemId item;
+      PlaylistItemId playlistItem;
+      std::string error;
     };
 
     // The file queued behind the current one (MediaBackend::preload).
@@ -112,6 +129,10 @@ namespace jfd::core {
       std::optional<TimerId> cooldownTimer;
       std::optional<TimerId> correctionTimer;
       bool reportedBuffering = false;
+      // The queue goes on after the current item (group::QueueChanged).
+      bool hasNextItem = false;
+      // The item whose end already asked the group for the next one.
+      PlaylistItemId nextRequestedFor;
       std::optional<std::int64_t> driftMilliseconds;
       // A command that came while the clock offset was unknown: scheduled
       // once ClockSynced arrives.
@@ -134,6 +155,8 @@ namespace jfd::core {
     void on(const intent::SelectTrack&);
     void on(const intent::AddExternalTrack&);
     void on(const intent::SetSyncCorrection&);
+    void on(const intent::SetAutoNext&);
+    void on(const intent::OpenFailed&);
     void on(const backend::SourceOpened&);
     void on(const backend::SeekStarted&);
     void on(const backend::PlaybackRestarted&);
@@ -169,6 +192,16 @@ namespace jfd::core {
     bool groupDrives() const;
     bool mediaFollowsGroup() const;
     bool mediaFollowsGroupItem(const PlaylistItemId& item) const;
+    // After a stream error: asks the app to reopen the file where it was
+    // (once), telling the group we wait for data. False when it may not.
+    bool reopenAfterError(std::string error);
+    // Stops the group's item for good and asks the app to leave the group.
+    void failGroupItem(std::string error);
+    // A group request while the connection is lost: tells the app, true.
+    bool groupOffline();
+    // How far ahead of the group a seek aims while it plays: the measured
+    // time seeks take (zero until one was measured).
+    WallTicks seekLead() const;
 
     // Group helpers.
     void leaveGroup();
@@ -181,6 +214,12 @@ namespace jfd::core {
     void executeCommand(const group::Command& command, bool late);
     void applyDuplicate(const group::Command& command);
     void reportReady(bool ready);
+    // Tells the group when our buffering state differs from what it was
+    // last told (Buffering while we wait for data, Ready once we no longer
+    // do). Called after every sample once no seek of ours is pending.
+    void reportBufferingState();
+    // After the paused seek of a group Pause while the group waits: Ready.
+    void readyAfterGroupPause();
     void synchronize();
     LocalInstant now() const { return m_ports.clock.now(); }
     void send(const SyncPlayMessage& message);
@@ -217,6 +256,10 @@ namespace jfd::core {
     // The round trip to the server of the latest ClockSynced, while synced.
     std::optional<WallTicks> m_roundTrip;
     PlaybackRate m_personalRate = PlaybackRate::normal();
+    bool m_autoNext = true;
+    std::optional<Reopen> m_reopen;
+    // Moving average of the time from a seek to its readiness.
+    std::optional<WallTicks> m_seekLatency;
     PlaybackPhase m_endPhase = PlaybackPhase::Idle;
     std::string m_error;
 

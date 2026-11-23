@@ -252,8 +252,8 @@
         <translation>Перематывать при расхождении больше чем на</translation>
     </message>
     <message>
-        <source>With speed correction on, differences up to 3 seconds are made up by speed first.</source>
-        <translation>Если включено выравнивание скоростью, расхождение до 3 секунд сначала выравнивается скоростью.</translation>
+        <source>With speed correction on, differences up to about half a second are made up by speed first (at most 10% faster or slower than the group).</source>
+        <translation>Если включено выравнивание скоростью, расхождение примерно до полсекунды сначала выравнивается скоростью (не больше чем на 10% быстрее или медленнее группы).</translation>
     </message>
 </context>
 <context>

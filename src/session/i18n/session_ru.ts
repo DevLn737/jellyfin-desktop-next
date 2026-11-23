@@ -40,6 +40,14 @@
         <translation>Группа перемотала на %1</translation>
     </message>
     <message>
+        <source>The group&apos;s item could not be played here, so you left the group.</source>
+        <translation>Здесь не удалось воспроизвести то, что смотрит группа, поэтому вы вышли из группы.</translation>
+    </message>
+    <message>
+        <source>No connection to the group. Reconnecting; try again in a moment.</source>
+        <translation>Нет связи с группой. Переподключаемся — попробуйте ещё раз через мгновение.</translation>
+    </message>
+    <message>
         <source>Not everyone in the group can play at another speed (%1 cannot).</source>
         <translation>Не все в группе могут смотреть на другой скорости (не могут: %1).</translation>
     </message>

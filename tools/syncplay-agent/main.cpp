@@ -457,6 +457,17 @@ namespace {
                              {"request", static_cast<int>(failed.request)},
                              {"status", failed.httpStatus}});
                      },
+                     [](const notice::ReopenAfterError& reopen) {
+                       emit({{"t", "notice"},
+                             {"kind", "reopenAfterError"},
+                             {"positionMs", reopen.position.milliseconds()}});
+                     },
+                     [](const notice::GroupItemFailed&) {
+                       emit({{"t", "notice"}, {"kind", "groupItemFailed"}});
+                     },
+                     [](const notice::GroupOffline&) {
+                       emit({{"t", "notice"}, {"kind", "groupOffline"}});
+                     },
                  },
                  notice);
     }

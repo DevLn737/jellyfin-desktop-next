@@ -48,6 +48,9 @@ namespace jfd::core {
     MediaTicks start;
     std::optional<MediaTicks> runTime;
     bool startPaused = false;
+    // Music: its player keeps its own queue and reopens nothing by itself,
+    // so a stream error ends the track (no notice::ReopenAfterError).
+    bool audioOnly = false;
   };
 
   namespace intent {
@@ -96,6 +99,17 @@ namespace jfd::core {
     // The user's SyncPlay correction settings; apply from the next decision.
     struct SetSyncCorrection {
       ReconcilerSettings reconciler;
+    };
+    // The user's "play the next one" setting. In a group it decides whether
+    // the end of the group's item asks the group for the next one.
+    struct SetAutoNext {
+      bool enabled = true;
+    };
+    // An item the app was asked to open (notice::GroupItemRequested or
+    // notice::ReopenAfterError) could not be resolved: no Open follows.
+    struct OpenFailed {
+      ItemId item;
+      std::string error;
     };
   } // namespace intent
 
@@ -180,6 +194,7 @@ namespace jfd::core {
                    TimerFired, intent::Next, intent::Previous, intent::SelectTrack,
                    intent::AddExternalTrack, group::ParticipantsChanged,
                    intent::SetSyncCorrection, intent::PreloadNext, backend::Advanced,
-                   group::ClockLost, group::RequestFailed>;
+                   group::ClockLost, group::RequestFailed, intent::SetAutoNext,
+                   intent::OpenFailed>;
 
 } // namespace jfd::core

@@ -186,6 +186,8 @@ namespace jfd::ui {
   void PlayerModel::setAutoNext(bool on) {
     if (on == m_autoNext) return;
     m_autoNext = on;
+    // In a group the session asks the group for the next item.
+    m_runtime.post(core::intent::SetAutoNext{on});
     Q_EMIT autoNextChanged();
   }
 
@@ -262,7 +264,9 @@ namespace jfd::ui {
     const double clamped = std::max(0.0, duration() > 0 ? std::min(seconds, duration()) : seconds);
     if (const auto position =
             core::MediaTicks::fromTicks(static_cast<std::int64_t>(clamped * TicksPerSecond))) {
-      if (inGroup()) {
+      // While the group's connection is lost the seek is not sent (the
+      // group model says so): the bar stays where the file is.
+      if (inGroup() && m_snapshot.group->connected) {
         m_groupSeek = clamped;
         m_groupSeekAge.start();
         Q_EMIT positionChanged();

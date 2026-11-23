@@ -28,6 +28,9 @@ namespace jfd::testing {
 
     std::vector<std::string> loadedUrls;
     std::vector<core::ExternalTrack> addedTracks;
+    // Faults: the next loads end with an error instead of opening (a stream
+    // the server cannot produce).
+    int failingLoads = 0;
 
     void load(core::MediaEpoch epoch, const core::BackendLoad& request) override {
       m_epoch = epoch;
@@ -35,7 +38,20 @@ namespace jfd::testing {
       m_paused = request.startPaused;
       m_position = 0.0;
       loadedUrls.push_back(request.url);
+      if (failingLoads > 0) {
+        --failingLoads;
+        later(80, [this, epoch] {
+          m_post(core::backend::Ended{epoch, core::backend::EndReason::Error, "cannot open"});
+        });
+        return;
+      }
       later(80, [this, epoch] { m_post(core::backend::SourceOpened{epoch, 0.0, 600.0}); });
+    }
+    // The current file's stream dies, as mpv reports a network error.
+    void failCurrent(const std::string& error) {
+      m_position = current();
+      m_started = false;
+      m_post(core::backend::Ended{m_epoch, core::backend::EndReason::Error, error});
     }
     // Never plays to its end in a test, so a queued file is never reached.
     void preload(core::MediaEpoch, const core::BackendLoad&) override {}

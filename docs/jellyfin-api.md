@@ -11,7 +11,7 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `MusicApi.h` | Music lists, playlists and lyrics (`Audio/{id}/Lyrics`: synced lines with start ticks or plain text; 404 is "no lyrics") |
 | `JellyfinClient.h` (library) | Libraries (`UserViews`), "Continue watching" (`UserItems/Resume`), "Next up" (`Shows/NextUp`), latest per library (`Items/Latest`), filtered and sorted pages, filter values (`Items/Filters`), similar items, people (`Persons`), favorites, image URLs, item details with trickplay, media segments, trickplay tile URLs and authorized fetches |
 | `ServerDiscovery.h` | Servers on the local network (UDP broadcast to port 7359) |
-| `SessionSocket.h` | The `/socket` connection: keep-alives, reconnect with backoff, capabilities re-reported on every connect, raw `SyncPlayCommand` and `SyncPlayGroupUpdate` |
+| `SessionSocket.h` | The `/socket` connection: keep-alives with pings and a silence watchdog (2.5 intervals), reconnect with backoff, capabilities re-reported on every connect, raw `SyncPlayCommand` and `SyncPlayGroupUpdate` |
 | `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, `Queue` (next or last), and `GetUtcTime` samples |
 | `Playback.h` | `PlaybackInfo` to mpv URLs (direct play, static stream, transcode), external subtitles and audio, mpv track ids, report bodies |
 | `DeviceProfile.h` | The 2.x client's device profile and its options |

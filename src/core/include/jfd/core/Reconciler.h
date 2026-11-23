@@ -8,6 +8,9 @@
 // The SyncPlay drift decision as a pure function. Defaults come from Jellyfin
 // Web's PlaybackCore (speed correction 60-3000 ms over 1000 ms, skip from
 // 400 ms); they are starting points to be measured, not acceptance limits.
+// Unlike Web, a speed correction stays within 10 % of the group rate and
+// may take up to correctionMaximum: Web's formula reaches 0.2x-3.9x, which
+// sounds broken. Drift the band cannot make up in that time is skipped.
 namespace jfd::core {
 
   struct ReconcilerSettings {
@@ -19,6 +22,9 @@ namespace jfd::core {
     WallTicks speedDuration = std::chrono::milliseconds(1000);
     WallTicks correctionMaximum = std::chrono::milliseconds(5000);
     MediaDelta skipMinimum = MediaDelta::fromMilliseconds(400);
+    // How far a correction may move the rate from the group's, in per mille
+    // of the group rate (100: 0.9x-1.1x at 1x). 0: no band (Web's range).
+    std::int32_t speedBandPerMille = 100;
   };
 
   // Where the group is: at `position` at server instant `when`, moving at
@@ -60,11 +66,12 @@ namespace jfd::core {
                               MediaTicks actual, const ReconcilerSettings& settings,
                               bool rateAvailable = true);
 
-  // round(base + drift / duration), clamped to the effective range, and the
-  // wall time needed at that rate. Empty when the rate does not change or
-  // the correction would last longer than the maximum.
+  // round(base + drift / duration), clamped to the effective range and to
+  // `bandPerMille` of the base rate (0: no band), and the wall time needed at
+  // that rate. Empty when the rate does not change or the correction would
+  // last longer than the maximum.
   std::optional<drift::SpeedCorrection>
   speedCorrection(PlaybackRate base, MediaDelta drift, WallTicks preferredDuration,
-                  WallTicks maximumDuration);
+                  WallTicks maximumDuration, std::int32_t bandPerMille = 0);
 
 } // namespace jfd::core

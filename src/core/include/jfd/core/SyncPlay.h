@@ -91,6 +91,10 @@ namespace jfd::core {
       MediaTicks startPosition;
       bool isPlaying = false;
       PlaybackRate baseRate = PlaybackRate::normal();
+      // The queue goes on after the current item (another entry after it,
+      // or RepeatAll over more than one), so the end of the current item
+      // can ask for the next one.
+      bool hasNextItem = false;
     };
 
     // The server refused POST SyncPlay/SetPlaybackRate. 409 means a member

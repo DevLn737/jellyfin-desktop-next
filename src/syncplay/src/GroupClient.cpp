@@ -132,6 +132,7 @@ namespace jfd::syncplay {
               input.startPosition = queue.startPosition;
               input.isPlaying = queue.isPlaying;
               input.baseRate = queue.baseRate;
+              input.hasNextItem = queue.hasNextItem;
               m_sink(input);
             },
             [&](const wire::UserJoined& user) {

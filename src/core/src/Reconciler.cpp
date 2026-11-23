@@ -14,13 +14,19 @@ namespace jfd::core {
 
   std::optional<drift::SpeedCorrection>
   speedCorrection(PlaybackRate base, MediaDelta drift, WallTicks preferredDuration,
-                  WallTicks maximumDuration) {
+                  WallTicks maximumDuration, std::int32_t bandPerMille) {
     if (preferredDuration.count() <= 0 || maximumDuration.count() <= 0) return std::nullopt;
     // drift ticks per wall tick, in per mille: drift / duration * 1000.
     const std::int64_t requested =
         base.perMille() + (drift.ticks() * 1000) / preferredDuration.count();
-    const auto clamped = static_cast<std::int32_t>(
-        std::clamp<std::int64_t>(requested, PlaybackRate::MinimumEffective, PlaybackRate::Maximum));
+    std::int64_t low = PlaybackRate::MinimumEffective;
+    std::int64_t high = PlaybackRate::Maximum;
+    if (bandPerMille > 0) {
+      const std::int64_t band = std::max<std::int64_t>(1, std::int64_t{base.perMille()} * bandPerMille / 1000);
+      low = std::max(low, std::int64_t{base.perMille()} - band);
+      high = std::min(high, std::int64_t{base.perMille()} + band);
+    }
+    const auto clamped = static_cast<std::int32_t>(std::clamp<std::int64_t>(requested, low, high));
     const std::int32_t delta = clamped - base.perMille();
     if (delta == 0) return std::nullopt;
     // Wall time to cover the drift at the rate difference: drift / delta.
@@ -48,7 +54,7 @@ namespace jfd::core {
     if (rateAvailable && settings.useSpeed && size >= settings.speedMinimum &&
         size < settings.speedMaximum) {
       if (const auto correction = speedCorrection(group.baseRate, drift, settings.speedDuration,
-                                                  settings.correctionMaximum)) {
+                                                  settings.correctionMaximum, settings.speedBandPerMille)) {
         decision.action = *correction;
       } else {
         // As in Jellyfin Web: a correction that cannot be expressed falls back
