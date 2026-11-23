@@ -18,8 +18,13 @@ namespace jfd::api {
   //
   // On every (re)connect it re-reports the client's session capabilities, as
   // the contract's reconnectRule requires, and only then emits `ready`.
-  // Keep-alives follow the server's ForceKeepAlive timeout. A dropped
-  // connection is retried with backoff (1 s doubling to 30 s) until stop().
+  // Keep-alives follow the server's ForceKeepAlive timeout: a KeepAlive and
+  // a WebSocket ping every half timeout. A connection that stays silent for
+  // two and a half of those intervals (no message, no KeepAlive answer, no
+  // pong) is taken for dead and aborted: a half-open TCP connection after a
+  // Wi-Fi roam or NAT timeout would otherwise look alive for many minutes.
+  // A dropped connection is retried with backoff (1 s doubling to 30 s)
+  // until stop().
   class SessionSocket : public QObject {
     Q_OBJECT
 
@@ -60,6 +65,9 @@ namespace jfd::api {
     void onDisconnected();
     void onTextMessage(const QString& text);
     void scheduleReconnect(const QString& reason);
+    // Something arrived: the connection is alive.
+    void heard();
+    void onSilence();
     void setState(State state);
     QUrl socketUrl() const;
 
@@ -67,6 +75,7 @@ namespace jfd::api {
     QWebSocket* m_socket = nullptr;
     QTimer m_keepAlive;
     QTimer m_reconnect;
+    QTimer m_watchdog;
     State m_state = State::Stopped;
     quint64 m_generation = 0;
     int m_initialDelayMs = 1000;

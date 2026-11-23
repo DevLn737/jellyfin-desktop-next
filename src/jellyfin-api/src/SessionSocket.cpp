@@ -3,6 +3,7 @@
 #include <jfd/api/JellyfinClient.h>
 
 #include <QJsonDocument>
+#include <QLoggingCategory>
 #include <QNetworkRequest>
 #include <QUrlQuery>
 #include <QWebSocket>
@@ -14,12 +15,20 @@ namespace jfd::api {
   namespace {
     const QString KeepAlive = QStringLiteral("KeepAlive");
     const QString ForceKeepAlive = QStringLiteral("ForceKeepAlive");
+    Q_LOGGING_CATEGORY(lcSocket, "jfd.api.socket")
   } // namespace
 
   SessionSocket::SessionSocket(JellyfinClient& client, QObject* parent)
       : QObject(parent), m_client(client) {
     m_keepAlive.setSingleShot(false);
-    connect(&m_keepAlive, &QTimer::timeout, this, [this]() { send(KeepAlive); });
+    connect(&m_keepAlive, &QTimer::timeout, this, [this]() {
+      send(KeepAlive);
+      // Answered by the peer's WebSocket layer even when the server's own
+      // KeepAlive answer is late.
+      if (m_socket && m_socket->state() == QAbstractSocket::ConnectedState) m_socket->ping();
+    });
+    m_watchdog.setSingleShot(true);
+    connect(&m_watchdog, &QTimer::timeout, this, &SessionSocket::onSilence);
     m_reconnect.setSingleShot(true);
     connect(&m_reconnect, &QTimer::timeout, this, &SessionSocket::open);
   }
@@ -46,6 +55,7 @@ namespace jfd::api {
   void SessionSocket::stop() {
     m_reconnect.stop();
     m_keepAlive.stop();
+    m_watchdog.stop();
     if (m_socket) {
       m_socket->disconnect(this);
       m_socket->close();
@@ -75,6 +85,8 @@ namespace jfd::api {
     connect(m_socket, &QWebSocket::connected, this, &SessionSocket::onConnected);
     connect(m_socket, &QWebSocket::disconnected, this, &SessionSocket::onDisconnected);
     connect(m_socket, &QWebSocket::textMessageReceived, this, &SessionSocket::onTextMessage);
+    connect(m_socket, &QWebSocket::binaryMessageReceived, this, &SessionSocket::heard);
+    connect(m_socket, &QWebSocket::pong, this, &SessionSocket::heard);
 
     // The token goes in the Authorization header with the same identity as
     // HTTP requests, so the server attaches the socket to this session and
@@ -110,6 +122,7 @@ namespace jfd::api {
 
   void SessionSocket::onDisconnected() {
     m_keepAlive.stop();
+    m_watchdog.stop();
     QString reason = m_socket ? m_socket->closeReason() : QString();
     if (m_socket && reason.isEmpty()) reason = m_socket->errorString();
     Q_EMIT disconnected(reason);
@@ -123,7 +136,22 @@ namespace jfd::api {
     m_nextDelayMs = std::min(m_nextDelayMs * 2, m_maximumDelayMs);
   }
 
+  void SessionSocket::heard() {
+    // Armed once the server set the keep-alive interval (ForceKeepAlive).
+    if (m_watchdog.interval() > 0 && m_keepAlive.isActive()) m_watchdog.start();
+  }
+
+  void SessionSocket::onSilence() {
+    if (!m_socket) return;
+    qCWarning(lcSocket) << "the session socket has been silent for" << m_watchdog.interval()
+                        << "ms; reconnecting";
+    // Reported as a disconnect, so the reconnect (and the group's rejoin)
+    // runs as for any other dropped connection.
+    m_socket->abort();
+  }
+
   void SessionSocket::onTextMessage(const QString& text) {
+    heard();
     const auto document = QJsonDocument::fromJson(text.toUtf8());
     if (!document.isObject()) return;
     const QJsonObject message = document.object();
@@ -135,7 +163,9 @@ namespace jfd::api {
       // client answers at half of it, and so does this one.
       const int timeoutSeconds = data.isDouble() ? data.toInt() : 60;
       send(KeepAlive);
-      m_keepAlive.start(std::max(1, timeoutSeconds) * 500);
+      const int intervalMs = std::max(1, timeoutSeconds) * 500;
+      m_keepAlive.start(intervalMs);
+      m_watchdog.start(intervalMs * 5 / 2);
       return;
     }
     if (type == KeepAlive) return;
