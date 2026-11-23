@@ -3,7 +3,7 @@
 // sizes and safe area, switching TV mode on a screen of 1000 cards, the
 // gamepad check's state, the on-screen keyboard with text from the
 // phone, and a gamepad without TV mode (focus-driven: the on-screen
-// keyboard). Only arrows, Enter, Back and Menu (and a physical keyboard where
+// keyboard, "Show all" after a row's cards). Only arrows, Enter, Back and Menu (and a physical keyboard where
 // the test says so).
 #include "../support/DoctestQt.h"
 
@@ -1529,3 +1529,63 @@ TEST_CASE("Without TV mode a gamepad opens the on-screen keyboard; a physical ke
   CHECK_FALSE(scene.entry->isOpen());
 }
 
+TEST_CASE("\"Show all\" after a row's last card: Right reaches it, Select opens, Left goes back") {
+  for (const bool tv : {false, true}) {
+    CAPTURE(tv);
+    Scene scene(R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Shell
+import Jfd.Ui.Controls
+Item {
+  SpatialNavigation.enabled: true
+  property int shown: 0
+  function setTvMode(on) { Theme.tvMode = on }
+  Component.onDestruction: Theme.tvMode = false
+  CardRow {
+    id: row
+    objectName: "row"
+    width: 700
+    title: "Latest"
+    canShowAll: true
+    cardHeight: 150
+    focus: true
+    model: 8
+    onShowAllClicked: parent.shown++
+    delegate: PosterCard {
+      required property int index
+      objectName: "c" + index
+      title: "Card " + index
+      cardWidth: 90
+      shape: "thumb"
+    }
+  }
+}
+)",
+                QSize(800, 400));
+    scene.setTvMode(tv);
+    pump(30);
+    QQuickWindow& window = scene.window;
+    SpatialNavigation::focusItem(scene.item(QStringLiteral("c0")));
+    for (int i = 0; i < 7; ++i) tap(window, Qt::Key_Right);
+    REQUIRE(focusName(window) == QStringLiteral("c7"));
+    tap(window, Qt::Key_Right);
+    QQuickItem* tile = window.activeFocusItem();
+    REQUIRE(tile != nullptr);
+    CHECK(tile->objectName() == QStringLiteral("cardRowShowAllTile"));
+    CHECK(tile->property("visualFocus").toBool());
+    pump(400);
+    // Scrolled into view.
+    const QRectF shown = tile->mapRectToScene(QRectF(0, 0, tile->width(), tile->height()));
+    CHECK(shown.right() <= 700 + 1);
+    // Right stays; Select opens the list; Left goes back to the last card.
+    tap(window, Qt::Key_Right);
+    CHECK(window.activeFocusItem() == tile);
+    tap(window, Qt::Key_Return);
+    CHECK(scene.root->property("shown").toInt() == 1);
+    tap(window, Qt::Key_Left);
+    CHECK(focusName(window) == QStringLiteral("c7"));
+    tap(window, Qt::Key_Left);
+    CHECK(focusName(window) == QStringLiteral("c6"));
+  }
+}

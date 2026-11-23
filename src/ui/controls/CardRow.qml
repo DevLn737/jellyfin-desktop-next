@@ -5,6 +5,11 @@ import Jfd.Ui.Theme
 // Scrolls with Shift + wheel, drag, and Left/Right when focused; the plain
 // wheel scrolls the page. The
 // delegate is usually a PosterCard bound to the model's roles.
+//
+// With canShowAll, "Show all" is beside the title for the pointer and, for
+// keys and a gamepad, a button after the last card: Right from the last
+// card reaches it, Left goes back. The scroll arrows stay for the pointer:
+// Left and Right along the cards scroll the row already.
 FocusScope {
     id: row
 
@@ -17,7 +22,7 @@ FocusScope {
     // Height of the tallest card; set it so the row does not resize while
     // images load.
     property int cardHeight: Math.round(Theme.posterWidth / Theme.posterAspect) + Theme.cardCaptionHeight
-    // A "Show all" link beside the title.
+    // A "Show all" link beside the title and after the last card.
     property bool canShowAll: false
     signal showAllClicked()
 
@@ -121,6 +126,42 @@ FocusScope {
         preferredHighlightBegin: Theme.spacingHuge
         preferredHighlightEnd: width - Theme.spacingHuge
         cacheBuffer: 2 * Theme.thumbWidth
+
+        // Right from the last card: "Show all" after it.
+        Keys.onRightPressed: (event) => {
+            const tile = list.footerItem ? list.footerItem.tile : null
+            if (!row.canShowAll || !tile || list.currentIndex !== list.count - 1) {
+                event.accepted = false
+                return
+            }
+            tile.forceActiveFocus(Qt.TabFocusReason)
+            list.positionViewAtEnd()
+        }
+
+        footer: Item {
+            readonly property alias tile: showAllTile
+            width: row.canShowAll ? showAllTile.width + Theme.spacing : 0
+            height: list.height
+            visible: row.canShowAll
+
+            ActionButton {
+                id: showAllTile
+                objectName: "cardRowShowAllTile"
+                x: Theme.spacing
+                // Level with the middle of the cards' pictures.
+                y: Math.max(0, Math.round((row.cardHeight - Theme.cardCaptionHeight - height) / 2))
+                focusPolicy: Qt.TabFocus
+                iconSource: Icons.right
+                text: qsTr("Show all")
+                onClicked: row.showAllClicked()
+                // Left: back to the last card; Right: nothing further.
+                Keys.onLeftPressed: {
+                    list.positionViewAtEnd()
+                    if (list.currentItem) list.currentItem.forceActiveFocus(Qt.TabFocusReason)
+                }
+                Keys.onRightPressed: {}
+            }
+        }
 
         // A plain vertical wheel belongs to the page (it passes through the
         // row); Shift + wheel scrolls the row sideways. A sideways wheel or
