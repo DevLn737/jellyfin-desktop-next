@@ -161,8 +161,13 @@ namespace jfd::api {
 
   QNetworkReply* JellyfinClient::startRequest(Method method, const QUrl& target,
                                               const QByteArray* payload) {
+    return startRequest(method, target, payload, authorizationHeader());
+  }
+
+  QNetworkReply* JellyfinClient::startRequest(Method method, const QUrl& target, const QByteArray* payload,
+                                              const QByteArray& authorization) {
     QNetworkRequest request(target);
-    request.setRawHeader("Authorization", authorizationHeader());
+    request.setRawHeader("Authorization", authorization);
     request.setRawHeader("Accept", "application/json");
     if (m_timeoutMs > 0) request.setTransferTimeout(m_timeoutMs);
     if (payload || method == Method::Post)
@@ -193,11 +198,31 @@ namespace jfd::api {
     return reply;
   }
 
-  void JellyfinClient::expireSessionOn401(int status, bool wasAuthenticated) {
-    if (status == 401 && wasAuthenticated && !m_accessToken.isEmpty()) {
-      clearSession();
-      Q_EMIT sessionExpired();
-    }
+  void JellyfinClient::checkTokenAfter401(int status, const QString& token) {
+    // A token signed out or replaced since the request went out: its 401
+    // says nothing about the current one.
+    if (status != 401 || token.isEmpty() || token != m_accessToken) return;
+    if (m_checkingToken == token) return;
+    constexpr std::chrono::seconds recheckAfter{30};
+    if (m_checkedToken == token && std::chrono::steady_clock::now() - m_checkedAt < recheckAfter) return;
+    // A reverse proxy with its own sign-in may answer 401 for one request
+    // while the token is fine: ask Jellyfin itself before giving it up.
+    m_checkingToken = token;
+    QNetworkReply* reply = startRequest(Method::Get, url(QStringLiteral("Users/Me")), nullptr);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, token] {
+      reply->deleteLater();
+      if (m_checkingToken == token) m_checkingToken.clear();
+      if (token != m_accessToken) return;
+      const QVariant code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+      if (!code.isNull() && code.toInt() == 401) {
+        clearSession();
+        Q_EMIT sessionExpired();
+        return;
+      }
+      // Accepted, or no answer (offline, timeout, server error): keep it.
+      m_checkedToken = token;
+      m_checkedAt = std::chrono::steady_clock::now();
+    });
   }
 
   void JellyfinClient::send(Method method, const QString& path, const QUrlQuery& query,
@@ -236,12 +261,12 @@ namespace jfd::api {
 
   void JellyfinClient::finishRaw(QNetworkReply* reply, QObject* context,
                                  Callback<RawResponse> done) {
-    const bool authenticated = !m_accessToken.isEmpty();
+    const QString token = m_accessToken;
     const QPointer<QObject> guard(context);
     const bool hasContext = context != nullptr;
     abandonWith(reply, context);
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, guard, hasContext, authenticated, done = std::move(done)]() {
+            [this, reply, guard, hasContext, token, done = std::move(done)]() {
               reply->deleteLater();
               if (hasContext && guard.isNull()) return;
 
@@ -253,7 +278,7 @@ namespace jfd::api {
               const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
               const QByteArray data = reply->readAll();
               if (status < 200 || status > 299) {
-                expireSessionOn401(status, authenticated);
+                checkTokenAfter401(status, token);
                 done(httpError(status, data));
                 return;
               }
@@ -270,12 +295,12 @@ namespace jfd::api {
     QNetworkReply* reply =
         startRequest(method, url(path, query), jsonBody.isEmpty() ? nullptr : &jsonBody);
 
-    const bool authenticated = !m_accessToken.isEmpty();
+    const QString token = m_accessToken;
     const QPointer<QObject> guard(context);
     const bool hasContext = context != nullptr;
     abandonWith(reply, context);
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, guard, hasContext, authenticated, done = std::move(done)]() {
+            [this, reply, guard, hasContext, token, done = std::move(done)]() {
               reply->deleteLater();
               if (hasContext && guard.isNull()) return;
               const QVariant code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
@@ -284,7 +309,7 @@ namespace jfd::api {
                 return;
               }
               const int status = code.toInt();
-              expireSessionOn401(status, authenticated);
+              checkTokenAfter401(status, token);
               done(status, reply->readAll());
             });
   }
@@ -469,11 +494,25 @@ namespace jfd::api {
       done(Empty{});
       return;
     }
-    sendNoContent(Method::Post, QStringLiteral("Sessions/Logout"), {}, std::nullopt, context,
-                  [this, done = std::move(done)](Result<Empty> result) {
-                    clearSession();
-                    done(std::move(result));
-                  });
+    // Cleared now, not when the server answers: by then (up to the timeout
+    // with a server that is down) the user may have signed in again.
+    const QByteArray authorization = authorizationHeader();
+    clearSession();
+    finishRaw(startRequest(Method::Post, url(QStringLiteral("Sessions/Logout")), nullptr, authorization), context,
+              [done = std::move(done)](Result<RawResponse> result) {
+                if (!result) {
+                  done(result.error());
+                  return;
+                }
+                done(Empty{});
+              });
+  }
+
+  void JellyfinClient::revokeToken(const QString& token) {
+    if (token.isEmpty()) return;
+    QNetworkReply* reply = startRequest(Method::Post, url(QStringLiteral("Sessions/Logout")), nullptr,
+                                        api::authorizationHeader(m_identity, token));
+    connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
   }
 
   void JellyfinClient::currentUser(QObject* context, Callback<UserInfo> done) {

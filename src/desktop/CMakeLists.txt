@@ -92,6 +92,14 @@ if(JFD_BUILD_TESTS)
   add_test(NAME desktop_smoke_legacy COMMAND jellyfin-desktop --smoke)
   set_tests_properties(desktop_smoke_legacy PROPERTIES TIMEOUT 60
     ENVIRONMENT "JFD_LEGACY_PROFILE=${PROJECT_SOURCE_DIR}/tests/settings/legacy-2x")
+  # A second start while the app runs hands over and leaves the running
+  # copy's log and settings alone (profile paths set by environment: Linux).
+  find_program(JFD_BASH bash)
+  if(UNIX AND NOT APPLE AND JFD_BASH)
+    add_test(NAME desktop_second_start
+      COMMAND "${JFD_BASH}" "${PROJECT_SOURCE_DIR}/tests/desktop/second-start-test.sh" $<TARGET_FILE:jellyfin-desktop>)
+    set_tests_properties(desktop_second_start PROPERTIES TIMEOUT 90)
+  endif()
   if(WIN32)
     # The HDR10 setting on a runner without an HDR display: Qt Quick falls
     # back to SDR and the app has to work as without it.

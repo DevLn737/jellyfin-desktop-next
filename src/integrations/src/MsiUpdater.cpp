@@ -76,12 +76,12 @@ namespace jfd::integrations {
   }
 
   MsiUpdater::MsiUpdater(QNetworkAccessManager* network, QString executable, QString installFolder,
-                         QString stateDirectory, std::optional<MinisignPublicKey> key, QObject* parent)
+                         QString stateDirectory, MinisignKeys keys, QObject* parent)
       : QObject(parent), m_executable(std::move(executable)), m_installFolder(std::move(installFolder)),
-        m_stateDirectory(std::move(stateDirectory)), m_key(key), m_download(network, this) {}
+        m_stateDirectory(std::move(stateDirectory)), m_keys(std::move(keys)), m_download(network, this) {}
 
   bool MsiUpdater::supported() const {
-    if (m_executable.isEmpty() || m_installFolder.isEmpty() || m_stateDirectory.isEmpty() || !m_key) return false;
+    if (m_executable.isEmpty() || m_installFolder.isEmpty() || m_stateDirectory.isEmpty() || m_keys.empty()) return false;
     const QFileInfo file(m_executable);
     return file.isFile() && normalized(file.absolutePath()) == normalized(m_installFolder);
   }
@@ -110,7 +110,7 @@ namespace jfd::integrations {
     m_preparing = release.version;
     // Downloaded under its final name: the signature check is what makes
     // the file trustworthy, and a failed one removes it.
-    m_download.start(*file, *signature, msiPath(release.version), name, *m_key, [this, name](const QString& error) {
+    m_download.start(*file, *signature, msiPath(release.version), name, m_keys, [this, name](const QString& error) {
       if (!error.isEmpty()) {
         m_preparing.clear();
         Q_EMIT failed(error);

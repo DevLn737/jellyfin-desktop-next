@@ -8,6 +8,8 @@
 #include <QTimer>
 #include <QVariantList>
 
+#include <functional>
+
 namespace jfd::api {
   class JellyfinClient;
   class ServerDiscovery;
@@ -30,7 +32,9 @@ namespace jfd::library {
   // A successful sign-in stores the token in the system credential store and
   // the server in ServerStore; restore() signs in with them at start-up. When
   // the server later rejects the token, the screen goes back to Credentials
-  // for the same server.
+  // for the same server. The saved token is removed only by signOut() or
+  // replaced by the next successful sign-in, never because of a 401: a proxy
+  // in front of the server may refuse a request while the token still works.
   class SignIn : public QObject {
     Q_OBJECT
     Q_PROPERTY(Step step READ step NOTIFY stepChanged)
@@ -103,7 +107,15 @@ namespace jfd::library {
     // From Credentials back to the server choice.
     Q_INVOKABLE void back();
     // Revokes the token on the server and here; the server stays in the list.
+    // The local session ends at once; the server is told after the reports
+    // of what is playing (setBeforeSignOut) are answered.
     Q_INVOKABLE void signOut();
+
+    // Runs at sign-out while the token is still current: sends what has to
+    // reach the server as this user (Stopped reports, leaving the group) and
+    // calls done once they are answered or given up. Logout waits for it.
+    using BeforeSignOut = std::function<void(std::function<void()> done)>;
+    void setBeforeSignOut(BeforeSignOut before) { m_beforeSignOut = std::move(before); }
 
   Q_SIGNALS:
     void stepChanged();
@@ -141,6 +153,7 @@ namespace jfd::library {
     QString m_userName;
     bool m_tokenSaved = false;
     quint64 m_attempt = 0;
+    BeforeSignOut m_beforeSignOut;
   };
 
 } // namespace jfd::library

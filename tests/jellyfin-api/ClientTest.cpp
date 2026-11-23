@@ -10,6 +10,7 @@
 #include <QElapsedTimer>
 #include <QSignalSpy>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
@@ -110,8 +111,132 @@ TEST_CASE("A rejected token clears the session and reports it once") {
   auto result = run<UserInfo>([&](auto done) { client.currentUser(nullptr, done); });
   REQUIRE_FALSE(*result);
   CHECK(result->error().isUnauthorized());
-  CHECK(expired.count() == 1);
+  // Expired only after GET Users/Me confirmed the token is refused.
+  REQUIRE(waitFor([&] { return expired.count() == 1; }));
   CHECK_FALSE(client.isSignedIn());
+  REQUIRE(server.requests().size() == 2);
+  CHECK(server.requests().at(1).path == QStringLiteral("/Users/Me"));
+  CHECK(server.requests().at(1).headers.value("authorization").contains("Token=\"old\""));
+  waitFor([] { return false; }, 200);
+  CHECK(expired.count() == 1);
+}
+
+TEST_CASE("A 401 the token check does not confirm keeps the session") {
+  // A reverse proxy with its own sign-in refuses one path; Jellyfin accepts
+  // the token.
+  FakeServer server([](const HttpRequest& r) {
+    if (r.path == QLatin1String("/Users/Me")) return jfd::test::json(R"({"Id": "user1", "Name": "alice"})");
+    return HttpResponse{401, {}, {}, 0};
+  });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("token1"), QStringLiteral("user1"));
+  QSignalSpy expired(&client, &JellyfinClient::sessionExpired);
+
+  // Several refused requests at once: one check.
+  int answered = 0;
+  for (int i = 0; i < 3; ++i)
+    client.rawRequest(JellyfinClient::Method::Get, QStringLiteral("Items"), {}, nullptr,
+                      [&](int status, QByteArray) {
+                        CHECK(status == 401);
+                        ++answered;
+                      });
+  REQUIRE(waitFor([&] { return answered == 3; }));
+  REQUIRE(waitFor([&] {
+    return std::count_if(server.requests().begin(), server.requests().end(),
+                         [](const HttpRequest& r) { return r.path == QLatin1String("/Users/Me"); }) == 1;
+  }));
+  waitFor([] { return false; }, 200);
+  CHECK(expired.count() == 0);
+  CHECK(client.accessToken() == QStringLiteral("token1"));
+
+  // Right after a passed check, more 401s do not check again.
+  bool againAnswered = false;
+  client.rawRequest(JellyfinClient::Method::Get, QStringLiteral("Items"), {}, nullptr,
+                    [&](int, QByteArray) { againAnswered = true; });
+  REQUIRE(waitFor([&] { return againAnswered; }));
+  waitFor([] { return false; }, 200);
+  CHECK(std::count_if(server.requests().begin(), server.requests().end(),
+                      [](const HttpRequest& r) { return r.path == QLatin1String("/Users/Me"); }) == 1);
+  CHECK(client.isSignedIn());
+}
+
+TEST_CASE("A server that cannot be reached for the token check keeps the session") {
+  FakeServer server([](const HttpRequest& r) {
+    if (r.path == QLatin1String("/Users/Me")) return HttpResponse{503, {}, {}, 0};
+    return HttpResponse{401, {}, {}, 0};
+  });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("token1"), QStringLiteral("user1"));
+  QSignalSpy expired(&client, &JellyfinClient::sessionExpired);
+  bool answered = false;
+  client.rawRequest(JellyfinClient::Method::Get, QStringLiteral("Items"), {}, nullptr,
+                    [&](int, QByteArray) { answered = true; });
+  REQUIRE(waitFor([&] { return answered && server.requests().size() == 2; }));
+  waitFor([] { return false; }, 200);
+  CHECK(expired.count() == 0);
+  CHECK(client.isSignedIn());
+}
+
+TEST_CASE("A 401 for a token that is no longer current is ignored") {
+  FakeServer server([](const HttpRequest& r) {
+    if (r.path == QLatin1String("/Users/Me")) return HttpResponse{401, {}, {}, 0};
+    return HttpResponse{401, {}, {}, 300};
+  });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("old"), QStringLiteral("user1"));
+  QSignalSpy expired(&client, &JellyfinClient::sessionExpired);
+  bool answered = false;
+  client.rawRequest(JellyfinClient::Method::Get, QStringLiteral("Items"), {}, nullptr,
+                    [&](int, QByteArray) { answered = true; });
+  REQUIRE(waitFor([&] { return server.requests().size() == 1; }));
+  // A new sign-in while the old token's request is under way.
+  client.setSession(QStringLiteral("new"), QStringLiteral("user2"));
+  REQUIRE(waitFor([&] { return answered; }));
+  waitFor([] { return false; }, 200);
+  CHECK(server.requests().size() == 1);
+  CHECK(expired.count() == 0);
+  CHECK(client.accessToken() == QStringLiteral("new"));
+}
+
+TEST_CASE("Signing out clears the session at once; a late Logout answer keeps a newer one") {
+  FakeServer server([](const HttpRequest& r) {
+    // A slow server: the answer comes after the user signed in again.
+    if (r.path == QLatin1String("/Sessions/Logout")) return HttpResponse{401, {}, {}, 400};
+    return HttpResponse{204, {}, {}, 0};
+  });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("old"), QStringLiteral("user1"));
+  QSignalSpy expired(&client, &JellyfinClient::sessionExpired);
+  std::optional<Result<Empty>> logout;
+  client.signOut(nullptr, [&](Result<Empty> result) { logout.emplace(std::move(result)); });
+  CHECK_FALSE(client.isSignedIn());
+  REQUIRE(waitFor([&] { return server.requests().size() == 1; }));
+  CHECK(server.requests().at(0).headers.value("authorization").contains("Token=\"old\""));
+
+  client.setSession(QStringLiteral("new"), QStringLiteral("user2"));
+  REQUIRE(waitFor([&] { return logout.has_value(); }));
+  waitFor([] { return false; }, 200);
+  CHECK(client.accessToken() == QStringLiteral("new"));
+  CHECK(client.userId() == QStringLiteral("user2"));
+  CHECK(expired.count() == 0);
+  CHECK(server.requests().size() == 1);
+}
+
+TEST_CASE("revokeToken sends Logout with the given token and leaves the session alone") {
+  FakeServer server([](const HttpRequest&) { return HttpResponse{204, {}, {}, 0}; });
+  JellyfinClient client(identity());
+  client.setServerUrl(server.url());
+  client.setSession(QStringLiteral("current"), QStringLiteral("user2"));
+  client.revokeToken(QStringLiteral("old"));
+  REQUIRE(waitFor([&] { return server.requests().size() == 1; }));
+  CHECK(server.requests().at(0).method == "POST");
+  CHECK(server.requests().at(0).path == QStringLiteral("/Sessions/Logout"));
+  CHECK(server.requests().at(0).headers.value("authorization").contains("Token=\"old\""));
+  CHECK(client.accessToken() == QStringLiteral("current"));
 }
 
 TEST_CASE("Old servers are refused") {

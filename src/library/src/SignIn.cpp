@@ -4,6 +4,7 @@
 #include <jfd/api/ServerDiscovery.h>
 #include <jfd/platform/CredentialStore.h>
 
+#include <QPointer>
 #include <QVariantMap>
 
 namespace jfd::library {
@@ -259,6 +260,11 @@ namespace jfd::library {
     m_server.userId = result.user.id;
     m_server.userName = result.user.name;
     m_server.lastUsed = QDateTime::currentDateTimeUtc();
+    // One user per server: the token of the one signed in before (kept when
+    // their session expired) goes.
+    if (const auto previous = m_servers.server(m_server.id);
+        previous && !previous->userId.isEmpty() && previous->userId != m_server.userId)
+      m_tokens.remove(platform::accessTokenKey(previous->id, previous->userId));
     m_servers.save(m_server);
     m_tokenSaved = m_tokens.write(platform::accessTokenKey(m_server.id, m_server.userId),
                                   result.accessToken) == platform::CredentialStore::Status::Ok;
@@ -308,8 +314,20 @@ namespace jfd::library {
     const SavedServer server = m_server;
     m_tokens.remove(platform::accessTokenKey(server.id, server.userId));
     m_servers.clearUser(server.id);
-    m_client.signOut(this, [](api::Result<api::Empty>) {});
     m_server.userId.clear();
+    // The playing item's Stopped report and the group leave go out with the
+    // token first; the server is asked to revoke it once they are answered,
+    // so they are not refused as coming from a signed-out session.
+    const QString token = m_client.accessToken();
+    QPointer<api::JellyfinClient> client(&m_client);
+    auto revoke = [client, token] {
+      if (client) client->revokeToken(token);
+    };
+    if (m_beforeSignOut) m_beforeSignOut(revoke);
+    else revoke();
+    // Requests already sent keep their token; nothing after this uses it,
+    // and a sign-in made before Logout is answered is not undone by it.
+    m_client.clearSession();
     Q_EMIT savedChanged();
     setStep(Step::Credentials);
     Q_EMIT signedOut();
@@ -318,10 +336,9 @@ namespace jfd::library {
   void SignIn::onSessionExpired() {
     if (m_step != Step::SignedIn) return;
     ++m_attempt;
-    m_tokens.remove(platform::accessTokenKey(m_server.id, m_server.userId));
-    m_servers.clearUser(m_server.id);
+    // The saved token and user stay: choosing the server again (or the next
+    // start) tries the token once more, and the next sign-in replaces it.
     m_server.userId.clear();
-    Q_EMIT savedChanged();
     setError(tr("The session has ended. Sign in again."));
     // The same server; Quick Connect may have been turned off meanwhile.
     m_client.quickConnectEnabled(this, [this](api::Result<bool> enabled) {
