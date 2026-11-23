@@ -43,6 +43,7 @@ endif()
 
 add_executable(jfd_diagnostics_tests
   core/main.cpp
+  diagnostics/CrashTest.cpp
   diagnostics/FrameStatsTest.cpp
   diagnostics/ProcessStatsTest.cpp
   diagnostics/RedactTest.cpp

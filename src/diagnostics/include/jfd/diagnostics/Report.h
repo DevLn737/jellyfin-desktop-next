@@ -38,6 +38,15 @@ struct ReportInput
   // One line each: the process (memory, CPU) and the presented frames over
   // the last intervals, oldest first.
   std::vector<std::string> statsSnapshots;
+  // The session before this one ended without a clean exit (crash, killed,
+  // power loss); previousSessionInfo is what its marker said.
+  bool previousSessionCrashed = false;
+  std::string previousSessionInfo;
+  // The crash files kept (name and size), newest first.
+  std::vector<std::string> crashFiles;
+  // The newest crash's text (signal and backtrace; not on Windows, whose
+  // minidump stays in the crash folder), as crash.txt when not empty.
+  std::string crashText;
 };
 
 // The most of one log file kept in the report.
@@ -45,7 +54,8 @@ constexpr std::size_t MaxLogBytes = 2 * 1024 * 1024;
 // The report as a whole stays under this, whatever the inputs.
 constexpr std::size_t MaxReportBytes = 10 * 1024 * 1024;
 
-// report.txt, log.txt, log-previous.txt, session-journal.txt and stats.txt,
+// report.txt, log.txt, log-previous.txt, session-journal.txt, stats.txt and
+// crash.txt (when there is a crash text),
 // with server access keys, passwords and server addresses replaced by ***
 // (redactSecrets) in everything.
 std::vector<ZipEntry> buildReport(const ReportInput& input);

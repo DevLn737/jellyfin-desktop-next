@@ -228,6 +228,14 @@
         <source>Report saved: %1</source>
         <translation>Отчёт сохранён: %1</translation>
     </message>
+    <message>
+        <source>The previous session ended unexpectedly. A diagnostic report helps to find out why.</source>
+        <translation>Предыдущий сеанс завершился неожиданно. Диагностический отчёт поможет выяснить причину.</translation>
+    </message>
+    <message>
+        <source>Save report</source>
+        <translation>Сохранить отчёт</translation>
+    </message>
 </context>
 <context>
     <name>GroupSettings</name>

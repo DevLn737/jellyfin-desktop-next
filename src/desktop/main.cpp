@@ -248,6 +248,9 @@ int main(int argc, char* argv[]) {
                                              QStringLiteral("/logs");
   desktop::setLogLevel(services.settings->value(settings::keys::LogLevel).toString());
   desktop::startLogFile(services.logDirectory);
+  // The "running" marker and the crash handler; tells when the previous
+  // session crashed.
+  desktop::startCrashGuard(services);
   QObject::connect(services.settings.get(), &settings::Settings::valueChanged,
                    [](const QString& key, const QVariant& value) {
                      if (key == settings::keys::LogLevel) {
@@ -403,6 +406,8 @@ int main(int argc, char* argv[]) {
   services.player.reset();
   services.library.reset();
   services.settings.reset();
+  // A clean exit: the next start finds no marker.
+  desktop::endCrashGuard(services);
   desktop::stopLogFile();
 
   const qint64 shutdownMs = shutdown.elapsed();
