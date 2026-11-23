@@ -16,6 +16,7 @@
 #include <QUrlQuery>
 
 #include <algorithm>
+#include <atomic>
 
 namespace jfd::library {
 
@@ -44,7 +45,64 @@ namespace jfd::library {
     qint64 costOf(const QImage& image) {
       return std::max<qint64>(image.sizeInBytes(), 1);
     }
+
+    // Reads a cached file and marks it used now. The time can only be set
+    // on an open file, and on Windows only on one opened for writing; a file
+    // that cannot be opened so (a read-only profile) is still read.
+    QByteArray readAndTouch(const QString& path) {
+      QFile file(path);
+      if (file.open(QIODevice::ReadWrite | QIODevice::ExistingOnly)) {
+        QByteArray data = file.readAll();
+        if (!data.isEmpty())
+          file.setFileTime(QDateTime::currentDateTimeUtc(), QFileDevice::FileModificationTime);
+        return data;
+      }
+      if (file.open(QIODevice::ReadOnly)) return file.readAll();
+      return {};
+    }
   } // namespace
+
+  // The disk cache as its worker thread sees it. Only that thread's jobs,
+  // which run one at a time, change `bytes`; `published` lets the cache's
+  // thread read the count.
+  struct ImageCache::Disk {
+    QDir dir;
+    qint64 limit = 0;
+    qint64 bytes = 0;
+    std::atomic<qint64> published{0};
+
+    void publish() { published.store(bytes, std::memory_order_relaxed); }
+
+    void scan() {
+      bytes = 0;
+      for (const QFileInfo& file : dir.entryInfoList(QDir::Files)) bytes += file.size();
+      trim();
+      publish();
+    }
+
+    void write(const QString& path, const QByteArray& data) {
+      const QFileInfo info(path);
+      const qint64 previous = info.exists() ? info.size() : 0;
+      QSaveFile file(path);
+      if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
+        return;
+      bytes += data.size() - previous;
+      trim();
+      publish();
+    }
+
+    void trim() {
+      if (bytes <= limit) return;
+      // Least recently used first (reads touch their file), down to 90 % of
+      // the limit so trimming is not repeated on every write.
+      const QFileInfoList files = dir.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
+      const qint64 target = limit * 9 / 10;
+      for (const QFileInfo& file : files) {
+        if (bytes <= target) break;
+        if (QFile::remove(file.filePath())) bytes -= file.size();
+      }
+    }
+  };
 
   bool ImageCache::Gate::post(std::function<void(ImageCache&)> work) {
     QMutexLocker lock(&m_mutex);
@@ -65,13 +123,24 @@ namespace jfd::library {
     m_pool.setMaxThreadCount(2);
     m_network->setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
     m_memory.setMaxCost(m_limits.memoryBytes);
+    m_diskPool.setMaxThreadCount(1);
     if (!diskDirectory.isEmpty() && QDir().mkpath(diskDirectory)) {
       m_disk = QDir(diskDirectory);
       m_hasDisk = true;
-      for (const QFileInfo& file : m_disk.entryInfoList(QDir::Files))
-        m_diskBytes += file.size();
-      trimDisk();
+      m_diskState = std::make_shared<Disk>();
+      m_diskState->dir = m_disk;
+      m_diskState->limit = m_limits.diskBytes;
+      // Tens of thousands of files in a full cache: counted off this thread.
+      m_diskPool.start([disk = m_diskState] { disk->scan(); });
     }
+  }
+
+  qint64 ImageCache::diskBytes() const {
+    return m_diskState ? m_diskState->published.load(std::memory_order_relaxed) : 0;
+  }
+
+  void ImageCache::waitForDisk() {
+    m_diskPool.waitForDone();
   }
 
   ImageCache::~ImageCache() {
@@ -83,6 +152,8 @@ namespace jfd::library {
     // closed gate.
     m_pool.clear();
     m_pool.waitForDone();
+    // Files being written are finished; nothing waits for them.
+    m_diskPool.waitForDone();
     for (const QString& key : m_running) {
       QNetworkReply* reply = m_fetches.value(key).reply;
       if (reply) {
@@ -153,15 +224,8 @@ namespace jfd::library {
       if (!sizes.contains(waiter.size)) sizes.append(waiter.size);
     m_pool.start([gate = m_gate, key, job, encoded, path, sizes] {
       QByteArray data = encoded;
-      if (data.isEmpty() && !path.isEmpty()) {
-        QFile file(path);
-        if (file.open(QIODevice::ReadOnly)) {
-          data = file.readAll();
-          file.close();
-          // Recently used files survive trimming.
-          file.setFileTime(QDateTime::currentDateTimeUtc(), QFileDevice::FileModificationTime);
-        }
-      }
+      // Recently used files survive trimming.
+      if (data.isEmpty() && !path.isEmpty()) data = readAndTouch(path);
       QList<Decoded> images;
       if (!data.isEmpty())
         for (const QSize& size : sizes) images.append(Decoded{size, decode(data, size)});
@@ -296,25 +360,8 @@ namespace jfd::library {
 
   void ImageCache::writeDisk(const QString& key, const QByteArray& data) {
     if (!m_hasDisk || data.isEmpty() || data.size() > m_limits.diskBytes) return;
-    const QString path = diskPath(key);
-    const qint64 previous = QFileInfo(path).exists() ? QFileInfo(path).size() : 0;
-    QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
-      return;
-    m_diskBytes += data.size() - previous;
-    if (m_diskBytes > m_limits.diskBytes) trimDisk();
-  }
-
-  void ImageCache::trimDisk() {
-    if (m_diskBytes <= m_limits.diskBytes) return;
-    // Oldest first, down to 90 % of the limit so trimming is not repeated
-    // on every write.
-    QFileInfoList files = m_disk.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
-    const qint64 target = m_limits.diskBytes * 9 / 10;
-    for (const QFileInfo& file : files) {
-      if (m_diskBytes <= target) break;
-      if (QFile::remove(file.filePath())) m_diskBytes -= file.size();
-    }
+    // Written (and the cache trimmed) on the disk worker, after the scan.
+    m_diskPool.start([disk = m_diskState, path = diskPath(key), data] { disk->write(path, data); });
   }
 
 } // namespace jfd::library
