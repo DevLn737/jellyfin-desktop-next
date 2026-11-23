@@ -7,6 +7,7 @@
 #include <QHash>
 #include <QJsonObject>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
@@ -70,7 +71,9 @@ namespace jfd::offline {
     void start();
     void fetchItems(QStringList ids, QHash<QString, QJsonObject> found,
                     std::function<void(bool ok, QHash<QString, QJsonObject>)> done);
-    void sendJournal(const QHash<QString, QJsonObject>& items);
+    // Works only on the items that were fetched (requested): an item
+    // journaled while the fetch ran waits for the next run.
+    void sendJournal(const QHash<QString, QJsonObject>& items, const QSet<QString>& requested);
     void sendNext();
     void refreshManifests();
     void applyServerData(const QString& itemId, const QJsonObject& userData);

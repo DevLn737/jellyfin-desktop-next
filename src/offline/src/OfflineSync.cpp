@@ -73,9 +73,9 @@ namespace jfd::offline {
     }
     QStringList list = ids.values();
     list.sort();
-    fetchItems(list, {}, [this](bool ok, QHash<QString, QJsonObject> items) {
+    fetchItems(list, {}, [this, ids](bool ok, QHash<QString, QJsonObject> items) {
       if (!ok) return done();
-      sendJournal(items);
+      sendJournal(items, ids);
     });
   }
 
@@ -106,13 +106,23 @@ namespace jfd::offline {
         });
   }
 
-  void OfflineSync::sendJournal(const QHash<QString, QJsonObject>& items) {
+  void OfflineSync::sendJournal(const QHash<QString, QJsonObject>& items, const QSet<QString>& requested) {
     const QList<ViewEvent> events = m_journal.events(m_serverId, m_userId);
     QStringList itemIds;
+    const auto add = [this, &itemIds, &requested](const QString& itemId) {
+      if (itemIds.contains(itemId)) return;
+      // Journaled after the fetch went out (a report that failed while it
+      // ran): not looked up, so not known to be gone. The next run takes it.
+      if (!requested.contains(itemId)) {
+        m_again = true;
+        return;
+      }
+      itemIds.append(itemId);
+    };
     for (const ViewEvent& e : events)
-      if (!itemIds.contains(e.itemId)) itemIds.append(e.itemId);
+      add(e.itemId);
     for (const ViewUpdate& u : m_journal.updates(m_serverId, m_userId))
-      if (!itemIds.contains(u.itemId)) itemIds.append(u.itemId);
+      add(u.itemId);
 
     m_toSend.clear();
     for (const QString& itemId : std::as_const(itemIds)) {
