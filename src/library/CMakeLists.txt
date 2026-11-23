@@ -12,6 +12,7 @@ add_library(jfd_library STATIC
   src/ItemBrowser.cpp
   src/ItemDetails.cpp
   src/ItemListModel.cpp
+  src/ItemRangeModel.cpp
   src/LibraryModel.cpp
   src/LibraryUpdates.cpp
   src/LiveTvChannels.cpp
@@ -33,6 +34,7 @@ add_library(jfd_library STATIC
   include/jfd/library/ItemBrowser.h
   include/jfd/library/ItemDetails.h
   include/jfd/library/ItemListModel.h
+  include/jfd/library/ItemRangeModel.h
   include/jfd/library/LibraryModel.h
   include/jfd/library/LibraryUpdates.h
   include/jfd/library/LiveTvChannels.h

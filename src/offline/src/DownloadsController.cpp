@@ -245,7 +245,8 @@ namespace jfd::offline {
       row.groupName = text(m.item, "SeriesName");
       QString number;
       if (m.item.contains(QLatin1String("IndexNumber")))
-        number = QStringLiteral("S%1:E%2")
+        // The same words as the library's episode numbers (ItemListModel.cpp).
+        number = QCoreApplication::translate("EpisodeNumber", "S%1:E%2")
                      .arg(m.item.value(QLatin1String("ParentIndexNumber")).toInt())
                      .arg(m.item.value(QLatin1String("IndexNumber")).toInt());
       QStringList parts{row.groupName, number};

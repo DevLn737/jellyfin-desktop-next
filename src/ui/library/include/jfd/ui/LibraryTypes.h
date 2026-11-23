@@ -3,6 +3,7 @@
 #include <jfd/library/HomeModel.h>
 #include <jfd/library/ItemDetails.h>
 #include <jfd/library/ItemListModel.h>
+#include <jfd/library/ItemRangeModel.h>
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/LiveTvChannels.h>
 #include <jfd/library/LiveTvGuide.h>
@@ -60,6 +61,13 @@ namespace jfd::ui {
     QML_FOREIGN(jfd::library::ItemListModel)
     QML_NAMED_ELEMENT(ItemListModel)
     QML_UNCREATABLE("Part of the other models")
+  };
+
+  // A window of another model's rows (a long season's range of episodes).
+  struct ItemRangeModelForeign {
+    Q_GADGET
+    QML_FOREIGN(jfd::library::ItemRangeModel)
+    QML_NAMED_ELEMENT(ItemRangeModel)
   };
 
   struct LiveTvChannelsForeign {
