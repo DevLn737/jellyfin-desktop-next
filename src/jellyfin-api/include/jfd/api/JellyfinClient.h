@@ -14,6 +14,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 
+#include <chrono>
 #include <functional>
 #include <optional>
 
@@ -154,9 +155,13 @@ namespace jfd::api {
     // POST Users/AuthenticateWithQuickConnect. On success the session is stored.
     void quickConnectSignIn(const QString& secret, QObject* context,
                             Callback<AuthenticationResult> done);
-    // POST Sessions/Logout: revokes the token on the server, then clears the
-    // local session whatever the answer.
+    // Clears the local session at once, then revokes its token on the server
+    // (POST Sessions/Logout); done gets the server's answer. A sign-in made
+    // before that answer arrives is kept.
     void signOut(QObject* context, Callback<Empty> done);
+    // POST Sessions/Logout with this token, whatever the current session;
+    // nobody waits for the answer.
+    void revokeToken(const QString& token);
     void currentUser(QObject* context, Callback<UserInfo> done);
 
     // --- Session -------------------------------------------------------------
@@ -278,7 +283,10 @@ namespace jfd::api {
     QByteArray authorizationHeader() const;
 
   Q_SIGNALS:
-    // The server rejected the stored token (401). The session is cleared.
+    // The server rejected the current token: a request sent with it got 401,
+    // and a check of it (GET Users/Me) got 401 too. The session is cleared;
+    // a 401 from a proxy, or for a token that is no longer current, is not
+    // enough.
     void sessionExpired();
     void sessionChanged();
 
@@ -287,7 +295,11 @@ namespace jfd::api {
     void finishRaw(QNetworkReply* reply, QObject* context, Callback<RawResponse> done);
     void storeSession(const AuthenticationResult& result);
     QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload);
-    void expireSessionOn401(int status, bool wasAuthenticated);
+    QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload,
+                                const QByteArray& authorization);
+    // A 401 for a request sent with token: checks the token once, if it is
+    // still the current one.
+    void checkTokenAfter401(int status, const QString& token);
     QUrlQuery userQuery() const;
 
     ClientIdentity m_identity;
@@ -296,6 +308,12 @@ namespace jfd::api {
     QString m_accessToken;
     QString m_userId;
     int m_timeoutMs = 30'000;
+    // The token being checked after a 401, and the last one that passed the
+    // check, with when: more 401s right after a passed check (a proxy that
+    // refuses one path) do not check again for a while.
+    QString m_checkingToken;
+    QString m_checkedToken;
+    std::chrono::steady_clock::time_point m_checkedAt;
     std::optional<SessionCapabilities> m_capabilities;
   };
 
