@@ -115,12 +115,33 @@ namespace jfd::core {
       group::Request request = group::Request::Ready;
       int httpStatus = 0;
     };
+    // The stream failed while it played: the app opens the same item and
+    // source again at `position` (through PlaybackInfo, so a transcode
+    // starts anew) and posts intent::Open, or intent::OpenFailed if that
+    // cannot be resolved. The session asks once per file; a file opened by
+    // such a reopen asks again only after it played on for a minute.
+    struct ReopenAfterError {
+      ItemId item;
+      MediaSourceId mediaSource;
+      PlaylistItemId playlistItem;
+      MediaTicks position;
+      bool startPaused = false;
+    };
+    // The group's item cannot be played here: it failed to load, failed
+    // again after a reopen, or did not become ready in time. The group waits
+    // for this member's Ready, so the app leaves the group (and says why).
+    struct GroupItemFailed {};
+    // Play, Pause, Seek, a speed, Stop, Next or Previous for the group while
+    // the connection to it is lost: nothing was sent. The app says so; the
+    // group client rejoins on its own.
+    struct GroupOffline {};
   } // namespace notice
 
   using SessionNotice =
       std::variant<notice::GroupItemRequested, notice::GroupRateRejected,
                    notice::StreamReopenNeeded, notice::ReadyTimedOut, notice::QueueStepRequested,
-                   notice::GroupRequestFailed>;
+                   notice::GroupRequestFailed, notice::ReopenAfterError, notice::GroupItemFailed,
+                   notice::GroupOffline>;
 
   class SessionObserver {
   public:

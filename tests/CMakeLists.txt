@@ -237,7 +237,7 @@ if(TARGET jfd_jellyfin_api)
 
   if(TARGET jfd_session_runtime)
     jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp
-      session/OpenGateTest.cpp session/RoomsModelTest.cpp)
+      session/OpenGateTest.cpp session/RoomsModelTest.cpp session/RoomRecoveryTest.cpp)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 

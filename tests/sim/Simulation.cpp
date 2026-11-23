@@ -36,6 +36,10 @@ namespace jfd::sim {
       GroupEpoch epoch;
       bool ready = false;
       bool legacy = false;
+      // Since when the waiting group has waited for this member, and for
+      // which item (a new item is a new wait).
+      std::optional<ServerInstant> waitedForSince;
+      PlaylistItemId waitedForItem;
     };
 
     struct Server {
@@ -131,6 +135,8 @@ namespace jfd::sim {
       double rate = 1.0;
       ServerInstant updated;
       RequestId latestSeek;
+      // Ended by an error; the session stops it once it hears.
+      bool dead = false;
     };
 
     struct Client final : Clock, Timers, SyncPlayOutbox, SessionObserver, MediaBackend {
@@ -197,6 +203,8 @@ namespace jfd::sim {
                 [&](const intent::Previous&) { return false; },
                 [&](const intent::SetSyncCorrection&) { return false; },
                 [&](const intent::PreloadNext&) { return false; },
+                [&](const intent::SetAutoNext&) { return false; },
+                [&](const intent::OpenFailed&) { return false; },
                 [&](const backend::Advanced&) { return true; },
                 [&](const group::Joined&) { return false; },
                 [&](const group::ClockSynced&) { return false; },
@@ -234,7 +242,7 @@ namespace jfd::sim {
                                       "ClockSynced", "Timer",      "Next",         "Previous",
                                       "SelectTrack", "AddTrack",   "Participants",
                                       "SyncCorrection", "PreloadNext", "Advanced",  "ClockLost",
-                                      "GroupRequestFailed"};
+                                      "GroupRequestFailed", "SetAutoNext", "OpenFailed"};
         static_assert(std::size(names) == std::variant_size_v<SessionInput>);
         std::string text = names[input.index()];
         std::visit(Overloaded{
@@ -287,7 +295,7 @@ namespace jfd::sim {
 
       void progress() {
         if (!file) return;
-        if (file->started && !file->paused && !file->seeking && !file->buffering)
+        if (file->started && !file->paused && !file->seeking && !file->buffering && !file->dead)
           file->position += std::chrono::duration<double>(world.now - file->updated).count() * file->rate *
                             (1.0 + speedError);
         file->updated = world.now;
@@ -349,6 +357,18 @@ namespace jfd::sim {
         next.item = pendingItem;
         file = next;
         const WallTicks latency = cold ? world.jitter(800, 2500) : world.jitter(50, 400);
+        // Chaos: the server cannot stream the file (mpv ends it with an
+        // error), or its playlist never yields a segment.
+        const auto fault = world.chaos() ? world.rng.range(1, 100) : 100;
+        if (fault <= 2) {
+          world.after(latency, [this, epoch] {
+            if (!file || file->epoch != epoch) return;
+            file->dead = true;
+            emit(backend::Ended{epoch, backend::EndReason::Error, "cannot open"});
+          });
+          return;
+        }
+        if (fault <= 3) return;
         world.after(latency, [this, epoch] {
           if (!file || file->epoch != epoch) return;
           file->opened = true;
@@ -487,7 +507,14 @@ namespace jfd::sim {
       }
 
       void tick() {
-        if (file && file->started) {
+        if (file && file->started && !file->dead && world.chaos() && !file->seeking &&
+            world.rng.range(1, 1500) == 1) {
+          // The stream dies while it plays (network, server restart).
+          progress();
+          file->dead = true;
+          emit(backend::Ended{file->epoch, backend::EndReason::Error, "stream"});
+        }
+        if (file && file->started && !file->dead) {
           if (world.chaos() && !file->buffering && !file->paused && world.rng.chance(1)) {
             file->buffering = true;
             const MediaEpoch epoch = file->epoch;
@@ -579,6 +606,7 @@ namespace jfd::sim {
       // ---- Observer and app --------------------------------------------------
 
       PlaylistItemId pendingItem;
+      std::uint64_t openSerial = 0;
 
       SyncCorrection lastCorrection = SyncCorrection::None;
       void snapshotChanged(const SessionSnapshot& snapshot) override {
@@ -598,7 +626,32 @@ namespace jfd::sim {
           const auto item = requested->playlistItem;
           const auto position = requested->position;
           const WallTicks delay = cold ? world.jitter(500, 1500) : world.jitter(100, 800);
-          world.after(delay, [this, item, position] { openItem(item, position); });
+          // Like PlaybackLauncher, only the latest request opens.
+          const std::uint64_t serial = ++openSerial;
+          world.after(delay, [this, item, position, serial] {
+            if (serial == openSerial) openItem(item, position);
+          });
+        } else if (const auto* reopen = std::get_if<notice::ReopenAfterError>(&notice)) {
+          const auto item = reopen->playlistItem;
+          const auto position = reopen->position;
+          const auto itemId = reopen->item;
+          const std::uint64_t serial = ++openSerial;
+          world.after(world.jitter(200, 1500), [this, item, position, itemId, serial] {
+            if (serial != openSerial) return;
+            if (world.rng.chance(15)) {
+              // PlaybackInfo failed too: the app also leaves a group whose
+              // item it is (SessionRuntime on PlaybackLauncher::openFailed).
+              deliver(intent::OpenFailed{itemId, "gone"});
+              const auto& group = session->snapshot().group;
+              if (group && !item.isEmpty() && group->playlistItem == item)
+                world.after(world.jitter(20, 150), [this] { world.server.leave(this, false); });
+              return;
+            }
+            openItem(item, position);
+          });
+        } else if (std::holds_alternative<notice::GroupItemFailed>(notice)) {
+          // SessionRuntime leaves the group.
+          world.after(world.jitter(20, 150), [this] { world.server.leave(this, false); });
         }
       }
 
@@ -690,6 +743,9 @@ namespace jfd::sim {
     }
 
     void Server::join(Client* c, bool legacy) {
+      // A second join of a member (the first scheduled join after a chaos
+      // one) would leave a member with a stale epoch that is never ready.
+      if (member(c)) return;
       Member m;
       m.client = c;
       m.legacy = legacy;
@@ -920,6 +976,26 @@ namespace jfd::sim {
       }
     }
 
+    // No member may keep the group waiting for good: one that cannot play
+    // the item leaves within the 30 s ready deadline (the server itself
+    // never gives up on a member). Each item is a new wait: a member whose
+    // reopen hangs and whose next item hangs too takes 30 s for each.
+    void watchWaiting(World& world) {
+      Server& server = world.server;
+      for (auto& m : server.members) {
+        if (server.state != GroupState::Waiting || m.ready) {
+          m.waitedForSince.reset();
+        } else if (!m.waitedForSince || m.waitedForItem != server.item) {
+          m.waitedForSince = world.now;
+          m.waitedForItem = server.item;
+        } else if (world.now - *m.waitedForSince > 45s) {
+          world.violation("the group has waited 45 s for client " + std::to_string(m.client->index));
+          m.waitedForSince.reset();
+        }
+      }
+      world.after(1s, [&world] { watchWaiting(world); });
+    }
+
     void scheduleChaos(World& world) {
       world.after(world.jitter(500, 8000), [&world] {
         chaosAction(world);
@@ -975,6 +1051,7 @@ namespace jfd::sim {
       }
       world.after(6s, [&first] { first.deliver(intent::Play{}); });
       scheduleChaos(world);
+      watchWaiting(world);
     } else {
       // One member starts the group; a cold second client joins while it plays.
       world.server.join(&first, false);

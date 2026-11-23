@@ -142,6 +142,8 @@ namespace jfd::syncplay {
         const Json& entry = (*playlist)[static_cast<std::size_t>(index)];
         queue.currentPlaylistItem = PlaylistItemId(stringField(entry, "PlaylistItemId"));
         queue.currentItem = ItemId(stringField(entry, "ItemId"));
+        const auto size = static_cast<std::int64_t>(playlist->size());
+        queue.hasNextItem = index + 1 < size || (stringField(data, "RepeatMode") == "RepeatAll" && size > 1);
       }
       return queue;
     }

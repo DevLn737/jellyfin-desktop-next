@@ -109,12 +109,33 @@ TEST_CASE("Group updates decode") {
   CHECK(q.startPosition.milliseconds() == 30'000);
   CHECK(q.isPlaying);
   CHECK(q.baseRate.perMille() == 1500);
+  // The last entry of the queue: nothing follows.
+  CHECK_FALSE(q.hasNextItem);
 
   auto refused = parseMessage(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"Type":"GroupDoesNotExist","Data":""}})");
   REQUIRE(refused);
   CHECK(std::holds_alternative<wire::Refused>(*refused));
 
   CHECK(std::holds_alternative<wire::Other>(*parseMessage(R"({"MessageType":"KeepAlive"})")));
+}
+
+TEST_CASE("PlayQueue says whether an item follows the playing one") {
+  const auto parse = [](const char* playlist, int index, const char* repeat) {
+    const std::string text = std::string(R"({"MessageType":"SyncPlayGroupUpdate","Data":{"Type":"PlayQueue",
+      "Data":{"Reason":"NewPlaylist","Playlist":)") + playlist + R"(,"PlayingItemIndex":)" +
+                             std::to_string(index) + R"(,"RepeatMode":")" + repeat + R"("}}})";
+    return std::get<wire::PlayQueue>(*parseMessage(text)).hasNextItem;
+  };
+  const char* two = R"([{"ItemId":"i0","PlaylistItemId":"p0"},{"ItemId":"i1","PlaylistItemId":"p1"}])";
+  const char* one = R"([{"ItemId":"i0","PlaylistItemId":"p0"}])";
+  CHECK(parse(two, 0, "RepeatNone"));
+  CHECK_FALSE(parse(two, 1, "RepeatNone"));
+  // RepeatAll wraps to the first entry, a different occurrence.
+  CHECK(parse(two, 1, "RepeatAll"));
+  // One entry on repeat, or RepeatOne: the same occurrence again, which
+  // every member reaching the end would ask for anew.
+  CHECK_FALSE(parse(one, 0, "RepeatAll"));
+  CHECK_FALSE(parse(two, 1, "RepeatOne"));
 }
 
 TEST_CASE("Malformed SyncPlay messages are rejected, not guessed") {

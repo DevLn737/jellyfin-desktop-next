@@ -313,7 +313,16 @@ namespace jfd::session {
       Q_EMIT itemOpening();
       return;
     }
-    if (const auto* failed = std::get_if<core::notice::GroupRequestFailed>(&notice)) {
+    if (std::holds_alternative<core::notice::GroupItemFailed>(notice)) {
+      // SessionRuntime leaves the group: the others would wait for us.
+      Q_EMIT this->notice(tr("The group's item could not be played here, so you left the group."), true);
+      return;
+    }
+    if (std::holds_alternative<core::notice::GroupOffline>(notice)) {
+      Q_EMIT this->notice(tr("No connection to the group. Reconnecting; try again in a moment."), true);
+      return;
+    }
+        if (const auto* failed = std::get_if<core::notice::GroupRequestFailed>(&notice)) {
       // Create, join and leave failures arrive as replies (onReplied).
       if (failed->request == core::group::Request::Rejoin) {
         const QString text = tr("Could not return to the group after the connection came back.");
