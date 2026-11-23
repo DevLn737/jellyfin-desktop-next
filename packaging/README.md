@@ -10,8 +10,9 @@ Built by `.github/workflows/package.yml`; every version used is pinned in
 1. The app is built with the pinned Qt and libmpv (`scripts/fetch-windows-deps.ps1`).
 2. `windeployqt` copies Qt, the QML modules and the MSVC runtime next to the
    executable; libmpv and the Vulkan loader are added, and the licences of
-   what is linked in (`LICENSE`, `LICENSES.md`, [licenses/](licenses)) go to
-   a `licenses` folder. SDL3 (gamepads) needs no DLL: CMake builds the pinned
+   everything bundled (`LICENSE`, `LICENSES.md`, [licenses/](licenses) with
+   `THIRD-PARTY-NOTICES.txt`) go to a `licenses` folder. A DLL next to the
+   executable that the notices do not cover stops the build. SDL3 (gamepads) needs no DLL: CMake builds the pinned
    release statically into the executable (`cmake/JfdSdl3.cmake`).
 3. [windows/build-msi.ps1](windows/build-msi.ps1) builds
    [windows/jellyfin-desktop-next.wxs](windows/jellyfin-desktop-next.wxs) with
@@ -108,8 +109,11 @@ new version by hand once.
    and its Qt plugin (X11 and Wayland). Libraries that must match the running
    system stay out: Mesa/GL/EGL/Vulkan, VA-API and VDPAU, libdrm/gbm, PipeWire,
    PulseAudio, ALSA, GnuTLS (it knows the distribution's CA store), Wayland,
-   D-Bus, libudev. The licences of what is linked in go to
-   `usr/share/licenses/jellyfin-desktop-next`. The AppImage excludelist also
+   D-Bus, libudev. The licences of everything bundled go to
+   `usr/share/licenses/jellyfin-desktop-next` (`THIRD-PARTY-NOTICES.txt` and
+   the texts in [licenses/](licenses)); each library taken from the build
+   system adds its Ubuntu package's copyright file under `system/`, and a
+   library with neither stops the build. The AppImage excludelist also
    leaves fontconfig, FreeType and HarfBuzz to the system; FriBiDi, which it lists too, ships in the image,
    because systems without a GTK desktop often lack it. The GL dispatch
    library (libOpenGL.so.0 from libglvnd) must be installed; every desktop

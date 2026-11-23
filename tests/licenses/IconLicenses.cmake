@@ -45,3 +45,6 @@ if(problems)
 endif()
 list(LENGTH icons count)
 message(STATUS "${count} icon files, each with its licence in LICENSES.md")
+
+# The packages' third-party licences.
+include("${CMAKE_CURRENT_LIST_DIR}/BundledLicenses.cmake")

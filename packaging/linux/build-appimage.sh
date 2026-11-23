@@ -48,9 +48,11 @@ fetch linuxdeployPluginQt
 
 install -m 755 "$exe" "$appdir/usr/bin/$name"
 install -m 644 "$here/$app_id.metainfo.xml" "$appdir/usr/share/metainfo/$app_id.metainfo.xml"
-# Licences of what is linked into the executable (LICENSES.md).
-install -d "$appdir/usr/share/licenses/$package"
-install -m 644 "$root/LICENSE" "$root/LICENSES.md" "$root"/packaging/licenses/*.txt "$appdir/usr/share/licenses/$package/"
+# Licences of everything in the image (packaging/licenses/THIRD-PARTY-NOTICES.txt);
+# the system libraries' copyright files are added after linuxdeploy below.
+licenses="$appdir/usr/share/licenses/$package"
+install -d "$licenses"
+install -m 644 "$root/LICENSE" "$root/LICENSES.md" "$root"/packaging/licenses/*.txt "$licenses/"
 
 excludes=()
 for pattern in 'libva.so*' 'libva-*.so*' 'libvdpau*.so*' 'libdrm*.so*' 'libgbm.so*' \
@@ -79,11 +81,57 @@ export EXTRA_PLATFORM_PLUGINS="libqwayland.so"
 export LDAI_OUTPUT="$output/$package-x86_64.AppImage"
 export LINUXDEPLOY_OUTPUT_VERSION="${JFD_PACKAGE_VERSION:-dev}"
 cd "$work"
+# First the libraries and Qt's plugins, then (below, after their licences are
+# in) the AppImage itself.
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
   --desktop-file "$here/$app_id.desktop" \
   --icon-file "$root/packaging/icons/$package.png" --icon-filename "$package" \
   "${excludes[@]}" "${forced[@]}" \
-  --plugin qt --output appimage
+  --plugin qt
+
+# Every library in the image has its licence: Qt's (and the ICU it is built
+# with) and the pinned libmpv, FFmpeg, libplacebo and libass have theirs in
+# packaging/licenses; any other comes from this system, and its package's
+# Debian copyright file goes in. A library without either stops the build.
+icu_major=73
+install -d "$licenses/system"
+{
+  echo "Libraries of the build system in this AppImage, with the Ubuntu package"
+  echo "each came from; that package's copyright file is <package>.copyright here."
+  echo
+} > "$licenses/system/README.txt"
+unlicensed=()
+while IFS= read -r lib; do
+  base=$(basename "$lib")
+  case "$base" in
+    libQt6*) continue ;;
+    libicu*)
+      if [[ "$base" != *.so."$icu_major"* ]]; then
+        echo "$base: Qt now ships another ICU than $icu_major; update packaging/licenses/ICU.txt and icu_major" >&2
+        exit 1
+      fi
+      continue ;;
+    libmpv.so*|libavcodec.so*|libavformat.so*|libavutil.so*|libavfilter.so*|libavdevice.so*| \
+    libswscale.so*|libswresample.so*|libplacebo.so*|libass.so*)
+      if [[ -e "$mpv_prefix/lib/$base" ]]; then continue; fi ;;
+  esac
+  owner=$(dpkg -S "*/$base" 2>/dev/null | grep -v '^diversion' | head -n 1 | cut -d: -f1 || true)
+  copyright="/usr/share/doc/$owner/copyright"
+  if [[ -z "$owner" || ! -r "$copyright" ]]; then
+    unlicensed+=("$base")
+    continue
+  fi
+  cp -L "$copyright" "$licenses/system/$owner.copyright"
+  echo "$base: $owner $(dpkg-query -W -f='${Version}' "$owner")" >> "$licenses/system/README.txt"
+done < <(find "$appdir/usr/lib" \( -type f -o -type l \) -name '*.so*' | sort)
+if (( ${#unlicensed[@]} )); then
+  echo "no licence for these libraries in the image: ${unlicensed[*]}" >&2
+  echo "(add their texts to packaging/licenses and THIRD-PARTY-NOTICES.txt, or exclude them)" >&2
+  exit 1
+fi
+test -f "$licenses/THIRD-PARTY-NOTICES.txt"
+
+"$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" --output appimage
 
 # A program that plays video must carry the pinned libmpv, not a system one.
 if readelf -d "$exe" | grep -q 'NEEDED.*libmpv\.so'; then
