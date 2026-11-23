@@ -159,6 +159,7 @@ namespace jfd::ui {
   void DownloadsUi::resumeAll() {
     if (s_service) s_service->resumeAll();
   }
+  int DownloadsUi::verify() { return s_service ? s_service->verify() : 0; }
   bool DownloadsUi::remove(const QString& itemId) { return s_service && s_service->remove(itemId); }
   int DownloadsUi::removeWatched() { return s_service ? s_service->removeWatched() : 0; }
   int DownloadsUi::removeAll() { return s_service ? s_service->removeAll() : 0; }

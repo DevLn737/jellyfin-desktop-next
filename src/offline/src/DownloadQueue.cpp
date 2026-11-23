@@ -20,6 +20,18 @@ namespace jfd::offline {
   namespace {
     Q_LOGGING_CATEGORY(lcQueue, "jfd.offline.queue")
 
+    constexpr int SpaceRecheckMs = 30'000;
+
+    // Problems that stop the whole queue; the space problems only hold
+    // back the items that do not fit.
+    bool stopsQueue(QueueProblem problem) {
+      return problem == QueueProblem::PausedByUser || problem == QueueProblem::SignInRequired;
+    }
+
+    bool isSpaceProblem(QueueProblem problem) {
+      return problem == QueueProblem::LowSpace || problem == QueueProblem::OverLimit;
+    }
+
     // The external audio tracks of an original still to fetch, in index
     // order. Compressed copies carry their one audio track inside.
     QList<QJsonObject> pendingAudio(const ItemManifest& m) {
@@ -73,7 +85,14 @@ namespace jfd::offline {
     connect(worker, &DownloadWorker::transcodeStarted, this, &DownloadQueue::onTranscodeStarted);
     connect(worker, &DownloadWorker::segmentWritten, this, &DownloadQueue::onSegmentWritten);
     m_thread->start();
+    // Space freed outside the app (or a drive connected again) lets the
+    // waiting items go on without a press of "Continue".
+    m_spaceTimer = new QTimer(this);
+    m_spaceTimer->setInterval(SpaceRecheckMs);
+    connect(m_spaceTimer, &QTimer::timeout, this, &DownloadQueue::schedule);
   }
+
+  void DownloadQueue::setSpaceRecheckMs(int ms) { m_spaceTimer->setInterval(ms); }
 
   DownloadQueue::~DownloadQueue() {
     if (m_worker)
@@ -134,8 +153,15 @@ namespace jfd::offline {
       return;
     }
     QList<ItemManifest> pending;
+    // A download folder that is not there (a drive not connected) says
+    // nothing about the files in it.
+    const bool rootThere = QFileInfo(m_store.root()).isDir();
     for (ItemManifest& m : m_catalog.items(m_serverId, m_userId)) {
-      if (m.state == ItemState::Complete) continue;
+      if (m.state == ItemState::Complete) {
+        // Deleted, moved or cut short outside the app: download it again.
+        if (rootThere && markIfMissing(m)) pending.append(m);
+        continue;
+      }
       // Killed between the rename and the manifest: the file is there and
       // has the expected size, so it is complete.
       const QString media = m_store.mediaPath(m);
@@ -178,10 +204,60 @@ namespace jfd::offline {
       entry.manifest = m;
       entry.bytesOnDisk = m.mediaComplete ? m.expectedSize : QFileInfo(m_store.partPath(m)).size();
       entry.total = m.expectedSize + (m.mediaComplete ? pendingAudioBytes(m) : 0);
+      // Failed after it was complete: its file went missing (markIfMissing).
+      if (m.state == ItemState::Failed && m.completedAt.isValid()) entry.problem = QueueProblem::MediaMissing;
       m_order.append(m.itemId);
       m_entries.insert(m.itemId, std::move(entry));
     }
     Q_EMIT orderChanged();
+  }
+
+  bool DownloadQueue::markIfMissing(ItemManifest& m) {
+    const QString media = m_store.mediaPath(m);
+    const QFileInfo info(media);
+    if (!media.isEmpty() && info.isFile() && (m.expectedSize <= 0 || info.size() == m.expectedSize))
+      return false;
+    if (info.exists())
+      qCWarning(lcQueue) << "the downloaded file of" << m.itemId << "has" << info.size() << "bytes, not"
+                         << m.expectedSize << "- it can be downloaded again";
+    else
+      qCWarning(lcQueue) << "the downloaded file of" << m.itemId << "is missing - it can be downloaded again";
+    // completedAt stays: it tells a missing file from a failed download
+    // after a restart.
+    m.state = ItemState::Failed;
+    m.mediaComplete = false;
+    m.resumeValidator.clear();
+    m.transcode.segmentsDone = 0;
+    m.transcode.partBytes = 0;
+    if (!m_store.writeManifest(m)) qCWarning(lcQueue) << "could not write the manifest of" << m.itemId;
+    m_catalog.update(m);
+    return true;
+  }
+
+  int DownloadQueue::verifyComplete() {
+    if (m_serverId.isEmpty() || m_userId.isEmpty() || !QFileInfo(m_store.root()).isDir()) return 0;
+    QList<ItemManifest> missing;
+    for (ItemManifest& m : m_catalog.items(m_serverId, m_userId))
+      if (m.state == ItemState::Complete && !m_entries.contains(m.itemId) && markIfMissing(m)) missing.append(m);
+    std::stable_sort(missing.begin(), missing.end(),
+                     [](const ItemManifest& a, const ItemManifest& b) { return a.queuedAt < b.queuedAt; });
+    QStringList marked;
+    for (const ItemManifest& m : std::as_const(missing)) {
+      Entry entry;
+      entry.manifest = m;
+      entry.total = m.expectedSize;
+      entry.problem = QueueProblem::MediaMissing;
+      m_order.append(m.itemId);
+      m_entries.insert(m.itemId, std::move(entry));
+      marked.append(m.itemId);
+    }
+    if (marked.isEmpty()) return 0;
+    Q_EMIT orderChanged();
+    for (const QString& itemId : std::as_const(marked)) {
+      Q_EMIT itemChanged(itemId);
+      Q_EMIT failed(itemId, QueueProblem::MediaMissing);
+    }
+    return int(marked.size());
   }
 
   EnqueueResult DownloadQueue::enqueueOriginal(const QJsonObject& item,
@@ -339,8 +415,14 @@ namespace jfd::offline {
   }
 
   void DownloadQueue::schedule() {
-    if (m_problem != QueueProblem::None || m_serverUrl.isEmpty() || !m_worker) return;
+    if (stopsQueue(m_problem) || m_serverUrl.isEmpty() || !m_worker) return;
     int active = activeCount();
+    // The first reason an item had to wait, for the whole queue's notice.
+    QueueProblem waiting = QueueProblem::None;
+    // The free space is the same for every item of this pass: an item
+    // needing at least as much as one refused for low space is refused too,
+    // without asking the disk again.
+    std::int64_t refusedLowSpace = -1;
     for (const QString& itemId : std::as_const(m_order)) {
       if (active >= m_maxParallel) break;
       Entry& entry = m_entries[itemId];
@@ -351,21 +433,39 @@ namespace jfd::offline {
           entry.manifest.mediaComplete
               ? pendingAudioBytes(entry.manifest)
               : std::max<std::int64_t>(0, entry.manifest.expectedSize - entry.bytesOnDisk);
-      const StorageVerdict verdict =
-          m_guard ? m_guard->admit(m_store.root(), remaining, committedBytes(entry))
-                  : StorageVerdict::Ok;
-      if (verdict == StorageVerdict::OverLimit) {
-        setProblem(QueueProblem::OverLimit);
-        return;
+      StorageVerdict verdict = StorageVerdict::Ok;
+      if (refusedLowSpace >= 0 && remaining >= refusedLowSpace)
+        verdict = StorageVerdict::LowSpace;
+      else if (m_guard)
+        verdict = m_guard->admit(m_store.root(), remaining, committedBytes(entry));
+      if (verdict != StorageVerdict::Ok) {
+        // This one waits; smaller ones behind it may still fit.
+        const QueueProblem why =
+            verdict == StorageVerdict::OverLimit ? QueueProblem::OverLimit : QueueProblem::LowSpace;
+        if (why == QueueProblem::LowSpace && (refusedLowSpace < 0 || remaining < refusedLowSpace))
+          refusedLowSpace = remaining;
+        if (waiting == QueueProblem::None) waiting = why;
+        if (entry.problem != why) {
+          entry.problem = why;
+          Q_EMIT itemChanged(itemId);
+        }
+        continue;
       }
-      if (verdict == StorageVerdict::LowSpace) {
-        setProblem(QueueProblem::LowSpace);
-        return;
-      }
+      entry.problem = QueueProblem::None;
       startTransfer(entry);
       ++active;
     }
+    if (waiting != QueueProblem::None)
+      setProblem(waiting);
+    else if (isSpaceProblem(m_problem))
+      setProblem(QueueProblem::None);
+    if (waiting != QueueProblem::None && !m_spaceTimer->isActive())
+      m_spaceTimer->start();
+    else if (waiting == QueueProblem::None)
+      m_spaceTimer->stop();
   }
+
+  void DownloadQueue::recheckSpace() { schedule(); }
 
   void DownloadQueue::startTransfer(Entry& entry) {
     const ItemManifest& m = entry.manifest;
@@ -471,9 +571,11 @@ namespace jfd::offline {
   void DownloadQueue::setProblem(QueueProblem problem) {
     if (m_problem == problem) return;
     m_problem = problem;
-    if (problem != QueueProblem::None) {
+    if (stopsQueue(problem)) {
       qCInfo(lcQueue) << "queue stopped:" << static_cast<int>(problem);
       stopAllTransfers();
+    } else if (problem != QueueProblem::None) {
+      qCInfo(lcQueue) << "items wait for space:" << static_cast<int>(problem);
     }
     Q_EMIT problemChanged(problem);
   }
@@ -534,12 +636,18 @@ namespace jfd::offline {
       stopTransfer(*it, Entry::AfterStop::Remove);
       return;
     }
+    removeEntry(itemId);
+    Q_EMIT itemChanged(itemId);
+    schedule();
+  }
+
+  void DownloadQueue::removeEntry(const QString& itemId) {
+    const auto it = m_entries.constFind(itemId);
+    if (it == m_entries.cend()) return;
     const ItemManifest manifest = it->manifest;
     dropEntry(itemId);
     m_store.removeItem(manifest);
     m_catalog.remove(manifest.serverId, manifest.userId, manifest.itemId);
-    Q_EMIT itemChanged(itemId);
-    schedule();
   }
 
   void DownloadQueue::move(const QString& itemId, int index) {
@@ -730,6 +838,24 @@ namespace jfd::offline {
     entry.bytesOnDisk = audio >= 0 ? entry.manifest.expectedSize
                                    : QFileInfo(m_store.partPath(entry.manifest)).size();
     const QString audioFile = m_pendingAudioFile.take(itemId);
+    // Cancelled while the transfer was ending: whatever it ended with
+    // (complete too), the item goes.
+    if (entry.afterStop == Entry::AfterStop::Remove) {
+      removeEntry(itemId);
+      Q_EMIT itemChanged(itemId);
+      schedule();
+      return;
+    }
+    // Paused while it was ending: what is in stays, the rest waits.
+    const auto pauseIfAsked = [this, itemId]() {
+      const auto again = m_entries.find(itemId);
+      if (again == m_entries.end() || again->afterStop != Entry::AfterStop::Pause ||
+          again->manifest.state != ItemState::Queued)
+        return;
+      again->manifest.state = ItemState::Paused;
+      save(*again);
+      Q_EMIT itemChanged(itemId);
+    };
     if (audio >= 0) {
       switch (outcome) {
       case TransferOutcome::Complete:
@@ -737,6 +863,7 @@ namespace jfd::offline {
         entry.attempts = 0;
         save(entry);
         Q_EMIT itemChanged(itemId);
+        pauseIfAsked();
         schedule();
         return;
       case TransferOutcome::Refused:
@@ -766,14 +893,10 @@ namespace jfd::offline {
     switch (outcome) {
     case TransferOutcome::Complete:
       mediaDone(entry);
+      pauseIfAsked();
       break;
     case TransferOutcome::Cancelled:
-      if (entry.afterStop == Entry::AfterStop::Remove) {
-        const ItemManifest manifest = entry.manifest;
-        dropEntry(itemId);
-        m_store.removeItem(manifest);
-        m_catalog.remove(manifest.serverId, manifest.userId, manifest.itemId);
-      } else if (entry.afterStop == Entry::AfterStop::Pause) {
+      if (entry.afterStop == Entry::AfterStop::Pause) {
         entry.manifest.state = ItemState::Paused;
         save(entry);
       }
@@ -784,9 +907,12 @@ namespace jfd::offline {
       Q_EMIT itemChanged(itemId);
       return;
     case TransferOutcome::LowSpace:
-      setProblem(QueueProblem::LowSpace);
+      // The disk filled while it was written: it waits for space like an
+      // item that does not fit (schedule() below looks again, and the
+      // others go on while they fit).
+      entry.problem = QueueProblem::LowSpace;
       Q_EMIT itemChanged(itemId);
-      return;
+      break;
     case TransferOutcome::Refused:
       fail(QueueProblem::Refused);
       break;

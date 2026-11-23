@@ -95,14 +95,6 @@
         <translation>Войдите снова, чтобы продолжить загрузки.</translation>
     </message>
     <message>
-        <source>The disk is almost full. Free some space, then continue.</source>
-        <translation>Диск почти заполнен. Освободите место и продолжите.</translation>
-    </message>
-    <message>
-        <source>The space for downloads is used up. Delete some downloads or raise the limit in Settings, then continue.</source>
-        <translation>Место для загрузок закончилось. Удалите часть загрузок или увеличьте лимит в настройках и продолжите.</translation>
-    </message>
-    <message>
         <source>The server refused the download.</source>
         <translation>Сервер отказал в загрузке.</translation>
     </message>
@@ -149,6 +141,26 @@
     <message>
         <source>Connection lost, trying again</source>
         <translation>Связь прервалась, повторяем</translation>
+    </message>
+    <message>
+        <source>The disk is almost full. Downloads that do not fit wait until there is free space.</source>
+        <translation>Диск почти заполнен. Загрузки, которым не хватает места, подождут, пока оно освободится.</translation>
+    </message>
+    <message>
+        <source>The space for downloads is used up. Downloads that do not fit wait until you delete some or raise the limit in Settings.</source>
+        <translation>Место для загрузок закончилось. Загрузки, которым не хватает места, подождут, пока вы не удалите часть загрузок или не увеличите лимит в настройках.</translation>
+    </message>
+    <message>
+        <source>The downloaded file is missing or damaged. Try again to download it again.</source>
+        <translation>Загруженный файл пропал или повреждён. Нажмите «Повторить», чтобы загрузить его снова.</translation>
+    </message>
+    <message>
+        <source>Waiting for free disk space</source>
+        <translation>Ждёт свободного места на диске</translation>
+    </message>
+    <message>
+        <source>Waiting: the space for downloads is used up</source>
+        <translation>Ждёт: место для загрузок закончилось</translation>
     </message>
     <message>
         <source>%1 of %2</source>

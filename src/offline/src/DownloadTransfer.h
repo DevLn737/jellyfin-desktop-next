@@ -6,13 +6,28 @@
 #include <jfd/offline/DownloadWorker.h>
 #include <jfd/offline/HlsPlaylist.h>
 
+#include <jfd/offline/StorageGuard.h>
+
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QNetworkReply>
 
+#include <algorithm>
 #include <optional>
 
 namespace jfd::offline {
+
+  // A write that failed with the disk (nearly) full, or its volume gone,
+  // between two looks of the guard (ENOSPC) waits for space like any item
+  // that does not fit; any other failed write is a disk error.
+  inline TransferOutcome writeFailure(const StorageGuard* guard, const QString& partPath) {
+    if (guard != nullptr) {
+      const auto free = guard->freeBytes(QFileInfo(partPath).path());
+      if (!free || *free < std::max<std::int64_t>(guard->reserveBytes(), 64 * MiB)) return TransferOutcome::LowSpace;
+    }
+    return TransferOutcome::DiskError;
+  }
 
   struct DownloadWorker::Transfer {
     DownloadJob job;

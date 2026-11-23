@@ -15,6 +15,8 @@ add_library(jfd_offline STATIC
   src/DownloadTransfer.h
   src/DownloadWorker.cpp
   src/DownloadWorkerHls.cpp
+  src/FileSync.cpp
+  src/FileSync.h
   src/ExtrasDownloader.cpp
   src/HlsPlaylist.cpp
   src/JournalReportSink.cpp

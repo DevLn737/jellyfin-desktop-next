@@ -87,6 +87,10 @@ namespace jfd::offline {
     void setPermission(bool known, bool allowed);
     // Rebuilds the lists from the catalog (after a sync changed manifests).
     void refresh();
+    // Looks for complete downloads whose file went missing or was cut
+    // short (DownloadQueue::verifyComplete) and lists them in the queue as
+    // failed; how many. The downloads page calls it when it opens.
+    Q_INVOKABLE int verify();
 
     bool signedIn() const { return !m_serverId.isEmpty() && !m_userId.isEmpty(); }
     bool online() const { return m_online; }

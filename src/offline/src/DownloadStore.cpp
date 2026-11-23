@@ -94,9 +94,15 @@ namespace jfd::offline {
   QString DownloadStore::libraryFileFor(const QJsonObject& item, const QString& itemId,
                                         const QString& extension, const QSet<QString>& taken) const {
     const QString base = libraryBase(item);
+    const auto used = [&](const QString& file) {
+      return taken.contains(file.toLower()) || QFileInfo::exists(m_root + QLatin1Char('/') + file);
+    };
     QString file = base + QLatin1Char('.') + extension;
-    if (taken.contains(file.toLower()) || QFileInfo::exists(m_root + QLatin1Char('/') + file))
-      file = base + QStringLiteral(" [") + itemId.left(8) + QStringLiteral("].") + extension;
+    if (!used(file)) return file;
+    file = base + QStringLiteral(" [") + itemId.left(8) + QStringLiteral("].") + extension;
+    // Two more items of that name whose ids start alike: the whole id, so
+    // one never writes over the other.
+    if (used(file)) file = base + QStringLiteral(" [") + itemId + QStringLiteral("].") + extension;
     return file;
   }
 
