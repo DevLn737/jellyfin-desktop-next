@@ -352,13 +352,18 @@ jobs:
         run: |
           echo "::error::No MINISIGN_SECRET_KEY secret in the release environment: nothing is published"
           exit 1
-      # The commit's CI, App and Session runs (pushes to main) must have
-      # passed. Runs still going are waited for, up to an hour each.
+      # Every workflow that runs on a push to main must have passed for this
+      # commit. Runs still going are waited for, up to an hour each. Those
+      # with a paths filter run only when their files change: when they ran
+      # for this commit they must have passed, when not they are skipped.
+      # A new workflow that runs on push to main goes in one of the lists.
       - name: Require green CI for this commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for workflow in ci.yml app.yml session.yml; do
+          always="ci.yml app.yml session.yml api.yml library-ui.yml syncplay-drift.yml"
+          when_changed="seerr-api.yml syncplay-harness.yml"
+          for workflow in $always $when_changed; do
             for attempt in $(seq 1 60); do
               run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
                 --jq '.workflow_runs[0] // {} | [.status // "missing", .conclusion // "none", .html_url // ""] | join("|")')
@@ -368,6 +373,11 @@ jobs:
               sleep 60
             done
             if [ "$status" = "missing" ]; then
+              case " $when_changed " in
+                *" $workflow "*)
+                  echo "$workflow: did not run for $GITHUB_SHA (its files did not change)"
+                  continue ;;
+              esac
               echo "::error::$workflow has no run for $GITHUB_SHA on a push to main: release from a commit on main"
               exit 1
             fi
