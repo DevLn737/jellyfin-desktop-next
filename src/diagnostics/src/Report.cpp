@@ -68,8 +68,17 @@ std::string summary(const ReportInput& in)
       << "FFmpeg: " << orUnknown(in.ffmpegVersion) << "\n"
       << "Hardware decoding: setting " << orUnknown(in.hwdecSetting) << ", in use " << orUnknown(in.hwdecCurrent)
       << "\n"
-      << "Server: Jellyfin " << orUnknown(in.serverVersion) << "\n\n"
-      << "Settings\n";
+      << "Server: Jellyfin " << orUnknown(in.serverVersion) << "\n"
+      << "Previous session: "
+      << (in.previousSessionCrashed ? "ended unexpectedly (" + orUnknown(in.previousSessionInfo) + ")"
+                                    : std::string("ended normally"))
+      << "\n";
+  if (!in.crashFiles.empty()) {
+    out << "Crash files (newest first):\n";
+    for (const std::string& file : in.crashFiles)
+      out << "  " << file << "\n";
+  }
+  out << "\nSettings\n";
   for (const auto& [key, value] : in.settings)
     out << "  " << key << " = " << value << "\n";
   return out.str();
@@ -85,6 +94,8 @@ std::vector<ZipEntry> buildReport(const ReportInput& input)
   entries.push_back({"log-previous.txt", redactLines(tail(input.previousLog, MaxLogBytes))});
   entries.push_back({"session-journal.txt", redactLines(joinLines(input.sessionJournal))});
   entries.push_back({"stats.txt", redactLines(joinLines(input.statsSnapshots))});
+  if (!input.crashText.empty())
+    entries.push_back({"crash.txt", redactLines(tail(input.crashText, MaxLogBytes))});
 
   // Whatever the inputs, the archive stays under the limit: trim the biggest
   // entry's start until it fits.

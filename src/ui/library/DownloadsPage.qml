@@ -27,6 +27,10 @@ RoutePage {
 
     title: qsTr("Downloads")
 
+    // A file deleted or cut short outside the app shows as failed, with
+    // "Try again", rather than as downloaded.
+    Component.onCompleted: Downloads.verify()
+
     function deleteOne(itemId, name) {
         confirm.itemId = itemId
         confirm.mode = "one"

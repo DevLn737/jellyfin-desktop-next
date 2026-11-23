@@ -1,6 +1,7 @@
 #include <jfd/offline/DownloadWorker.h>
 
 #include "DownloadTransfer.h"
+#include "FileSync.h"
 
 #include <jfd/api/Downloads.h>
 #include <jfd/offline/MatroskaAudio.h>
@@ -178,7 +179,7 @@ namespace jfd::offline {
     const QByteArray data = t.reply->readAll();
     if (data.isEmpty()) return;
     if (t.file.write(data) != data.size()) {
-      t.forced = TransferOutcome::DiskError;
+      t.forced = writeFailure(m_guard.get(), t.job.partPath);
       t.reply->abort();
       return;
     }
@@ -212,12 +213,12 @@ namespace jfd::offline {
     if (!t.forced && t.writing && reply->bytesAvailable() > 0) {
       const QByteArray rest = reply->readAll();
       if (t.file.write(rest) != rest.size())
-        t.forced = TransferOutcome::DiskError;
+        t.forced = writeFailure(m_guard.get(), t.job.partPath);
       else
         t.received += rest.size();
     }
     if (t.file.isOpen()) {
-      if (!t.file.flush() && !t.forced) t.forced = TransferOutcome::DiskError;
+      if (!t.file.flush() && !t.forced) t.forced = writeFailure(m_guard.get(), t.job.partPath);
       t.file.close();
     }
     if (t.forced) {
@@ -275,6 +276,10 @@ namespace jfd::offline {
       finish(key, TransferOutcome::SizeMismatch);
       return;
     }
+    // On the disk before it takes the final name: the manifest that says
+    // "complete" is written right after (QSaveFile), and a power loss must
+    // not leave a short file behind it.
+    if (!syncFileToDisk(t.job.partPath)) qCWarning(lcDownload) << "could not flush the download to the disk";
     if (QFileInfo::exists(t.job.finalPath)) QFile::remove(t.job.finalPath);
     QDir().mkpath(QFileInfo(t.job.finalPath).path());
     if (t.job.audioOnly) {
@@ -287,6 +292,8 @@ namespace jfd::offline {
           return;
         }
       } else {
+        if (!syncFileToDisk(t.job.finalPath))
+          qCWarning(lcDownload) << "could not flush the audio track to the disk";
         QFile::remove(t.job.partPath);
       }
     } else if (!QFile::rename(t.job.partPath, t.job.finalPath)) {

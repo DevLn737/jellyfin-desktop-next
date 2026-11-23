@@ -94,9 +94,21 @@ jobs:
           windeployqt --release --compiler-runtime --qmldir $env:APP_QML_DIR --no-translations "$stage/$env:APP_EXE.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
-          # Licences of what is linked into the executable (SDL3 for gamepads, see LICENSES.md).
+          # Licences of everything in the package (packaging/licenses/THIRD-PARTY-NOTICES.txt).
           New-Item -ItemType Directory -Force -Path "$stage/licenses" | Out-Null
           Copy-Item LICENSE, LICENSES.md, packaging/licenses/*.txt "$stage/licenses"
+          # Every DLL next to the executable has its notice there: Qt, libmpv,
+          # the Vulkan loader, Mesa and Microsoft's redistributables (the
+          # subfolders are windeployqt's: Qt's plugins and QML modules).
+          # Another DLL stops the build until THIRD-PARTY-NOTICES.txt and a
+          # licence text cover it.
+          $known = @('Qt6*.dll', 'libmpv-2.dll', 'vulkan-1.dll', 'opengl32sw.dll', 'd3dcompiler_47.dll',
+                     'dxcompiler.dll', 'dxil.dll', 'vcruntime140*.dll', 'msvcp140*.dll', 'concrt140.dll',
+                     'vccorlib140.dll')
+          $unlicensed = Get-ChildItem $stage -Filter *.dll | Where-Object {
+            $name = $_.Name; -not ($known | Where-Object { $name -like $_ })
+          }
+          if ($unlicensed) { throw "No licence notice for: $($unlicensed.Name -join ', ') (packaging/licenses/THIRD-PARTY-NOTICES.txt)" }
           @{ commit = '${{ github.sha }}'; ref = '${{ github.ref_name }}'; run = '${{ github.run_id }}' } |
             ConvertTo-Json | Set-Content -Encoding ASCII "$stage/build-info.json"
 
@@ -352,13 +364,18 @@ jobs:
         run: |
           echo "::error::No MINISIGN_SECRET_KEY secret in the release environment: nothing is published"
           exit 1
-      # The commit's CI, App and Session runs (pushes to main) must have
-      # passed. Runs still going are waited for, up to an hour each.
+      # Every workflow that runs on a push to main must have passed for this
+      # commit. Runs still going are waited for, up to an hour each. Those
+      # with a paths filter run only when their files change: when they ran
+      # for this commit they must have passed, when not they are skipped.
+      # A new workflow that runs on push to main goes in one of the lists.
       - name: Require green CI for this commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for workflow in ci.yml app.yml session.yml; do
+          always="ci.yml app.yml session.yml api.yml library-ui.yml syncplay-drift.yml"
+          when_changed="seerr-api.yml syncplay-harness.yml"
+          for workflow in $always $when_changed; do
             for attempt in $(seq 1 60); do
               run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
                 --jq '.workflow_runs[0] // {} | [.status // "missing", .conclusion // "none", .html_url // ""] | join("|")')
@@ -368,6 +385,11 @@ jobs:
               sleep 60
             done
             if [ "$status" = "missing" ]; then
+              case " $when_changed " in
+                *" $workflow "*)
+                  echo "$workflow: did not run for $GITHUB_SHA (its files did not change)"
+                  continue ;;
+              esac
               echo "::error::$workflow has no run for $GITHUB_SHA on a push to main: release from a commit on main"
               exit 1
             fi

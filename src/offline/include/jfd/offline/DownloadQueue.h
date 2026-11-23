@@ -34,8 +34,14 @@ class QTimer;
 // - A dropped transfer is retried 5 times, after 2, 4, 8, 16 and 32 s; a
 //   retry that received data starts the count again. Then the item fails;
 //   retry() puts it back.
-// - 401 stops the queue until the next sign-in (setAccess); low disk space
-//   or the space limit stop it until resumeAll().
+// - 401 stops the queue until the next sign-in (setAccess). An item that
+//   would break the reserve of free space or the space limit waits
+//   ("waiting for space") while smaller items behind it go ahead; the queue
+//   looks again when the limits change (recheckSpace), after a deletion,
+//   on resumeAll() and every 30 s while something waits.
+// - Complete items are checked at sign-in and by verifyComplete(): a media
+//   file that is gone or has the wrong size is marked Failed
+//   (MediaMissing), and retry() downloads it again.
 // - Other users' downloads stay on disk untouched (and are not resumed)
 //   until that user signs in again.
 namespace jfd::offline {
@@ -46,9 +52,10 @@ namespace jfd::offline {
     PausedByUser,
     // The server answered 401; continues after the next setAccess().
     SignInRequired,
-    // The reserve of free space would be broken.
+    // Queue: some items wait for space (the others go on); per item: this
+    // one waits. The reserve of free space would be broken.
     LowSpace,
-    // The downloads would use more than the limit.
+    // The same for the downloads using more than the limit.
     OverLimit,
     // Per item: the server refused (403 without download permission, 404).
     Refused,
@@ -58,6 +65,9 @@ namespace jfd::offline {
     DiskError,
     // Per item: the download URL or a redirect led off the server.
     NotServerUrl,
+    // Per item: it was complete, but its media file is gone or has the
+    // wrong size (deleted, moved or cut short outside the app).
+    MediaMissing,
   };
 
   enum class Activity {
@@ -148,12 +158,24 @@ namespace jfd::offline {
     void move(const QString& itemId, int index);
     void pauseAll();
     void resumeAll();
+    // The space limit or reserve changed, or downloads were deleted: items
+    // waiting for space may fit now.
+    void recheckSpace();
+    // Looks at the signed-in user's complete items (a stat each): those
+    // whose media file is gone or has another size than the manifest
+    // says become Failed with MediaMissing. Returns how many. Skipped while
+    // the download folder itself is missing (a drive not connected).
+    int verifyComplete();
 
     // The signed-in user's items that are not complete, in queue order.
     QStringList order() const { return m_order; }
     std::optional<DownloadStatus> status(const QString& itemId) const;
-    // Why the whole queue stands still; None while it runs.
+    // Why the whole queue stands still (PausedByUser, SignInRequired), or
+    // that some items wait for space (LowSpace, OverLimit; the rest runs);
+    // None while all is well.
     QueueProblem problem() const { return m_problem; }
+    // For tests: how often items waiting for space are looked at again.
+    void setSpaceRecheckMs(int ms);
     // Transferring or waiting for a retry.
     int activeCount() const;
 
@@ -204,6 +226,9 @@ namespace jfd::offline {
     void onStarted(const QString& key, qint64 offset, qint64 total, const QString& validator);
     void onProgress(const QString& key, qint64 bytesOnDisk, qint64 total);
     void onFinished(const QString& key, int outcome, qint64 received);
+    void removeEntry(const QString& itemId);
+    // Complete -> Failed (MediaMissing) when the media file is gone or cut.
+    bool markIfMissing(ItemManifest& m);
 
     DownloadStore& m_store;
     OfflineCatalog& m_catalog;
@@ -221,6 +246,8 @@ namespace jfd::offline {
     QHash<QString, QString> m_pendingAudioFile;
     QStringList m_order;
     QueueProblem m_problem = QueueProblem::None;
+    // Runs schedule() again while items wait for space.
+    QTimer* m_spaceTimer = nullptr;
     int m_maxParallel = 1;
     QList<int> m_retryDelays{2000, 4000, 8000, 16000, 32000};
   };

@@ -154,8 +154,11 @@ namespace jfd::desktop {
                          d.queue.setMaxParallel(value.toInt());
                        else if (key == offline::keys::Quality)
                          d.controller.setQuality(value.toString());
-                       if (key == offline::keys::MaxGiB || key == offline::keys::ReserveGiB)
+                       if (key == offline::keys::MaxGiB || key == offline::keys::ReserveGiB) {
+                         // Items waiting for space may fit under the new limit.
+                         d.queue.recheckSpace();
                          d.controller.refresh();
+                       }
                      });
 
     library::SignIn& signIn = *services.signIn;

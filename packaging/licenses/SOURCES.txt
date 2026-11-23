@@ -1,0 +1,29 @@
+Where the licence texts in this folder come from (fetched 2026-11-23 over
+HTTPS from the projects' official repositories, unmodified; the files that
+start with a short header note keep the original text after it).
+
+GPL-2.0.txt         https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/COPYING.GPLv2
+                    (identical to qtbase v6.11.3 LICENSES/GPL-2.0-only.txt)
+GPL-3.0.txt         https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/COPYING.GPLv3
+                    (identical to qtbase v6.11.3 LICENSES/GPL-3.0-only.txt)
+LGPL-2.1.txt        https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/COPYING.LGPLv2.1
+LGPL-3.0.txt        https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/COPYING.LGPLv3
+                    (identical to qtbase v6.11.3 LICENSES/LGPL-3.0-only.txt)
+Qt-third-party.txt  generated from the qt_attribution.json files and the
+                    licence files they name in https://github.com/qt/qtbase,
+                    qtdeclarative, qtsvg and qtwayland at tag v6.11.3
+SDL3.txt, HIDAPI.txt  from the SDL 3.4.20 release archive (see LICENSES.md)
+mpv.txt             https://github.com/mpv-player/mpv at commit
+                    01e2533f3143b8940857ca419b0b367f583e05ca: Copyright,
+                    LICENSE.LGPL, LICENSE.GPL
+FFmpeg.txt          https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/LICENSE.md
+libplacebo.txt      https://github.com/haasn/libplacebo/blob/v7.360.1/LICENSE
+libass.txt          https://github.com/libass/libass/blob/0.17.5/COPYING
+ICU.txt             https://github.com/unicode-org/icu/blob/release-73-2/icu4c/LICENSE
+                    (Qt's Linux binaries are built with ICU 73.2: qt/qt5 v6.11.3,
+                    coin/provisioning/qtci-linux-RHEL-*/30-install_icu.sh)
+Vulkan-Loader.txt   https://github.com/KhronosGroup/Vulkan-Loader/blob/vulkan-sdk-1.4.363.0/LICENSE.txt
+Mesa.txt            Ubuntu 24.04 package libgl1-mesa-dri,
+                    /usr/share/doc/libgl1-mesa-dri/copyright (the Mesa archive
+                    and GitLab could not be reached)
+LLVM.txt            https://github.com/llvm/llvm-project/blob/llvmorg-3.8.0/llvm/LICENSE.TXT

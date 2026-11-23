@@ -146,6 +146,12 @@ namespace jfd::offline {
 
   void DownloadsController::refresh() { rebuild(); }
 
+  int DownloadsController::verify() {
+    const int marked = m_queue.verifyComplete();
+    if (marked > 0) rebuild();
+    return marked;
+  }
+
   void DownloadsController::scheduleRebuild() { m_rebuild.start(); }
 
   bool DownloadsController::queueStopped() const {
@@ -164,14 +170,16 @@ namespace jfd::offline {
     case QueueProblem::PausedByUser: return tr("Downloads are paused.");
     case QueueProblem::SignInRequired: return tr("Sign in again to continue the downloads.");
     case QueueProblem::LowSpace:
-      return tr("The disk is almost full. Free some space, then continue.");
+      return tr("The disk is almost full. Downloads that do not fit wait until there is free space.");
     case QueueProblem::OverLimit:
-      return tr("The space for downloads is used up. Delete some downloads or raise the limit "
-                "in Settings, then continue.");
+      return tr("The space for downloads is used up. Downloads that do not fit wait until you delete "
+                "some or raise the limit in Settings.");
     case QueueProblem::Refused: return tr("The server refused the download.");
     case QueueProblem::Network: return tr("The connection to the server failed.");
     case QueueProblem::DiskError: return tr("The download folder cannot be written to.");
     case QueueProblem::NotServerUrl: return tr("The download led away from the server.");
+    case QueueProblem::MediaMissing:
+      return tr("The downloaded file is missing or damaged. Try again to download it again.");
     }
     return {};
   }
@@ -199,6 +207,10 @@ namespace jfd::offline {
       return problemText(status != nullptr ? status->problem : QueueProblem::Network);
     if (status != nullptr && status->activity == Activity::RetryWait)
       return tr("Connection lost, trying again");
+    if (status != nullptr && status->activity == Activity::Idle && status->problem == QueueProblem::LowSpace)
+      return tr("Waiting for free disk space");
+    if (status != nullptr && status->activity == Activity::Idle && status->problem == QueueProblem::OverLimit)
+      return tr("Waiting: the space for downloads is used up");
     if (status != nullptr && status->activity == Activity::Transferring && status->audioTrack > 0)
       return tr("Audio track %1 of %2").arg(status->audioTrack).arg(status->audioTracks);
     if (status != nullptr && status->activity == Activity::Transferring) {
@@ -607,6 +619,8 @@ namespace jfd::offline {
   bool DownloadsController::remove(const QString& itemId) {
     bool ok = true;
     for (const QString& id : membersOf(itemId)) ok = removeOne(id) && ok;
+    // Space freed: items waiting for it may go on.
+    m_queue.recheckSpace();
     rebuild();
     return ok;
   }
@@ -615,6 +629,7 @@ namespace jfd::offline {
     int removed = 0;
     for (const ItemManifest& m : completeItems())
       if (userDataOf(m).value(QLatin1String("Played")).toBool() && removeOne(m.itemId)) ++removed;
+    m_queue.recheckSpace();
     rebuild();
     return removed;
   }
@@ -624,6 +639,7 @@ namespace jfd::offline {
     const QStringList ids = m_members.keys();
     for (const QString& id : ids)
       if (removeOne(id)) ++removed;
+    m_queue.recheckSpace();
     rebuild();
     return removed;
   }

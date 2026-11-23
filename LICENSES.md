@@ -24,6 +24,15 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   `licenses` folder).
 - **doctest** (`third_party/doctest`, tests only), MIT; **nlohmann/json** and
   **Monocypher** under their own licences in `third_party/`.
+- **Bundled with the packages** (not in this repository): Qt, libmpv,
+  FFmpeg, libplacebo, libass, ICU, the Vulkan loader, Mesa llvmpipe and
+  Microsoft's runtime redistributables, plus the build system's libraries in
+  the AppImage. [packaging/licenses/THIRD-PARTY-NOTICES.txt](packaging/licenses/THIRD-PARTY-NOTICES.txt)
+  lists each with its version, licence and source, and the licence texts are
+  next to it (sources of the texts: `SOURCES.txt` there). Both packages ship
+  the folder; the MSI build fails on a DLL and the AppImage build on a
+  library that has no notice, and `licenses_check` fails when a text or a
+  pinned version is missing from the notices.
 
 ## Icons, one row per file
 

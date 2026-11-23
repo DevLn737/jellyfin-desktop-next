@@ -95,6 +95,10 @@ namespace jfd::desktop {
     // The smoke test's temporary profile: nothing goes to the system
     // credential store.
     bool isolatedProfile = false;
+    // The previous session ended without a clean exit (startCrashGuard),
+    // and what its marker said (version, start time).
+    bool previousSessionCrashed = false;
+    QString previousSessionInfo;
 
     // The server connection and the library's models (installLibrary). The
     // session and group modules use the same client and socket.
@@ -159,6 +163,16 @@ namespace jfd::desktop {
   // saves a diagnostic report when Settings > Save diagnostic report is
   // pressed (reports go to <logDirectory>/reports, the last five are kept).
   void installDiagnostics(AppServices& services, QQuickWindow& window);
+
+  // Right after the log file starts: writes the "running" marker (a marker
+  // left by the previous session means it did not exit cleanly: that is
+  // logged, its log is kept in <logDirectory>/crashes and the report says
+  // so) and installs the crash handler, which writes a minidump (Windows)
+  // or a backtrace (Linux) into <logDirectory>/crashes. The newest five
+  // crashes keep their files.
+  void startCrashGuard(AppServices& services);
+  // At a clean exit: removes the marker.
+  void endCrashGuard(const AppServices& services);
 
   // After the window loads: sets Theme.reducedEffects from the "Simplified
   // effects" setting; on automatic, from the GPU the window renders on.

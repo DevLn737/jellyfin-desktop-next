@@ -8,6 +8,8 @@
 #include <jfd/offline/DownloadWorker.h>
 #include <jfd/offline/OfflineCatalog.h>
 
+#include <QDir>
+#include <QDirIterator>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QTemporaryDir>
@@ -416,4 +418,157 @@ TEST_CASE("Another user's downloads stay on disk and are not resumed") {
   CHECK(h.catalog.find(ServerId, UserId, id));
   h.queue->setAccess({}, {}, {}, {});
   CHECK(QFile::exists(h.store.manifestPath(*h.catalog.find(ServerId, UserId, id))));
+}
+
+TEST_CASE("A complete download whose file was deleted or cut short shows as failed, and Retry fetches it") {
+  FakeFileServer server;
+  const QString gone = itemIdFor(40);
+  const QString cut = itemIdFor(41);
+  const QString kept = itemIdFor(42);
+  const QByteArray goneContent = patternBytes(300 * 1024, 40);
+  const QByteArray cutContent = patternBytes(300 * 1024, 41);
+  const QByteArray keptContent = patternBytes(300 * 1024, 42);
+  server.setFile(downloadPath(gone), {goneContent});
+  server.setFile(downloadPath(cut), {cutContent});
+  server.setFile(downloadPath(kept), {keptContent});
+
+  auto h = std::make_unique<Harness>(server.url());
+  REQUIRE(h->add(gone, goneContent.size()) == EnqueueResult::Queued);
+  REQUIRE(h->add(cut, cutContent.size()) == EnqueueResult::Queued);
+  REQUIRE(h->add(kept, keptContent.size()) == EnqueueResult::Queued);
+  REQUIRE(waitFor([&] { return h->completed.size() == 3; }, 10000));
+  // Nothing to find while every file is whole.
+  CHECK(h->queue->verifyComplete() == 0);
+
+  // Outside the app: one file deleted, one cut short.
+  REQUIRE(QFile::remove(h->mediaPath(gone)));
+  {
+    QFile file(h->mediaPath(cut));
+    REQUIRE(file.open(QIODevice::ReadWrite));
+    REQUIRE(file.resize(1000));
+  }
+
+  // While the app runs (the downloads page opens).
+  CHECK(h->queue->verifyComplete() == 2);
+  CHECK(h->queue->status(gone)->state == ItemState::Failed);
+  CHECK(h->queue->status(gone)->problem == QueueProblem::MediaMissing);
+  CHECK(h->queue->status(cut)->state == ItemState::Failed);
+  CHECK(h->queue->status(cut)->problem == QueueProblem::MediaMissing);
+  CHECK(h->queue->status(kept)->state == ItemState::Complete);
+  CHECK(h->queue->order() == QStringList{gone, cut});
+
+  // After a restart they are still failed, with the same reason.
+  h->open(server.url());
+  CHECK(h->queue->status(gone)->state == ItemState::Failed);
+  CHECK(h->queue->status(gone)->problem == QueueProblem::MediaMissing);
+  CHECK(h->queue->status(cut)->problem == QueueProblem::MediaMissing);
+  CHECK(h->queue->status(kept)->state == ItemState::Complete);
+
+  // The whole file put back outside the app: complete again at the next
+  // start.
+  {
+    QFile file(h->mediaPath(cut));
+    REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    REQUIRE(file.write(cutContent) == cutContent.size());
+  }
+  h->open(server.url());
+  CHECK(h->queue->status(cut)->state == ItemState::Complete);
+  CHECK(h->queue->order() == QStringList{gone});
+
+  // Retry downloads the missing one again, whole.
+  const int requestsBefore = int(server.requests().size());
+  h->completed.clear();
+  h->queue->retry(gone);
+  REQUIRE(waitFor([&] { return h->completed.size() == 1; }, 10000));
+  CHECK(fileSha(h->mediaPath(gone)) == FakeFileServer::sha256(goneContent));
+  CHECK(fileSha(h->mediaPath(cut)) == FakeFileServer::sha256(cutContent));
+  CHECK(h->catalog.find(ServerId, UserId, gone)->state == ItemState::Complete);
+  CHECK(int(server.requests().size()) == requestsBefore + 1);
+
+  // A download folder that is not there (a drive not connected) marks
+  // nothing.
+  const QString root = h->store.root();
+  REQUIRE(QDir(root).rename(root, root + QStringLiteral(".away")));
+  CHECK(h->queue->verifyComplete() == 0);
+  h->open(server.url());
+  CHECK(h->queue->order().isEmpty());
+  REQUIRE(QDir(root + QStringLiteral(".away")).rename(root + QStringLiteral(".away"), root));
+  h->open(server.url());
+  CHECK(h->queue->order().isEmpty());
+  CHECK(h->queue->status(kept)->state == ItemState::Complete);
+}
+
+TEST_CASE("Cancel pressed while the download completes removes the item") {
+  FakeFileServer server;
+  const QString id = itemIdFor(43);
+  const QByteArray content = patternBytes(200 * 1024, 43);
+  server.setFile(downloadPath(id), {content});
+
+  Harness h(server.url());
+  bool cancelled = false;
+  // The last progress report comes just before the worker reports the
+  // file complete: Cancel lands while the completion is on its way.
+  QObject::connect(h.queue.get(), &DownloadQueue::progress, [&](const QString& itemId, qint64 done, qint64 total) {
+    if (cancelled || itemId != id || total <= 0 || done < total) return;
+    cancelled = true;
+    h.queue->cancel(id);
+  });
+  REQUIRE(h.add(id, content.size()) == EnqueueResult::Queued);
+  REQUIRE(waitFor([&] { return cancelled && !h.queue->status(id); }, 10000));
+  CHECK_FALSE(h.catalog.find(ServerId, UserId, id));
+  CHECK(h.completed.isEmpty());
+  QDirIterator files(h.store.root(), QDir::Files, QDirIterator::Subdirectories);
+  QStringList left;
+  while (files.hasNext()) left.append(files.next());
+  CHECK(left.isEmpty());
+}
+
+TEST_CASE("An item too big for the space waits while smaller ones go on; a higher limit lets it start") {
+  FakeFileServer server;
+  const QString big = itemIdFor(44);
+  const QString small = itemIdFor(45);
+  const QByteArray bigContent = patternBytes(900 * 1024, 44);
+  const QByteArray smallContent = patternBytes(200 * 1024, 45);
+  server.setFile(downloadPath(big), {bigContent});
+  server.setFile(downloadPath(small), {smallContent});
+
+  Harness h(server.url());
+  h.guard->setLimitBytes(512 * 1024);
+  REQUIRE(h.add(big, bigContent.size()) == EnqueueResult::Queued);
+  REQUIRE(h.add(small, smallContent.size()) == EnqueueResult::Queued);
+  // The big one waits; the small one behind it is not held up.
+  REQUIRE(waitFor([&] { return h.completed.contains(small); }, 10000));
+  CHECK(h.queue->problem() == QueueProblem::OverLimit);
+  REQUIRE(h.queue->status(big));
+  CHECK(h.queue->status(big)->state == ItemState::Queued);
+  CHECK(h.queue->status(big)->problem == QueueProblem::OverLimit);
+  CHECK(h.failures.isEmpty());
+
+  // The limit raised in Settings: it starts without "Continue".
+  h.guard->setLimitBytes(2 * MiB);
+  h.queue->recheckSpace();
+  REQUIRE(waitFor([&] { return h.completed.contains(big); }, 10000));
+  CHECK(h.queue->problem() == QueueProblem::None);
+  CHECK(fileSha(h.mediaPath(big)) == FakeFileServer::sha256(bigContent));
+}
+
+TEST_CASE("Low disk space: items wait and go on by themselves once space is free") {
+  FakeFileServer server;
+  const QString id = itemIdFor(46);
+  const QByteArray content = patternBytes(300 * 1024, 46);
+  server.setFile(downloadPath(id), {content});
+
+  Harness h(server.url());
+  h.queue->setSpaceRecheckMs(50);
+  h.guard->setReserveBytes(GiB);
+  h.guard->free = GiB / 2;
+  REQUIRE(h.add(id, content.size()) == EnqueueResult::Queued);
+  CHECK(h.queue->problem() == QueueProblem::LowSpace);
+  CHECK(h.queue->status(id)->problem == QueueProblem::LowSpace);
+  CHECK(server.requests().isEmpty());
+  // Space freed outside the app: no press of "Continue" needed.
+  h.guard->free = 100 * GiB;
+  REQUIRE(waitFor([&] { return h.completed.contains(id); }, 10000));
+  CHECK(h.queue->problem() == QueueProblem::None);
+  CHECK(h.failures.isEmpty());
 }
