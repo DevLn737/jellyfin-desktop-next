@@ -34,4 +34,10 @@ QtObject {
     readonly property url favoriteBorder: Qt.resolvedUrl("icons/favorite-border.svg")
     readonly property url info: Qt.resolvedUrl("icons/info.svg")
     readonly property url more: Qt.resolvedUrl("icons/more.svg")
+    readonly property url subtitles: Qt.resolvedUrl("icons/subtitles.svg")
+    readonly property url audio: Qt.resolvedUrl("icons/audio.svg")
+    readonly property url window: Qt.resolvedUrl("icons/window.svg")
+    readonly property url music: Qt.resolvedUrl("icons/music.svg")
+    readonly property url link: Qt.resolvedUrl("icons/link.svg")
+    readonly property url palette: Qt.resolvedUrl("icons/palette.svg")
 }

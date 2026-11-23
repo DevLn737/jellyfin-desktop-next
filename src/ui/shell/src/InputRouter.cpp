@@ -1,5 +1,7 @@
 #include "InputRouter.h"
 
+#include "InputMode.h"
+
 #include <QCoreApplication>
 #include <QInputMethodEvent>
 #include <QInputMethodQueryEvent>
@@ -46,6 +48,8 @@ namespace jfd::ui {
   }
 
   void InputRouter::route(InputAction action, bool repeat) {
+    // Before the key goes out: what it reaches already sees a gamepad.
+    InputMode::instance()->noteGamepad();
     if (platform::isMediaAction(action)) {
       if (m_media) m_media(action);
       return;

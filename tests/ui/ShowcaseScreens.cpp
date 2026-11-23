@@ -28,6 +28,7 @@
 
 #include <QBuffer>
 #include <QDir>
+#include <QFile>
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -870,6 +871,27 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
   // The section list: one entry per section; choosing one scrolls to it.
   REQUIRE(waitFor([&] { return show.item("settingsSection_diagnostics") != nullptr; }, Timeout));
   show.screenshot(QStringLiteral("settings-1600"));
+  // Every section the application registers has an icon file (light and
+  // dark), and Interface and Appearance are told apart.
+  QQuickItem* settingsPage = show.page();
+  REQUIRE(settingsPage != nullptr);
+  const auto iconFor = [&](const char* id) {
+    QVariant icon;
+    QMetaObject::invokeMethod(settingsPage, "iconFor", Q_RETURN_ARG(QVariant, icon),
+                              Q_ARG(QVariant, QString::fromLatin1(id)));
+    return icon.toUrl();
+  };
+  for (const char* id : {"playback", "subtitles", "audio", "interface", "appearance", "window", "library", "music",
+                         "input", "syncplay", "downloads", "integrations", "seerr", "remote", "account",
+                         "diagnostics", "legacy"}) {
+    CAPTURE(id);
+    const QUrl icon = iconFor(id);
+    REQUIRE(icon.scheme() == QStringLiteral("qrc"));
+    const QString file = QLatin1Char(':') + icon.path();
+    CHECK(QFile::exists(file));
+    CHECK(QFile::exists(QString(file).replace(QStringLiteral("/icons/"), QStringLiteral("/icons-dark/"))));
+  }
+  CHECK(iconFor("interface") != iconFor("appearance"));
   QMetaObject::invokeMethod(show.item("settingsSection_diagnostics"), "clicked");
   CHECK(waitFor([&] { return list->property("contentY").toDouble() > 100; }, Timeout));
   CHECK(waitFor([&] { return show.item("settingsSection_diagnostics")->property("current").toBool(); }, Timeout));

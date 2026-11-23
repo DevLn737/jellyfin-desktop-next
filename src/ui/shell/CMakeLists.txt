@@ -1,6 +1,7 @@
 # Jfd.Ui.Shell: the window's frame. Navigator (routes and the page stack),
 # the sidebar, back and full-screen keys, the toast, remembering the
 # window's placement in settings, InputRouter (gamepad actions to keys),
+# InputMode (whether the last input was a gamepad),
 # SpatialNavigation (arrows to the nearest item), GamepadStatus (the
 # connected gamepad and the button check) and TextEntry with
 # OnScreenKeyboard (typing without a keyboard in TV mode).
@@ -10,6 +11,7 @@ qt_add_library(jfd_ui_shell STATIC
   src/GraphicsInfo.cpp
   src/CommandRegistry.cpp
   src/GamepadStatus.cpp
+  src/InputMode.cpp
   src/InputRouter.cpp
   src/Navigator.cpp
   src/SpatialNavigation.cpp
@@ -19,6 +21,7 @@ qt_add_library(jfd_ui_shell STATIC
   include/jfd/ui/CommandRegistry.h
   include/jfd/ui/GamepadStatus.h
   include/jfd/ui/GraphicsInfo.h
+  include/jfd/ui/InputMode.h
   include/jfd/ui/InputRouter.h
   include/jfd/ui/Navigator.h
   include/jfd/ui/SpatialNavigation.h

@@ -14,8 +14,9 @@ import Jfd.Ui.Shell
 // the nearest item in that direction, PageUp and PageDown by a page
 // (SpatialNavigation); the Menu key, when the focused item has no menu of
 // its own, goes to the bar and back. In TV mode the pages keep 5 % away from the screen's edges
-// (Theme.safeMargin). In TV mode a text field reached by keys, or Select on
-// it, opens the on-screen keyboard over everything (TextEntry).
+// (Theme.safeMargin). In TV mode, or while a gamepad is in use
+// (Theme.focusDriven), a text field reached by keys, or Select on it, opens
+// the on-screen keyboard over everything (TextEntry).
 FocusScope {
     id: shell
 
@@ -110,6 +111,8 @@ FocusScope {
 
     // The size classes follow the window's width (logical pixels).
     Binding { target: Theme; property: "windowWidth"; value: shell.width }
+    // A gamepad in use makes the interface focus-driven (Theme.focusDriven).
+    Binding { target: Theme; property: "gamepadInput"; value: InputMode.gamepad }
 
     Rectangle {
         anchors.fill: parent
@@ -234,12 +237,13 @@ FocusScope {
     // Settings > Gamepad > Check the buttons.
     GamepadCheck {}
 
-    // TV mode: the on-screen keyboard, above the pages, dialogs and the
-    // command palette while it shows.
+    // TV mode or a gamepad in use: the on-screen keyboard, above the pages,
+    // dialogs and the command palette while it shows. Once open it stays
+    // until closed, so a click on one of its keys does not take it away.
     TextEntry {
         id: textEntry
         objectName: "textEntry"
-        active: Theme.tvMode
+        active: Theme.focusDriven || open
     }
     OnScreenKeyboard {
         entry: textEntry

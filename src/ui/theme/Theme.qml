@@ -26,6 +26,15 @@ QtObject {
     property bool tvMode: false
     property bool tvSafeArea: true
     readonly property real safeMargin: tvMode && tvSafeArea ? 0.05 : 0
+    // The last input came from a gamepad or the phone's remote, not a
+    // keyboard or mouse; the shell sets it (InputMode.gamepad).
+    property bool gamepadInput: false
+    // Behaviour for a gamepad, in TV mode or whenever a gamepad is in use:
+    // the focus is the way around (the player's arrows move between its
+    // controls, Select acts, menus open with their first row focused) and a
+    // text field offers the on-screen keyboard. Sizes and the safe area stay
+    // with tvMode: a gamepad on a desktop keeps the desktop's layout.
+    readonly property bool focusDriven: tvMode || gamepadInput
 
     // Colours come from a palette, a plain map of these names to colours
     // (Palettes.qml has the built-in ones). The names are shared by every

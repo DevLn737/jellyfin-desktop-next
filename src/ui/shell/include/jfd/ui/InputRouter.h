@@ -19,7 +19,8 @@
 // Ctrl+K palette. The media actions are not keys: they go to the media
 // handler (MediaSessionBridge), the path of the system media controls, so
 // they work on every screen and in a SyncPlay group. The server's remote
-// navigation (MoveUp ... Back, SendString) comes the same way.
+// navigation (MoveUp ... Back, SendString) comes the same way. Every routed
+// action marks InputMode: the last input was a gamepad.
 namespace jfd::ui {
 
   class InputRouter final : public QObject {
