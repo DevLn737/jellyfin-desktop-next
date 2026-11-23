@@ -164,7 +164,8 @@ TEST_CASE("a crash leaves its signal and a backtrace behind, and the process sti
     // The child: no output of its own on the test's stderr.
     if (!installCrashHandler(crashes, "20261123-120000-1", "Jellyfin Desktop Next test crashed"))
       _exit(3);
-    std::freopen("/dev/null", "w", stderr);
+    if (std::freopen("/dev/null", "w", stderr) == nullptr)
+      _exit(5);
     std::raise(SIGSEGV);
     _exit(4);
   }
