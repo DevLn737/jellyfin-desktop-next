@@ -4,6 +4,7 @@ add_library(jfd_diagnostics STATIC
   src/FrameStats.cpp
   src/ProcessStats.cpp
   src/Redact.cpp
+  src/LogFile.cpp
   src/Report.cpp
   src/Zip.cpp)
 add_library(jfd::diagnostics ALIAS jfd_diagnostics)

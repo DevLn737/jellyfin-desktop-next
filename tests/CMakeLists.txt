@@ -48,6 +48,7 @@ add_executable(jfd_diagnostics_tests
   diagnostics/FrameStatsTest.cpp
   diagnostics/ProcessStatsTest.cpp
   diagnostics/RedactTest.cpp
+  diagnostics/LogFileTest.cpp
   diagnostics/ReportTest.cpp)
 target_link_libraries(jfd_diagnostics_tests PRIVATE jfd::diagnostics doctest)
 add_test(NAME jfd_diagnostics_tests COMMAND jfd_diagnostics_tests)
