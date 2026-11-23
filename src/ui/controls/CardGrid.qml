@@ -32,12 +32,13 @@ FocusScope {
         cellHeight: root.cardHeight + Theme.spacingLarge
         highlightMoveDuration: Theme.durationNormal
         cacheBuffer: cellHeight * 2
-        keyNavigationEnabled: !Theme.tvMode
+        keyNavigationEnabled: !Theme.focusDriven
 
-        // TV mode: the grid's own moves; a key it cannot use goes on to the
-        // page and the shell's SpatialNavigation.
+        // TV mode or a gamepad (Theme.focusDriven): the grid's own moves; a
+        // key it cannot use goes on to the page and the shell's
+        // SpatialNavigation. A keyboard keeps the grid's wrapping rows.
         function step(target, event) {
-            if (!Theme.tvMode || target < 0 || target >= count || target === currentIndex) {
+            if (!Theme.focusDriven || target < 0 || target >= count || target === currentIndex) {
                 event.accepted = false
                 return
             }

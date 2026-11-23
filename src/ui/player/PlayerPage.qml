@@ -25,6 +25,13 @@ import Jfd.Ui.Player
 // display, then the player. On a Live TV channel: Page Up / Channel
 // Up (and a gamepad's LB) the next channel, Page Down / Channel Down (RB) the
 // one before; N the next channel.
+//
+// A gamepad without TV mode (Theme.focusDriven) gets TV mode's keys: Up and
+// Down focus the display, whose controls, menus included, the arrows then
+// reach; Select plays or pauses, Back closes a menu, the display, then the
+// player. The layout (the icon buttons, their sizes) stays the desktop's.
+// A keyboard keeps its keys (Up and Down: volume) until a gamepad is used.
+// Menu (a gamepad's View) opens and closes the player settings.
 RoutePage {
     id: page
 
@@ -76,16 +83,19 @@ RoutePage {
         }
     }
 
-    // A closed menu gives the keys back to the page, in TV mode to the
+    // A closed menu gives the keys back to the page, focus-driven to the
     // button that opened it.
     onOpenMenuChanged: {
         if (openMenu.length > 0) return
-        if (tvMode && menuOpener && menuOpener.visible) menuOpener.forceActiveFocus(Qt.TabFocusReason)
+        if (focusDriven && menuOpener && menuOpener.visible) menuOpener.forceActiveFocus(Qt.TabFocusReason)
         else page.forceActiveFocus()
         menuOpener = null
     }
 
+    // TV mode: the layout (sizes, the named menu buttons, the safe area).
     readonly property bool tvMode: Theme.tvMode
+    // TV mode or a gamepad in use: the keys move the focus (tvKey).
+    readonly property bool focusDriven: Theme.focusDriven
     // TV mode keeps the controls out of the screen's outer 5 %.
     readonly property int safeX: Math.round(width * Theme.safeMargin)
     readonly property int safeY: Math.round(height * Theme.safeMargin)
@@ -96,7 +106,7 @@ RoutePage {
     property real seekTarget: 0
     property bool seekPending: false
     // The display hides: the arrows seek again.
-    onOsdShownChanged: if (!osdShown && tvMode && osdFocused()) focusPage()
+    onOsdShownChanged: if (!osdShown && focusDriven && osdFocused()) focusPage()
 
     // The keys to the page itself: the control inside that had the focus
     // lets it go (forceActiveFocus alone would give it back, the page being
@@ -157,6 +167,29 @@ RoutePage {
         else playPauseButton.forceActiveFocus(Qt.TabFocusReason)
     }
 
+    // Left or Right along the row of buttons under the timeline, from the
+    // control `from` in it; at either end the focus stays. False when
+    // `from` is not in the row.
+    function stepControls(from, direction) {
+        const controls = []
+        const collect = (item) => {
+            for (let i = 0; i < item.children.length; ++i) {
+                const child = item.children[i]
+                if (!child.visible || !child.enabled) continue
+                if (child.activeFocusOnTab) controls.push(child)
+                else collect(child)
+            }
+        }
+        collect(controlsRow)
+        controls.sort((a, b) => a.mapToItem(null, 0, 0).x - b.mapToItem(null, 0, 0).x)
+        const at = controls.indexOf(from)
+        if (at < 0) return false
+        const next = controls[at + direction]
+        if (next) next.forceActiveFocus(Qt.TabFocusReason)
+        poke()
+        return true
+    }
+
     // The first control of the open menu.
     function focusMenu() {
         const menu = openMenu === "episodes" ? sheetLoader.item : menuLoader.item
@@ -174,7 +207,8 @@ RoutePage {
         }
     }
 
-    // TV mode's keys before the others; true when taken.
+    // TV mode's keys (also a gamepad's without it) before the others; true
+    // when taken.
     function tvKey(event) {
         switch (event.key) {
         case Qt.Key_Left:
@@ -323,10 +357,10 @@ RoutePage {
 
     function toggleMenu(name) {
         const opening = openMenu !== name
-        if (opening && tvMode && osdFocused()) menuOpener = Window.activeFocusItem
+        if (opening && focusDriven && osdFocused()) menuOpener = Window.activeFocusItem
         openMenu = opening ? name : ""
         poke()
-        if (opening && tvMode) focusMenu()
+        if (opening && focusDriven) focusMenu()
     }
 
     // A short line in the middle of the screen for a key's effect.
@@ -962,14 +996,14 @@ RoutePage {
                     when: !timeline.pressed
                     value: page.seekPending ? page.seekTarget : page.player.position
                 }
-                // TV mode: the page's seek, faster when held.
+                // Focus-driven: the page's seek, faster when held.
                 Keys.onLeftPressed: (event) => {
-                    if (!page.tvMode) { event.accepted = false; return }
+                    if (!page.focusDriven) { event.accepted = false; return }
                     page.seekStep(-1, event.isAutoRepeat)
                     page.poke()
                 }
                 Keys.onRightPressed: (event) => {
-                    if (!page.tvMode) { event.accepted = false; return }
+                    if (!page.focusDriven) { event.accepted = false; return }
                     page.seekStep(1, event.isAutoRepeat)
                     page.poke()
                 }
@@ -1025,8 +1059,16 @@ RoutePage {
             }
 
             // One row under the timeline: playback on the left, the menus
-            // on the right.
+            // on the right. Focus-driven, Left and Right go along it, across
+            // the gap between its halves (else the timeline above is nearer).
             Item {
+                id: controlsRow
+                Keys.onLeftPressed: (event) => {
+                    event.accepted = page.focusDriven && page.stepControls(Window.activeFocusItem, -1)
+                }
+                Keys.onRightPressed: (event) => {
+                    event.accepted = page.focusDriven && page.stepControls(Window.activeFocusItem, 1)
+                }
                 width: parent.width
                 height: playPauseButton.height
 
@@ -1124,6 +1166,7 @@ RoutePage {
                         onClicked: page.toggleMute()
                     }
                     ValueSlider {
+                        id: volumeSlider
                         objectName: "volume"
                         focusPolicy: Qt.TabFocus
                         anchors.verticalCenter: parent.verticalCenter
@@ -1134,6 +1177,25 @@ RoutePage {
                         to: 100
                         stepSize: 1
                         value: page.player.muted ? 0 : page.player.volume
+                        // Focus-driven: Left and Right go on along the row,
+                        // Up and Down change the volume, so the arrows never
+                        // stick here.
+                        Keys.onLeftPressed: (event) => {
+                            event.accepted = page.focusDriven && page.stepControls(volumeSlider, -1)
+                        }
+                        Keys.onRightPressed: (event) => {
+                            event.accepted = page.focusDriven && page.stepControls(volumeSlider, 1)
+                        }
+                        Keys.onUpPressed: (event) => {
+                            if (!page.focusDriven) { event.accepted = false; return }
+                            page.changeVolume(5)
+                            page.poke()
+                        }
+                        Keys.onDownPressed: (event) => {
+                            if (!page.focusDriven) { event.accepted = false; return }
+                            page.changeVolume(-5)
+                            page.poke()
+                        }
                         onMoved: {
                             page.player.muted = false
                             page.player.volume = Math.round(value)
@@ -1321,7 +1383,7 @@ RoutePage {
             event.accepted = false
             return
         }
-        if (page.tvMode) {
+        if (page.focusDriven) {
             const arrow = event.key === Qt.Key_Left || event.key === Qt.Key_Right
                 || event.key === Qt.Key_Up || event.key === Qt.Key_Down
             if (arrow && page.osdFocused()) {
@@ -1396,6 +1458,9 @@ RoutePage {
             page.toggleMenu("subtitles"); break
         case Qt.Key_I:
             page.statsShown = !page.statsShown; break
+        // A gamepad's View: the player settings (Back closes them).
+        case Qt.Key_Menu:
+            page.toggleMenu("tune"); break
         case Qt.Key_Escape:
         case Qt.Key_Back:
             if (page.openMenu.length > 0) page.openMenu = ""

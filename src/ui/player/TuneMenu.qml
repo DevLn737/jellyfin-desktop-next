@@ -57,7 +57,7 @@ Rectangle {
             : qsTr("Player settings")
     }
 
-    // Keys and the TV mode: the first row of what shows.
+    // Keys, TV mode or a gamepad: the first row of what shows.
     function focusFirst() {
         const first = content.nextItemInFocusChain(true)
         for (let item = first; item; item = item.parent) {
@@ -68,7 +68,7 @@ Rectangle {
         }
     }
     // A page opened by keys keeps the keys on its rows.
-    onSectionChanged: if (Theme.tvMode || Window.activeFocusItem && holds(Window.activeFocusItem)) Qt.callLater(focusFirst)
+    onSectionChanged: if (Theme.focusDriven || Window.activeFocusItem && holds(Window.activeFocusItem)) Qt.callLater(focusFirst)
 
     function holds(item) {
         for (let at = item; at; at = at.parent)
