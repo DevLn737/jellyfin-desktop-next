@@ -1088,6 +1088,8 @@ TEST_CASE("A gamepad without TV mode reaches every control and menu of the playe
   f.press(InputAction::Menu);
   CHECK(f.page->property("openMenu").toString() == QLatin1String("tune"));
   CHECK(within(window.activeFocusItem(), find(f.page, "tuneMenu")));
+  // A gamepad has no right click: the statistics stay in the menu.
+  CHECK(find(find(f.page, "tuneMenu"), "tuneStats")->isVisible());
   f.press(InputAction::Back);
   CHECK(f.page->property("openMenu").toString().isEmpty());
 
@@ -1202,6 +1204,11 @@ TEST_CASE("The player settings show the focus frame only after keys, not after t
   QQuickItem* tune = nullptr;
   REQUIRE(waitFor([&] { return (tune = find(f.page, "tuneMenu")) != nullptr; }, 2000));
   CHECK(framed(tune).isEmpty());
+  // Discord's switch lives in the main settings; the statistics, with a
+  // mouse, in the video's right-click menu (and I).
+  CHECK(find(tune, "tuneDiscordHidden") == nullptr);
+  REQUIRE(find(tune, "tuneStats") != nullptr);
+  CHECK_FALSE(find(tune, "tuneStats")->isVisible());
 
   // Speed, then back, both with the mouse.
   QQuickItem* speedRow = find(tune, "tuneSpeed");
