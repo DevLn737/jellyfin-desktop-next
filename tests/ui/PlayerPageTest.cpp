@@ -321,6 +321,23 @@ TEST_CASE("The episodes panel shows each episode's still, the watched check and 
   const auto entry = [&](int i) { return list[i].toMap(); };
   CHECK(entry(0).value(QStringLiteral("played")).toBool());
   CHECK(entry(1).value(QStringLiteral("current")).toBool());
+  // Under the title: the season, the number and the episode's own name.
+  CHECK(f.page->property("episodeLine").toString() == QStringLiteral("Season 1 · Episode 2 «First storm»"));
+  // A name the server made from the number is left out.
+  const auto placeholder = [&](const QString& name, int number) {
+    QVariant result;
+    QMetaObject::invokeMethod(f.page, "placeholderName", Q_RETURN_ARG(QVariant, result), Q_ARG(QVariant, name),
+                              Q_ARG(QVariant, number));
+    return result.toBool();
+  };
+  CHECK(placeholder(QStringLiteral("Episode 3"), 3));
+  CHECK(placeholder(QString::fromUtf8("Эпизод 3"), 3));
+  CHECK(placeholder(QString::fromUtf8("Серия 03"), 3));
+  CHECK(placeholder(QStringLiteral("Ep. 12"), 12));
+  CHECK_FALSE(placeholder(QStringLiteral("Episode 4"), 3));
+  CHECK_FALSE(placeholder(QStringLiteral("First storm"), 2));
+  CHECK_FALSE(placeholder(QStringLiteral("Chapter 3 begins"), 3));
+  CHECK_FALSE(placeholder(QStringLiteral("1984"), 3));
   CHECK(entry(2).value(QStringLiteral("progress")).toDouble() == doctest::Approx(0.5));
   CHECK(entry(0).value(QStringLiteral("progress")).toDouble() == doctest::Approx(0.0));
   CHECK(entry(0).value(QStringLiteral("runTimeTicks")).toLongLong() == 28800000000LL);

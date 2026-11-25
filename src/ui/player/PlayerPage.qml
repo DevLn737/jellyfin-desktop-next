@@ -283,11 +283,22 @@ RoutePage {
     readonly property string episodeLine: {
         const episode = currentEpisode
         if (!episode) return ""
-        const name = episode.name || ""
+        // A name the server made up from the number ("Episode 3",
+        // "Эпизод 3", "Ep. 03") says nothing more: the number alone.
+        const name = placeholderName(episode.name || "", episode.number) ? "" : (episode.name || "")
         if (episode.season > 0 && episode.number > 0)
-            return qsTr("Season %1 · Episode %2 «%3»").arg(episode.season).arg(episode.number).arg(name)
-        if (episode.number > 0) return qsTr("Episode %1 «%2»").arg(episode.number).arg(name)
+            return name.length > 0 ? qsTr("Season %1 · Episode %2 «%3»").arg(episode.season).arg(episode.number).arg(name)
+                                   : qsTr("Season %1 · Episode %2").arg(episode.season).arg(episode.number)
+        if (episode.number > 0)
+            return name.length > 0 ? qsTr("Episode %1 «%2»").arg(episode.number).arg(name)
+                                   : qsTr("Episode %1").arg(episode.number)
         return name
+    }
+    // One word and the episode's own number, in any language: the server's
+    // name for an episode without a title.
+    function placeholderName(name, number) {
+        const match = /^\s*[^\d\s]+\s*#?\s*0*(\d+)\s*$/.exec(name)
+        return match !== null && number > 0 && Number(match[1]) === number
     }
     // The subtitles that show, short: "Rus" (nothing when off).
     readonly property string subtitleLabel: {
