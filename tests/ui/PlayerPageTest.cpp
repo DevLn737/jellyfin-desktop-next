@@ -1153,3 +1153,60 @@ TEST_CASE("Right-click on the video shows the statistics; I hides them; a transc
   CHECK(f.page->property("statsShown").toBool());
   CHECK(menu->property("entries").toStringList() == QStringList{QStringLiteral("Hide stats for nerds")});
 }
+
+TEST_CASE("The player settings show the focus frame only after keys, not after the mouse") {
+  // A page of the settings opened with the mouse, then the way back with
+  // the mouse: no row shows the focus frame (it showed on Quality). Escape,
+  // a key, brings the frame back to the list.
+  ui::InputMode::instance()->setGamepad(false);
+  Fixture f;
+  f.open();
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
+
+  const auto click = [&](QQuickItem* item) {
+    const QPoint at = item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
+    QTest::mouseMove(&f.window, at);
+    QTest::mouseClick(&f.window, Qt::LeftButton, Qt::NoModifier, at);
+  };
+  // Whether a visible row or button of the menu shows the focus frame.
+  const std::function<QString(QQuickItem*)> framed = [&](QQuickItem* item) -> QString {
+    if (item->isVisible() && item->property("visualFocus").toBool())
+      return item->objectName().isEmpty() ? QStringLiteral("(unnamed)") : item->objectName();
+    for (QQuickItem* child : item->childItems())
+      if (const QString name = framed(child); !name.isEmpty()) return name;
+    return {};
+  };
+
+  QQuickItem* tuneButton = find(f.page, "tuneButton");
+  REQUIRE(tuneButton != nullptr);
+  QTest::mouseMove(&f.window, QPoint(640, 300));
+  REQUIRE(waitFor([&] { return tuneButton->isVisible() && tuneButton->opacity() > 0.99; }, 2000));
+  click(tuneButton);
+  QQuickItem* tune = nullptr;
+  REQUIRE(waitFor([&] { return (tune = find(f.page, "tuneMenu")) != nullptr; }, 2000));
+  CHECK(framed(tune).isEmpty());
+
+  // Speed, then back, both with the mouse.
+  QQuickItem* speedRow = find(tune, "tuneSpeed");
+  REQUIRE(speedRow != nullptr);
+  click(speedRow);
+  CHECK(tune->property("section").toString() == QStringLiteral("speed"));
+  QTest::qWait(50);
+  CHECK(framed(tune).isEmpty());
+  click(find(tune, "tuneBack"));
+  CHECK(tune->property("section").toString().isEmpty());
+  QTest::qWait(50);
+  CHECK(framed(tune).isEmpty());
+
+  // The keys still reach the menu, and a key shows the frame.
+  click(speedRow);
+  QTest::qWait(50);
+  CHECK(tune->property("section").toString() == QStringLiteral("speed"));
+  REQUIRE(f.window.activeFocusItem() != nullptr);
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &escape);
+  QKeyEvent escapeUp(QEvent::KeyRelease, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &escapeUp);
+  CHECK(tune->property("section").toString().isEmpty());
+  CHECK(waitFor([&] { return framed(tune) == QStringLiteral("tuneQuality"); }, 1000));
+}
