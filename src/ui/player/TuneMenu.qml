@@ -6,7 +6,6 @@ import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Player
-import Jfd.Ui.Settings
 
 // The player's settings: a list of rows with their values (quality, speed,
 // the subtitles' look and delay, the audio delay), the automatic skip of
@@ -190,16 +189,10 @@ Rectangle {
                     onClicked: PlayerSession.autoSkip = !PlayerSession.autoSkip
                 }
                 SettingRow {
-                    objectName: "tuneDiscordHidden"
-                    // Only for those who show their status in Discord.
-                    visible: AppSettings.revision >= 0 && AppSettings.value("integrations/discord") === true
-                    text: qsTr("Hide from Discord")
-                    toggle: true
-                    checked: AppSettings.revision >= 0 && AppSettings.value("integrations/discordHidden") === true
-                    onClicked: AppSettings.setValue("integrations/discordHidden", !checked)
-                }
-                SettingRow {
                     objectName: "tuneStats"
+                    // The mouse has the video's right-click menu and the
+                    // keyboard I; a gamepad or TV mode has only this row.
+                    visible: Theme.focusDriven
                     text: menu.statsShown ? qsTr("Hide stats for nerds") : qsTr("Stats for nerds")
                     value: "I"
                     chevron: false

@@ -518,10 +518,6 @@
         <translation>Пропускать заставки и титры</translation>
     </message>
     <message>
-        <source>Hide from Discord</source>
-        <translation>Скрыть из Discord</translation>
-    </message>
-    <message>
         <source>Hide stats for nerds</source>
         <translation>Скрыть статистику для сисадминов</translation>
     </message>
