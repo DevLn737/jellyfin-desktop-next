@@ -77,4 +77,40 @@ namespace jfd::ui {
     return centred(saved->size(), screens[primary].available);
   }
 
+  void WindowShape::start(const QRect& normalGeometry, bool maximized) {
+    m_normal = normalGeometry;
+    m_maximized = maximized;
+  }
+
+  void WindowShape::geometryChanged(QWindow::Visibility visibility, const QRect& geometry,
+                                    const QRect& screenGeometry) {
+    if (visibility != QWindow::Windowed || !geometry.isValid()) return;
+    if (screenGeometry.isValid() && geometry.contains(screenGeometry)) return;
+    m_normal = geometry;
+  }
+
+  WindowShape::Restore WindowShape::visibilityChanged(QWindow::Visibility visibility) {
+    const QWindow::Visibility previous = m_last;
+    if (visibility == QWindow::Hidden || visibility == QWindow::Minimized) {
+      return Restore::Nothing;
+    }
+    m_last = visibility;
+    if (visibility == QWindow::Maximized) {
+      m_maximized = true;
+      return Restore::Nothing;
+    }
+    if (visibility == QWindow::FullScreen) {
+      // m_maximized keeps what the window was before.
+      return Restore::Nothing;
+    }
+    // A plain window now.
+    if (previous != QWindow::FullScreen) {
+      m_maximized = false;
+      return Restore::Nothing;
+    }
+    if (m_maximized) return Restore::Maximize;
+    return m_normal.isValid() ? Restore::Geometry : Restore::Nothing;
+  }
+
 } // namespace jfd::ui
+

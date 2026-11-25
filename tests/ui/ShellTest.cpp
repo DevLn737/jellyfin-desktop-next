@@ -332,6 +332,59 @@ TEST_CASE("The window opens where it was, or on a screen that is still there") {
   CHECK(placeWindow(huge, QStringLiteral("left"), onlyLeft, 0, defaultSize).size() == QSize(1920, 1040));
 }
 
+TEST_CASE("Leaving full screen brings back the window's size and maximized state") {
+  using Restore = WindowShape::Restore;
+  const QRect screen(0, 0, 2560, 1440);
+  const QRect normal(200, 150, 1500, 900);
+
+  // A plain window, resized by the user, goes full screen and back.
+  WindowShape shape;
+  shape.start(QRect(640, 320, 1280, 800), false);
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Nothing);
+  shape.geometryChanged(QWindow::Windowed, normal, screen);
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  // The switch reports the screen-sized rectangle, sometimes still as a
+  // plain window: not the window's own size.
+  shape.geometryChanged(QWindow::Windowed, screen, screen);
+  shape.geometryChanged(QWindow::FullScreen, screen, screen);
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
+  CHECK(shape.normalGeometry() == normal);
+  CHECK_FALSE(shape.maximized());
+
+  // A maximized window goes back to maximized, keeping its normal size.
+  CHECK(shape.visibilityChanged(QWindow::Maximized) == Restore::Nothing);
+  shape.geometryChanged(QWindow::Maximized, QRect(0, 0, 2560, 1400), screen);
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(shape.maximized());
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Maximize);
+  CHECK(shape.normalGeometry() == normal);
+  CHECK(shape.visibilityChanged(QWindow::Maximized) == Restore::Nothing);
+
+  // Un-maximizing by hand is not a full-screen exit: nothing to undo.
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Nothing);
+  CHECK_FALSE(shape.maximized());
+
+  // Minimizing in full screen and coming back keeps the memory.
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(shape.visibilityChanged(QWindow::Minimized) == Restore::Nothing);
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
+}
+
+TEST_CASE("A window started in full screen leaves it into the saved shape") {
+  using Restore = WindowShape::Restore;
+  WindowShape maximized;
+  maximized.start(QRect(100, 100, 1280, 800), true);
+  CHECK(maximized.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(maximized.visibilityChanged(QWindow::Windowed) == Restore::Maximize);
+
+  WindowShape plain;
+  plain.start(QRect(100, 100, 1280, 800), false);
+  CHECK(plain.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(plain.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
+  CHECK(plain.normalGeometry() == QRect(100, 100, 1280, 800));
+}
+
 TEST_CASE("Simplified effects turn on with integrated and software graphics") {
   using Kind = GraphicsDevice::Kind;
   const auto device = [](Kind kind, quint32 vendor, const char* name) {
