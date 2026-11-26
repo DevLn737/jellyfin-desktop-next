@@ -136,10 +136,11 @@ TEST_CASE("Gamepad Back leaves the page; Search opens the palette and Back close
 
 namespace {
 
-  // The shell in TV mode on a page of 60 rows, driven by the gamepad alone;
-  // the presses go through the button check first, as in InputInstall.cpp.
+  // The shell on a page of 60 rows, driven by the gamepad alone, in TV mode
+  // or on the desktop's layout (a pad on a PC, TV mode off); the presses go
+  // through the button check first, as in InputInstall.cpp.
   struct TvScene {
-    TvScene() {
+    explicit TvScene(bool tvMode = true) {
       REQUIRE(pages.isValid());
       const QString page = pages.filePath(QStringLiteral("RowsPage.qml"));
       QFile file(page);
@@ -169,12 +170,12 @@ RoutePage {
       navigator->reset(QStringLiteral("home"));
       window.resize(1920, 1080);
       QQmlComponent component(&engine);
-      component.setData(R"(
+      component.setData(QByteArray(R"(
 import QtQuick
 import Jfd.Ui.Theme
 import Jfd.Ui.Shell
-AppShell { Component.onCompleted: Theme.tvMode = true }
-)",
+AppShell { Component.onCompleted: Theme.tvMode = )") +
+                            (tvMode ? "true" : "false") + " }\n",
                         QUrl(QStringLiteral("qrc:/gamepad-tv.qml")));
       object.reset(component.create());
       REQUIRE_MESSAGE(object != nullptr, component.errorString().toStdString());
@@ -221,56 +222,76 @@ AppShell { Component.onCompleted: Theme.tvMode = true }
 
 } // namespace
 
+namespace {
+  void driveByGamepadAlone(TvScene& scene) {
+    auto pad = VirtualGamepad::gamepad(0x2dc8, 0x6006, "8BitDo Pro 2");
+    REQUIRE(pad.attached());
+    REQUIRE(pumpUntil([&] { return scene.input.connectedCount() == 1; }));
+
+    REQUIRE(pumpUntil([&] { return scene.focused() == QStringLiteral("row0"); }));
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+    CHECK(scene.focused() == QStringLiteral("row1"));
+    // RB: a page down the list; LB: back up.
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
+    const int paged = scene.focused().mid(3).toInt();
+    CHECK(paged >= 6);
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
+    CHECK(scene.focused().mid(3).toInt() < paged);
+
+    // View (Menu): to the bar's entry of the page and back to the page;
+    // Down from the bar returns to the page too.
+    const QString before = scene.focused();
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
+    CHECK(scene.focused() == QStringLiteral("nav_home"));
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
+    CHECK(scene.focused() == before);
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
+    CHECK(scene.focused() == QStringLiteral("nav_home"));
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+    const QString onPage = scene.focused();
+    CHECK(onPage == before);
+
+    // The button check: presses show, nothing moves; B twice ends it.
+    scene.status->setAvailable(true);
+    scene.status->setControllers(scene.input.controllerNames());
+    scene.status->startCheck();
+    pump(200);
+    QObject* dialog = scene.object->findChild<QObject*>(QStringLiteral("gamepadCheck"));
+    REQUIRE(dialog != nullptr);
+    CHECK(dialog->property("visible").toBool());
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_SOUTH);
+    CHECK(scene.status->lastAction() == QStringLiteral("Select"));
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+    CHECK(scene.status->lastAction() == QStringLiteral("Down"));
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_EAST);
+    CHECK(scene.status->checking());
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_EAST);
+    CHECK_FALSE(scene.status->checking());
+    pump(300);
+    CHECK_FALSE(dialog->property("visible").toBool());
+    CHECK(scene.navigator->currentName() == QStringLiteral("home"));
+    // Back on the page where the check left it.
+    scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+    CHECK(scene.focused().startsWith(QLatin1String("row")));
+    CHECK(scene.focused() != onPage);
+  }
+
+  bool themeFlag(QQmlEngine& engine, const char* name) {
+    QObject* theme = engine.singletonInstance<QObject*>("Jfd.Ui.Theme", "Theme");
+    return theme != nullptr && theme->property(name).toBool();
+  }
+} // namespace
+
 TEST_CASE("TV mode with a gamepad alone: d-pad, pages on the shoulder buttons, View to the navigation bar, the button check") {
   TvScene scene;
-  auto pad = VirtualGamepad::gamepad(0x2dc8, 0x6006, "8BitDo Pro 2");
-  REQUIRE(pad.attached());
-  REQUIRE(pumpUntil([&] { return scene.input.connectedCount() == 1; }));
+  driveByGamepadAlone(scene);
+}
 
-  REQUIRE(pumpUntil([&] { return scene.focused() == QStringLiteral("row0"); }));
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
-  CHECK(scene.focused() == QStringLiteral("row1"));
-  // RB: a page down the list; LB: back up.
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
-  const int paged = scene.focused().mid(3).toInt();
-  CHECK(paged >= 6);
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
-  CHECK(scene.focused().mid(3).toInt() < paged);
-
-  // View (Menu): to the bar's entry of the page and back to the page;
-  // Down from the bar returns to the page too.
-  const QString before = scene.focused();
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
-  CHECK(scene.focused() == QStringLiteral("nav_home"));
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
-  CHECK(scene.focused() == before);
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_BACK);
-  CHECK(scene.focused() == QStringLiteral("nav_home"));
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
-  const QString onPage = scene.focused();
-  CHECK(onPage == before);
-
-  // The button check: presses show, nothing moves; B twice ends it.
-  scene.status->setAvailable(true);
-  scene.status->setControllers(scene.input.controllerNames());
-  scene.status->startCheck();
-  pump(200);
-  QObject* dialog = scene.object->findChild<QObject*>(QStringLiteral("gamepadCheck"));
-  REQUIRE(dialog != nullptr);
-  CHECK(dialog->property("visible").toBool());
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_SOUTH);
-  CHECK(scene.status->lastAction() == QStringLiteral("Select"));
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
-  CHECK(scene.status->lastAction() == QStringLiteral("Down"));
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_EAST);
-  CHECK(scene.status->checking());
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_EAST);
-  CHECK_FALSE(scene.status->checking());
-  pump(300);
-  CHECK_FALSE(dialog->property("visible").toBool());
-  CHECK(scene.navigator->currentName() == QStringLiteral("home"));
-  // Back on the page where the check left it.
-  scene.tap(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
-  CHECK(scene.focused().startsWith(QLatin1String("row")));
-  CHECK(scene.focused() != onPage);
+TEST_CASE("A gamepad without TV mode moves like TV mode, on the desktop's layout") {
+  TvScene scene(false);
+  CHECK_FALSE(themeFlag(scene.engine, "tvMode"));
+  driveByGamepadAlone(scene);
+  // The pad's presses made the interface focus-driven; TV mode stayed off.
+  CHECK(themeFlag(scene.engine, "focusDriven"));
+  CHECK_FALSE(themeFlag(scene.engine, "tvMode"));
 }
