@@ -14,6 +14,10 @@
     "comment": "the DLL's own build time, \"Oct 18 2026 00:18:15\" (mpv's build-date); the history goes back 14 days, ten times the longest delay seen between a commit's date and its arrival (libopus: the build has 51bd2e6, not 5f74436 dated a day and a half earlier)"
   },
   "licenseFiles": {
+    "avisynth-headers": [
+      "distrib/gpl.txt",
+      "avs_core/include/avisynth_c.h:35"
+    ],
     "nvcodec-headers": [
       "include/ffnvcodec/dynlink_loader.h:26",
       "include/ffnvcodec/nvEncodeAPI.h:26"
