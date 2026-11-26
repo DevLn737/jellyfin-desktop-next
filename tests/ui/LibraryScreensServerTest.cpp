@@ -371,7 +371,10 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   };
   for (int attempt = 0; attempt < 4 && collectionId.isEmpty(); ++attempt) {
     QUrlQuery create;
-    create.addQueryItem(QStringLiteral("name"), QStringLiteral("Stand collection"));
+    // A name no online metadata provider knows: the server refreshes a new
+    // collection's metadata, and "Stand collection" once matched a TMDB box
+    // set and was renamed to it before the page was checked.
+    create.addQueryItem(QStringLiteral("name"), QStringLiteral("Jfd Qzx test collection"));
     create.addQueryItem(QStringLiteral("ids"), movieId);
     const auto made =
         call(api::JellyfinClient::Method::Post, QStringLiteral("Collections"), create);
@@ -485,7 +488,7 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   REQUIRE(waitFor(
       [&] {
         return screens.find("collectionName")->property("text").toString() ==
-               QStringLiteral("Stand collection");
+               QStringLiteral("Jfd Qzx test collection");
       },
       Timeout));
   REQUIRE(screens.waitCount("collectionGrid", 1));
