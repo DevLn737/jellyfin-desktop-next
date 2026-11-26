@@ -27,3 +27,8 @@ Mesa.txt            Ubuntu 24.04 package libgl1-mesa-dri,
                     /usr/share/doc/libgl1-mesa-dri/copyright (the Mesa archive
                     and GitLab could not be reached)
 LLVM.txt            https://github.com/llvm/llvm-project/blob/llvmorg-3.8.0/llvm/LICENSE.TXT
+libmpv-windows.txt  collected by packaging/windows/libmpv-sources.py bundle
+                    (.github/workflows/libmpv-sources.yml checks it): the
+                    licence files of each library in
+                    deps/libmpv-windows-sources.json at its revision, of the
+                    recipe, and of the toolchain runtimes named there

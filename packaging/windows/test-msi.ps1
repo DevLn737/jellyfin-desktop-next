@@ -56,6 +56,8 @@ Invoke-Msiexec @('/i', "`"$Msi`"") (Join-Path $Logs 'install.log')
 Assert (Test-Path -LiteralPath $exe) "installed $exe"
 # SDL3 (gamepads) is linked into the executable; its licence ships beside it.
 Assert (Test-Path -LiteralPath (Join-Path $installFolder 'licenses\SDL3.txt')) 'third-party licences installed'
+# libmpv-2.dll links about ninety libraries; their licences ship beside it.
+Assert (Test-Path -LiteralPath (Join-Path $installFolder 'licenses\libmpv-windows.txt')) 'libmpv licences installed'
 Assert (Test-Path -LiteralPath $startMenu) 'Start menu shortcut'
 Assert (Test-Path -LiteralPath $desktop) 'desktop shortcut'
 Assert ((Get-ItemProperty -Path $registryKey -Name InstallFolder).InstallFolder.TrimEnd('\') -eq $installFolder) 'install folder remembered'

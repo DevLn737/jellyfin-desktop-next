@@ -1,0 +1,4 @@
+Licences of the libraries inside libmpv-2.dll (20261018-git-01e2533f31)
+========================================================================
+
+Placeholder: .github/workflows/libmpv-sources.yml collects the texts (packaging/windows/libmpv-sources.py bundle). This line is replaced with its output before the change is merged.

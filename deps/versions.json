@@ -83,6 +83,8 @@
       "url": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261018/mpv-dev-x86_64-20261018-git-01e2533f31.7z",
       "sha256": "d7f5621f42b6e161fe032df914a10bdece28a89df3e57c6c3e16a5a250929b5e",
       "bytes": 31595598,
+      "mirror": "https://github.com/DevLn737/jellyfin-desktop-next/releases/download/libmpv-windows-20261018-git-01e2533f31/mpv-dev-x86_64-20261018-git-01e2533f31.7z",
+      "mirrorComment": "The same file in this repository's release libmpv-windows-<version> (.github/workflows/libmpv-sources.yml), with the source code of every library in the DLL (deps/libmpv-windows-sources.json): upstream keeps only its 30 newest builds.",
       "clientApi": "2.6",
       "d3d11Header": {
         "comment": "The package omits render_d3d11.h; this is mpv's own header at the pinned commit, kept in the repository and copied into the unpacked include directory.",

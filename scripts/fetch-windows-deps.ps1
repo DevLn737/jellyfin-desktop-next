@@ -18,13 +18,17 @@ New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 function Get-Pinned($Pin) {
     $file = Join-Path $Destination $Pin.name
     if (-not (Test-Path -LiteralPath $file) -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $Pin.sha256) {
+        # A pin with a mirror (libmpv: upstream keeps only its newest builds)
+        # is fetched from there when the upstream file is gone.
+        $urls = @($Pin.url)
+        if ($Pin.PSObject.Properties.Name -contains 'mirror') { $urls += $Pin.mirror }
         for ($attempt = 1; ; $attempt++) {
             try {
-                Invoke-WebRequest -Uri $Pin.url -OutFile $file -UseBasicParsing
+                Invoke-WebRequest -Uri $urls[($attempt - 1) % $urls.Count] -OutFile $file -UseBasicParsing
                 break
             } catch {
-                if ($attempt -ge 4) { throw }
-                Start-Sleep -Seconds ([Math]::Pow(2, $attempt))
+                if ($attempt -ge 4 * $urls.Count) { throw }
+                Start-Sleep -Seconds ([Math]::Pow(2, [Math]::Min($attempt, 4)))
             }
         }
     }

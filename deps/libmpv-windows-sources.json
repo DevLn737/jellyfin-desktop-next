@@ -1,0 +1,836 @@
+{
+  "schemaVersion": 1,
+  "comment": "Which revision of each library the Windows libmpv-2.dll (deps/versions.json windows.mpv) is built from, for its licence texts and its source code. Made by packaging/windows/libmpv-sources.py resolve from the recipe at recipe.commit and the strings of the DLL; checked and turned into the source release by .github/workflows/libmpv-sources.yml. Change it only with the script.",
+  "build": "20261018-git-01e2533f31",
+  "recipe": {
+    "repository": "https://github.com/shinchiro/mpv-winbuild-cmake",
+    "commit": "1f8d2e76255abc48f0456d9be99b4cab9c6566e6",
+    "date": "2026-10-11T14:03:09+08:00",
+    "comment": "The recipe's last commit before the build (the release 20261018 points at it)."
+  },
+  "window": {
+    "before": "2026-10-18T00:18:15Z",
+    "after": "2026-10-04T00:00:00Z",
+    "comment": "the DLL's own build time, \"Oct 18 2026 00:18:15\" (mpv's build-date); the history goes back 14 days, ten times the longest delay seen between a commit's date and its arrival (libopus: the build has 51bd2e6, not 5f74436 dated a day and a half earlier)"
+  },
+  "licenseFiles": {
+    "nvcodec-headers": ["include/ffnvcodec/dynlink_loader.h:26", "include/ffnvcodec/nvEncodeAPI.h:26"]
+  },
+  "toolchain": [
+    {
+      "name": "llvm-runtimes",
+      "repository": "https://github.com/llvm/llvm-project",
+      "revision": "release/23.x",
+      "paths": [
+        "libcxx/LICENSE.TXT",
+        "libcxxabi/LICENSE.TXT",
+        "libunwind/LICENSE.TXT",
+        "compiler-rt/LICENSE.TXT"
+      ],
+      "comment": "the clang toolchain's libc++, libc++abi, libunwind and compiler-rt, linked into the DLL"
+    },
+    {
+      "name": "mingw-w64",
+      "repository": "https://github.com/mingw-w64/mingw-w64",
+      "revision": "master",
+      "paths": [
+        "COPYING",
+        "COPYING.MinGW-w64/COPYING.MinGW-w64.txt",
+        "COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt",
+        "DISCLAIMER",
+        "DISCLAIMER.PD",
+        "mingw-w64-libraries/winpthreads/COPYING"
+      ],
+      "comment": "the mingw-w64 C runtime and winpthreads, linked into the DLL"
+    },
+    {
+      "name": "rust-std",
+      "repository": "https://github.com/rust-lang/rust",
+      "revision": "1ed2df61a19042f231709eb05d032ae9e2cb2084",
+      "paths": [
+        "COPYRIGHT",
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ],
+      "comment": "the Rust standard library subrandr is built with; the DLL names this rustc commit"
+    }
+  ],
+  "components": [
+    {
+      "name": "amf-headers",
+      "recipe": "packages/amf-headers.cmake",
+      "repository": "https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git",
+      "branch": "master",
+      "commit": "57ee0cfb0e1a08d9041f77435653794c1b012be0",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T15:22:05-04:00",
+      "submodules": "all",
+      "paths": [
+        "amf/public/include"
+      ]
+    },
+    {
+      "name": "angle-headers",
+      "recipe": "packages/angle-headers.cmake",
+      "repository": "https://github.com/google/angle.git",
+      "branch": "main",
+      "commit": "7865acacbf6380ce2acc54f5afd86a242cd239eb",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T15:04:22-07:00",
+      "paths": [
+        "include/EGL",
+        "include/KHR"
+      ]
+    },
+    {
+      "name": "aom",
+      "recipe": "packages/aom.cmake",
+      "repository": "https://aomedia.googlesource.com/aom",
+      "branch": "main",
+      "commit": "7d61ce8d764648a443363f3dbbc20dcf111a85f0",
+      "anchor": "3.15.2-98-g7d61ce8d",
+      "date": "2026-10-16T16:54:58-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "avisynth-headers",
+      "recipe": "packages/avisynth-headers.cmake",
+      "repository": "https://github.com/AviSynth/AviSynthPlus.git",
+      "branch": "master",
+      "commit": "9c36929bb48b79714c531b85267556cec52874e8",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-15T08:45:38+02:00"
+    },
+    {
+      "name": "brotli",
+      "recipe": "packages/brotli.cmake",
+      "repository": "https://github.com/google/brotli.git",
+      "branch": "master",
+      "commit": "86ee1f65f62d6272345dee751d49e7d1f01c2b11",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-12T10:43:48-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "bzip2",
+      "recipe": "packages/bzip2.cmake",
+      "repository": "https://gitlab.com/bzip2/bzip2.git",
+      "branch": "master",
+      "commit": "66c46b8c9436613fd81bc5d03f63a61933a4dcc3",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2023-05-31T17:09:48-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "c-ares",
+      "recipe": "packages/c-ares.cmake",
+      "repository": "https://github.com/c-ares/c-ares.git",
+      "branch": "main",
+      "commit": "f4156c12c8b36f5cb8f8a53658d44b24263c6ad1",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-01T03:54:24+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "curl",
+      "recipe": "packages/curl.cmake",
+      "repository": "https://github.com/curl/curl.git",
+      "branch": "master",
+      "commit": "0eb8ebcc6ee44a4f4bf50bda5b3b4e3f6cfc12ed",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-18T01:12:49+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "dav1d",
+      "recipe": "packages/dav1d.cmake",
+      "repository": "https://code.videolan.org/videolan/dav1d.git",
+      "branch": "master",
+      "commit": "99f3354ed0b9b4bf3c7c9347318dbcc522c94af5",
+      "anchor": "1.5.4-31-g99f3354",
+      "date": "2026-10-01T23:15:13+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "davs2",
+      "recipe": "packages/davs2.cmake",
+      "repository": "https://github.com/saindriches/davs2.git",
+      "branch": "master",
+      "commit": "f50435051b72c168c2b566c544e27fcff71ba61a",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2023-09-28T12:17:15+08:00",
+      "submodules": "all"
+    },
+    {
+      "name": "fast_float",
+      "recipe": "packages/fast_float.cmake",
+      "repository": "https://github.com/fastfloat/fast_float.git",
+      "branch": "main",
+      "commit": "0de7a21da582b6c84b0546772a96549882905d2b",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T08:55:50-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "ffmpeg",
+      "recipe": "packages/ffmpeg.cmake",
+      "repository": "https://github.com/FFmpeg/FFmpeg.git",
+      "branch": "master",
+      "commit": "94cba3150c6b83057ed48b833689adc806715cc0",
+      "anchor": "N-127617-g94cba3150",
+      "date": "2026-10-17T15:49:47-03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "freetype2",
+      "recipe": "packages/freetype2.cmake",
+      "repository": "https://github.com/freetype/freetype.git",
+      "branch": "master",
+      "commit": "a5877f48fff8dd6cf8d53c505ce055499376aee2",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T06:29:59-04:00"
+    },
+    {
+      "name": "fribidi",
+      "recipe": "packages/fribidi.cmake",
+      "repository": "https://github.com/fribidi/fribidi.git",
+      "branch": "master",
+      "commit": "d2f3e1f4946e7cef9789e1c3ebdb4a60d4314c7f",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-15T21:31:49+03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "glad",
+      "recipe": "packages/glad.cmake",
+      "repository": "https://github.com/Dav1dde/glad.git",
+      "branch": "glad2",
+      "commit": "0a7cf1af9e25e02821587bd4095807fc90b6426a",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-09-28T10:07:03+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "glslang",
+      "recipe": "packages/glslang.cmake",
+      "repository": "https://github.com/KhronosGroup/glslang.git",
+      "branch": "main",
+      "commit": "5cf91e73b01ce835d281a9c3b3d9158f7f74ff86",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T14:21:10-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "graphengine",
+      "recipe": "packages/graphengine.cmake",
+      "repository": "https://github.com/sekrit-twc/graphengine.git",
+      "branch": "master",
+      "commit": "91c6af4c795c5396d8b974f24b4d2e2ecca04e2d",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-08-01T12:15:23-07:00"
+    },
+    {
+      "name": "harfbuzz",
+      "recipe": "packages/harfbuzz.cmake",
+      "repository": "https://github.com/harfbuzz/harfbuzz.git",
+      "branch": "main",
+      "commit": "bb702ff6dec2cf201608bab28ac5c676f0ebaabe",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T14:13:49+03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "highway",
+      "recipe": "packages/highway.cmake",
+      "repository": "https://github.com/google/highway.git",
+      "branch": "master",
+      "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T11:23:44-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "lame",
+      "recipe": "packages/lame.cmake",
+      "repository": "https://gitlab.com/shinchiro/lame.git",
+      "branch": "master",
+      "commit": "9a5b35c430a2e6d150d65a96c7d7acdd64962a8f",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2022-09-28T10:45:07+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "lcms2",
+      "recipe": "packages/lcms2.cmake",
+      "repository": "https://github.com/mm2/Little-CMS.git",
+      "branch": "master",
+      "commit": "a57322d8d5d561a08e3c28dd2c5d4c7e4f59d4c8",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-14T16:09:30+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libarchive",
+      "recipe": "packages/libarchive.cmake",
+      "repository": "https://github.com/libarchive/libarchive.git",
+      "branch": "master",
+      "commit": "bd7a249e9a3da5aaa41a782a095606be0af3b0ae",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T08:54:06-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libaribcaption",
+      "recipe": "packages/libaribcaption.cmake",
+      "repository": "https://github.com/xqq/libaribcaption.git",
+      "branch": "master",
+      "commit": "37dde0f32652c32aa98bf92278944d1cfb2e7354",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-14T00:27:53+09:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libass",
+      "recipe": "packages/libass.cmake",
+      "repository": "https://github.com/libass/libass.git",
+      "branch": "master",
+      "commit": "f61db567e6593df3470e91594bcd4ad2d0473aff",
+      "anchor": "0.17.5-11-gf61db567e6593df3470e91594bcd4ad2d0473aff",
+      "date": "2026-09-17T00:00:00+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libbs2b",
+      "recipe": "packages/libbs2b.cmake",
+      "repository": "https://github.com/alexmarsev/libbs2b.git",
+      "branch": "master",
+      "commit": "5ca2d59888df047f1e4b028e3a2fd5be8b5a7277",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2014-10-17T11:09:04+03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libiconv",
+      "recipe": "packages/libiconv.cmake",
+      "url": "https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz",
+      "hash": "sha256:3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8"
+    },
+    {
+      "name": "libjpeg",
+      "recipe": "packages/libjpeg.cmake",
+      "repository": "https://github.com/libjpeg-turbo/libjpeg-turbo.git",
+      "branch": "main",
+      "commit": "2fa570c514a4b0e70342ef8b32ce1cda21b85710",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-13T19:28:30-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libjxl",
+      "recipe": "packages/libjxl.cmake",
+      "repository": "https://github.com/libjxl/libjxl.git",
+      "branch": "main",
+      "commit": "ef67fde2ec16d52e644c5a0969230b9a85e3eb31",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-06T16:02:32+00:00"
+    },
+    {
+      "name": "libmodplug",
+      "recipe": "packages/libmodplug.cmake",
+      "repository": "https://github.com/Konstanty/libmodplug.git",
+      "branch": "master",
+      "commit": "d1b97ed0020bc620a059d3675d1854b40bd2608d",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2022-01-31T09:36:03+10:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libmysofa",
+      "recipe": "packages/libmysofa.cmake",
+      "repository": "https://github.com/hoene/libmysofa.git",
+      "branch": "main",
+      "commit": "648eed03472e6720a1ea45d1a1f86c4efb569ff9",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-09-08T09:19:38+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libopenmpt",
+      "recipe": "packages/libopenmpt.cmake",
+      "url": "https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.7.12+release.autotools.tar.gz",
+      "hash": "sha256:79ab3ce3672601e525b5cc944f026c80c03032f37d39caa84c8ca3fdd75e0c98"
+    },
+    {
+      "name": "libplacebo",
+      "recipe": "packages/libplacebo.cmake",
+      "repository": "https://github.com/haasn/libplacebo.git",
+      "branch": "master",
+      "commit": "0df80ae5229e8e520c0fa4e3d666098a3ffa1cbc",
+      "anchor": "360.0-171-g0df80ae",
+      "date": "2026-10-16T18:17:07+02:00"
+    },
+    {
+      "name": "libpng",
+      "recipe": "packages/libpng.cmake",
+      "repository": "https://github.com/glennrp/libpng.git",
+      "branch": "libpng18",
+      "commit": "18ea3e9404a09f42d92f952a4c0d1dd3d688182a",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-05T19:35:33+03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libpsl",
+      "recipe": "packages/libpsl.cmake",
+      "repository": "https://github.com/rockdaboot/libpsl.git",
+      "branch": "master",
+      "commit": "a629c831d09011f76974d931be7f6167be90673e",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-09-14T13:06:20+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libsamplerate",
+      "recipe": "packages/libsamplerate.cmake",
+      "repository": "https://github.com/libsndfile/libsamplerate.git",
+      "branch": "master",
+      "commit": "0844c208f683527c08ea8a80acc13b398aa9c8bf",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-08-13T12:47:19+10:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libsdl2",
+      "recipe": "packages/libsdl2.cmake",
+      "repository": "https://github.com/libsdl-org/SDL.git",
+      "branch": "SDL2",
+      "commit": "8acf7cfc0f88717e5c036f60f0314bfcafe39189",
+      "anchor": "2.32.0-261-g8acf7cfc",
+      "date": "2026-10-12T16:16:12-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libsixel",
+      "recipe": "packages/libsixel.cmake",
+      "repository": "https://github.com/saitoha/libsixel.git",
+      "branch": "master",
+      "commit": "f0b705a365563c56f977afaca73997ca68669c62",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-13T16:15:49+09:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libsoxr",
+      "recipe": "packages/libsoxr.cmake",
+      "repository": "https://gitlab.com/shinchiro/soxr.git",
+      "branch": "master",
+      "commit": "945b592b70470e29f917f4de89b4281fbbd540c0",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2018-02-24T10:53:13+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libsrt",
+      "recipe": "packages/libsrt.cmake",
+      "repository": "https://github.com/Haivision/srt.git",
+      "branch": "master",
+      "commit": "9f2390232a8256ed4c72a5418c2b2777c49ad737",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-15T14:35:38+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libssh",
+      "recipe": "packages/libssh.cmake",
+      "repository": "https://gitlab.com/libssh/libssh-mirror.git",
+      "branch": "master",
+      "commit": "de42e7e7d8c01baa67761b2d6225294bda8dd742",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-07T10:40:01+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libunibreak",
+      "recipe": "packages/libunibreak.cmake",
+      "repository": "https://github.com/adah1972/libunibreak.git",
+      "branch": "master",
+      "commit": "f8172fe771ef620112247cadfb876aecaa4f769e",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-07T11:59:37+08:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libva",
+      "recipe": "packages/libva.cmake",
+      "repository": "https://github.com/intel/libva.git",
+      "branch": "master",
+      "commit": "f3fefceb192ca28abf588aadf2392350aebf46ce",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-09-23T15:59:24+08:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libvpl",
+      "recipe": "packages/libvpl.cmake",
+      "repository": "https://github.com/intel/libvpl.git",
+      "branch": "main",
+      "commit": "674d015bcb294bc39fa276e99a652ea045423e82",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-07-13T11:45:22-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libvpx",
+      "recipe": "packages/libvpx.cmake",
+      "repository": "https://chromium.googlesource.com/webm/libvpx.git",
+      "branch": "main",
+      "commit": "37f48364a79f1c887682d78dd6098b914778b6b6",
+      "anchor": "17.0-71-g37f48364",
+      "date": "2026-10-16T13:09:11-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libwebp",
+      "recipe": "packages/libwebp.cmake",
+      "repository": "https://chromium.googlesource.com/webm/libwebp.git",
+      "branch": "main",
+      "commit": "0464ce36981fc8169f69923eb6957dd46848967a",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T13:12:20-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libxml2",
+      "recipe": "packages/libxml2.cmake",
+      "repository": "https://github.com/GNOME/libxml2.git",
+      "branch": "master",
+      "commit": "c79c9612fcc77b06b0d16f35fd363d938bdbbf5e",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T13:51:17+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "libzimg",
+      "recipe": "packages/libzimg.cmake",
+      "repository": "https://github.com/sekrit-twc/zimg.git",
+      "branch": "master",
+      "commit": "67e0603271c080e22c8429856dd4a8a56587e61e",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-09-03T20:27:08-07:00"
+    },
+    {
+      "name": "libzvbi",
+      "recipe": "packages/libzvbi.cmake",
+      "repository": "https://github.com/zapping-vbi/zvbi.git",
+      "branch": "main",
+      "commit": "d3a5ee9f2b047bf16cd1ee5ccf6ec05ee75409d0",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-08-12T17:49:11+03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "luajit",
+      "recipe": "packages/luajit.cmake",
+      "repository": "https://github.com/openresty/luajit2.git",
+      "branch": "v2.1-agentzh",
+      "commit": "f6a9b2a6f0386bac736655703e90f1ef534bfbdc",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-15T14:58:58+08:00",
+      "submodules": "all"
+    },
+    {
+      "name": "lzo",
+      "recipe": "packages/lzo.cmake",
+      "url": "https://www.oberhumer.com/opensource/lzo/download/lzo-2.10.tar.gz",
+      "hash": "sha1:4924676a9bae5db58ef129dc1cebce3baa3c4b5d"
+    },
+    {
+      "name": "mpv",
+      "recipe": "packages/mpv.cmake",
+      "repository": "https://github.com/mpv-player/mpv.git",
+      "branch": "master",
+      "commit": "01e2533f3143b8940857ca419b0b367f583e05ca",
+      "anchor": "41.0-1205-g01e2533f3",
+      "date": "2026-10-17T18:37:59+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "mujs",
+      "recipe": "packages/mujs.cmake",
+      "repository": "https://codeberg.org/ccxvii/mujs.git",
+      "branch": "master",
+      "commit": "2385035568eea7936bdae328d3f0668e1a32ad88",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2025-08-13T15:57:32+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "nghttp2",
+      "recipe": "packages/nghttp2.cmake",
+      "repository": "https://github.com/nghttp2/nghttp2.git",
+      "branch": "master",
+      "commit": "7e10fcf3c58e692902939bab8f898bdd9ec9cff7",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-14T00:53:27+09:00"
+    },
+    {
+      "name": "nghttp3",
+      "recipe": "packages/nghttp3.cmake",
+      "repository": "https://github.com/ngtcp2/nghttp3.git",
+      "branch": "main",
+      "commit": "d29ceea176cebc1f41c9d818c3b1825143d3f813",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-10T18:07:43+09:00",
+      "submodules": [
+        "lib/sfparse"
+      ]
+    },
+    {
+      "name": "ngtcp2",
+      "recipe": "packages/ngtcp2.cmake",
+      "repository": "https://github.com/ngtcp2/ngtcp2.git",
+      "branch": "main",
+      "commit": "48228939787d4b5bea94c7795b8c7fe0781d918e",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-11T14:27:11+09:00"
+    },
+    {
+      "name": "nvcodec-headers",
+      "recipe": "packages/nvcodec-headers.cmake",
+      "repository": "https://github.com/FFmpeg/nv-codec-headers.git",
+      "branch": "master",
+      "commit": "71acc268a541f7d7f33cf0387229e3015cfb4977",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T23:42:20+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "ogg",
+      "recipe": "packages/ogg.cmake",
+      "repository": "https://github.com/xiph/ogg.git",
+      "branch": "main",
+      "commit": "06a5e0262cdc28aa4ae6797627a783b5010440f0",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-03-02T05:10:35-08:00",
+      "submodules": "all"
+    },
+    {
+      "name": "openal-soft",
+      "recipe": "packages/openal-soft.cmake",
+      "repository": "https://github.com/kcat/openal-soft.git",
+      "branch": "master",
+      "commit": "d7b9e9de3ade3d78de621c02a552ab4cb475f2c3",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T23:29:47-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "openssl",
+      "recipe": "packages/openssl.cmake",
+      "repository": "https://github.com/openssl/openssl.git",
+      "branch": "master",
+      "commit": "6d76833d61fad07a171219d9cb1444bc37f88b8f",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-15T13:49:31+02:00"
+    },
+    {
+      "name": "opus",
+      "recipe": "packages/opus.cmake",
+      "repository": "https://github.com/xiph/opus.git",
+      "branch": "main",
+      "commit": "51bd2e649f4516d103ab9a7f22a768595621e847",
+      "anchor": "1.6.1-81-g51bd2e6",
+      "date": "2026-10-13T13:18:31-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "opus-dnn",
+      "recipe": "packages/opus-dnn.cmake",
+      "url": "https://media.xiph.org/opus/models/opus_data-8a07d57c4fce6fb30f23b3e0d264004e04f1d7b421f5392ef61543d021a439af.tar.gz",
+      "hash": "sha256:8a07d57c4fce6fb30f23b3e0d264004e04f1d7b421f5392ef61543d021a439af"
+    },
+    {
+      "name": "rubberband",
+      "recipe": "packages/rubberband.cmake",
+      "repository": "https://github.com/breakfastquay/rubberband.git",
+      "branch": "default",
+      "commit": "e4296ac80b1170018a110bc326fd0d45a0eb27d6",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2025-02-27T11:04:40+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "shaderc",
+      "recipe": "packages/shaderc.cmake",
+      "repository": "https://github.com/google/shaderc.git",
+      "branch": "main",
+      "commit": "ba3e587dbc13d423c713e964ac08e094731a034d",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-01T23:49:00-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "speex",
+      "recipe": "packages/speex.cmake",
+      "repository": "https://github.com/xiph/speex.git",
+      "branch": "main",
+      "commit": "f461ff44072493dde26d72862921ab5d30180cd4",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-10T14:44:55-04:00",
+      "submodules": "all"
+    },
+    {
+      "name": "spirv-cross",
+      "recipe": "packages/spirv-cross.cmake",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Cross.git",
+      "branch": "main",
+      "commit": "300681bbcb8365a8d1eacdacdbdd0249bbf1d6b1",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-14T13:31:50+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "spirv-headers",
+      "recipe": "packages/spirv-headers.cmake",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+      "branch": "main",
+      "commit": "86f980c731e62ae4eaf383d320449d71687936bf",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-02T12:57:46-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "spirv-tools",
+      "recipe": "packages/spirv-tools.cmake",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+      "branch": "main",
+      "commit": "71f287f18ed78d496e724fbfb1c3feae3a2af75a",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T17:52:40+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "subrandr",
+      "recipe": "packages/subrandr.cmake",
+      "repository": "https://github.com/afishhh/subrandr.git",
+      "branch": "master",
+      "commit": "fe13c58e178431ec469c556a91bc080096738dc7",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T20:27:01+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "svtav1",
+      "recipe": "packages/svtav1.cmake",
+      "repository": "https://gitlab.com/AOMediaCodec/SVT-AV1.git",
+      "branch": "master",
+      "commit": "2dbd20ca0c6c379c62ba51d687df8a6ed3479fff",
+      "anchor": "2.0-183-g2dbd20c",
+      "date": "2026-10-15T09:58:12+00:00",
+      "submodules": "all"
+    },
+    {
+      "name": "uavs3d",
+      "recipe": "packages/uavs3d.cmake",
+      "repository": "https://github.com/uavs3/uavs3d.git",
+      "branch": "master",
+      "commit": "0e20d2c291853f196c68922a264bcd8471d75b68",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2025-12-13T15:23:04+08:00",
+      "submodules": "all"
+    },
+    {
+      "name": "vapoursynth",
+      "recipe": "packages/vapoursynth.cmake",
+      "repository": "https://github.com/vapoursynth/vapoursynth.git",
+      "branch": "master",
+      "commit": "ba20f3ed42eb1eaf480ddddfb76f9cd07573b2e0",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-12T23:02:04+02:00",
+      "submodules": "all",
+      "paths": [
+        "include"
+      ]
+    },
+    {
+      "name": "vorbis",
+      "recipe": "packages/vorbis.cmake",
+      "repository": "https://github.com/xiph/vorbis.git",
+      "branch": "main",
+      "commit": "1b75110b5a2754ba1931d82dd83cb822b266a21d",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-08-03T18:51:25-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "vulkan",
+      "recipe": "packages/vulkan.cmake",
+      "repository": "https://github.com/KhronosGroup/Vulkan-Loader.git",
+      "branch": "main",
+      "commit": "3aba6aeb8786f8369e10e4640f3139f336541c07",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-17T15:09:34-06:00",
+      "submodules": "all"
+    },
+    {
+      "name": "vulkan-header",
+      "recipe": "packages/vulkan-header.cmake",
+      "repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+      "branch": "main",
+      "commit": "acbb9391c0a597272800cd3f4363661c00a27c77",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T17:00:04-06:00",
+      "submodules": "all"
+    },
+    {
+      "name": "x265",
+      "recipe": "packages/x265.cmake",
+      "repository": "https://github.com/Multicorewareinc/x265.git",
+      "branch": "master",
+      "commit": "0900b28e7057ec0f4492237963aa92b0f6469a76",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T13:40:04+05:30",
+      "submodules": "all"
+    },
+    {
+      "name": "xxhash",
+      "recipe": "packages/xxhash.cmake",
+      "repository": "https://github.com/Cyan4973/xxHash.git",
+      "branch": "dev",
+      "commit": "680bf463fa1ca0461b9a7c2dab7556e1f54cf4cf",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-09-19T22:53:15-07:00",
+      "submodules": "all"
+    },
+    {
+      "name": "xz",
+      "recipe": "packages/xz.cmake",
+      "repository": "https://github.com/tukaani-project/xz.git",
+      "branch": "master",
+      "commit": "299eb5c3f597f107fd6019bf156885ac8bfaa5ea",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-16T16:21:02+03:00",
+      "submodules": "all"
+    },
+    {
+      "name": "zlib",
+      "recipe": "packages/zlib.cmake",
+      "repository": "https://github.com/zlib-ng/zlib-ng.git",
+      "branch": "develop",
+      "commit": "1727258b764262c73149014cdf6a39bd551b3bd5",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-18T00:16:01+02:00",
+      "submodules": "all"
+    },
+    {
+      "name": "zstd",
+      "recipe": "packages/zstd.cmake",
+      "repository": "https://github.com/facebook/zstd.git",
+      "branch": "dev",
+      "commit": "49cf51799ea051457f57243527aa2058f999f005",
+      "historySince": "2026-10-04T00:00:00Z",
+      "date": "2026-10-05T18:11:50-07:00",
+      "submodules": "all"
+    }
+  ]
+}

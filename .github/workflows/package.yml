@@ -374,7 +374,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           always="ci.yml app.yml session.yml api.yml library-ui.yml syncplay-drift.yml"
-          when_changed="seerr-api.yml syncplay-harness.yml"
+          when_changed="seerr-api.yml syncplay-harness.yml libmpv-sources.yml"
           for workflow in $always $when_changed; do
             for attempt in $(seq 1 60); do
               run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
@@ -399,6 +399,20 @@ jobs:
             fi
             echo "$workflow: success ($url)"
           done
+      # The MSI's libmpv-2.dll is GPL-3.0: its corresponding source (every
+      # library in it) must be published before the DLL is
+      # (.github/workflows/libmpv-sources.yml makes the release on main).
+      - name: Require the source release of libmpv-2.dll
+        id: libmpv
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="libmpv-windows-$(jq -er '.windows.mpv.version' deps/versions.json)"
+          if ! gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx SHA256SUMS; then
+            echo "::error::No release $tag with the source code of libmpv-2.dll: run the libmpv sources workflow on main first"
+            exit 1
+          fi
+          echo "url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           name: ${{ env.APP_PACKAGE }}-signed
@@ -407,10 +421,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+          LIBMPV_SOURCES: ${{ steps.libmpv.outputs.url }}
         run: |
           # What changed since the previous client tag, how to install, and
           # the SmartScreen warning for the MSI without a code-signing certificate.
           packaging/release-notes.sh "$RELEASE_TAG" "$GITHUB_SHA" > "$RUNNER_TEMP/notes.md"
+          printf '\n## Source code\n\nThe program'"'"'s source is this repository at %s. The licences of the bundled libraries are in the "licenses" folder of the installation; the source code of every library inside the Windows libmpv-2.dll is in [%s](%s).\n' \
+            "$RELEASE_TAG" "${LIBMPV_SOURCES##*/}" "$LIBMPV_SOURCES" >> "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
           cd packages
           name="$APP_PACKAGE-$VERSION-x86_64.AppImage"
