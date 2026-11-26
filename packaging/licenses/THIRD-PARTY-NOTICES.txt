@@ -16,6 +16,14 @@ here; the build recipes are packaging/linux/build-libmpv.sh (Linux libmpv)
 and scripts/fetch-windows-deps.ps1 (Windows) in this program's source
 repository, at the tag of the release.
 
+The Windows libmpv-2.dll is published with its complete source: the GitHub
+release "libmpv-windows-20261018-git-01e2533f31" of this program's
+repository (https://github.com/DevLn737/jellyfin-desktop-next/releases/tag/libmpv-windows-20261018-git-01e2533f31)
+holds every library the DLL is built from, at the revision the build used,
+and the build recipe (README.txt there explains how each revision was
+determined). It is published before any release whose MSI carries the DLL,
+and is kept as long as such a release is offered.
+
 Both packages
 -------------
 Qt 6.11.3 (https://download.qt.io, sources https://github.com/qt, tag
@@ -62,12 +70,17 @@ libmpv-2.dll, the libmpv package of shinchiro/mpv-winbuild-cmake,
   1f8d2e76255abc48f0456d9be99b4cab9c6566e6, its last before the build): mpv at
   the commit above with a statically linked FFmpeg built with --enable-gpl
   --enable-version3, so the DLL as a whole is GPL-3.0-or-later
-  (GPL-3.0.txt; FFmpeg.txt, mpv.txt). The recipe links in, among others,
+  (GPL-3.0.txt; FFmpeg.txt, mpv.txt). It links in about ninety libraries, among them
   libplacebo (libplacebo.txt), libass (libass.txt), FreeType, HarfBuzz,
-  FriBiDi, Little CMS, LuaJIT, uchardet, libarchive, libbluray, libdvdnav,
-  libdvdread, libjpeg, libpng, zlib, shaderc, SPIRV-Cross, dav1d, mujs,
-  rubberband, OpenAL Soft, SDL2 and curl; their sources and licences are
-  listed in the recipe's packages/ folder at that commit.
+  FriBiDi, fontconfig, Little CMS, LuaJIT, mujs, uchardet, libarchive,
+  libbluray, libdvdnav, libdvdread, libdvdcss, libjpeg-turbo, libpng,
+  zlib-ng, shaderc, glslang, SPIRV-Tools, SPIRV-Cross, the Vulkan loader,
+  dav1d, x264, x265, libaom, SVT-AV1, libvpx, libwebp, libjxl, Opus,
+  Vorbis, LAME, rubberband, OpenAL Soft, SDL2, curl, OpenSSL, libssh,
+  subrandr (Rust) and the C and C++ runtimes of its clang/mingw-w64
+  toolchain (LLVM libc++, libunwind, compiler-rt; mingw-w64, winpthreads)
+  and the Rust standard library. libmpv-windows.txt lists every one with
+  its revision and has all their licence texts.
 Vulkan loader (vulkan-1.dll) 1.4.363.0 from the LunarG Vulkan runtime
   components (https://github.com/KhronosGroup/Vulkan-Loader, tag
   vulkan-sdk-1.4.363.0): Apache-2.0, Vulkan-Loader.txt.
@@ -100,4 +113,5 @@ ICU.txt                  ICU (AppImage)
 Vulkan-Loader.txt        Vulkan loader (MSI)
 Mesa.txt                 Mesa llvmpipe (MSI)
 LLVM.txt                 LLVM (inside Mesa llvmpipe, MSI)
+libmpv-windows.txt       every library inside libmpv-2.dll (MSI)
 SOURCES.txt              where each licence text was taken from

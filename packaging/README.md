@@ -56,6 +56,49 @@ are `%LOCALAPPDATA%\Jellyfin Desktop Next` and `%APPDATA%\Jellyfin Desktop Next`
 Qt's locations for the application name "Jellyfin Desktop Next" with no
 organization name; keep them in step if the application's names change.
 
+### libmpv for Windows: licences and source code
+
+`libmpv-2.dll` is shinchiro/mpv-winbuild-cmake's build, pinned in
+`deps/versions.json` (`windows.mpv`). It is GPL-3.0-or-later and links about
+ninety libraries statically, so every release must carry their licence texts
+and publish their source. The recipe builds each library from the head of a
+branch without recording the commit, so
+[`deps/libmpv-windows-sources.json`](../deps/libmpv-windows-sources.json)
+records the revisions:
+
+- where the DLL names a commit in a version string (FFmpeg, mpv, libass,
+  libplacebo, dav1d, Opus, libvpx, libaom, SVT-AV1, SDL2), that commit;
+- otherwise the branch's newest commit dated before the DLL's build time, and
+  the source archive also keeps the branch's history 14 days back (a commit
+  can reach the server later than its date: the build fetched the checked-out
+  revision or one of those).
+
+[`windows/libmpv-sources.py`](windows/libmpv-sources.py) `resolve` works the
+revisions out from the recipe and the DLL's strings, `bundle` fetches them and
+collects the licence files into
+[`licenses/libmpv-windows.txt`](licenses/libmpv-windows.txt), which the MSI
+ships. `.github/workflows/libmpv-sources.yml` checks both on every change and,
+on main, publishes the release `libmpv-windows-<build>`: one archive per
+library, the recipe, the licences, a README and a copy of the DLL's package
+(upstream keeps only its 30 newest builds; `fetch-windows-deps.ps1` falls back
+to the copy, `windows.mpv.mirror`). The package workflow publishes a client
+release only when that release exists, and links it from the notes.
+
+**New libmpv build:** change `windows.mpv` in `deps/versions.json` (with
+`mirror` pointing at the new `libmpv-windows-<build>`), set `build`,
+`recipe` (the recipe's last commit before the build) and `window.before` (the
+DLL's build date: `strings libmpv-2.dll | grep -E '^[A-Z][a-z]{2} [ 0-9]{2} 20[0-9]{2} '`)
+in the manifest, then run
+
+    strings -n 6 libmpv-2.dll > strings.txt
+    python3 packaging/windows/libmpv-sources.py resolve --recipe <recipe checkout> --strings strings.txt --write
+    python3 packaging/windows/libmpv-sources.py bundle --out build/libmpv-sources --licenses-only
+    cp build/libmpv-sources/libmpv-windows.txt packaging/licenses/
+
+(or take both files from the workflow's output: it prints the resolved manifest
+and keeps the collected licences as an artifact). After the merge the workflow
+publishes the new source release before the next client release can go out.
+
 ## Release signing
 
 Every package is signed with minisign in the `sign` job; the client installs

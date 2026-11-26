@@ -1,0 +1,136 @@
+name: libmpv sources
+
+# The Windows package ships libmpv-2.dll (deps/versions.json, windows.mpv), a
+# GPL-3.0 build that links about ninety libraries statically. This workflow
+# keeps what the licences ask for:
+# - deps/libmpv-windows-sources.json must still name the revisions the recipe
+#   and the DLL give (packaging/windows/libmpv-sources.py resolve);
+# - packaging/licenses/libmpv-windows.txt must hold the licence texts of
+#   exactly those revisions (bundle);
+# - on main, the release "libmpv-windows-<build>" publishes the source of
+#   every library, the recipe and a copy of the DLL's package (the upstream
+#   release is deleted once 30 newer builds exist). The package workflow
+#   publishes a client release only when that release exists.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deps/versions.json
+      - deps/libmpv-windows-sources.json
+      - packaging/windows/libmpv-sources.py
+      - packaging/licenses/libmpv-windows.txt
+      - .github/workflows/libmpv-sources.yml
+  pull_request:
+    paths:
+      - deps/versions.json
+      - deps/libmpv-windows-sources.json
+      - packaging/windows/libmpv-sources.py
+      - packaging/licenses/libmpv-windows.txt
+      - .github/workflows/libmpv-sources.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: libmpv-sources-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sources:
+    name: Sources and licences of libmpv-2.dll
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the pin
+        id: pin
+        run: |
+          build=$(jq -er '.windows.mpv.version' deps/versions.json)
+          test "$build" = "$(jq -er '.build' deps/libmpv-windows-sources.json)" \
+            || { echo "::error::deps/libmpv-windows-sources.json is for another build than deps/versions.json"; exit 1; }
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "tag=libmpv-windows-$build" >> "$GITHUB_OUTPUT"
+          echo "recipe=$(jq -er '.recipe.commit' deps/libmpv-windows-sources.json)" >> "$GITHUB_OUTPUT"
+          echo "recipe-repository=$(jq -er '.recipe.repository' deps/libmpv-windows-sources.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Strings of the pinned libmpv-2.dll
+        run: |
+          mkdir -p build/libmpv-dll
+          name=$(jq -er '.windows.mpv.name' deps/versions.json)
+          curl -fsSL --retry 4 -o "build/libmpv-dll/$name" "$(jq -er '.windows.mpv.url' deps/versions.json)" \
+            || curl -fsSL --retry 4 -o "build/libmpv-dll/$name" "$(jq -er '.windows.mpv.mirror' deps/versions.json)"
+          echo "$(jq -er '.windows.mpv.sha256' deps/versions.json)  build/libmpv-dll/$name" | sha256sum -c -
+          7z x -y -obuild/libmpv-dll "build/libmpv-dll/$name" libmpv-2.dll > /dev/null
+          strings -n 6 build/libmpv-dll/libmpv-2.dll > build/libmpv-dll/strings.txt
+
+      - name: The recipe at its commit
+        run: |
+          git init -q build/recipe
+          git -C build/recipe fetch -q --depth=1 "${{ steps.pin.outputs.recipe-repository }}" "${{ steps.pin.outputs.recipe }}"
+          git -C build/recipe -c advice.detachedHead=false checkout -q FETCH_HEAD
+
+      - name: The revisions are still the ones the recipe and the DLL give
+        run: >
+          python3 packaging/windows/libmpv-sources.py resolve
+          --recipe build/recipe --strings build/libmpv-dll/strings.txt
+
+      - name: Is the source release there?
+        id: release
+        run: |
+          if gh release view "${{ steps.pin.outputs.tag }}" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx SHA256SUMS; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch every library and collect the licences
+        run: >
+          python3 packaging/windows/libmpv-sources.py bundle --out build/libmpv-sources
+          ${{ (github.event_name != 'pull_request' && steps.release.outputs.exists == 'true') && '--licenses-only' || '' }}
+
+      - name: The licence texts in the repository are the collected ones
+        run: |
+          if ! cmp -s packaging/licenses/libmpv-windows.txt build/libmpv-sources/libmpv-windows.txt; then
+            diff -u packaging/licenses/libmpv-windows.txt build/libmpv-sources/libmpv-windows.txt | head -200 || true
+            # The file also in the log, for those who can read logs but not artifacts:
+            # base64 -d | xz -d, then check the SHA256.
+            echo "SHA256 $(sha256sum < build/libmpv-sources/libmpv-windows.txt | cut -d' ' -f1)"
+            echo "::group::libmpv-windows.txt (xz, base64)"
+            echo "-----BEGIN LIBMPV-WINDOWS.TXT-----"
+            xz -9e < build/libmpv-sources/libmpv-windows.txt | base64 -w 120
+            echo "-----END LIBMPV-WINDOWS.TXT-----"
+            echo "::endgroup::"
+            echo "::error::packaging/licenses/libmpv-windows.txt differs from the collected texts (the artifact libmpv-windows-licences has them)"
+            exit 1
+          fi
+
+      - name: Keep the collected licences
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-windows-licences
+          path: |
+            build/libmpv-sources/libmpv-windows.txt
+            build/libmpv-sources/README.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Sizes
+        if: always()
+        run: ls -la build/libmpv-sources/assets 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      # Only from main (or a manual run on it), once per build.
+      - name: Publish the source release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.release.outputs.exists != 'true'
+        run: |
+          cd build/libmpv-sources/assets
+          gh release create "${{ steps.pin.outputs.tag }}" --prerelease --latest=false --target "$GITHUB_SHA" \
+            --title "Source code of libmpv-2.dll ${{ steps.pin.outputs.build }} (Windows)" \
+            --notes-file ../README.txt ./*
