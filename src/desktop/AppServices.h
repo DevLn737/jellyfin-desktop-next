@@ -1,7 +1,6 @@
 #pragma once
 
 #include <jfd/platform/CredentialStore.h>
-#include <jfd/seerr/SeerrService.h>
 #include <jfd/settings/Settings.h>
 #include <jfd/settings/SettingsRegistry.h>
 
@@ -110,7 +109,7 @@ namespace jfd::desktop {
     // set on it (setPlayHandler, setWatchTogetherHandler).
     ui::LibraryUi* libraryUi = nullptr;
     // The rows of the home screen: modules add theirs with
-    // homeSections->add(...) ("music.recent", "seerr.popular"). The cards'
+    // homeSections->add(...) ("music.recent"). The cards'
     // type picks the page they open (LibraryUi::routeFor).
     library::HomeSections* homeSections = nullptr;
 
@@ -136,11 +135,6 @@ namespace jfd::desktop {
     // the screens' lists. Declared after the session so they go first.
     std::unique_ptr<music::MusicPlayer> music;
     std::unique_ptr<ui::MusicUi> musicUi;
-    // installSeerr: the Seerr connection and the credential storage its
-    // session cookie is kept in (declared first so it goes last).
-    std::unique_ptr<platform::CredentialStore> seerrCredentials;
-    std::unique_ptr<seerr::SeerrService> seerr;
-
     // Remote control from the server and --command (installSession);
     // released before the session it posts to.
     std::shared_ptr<RemoteServices> remote;
@@ -259,14 +253,11 @@ namespace jfd::desktop {
   // After the window loads: the mini-player in the shell's strip.
   void installMiniPlayer(AppServices& services, QQmlEngine& engine);
   void uninstallMusic(AppServices& services);
-  // The Seerr settings section (address, sign in, check, sign out).
-  bool registerSeerrSettings(settings::SettingsRegistry& registry);
-  // Requests: the Seerr connection, its routes ("requests" in the sidebar
-  // only while an address is set) and the toasts of the connection check.
-  // Needs installShell. uninstallSeerr, after the QML engine is gone, drops
-  // the service.
-  void installSeerr(AppServices& services, QQmlEngine& engine);
-  void uninstallSeerr(AppServices& services);
+  // Data that features removed from the app left behind: the Seerr
+  // section of the settings file and its session cookie in the system
+  // credential store (not touched for an isolated profile). Once; does
+  // nothing when there is nothing left.
+  void forgetRemovedFeatures(const QString& settingsFile, bool isolatedProfile);
 
   // The gamepad settings section (on/off, in the background, the button
   // check).

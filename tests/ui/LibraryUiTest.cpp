@@ -37,8 +37,6 @@ TEST_CASE("Cards lead to a library or an item page") {
   CHECK(ui.routeFor(QStringLiteral("b"), QStringLiteral("BoxSet")) ==
         QStringLiteral("collection/b"));
   CHECK(ui.routeFor(QStringLiteral("c"), QStringLiteral("Series")) == QStringLiteral("item/c"));
-  CHECK(ui.routeFor(QStringLiteral("movie:603"), QStringLiteral("SeerrTitle")) ==
-        QStringLiteral("seerr-title/movie:603"));
   CHECK(ui.routeFor(QStringLiteral("d"), QStringLiteral("Episode")) == QStringLiteral("item/d"));
   // Music found by a search opens the music screens.
   CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) == QStringLiteral("album/e"));

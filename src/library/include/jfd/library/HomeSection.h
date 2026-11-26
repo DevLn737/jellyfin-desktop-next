@@ -13,15 +13,15 @@ namespace jfd::library {
 
   // One row of the home screen. The built-in rows (Continue watching, Next
   // up, the latest of each library, recommendations) and the rows other
-  // modules add ("Recently played", "Popular in Seerr") are all registered
+  // modules add ("Recently played") are all registered
   // as sections, and the user's order and choice of visible rows apply to
   // every one of them.
   //
-  // This header has no Qt Quick in it, so jfd::music and jfd::seerr can
+  // This header has no Qt Quick in it, so modules like jfd::music can
   // register sections without depending on the screens.
   struct HomeSection {
     // Stable and unique: "resume", "nextUp", "latest/<libraryId>",
-    // "music.recent", "seerr.popular". The saved order refers to it.
+    // "music.recent". The saved order refers to it.
     QString id;
     // Already translated.
     QString title;

@@ -37,7 +37,7 @@ RoutePage {
         case "input": return Icons.gamepad
         case "syncplay": return Icons.group
         case "downloads": return Icons.download
-        case "integrations": case "seerr": case "remote": return Icons.link
+        case "integrations": case "remote": return Icons.link
         case "account": case "diagnostics": return Icons.info
         default: return Icons.settings
         }

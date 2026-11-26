@@ -11,7 +11,7 @@
 namespace jfd::ui {
 
   // The commands of the Ctrl+K palette. Each module registers its own at
-  // startup ("Open Music", "Open Requests"); the palette lists those that
+  // startup ("Open Music", "Open Downloads"); the palette lists those that
   // are available at that moment, in registration order.
   //
   // Titles are shown as given, so a module passes them already translated.

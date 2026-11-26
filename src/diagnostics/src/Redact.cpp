@@ -114,7 +114,7 @@ bool isFileExtension(std::string_view label)
 }
 
 // Addresses written without a scheme: a dotted host name or IPv4 address
-// followed by a port (192.168.1.50:5055, seerr.example.org:5055), except
+// followed by a port (192.168.1.50:5055, media.example.org:5055), except
 // this computer's own and file names with a line number.
 void addBareAddresses(std::string_view folded, std::vector<std::pair<std::size_t, std::size_t>>& spans)
 {
@@ -142,7 +142,7 @@ void addBareAddresses(std::string_view folded, std::vector<std::pair<std::size_t
   }
 }
 
-// Addresses the user configured (a Seerr server, say), wherever they appear
+// Addresses the user configured (a server, say), wherever they appear
 // and in whatever case; with or without a scheme or port as configured.
 void addProtectedHosts(std::string_view folded, std::vector<std::pair<std::size_t, std::size_t>>& spans)
 {

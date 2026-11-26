@@ -65,7 +65,7 @@ TEST_CASE("Other modules register routes, with arguments and a sidebar entry") {
   CHECK_FALSE(navigator.navigate(QStringLiteral("album")));
   CHECK_FALSE(navigator.navigate(QStringLiteral("music/x")));
 
-  // A route that is not available (no Seerr address) has no sidebar entry
+  // A route that is not available (music off) has no sidebar entry
   // but is still a route.
   QSignalSpy sidebar(&navigator, &Navigator::sidebarChanged);
   navigator.setRouteAvailable(QStringLiteral("music"), false);

@@ -12,7 +12,7 @@ namespace jfd::diagnostics {
 // server part of http(s) and ws(s) addresses (loopback addresses stay).
 // Also hidden: X-Api-Key, the whole value of Cookie / Set-Cookie headers
 // (connect.sid among them) and addresses written without a scheme but with
-// a port (192.168.1.50:5055, seerr.example.org:5055). Names match without
+// a port (192.168.1.50:5055, media.example.org:5055). Names match without
 // regard to case. Paths, item ids and the rest of the
 // line are unchanged, so the log stays readable.
 std::string redactSecrets(std::string_view line);
