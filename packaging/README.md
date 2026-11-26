@@ -50,6 +50,11 @@ A release is published only after the AppImage passed its smoke test on every
 distribution (`sign` needs `appimage-smoke`) and the commit's CI, App and
 Session runs on main succeeded (the `release` job checks them).
 
+To publish, run the Package workflow by hand on main with the tag
+(`v0.0.1-beta.18`). Its optional `highlights` input is Markdown placed above the
+generated change list, for a short summary of the release in Russian and
+English.
+
 The product name, folder and `UpgradeCode` in the `.wxs` identify installs:
 never change the `UpgradeCode`. The profile folders removed by `REMOVEPROFILE=1`
 are `%LOCALAPPDATA%\Jellyfin Desktop Next` and `%APPDATA%\Jellyfin Desktop Next`,

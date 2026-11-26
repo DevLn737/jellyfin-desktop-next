@@ -17,6 +17,10 @@ on:
         description: 'Publish a pre-release from main under this tag (v<version>[-<pre-release>]); empty builds only'
         required: false
         default: ''
+      highlights:
+        description: 'Optional Markdown put at the top of the release notes, above the generated change list (for example the highlights in Russian and English)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -429,10 +433,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
           LIBMPV_SOURCES: ${{ steps.libmpv.outputs.url }}
+          # Passed through the environment, never into the script text.
+          HIGHLIGHTS: ${{ github.event_name == 'workflow_dispatch' && inputs.highlights || '' }}
         run: |
-          # What changed since the previous client tag, how to install, and
-          # the SmartScreen warning for the MSI without a code-signing certificate.
-          packaging/release-notes.sh "$RELEASE_TAG" "$GITHUB_SHA" > "$RUNNER_TEMP/notes.md"
+          # The run's highlights (if any), then what changed since the previous
+          # client tag, how to install, and the SmartScreen warning for the MSI
+          # without a code-signing certificate.
+          : > "$RUNNER_TEMP/notes.md"
+          if [ -n "$HIGHLIGHTS" ]; then
+            printf '%s\n\n' "$HIGHLIGHTS" >> "$RUNNER_TEMP/notes.md"
+          fi
+          packaging/release-notes.sh "$RELEASE_TAG" "$GITHUB_SHA" >> "$RUNNER_TEMP/notes.md"
           printf '\n## Source code\n\nThe program'"'"'s source is this repository at %s. The licences of the bundled libraries are in the "licenses" folder of the installation; the source code of every library inside the Windows libmpv-2.dll is in [%s](%s).\n' \
             "$RELEASE_TAG" "${LIBMPV_SOURCES##*/}" "$LIBMPV_SOURCES" >> "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
