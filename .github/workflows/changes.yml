@@ -1,0 +1,60 @@
+name: Changes
+
+# Called by the build and test workflows as their first job: `code` is
+# 'false' when a pull request or a push to main changes only documentation,
+# and the heavy jobs are then skipped. The workflow run itself still
+# completes with success, so the release gate in package.yml, which wants a
+# green run of every workflow for the commit, keeps working.
+#
+# Documentation: any `*.md` file except LICENSES.md (it ships in the
+# packages), and everything under docs/. Anything else, and every other
+# event (tags, manual runs, schedules), counts as code.
+
+on:
+  workflow_call:
+    outputs:
+      code:
+        description: "'true' unless only documentation changed"
+        value: ${{ jobs.changes.outputs.code }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Code or docs
+    runs-on: ubuntu-24.04
+    outputs:
+      code: ${{ steps.check.outputs.code }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          code=true
+          if { [ "$EVENT" = pull_request ] || { [ "$EVENT" = push ] && [ "$REF" = refs/heads/main ]; }; } \
+             && [ -n "$BASE" ] && [ "${BASE//0/}" != "" ]; then
+            # The compare API lists at most 300 files; more counts as code.
+            if files=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$HEAD" \
+                         --jq 'if (.files | length) >= 300 then "<too many>" else .files[].filename end'); then
+              code=false
+              while IFS= read -r file; do
+                [ -z "$file" ] && continue
+                case "$file" in
+                  LICENSES.md) code=true ;;
+                  docs/*|*.md) ;;
+                  *) code=true ;;
+                esac
+                [ "$code" = true ] && { echo "Code: $file"; break; }
+              done <<< "$files"
+              [ -z "$files" ] && code=true
+            else
+              echo "::warning::Could not list the changed files; running everything."
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Code changed: $code"

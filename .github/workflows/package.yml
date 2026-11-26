@@ -44,7 +44,12 @@ env:
   RELEASE_NEXT_PUBLIC_KEY: ${{ vars.MINISIGN_NEXT_PUBLIC_KEY }}
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   msi:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: MSI (Windows)
     runs-on: windows-2022
     steps:
@@ -164,6 +169,8 @@ jobs:
           retention-days: 5
 
   appimage:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: AppImage (Linux)
     runs-on: ubuntu-24.04
     steps:

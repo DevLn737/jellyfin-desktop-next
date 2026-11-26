@@ -24,7 +24,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   session:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Session with mpv (${{ matrix.server.name }})
     runs-on: ubuntu-24.04
     strategy:
