@@ -282,8 +282,16 @@ def fetch_component(component, directory):
             if "historySince" in component:
                 # The branch since the window's start (servers that send a
                 # commit by its hash only with --depth take the branch name).
-                git(directory, "fetch", "-q", f"--shallow-since={component['historySince']}",
-                    "origin", f"+refs/heads/{component['branch']}:refs/remotes/origin/{component['branch']}")
+                try:
+                    git(directory, "fetch", "-q", f"--shallow-since={component['historySince']}",
+                        "origin", f"+refs/heads/{component['branch']}:refs/remotes/origin/{component['branch']}")
+                except RuntimeError as error:
+                    # No commit on the branch since the window's start: the
+                    # commit itself is all the history there is to offer.
+                    if "shallow info" not in str(error):
+                        raise
+                    git(directory, "fetch", "-q", "--depth=1", "origin",
+                        f"+refs/heads/{component['branch']}:refs/remotes/origin/{component['branch']}")
                 if git(directory, "cat-file", "-t", commit, check=False) != "commit":
                     git(directory, "fetch", "-q", "--depth=1", "origin", commit)
             else:
