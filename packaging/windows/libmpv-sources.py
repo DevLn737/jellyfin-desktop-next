@@ -452,13 +452,19 @@ def bundle(args):
                 text = "".join(text.splitlines(keepends=True)[:int(lines)])
             texts.append((item, text))
         if not texts:
-            raise RuntimeError(f"{name}: no licence file found; name them in the manifest's \"licenseFiles\"")
+            # Reported with the others at the end, with what the tree has.
+            top = sorted(p.name + ("/" if p.is_dir() else "") for p in tree.iterdir() if p.name != ".git")
+            missing.append(f"{name}: {' '.join(top)}")
         shutil.rmtree(tree)
         log(f"{name}: {asset}, {len(texts)} licence file(s)")
         return name, asset, texts
 
+    missing = []
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         results = list(pool.map(one, components))
+    if missing:
+        raise SystemExit("No licence file found for these libraries; name the files in the manifest's "
+                         "\"licenseFiles\" (\"path\" or \"path:first-lines\"):\n  " + "\n  ".join(missing))
 
     # The recipe itself, at its commit.
     recipe = manifest["recipe"]
