@@ -99,6 +99,14 @@ jobs:
         run: |
           if ! cmp -s packaging/licenses/libmpv-windows.txt build/libmpv-sources/libmpv-windows.txt; then
             diff -u packaging/licenses/libmpv-windows.txt build/libmpv-sources/libmpv-windows.txt | head -200 || true
+            # The file also in the log, for those who can read logs but not artifacts:
+            # base64 -d | xz -d, then check the SHA256.
+            echo "SHA256 $(sha256sum < build/libmpv-sources/libmpv-windows.txt | cut -d' ' -f1)"
+            echo "::group::libmpv-windows.txt (xz, base64)"
+            echo "-----BEGIN LIBMPV-WINDOWS.TXT-----"
+            xz -9e < build/libmpv-sources/libmpv-windows.txt | base64 -w 120
+            echo "-----END LIBMPV-WINDOWS.TXT-----"
+            echo "::endgroup::"
             echo "::error::packaging/licenses/libmpv-windows.txt differs from the collected texts (the artifact libmpv-windows-licences has them)"
             exit 1
           fi
