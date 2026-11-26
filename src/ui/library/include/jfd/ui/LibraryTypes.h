@@ -11,7 +11,7 @@
 #include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 
 #include <QObject>
 #include <qqmlintegration.h>
@@ -23,7 +23,7 @@ namespace jfd::ui {
 
   struct SignInForeign {
     Q_GADGET
-    QML_FOREIGN(jfd::library::SignIn)
+    QML_FOREIGN(jfd::account::SignIn)
     QML_NAMED_ELEMENT(SignIn)
     QML_UNCREATABLE("Use Library.signIn")
   };

@@ -14,7 +14,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   core:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Core (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -31,6 +36,8 @@ jobs:
         run: ctest --test-dir build --build-config Release --output-on-failure --parallel 4
 
   sanitizers:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Core with ASan and UBSan (Linux)
     runs-on: ubuntu-24.04
     steps:
@@ -45,10 +52,12 @@ jobs:
         run: ctest --test-dir build --output-on-failure --parallel 4 -E "^mutation_"
 
   # The Qt modules (API client, library, playback, integrations and the
-  # updaters, settings, seerr, music, session) and the application's UI tests
+  # updaters, settings, music, session) and the application's UI tests
   # under ASan and UBSan. JFD_REQUIRE_QT makes a missing Qt fail the configure
   # step instead of silently leaving these out, as the job above does.
   sanitizers-qt:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Qt modules and app with ASan and UBSan (Linux)
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -109,8 +118,8 @@ jobs:
           # A configure that quietly skipped them would pass the step above.
           tests=$(ctest --test-dir build -N -E "^(mutation_|simulator_)" | sed -nE 's/^ *Test +#[0-9]+: //p')
           echo "$tests"
-          for name in jfd_api_tests jfd_library_tests jfd_playback_tests jfd_integrations_tests \
-                      jfd_settings_tests jfd_seerr_tests jfd_music_tests jfd_session_runtime_tests jfd_remote_tests jfd_offline_tests \
+          for name in jfd_api_tests jfd_account_tests jfd_library_tests jfd_playback_tests jfd_integrations_tests \
+                      jfd_settings_tests jfd_music_tests jfd_session_runtime_tests jfd_remote_tests jfd_offline_tests \
                       jfd_ui_tests jfd_ui_library_tests jfd_ui_player_tests jfd_ui_shell_page_tests desktop_smoke \
                       jfd_platform_gamepad_tests jfd_platform_xrandr_tests jfd_ui_gamepad_tests jfd_ui_tv_tests jfd_ui_livetv_tests \
                       jfd_offline_playback_tests jfd_ui_downloads_tests jfd_ui_login_tv_tests jfd_ui_rooms_tests; do

@@ -62,6 +62,10 @@ namespace jfd::api {
     // slow members.
     void ping(std::int64_t pingMs, QObject* context, Callback<Empty> done);
 
+    // GET RoomMembers (Room Members server plugin). Fails with Unsupported
+    // on a server without the plugin.
+    void roomMembers(QObject* context, Callback<RoomMembers> done);
+
     // GET GetUtcTime, with send and receive times read from `clock` (the
     // session's monotonic clock). `clock` must outlive the request.
     void utcTime(const core::Clock& clock, QObject* context, Callback<UtcTimeSample> done);

@@ -48,13 +48,13 @@ if(Qt6_FOUND)
   include(cmake/JfdTranslations.cmake)
   add_subdirectory(src/platform)
   add_subdirectory(src/jellyfin-api)
+  add_subdirectory(src/account)
   add_subdirectory(src/library)
   # Qt Core modules without Qt Quick or mpv. Each joins the build once its
   # directory has a CMakeLists.txt (see cmake/JfdModules.cmake).
   jfd_add_module(src/settings)
   jfd_add_module(src/playback)
   jfd_add_module(src/integrations)
-  jfd_add_module(src/seerr)
   # After integrations: Playstate goes the way of the media controls.
   jfd_add_module(src/remote)
   # Offline downloads: the store, catalog and queue (no screens).
@@ -88,7 +88,6 @@ if(JFD_BUILD_APP)
   jfd_add_module(src/ui/music)
   jfd_add_module(src/ui/player)
   jfd_add_module(src/ui/group)
-  jfd_add_module(src/ui/requests)
   # The SyncPlay agent with real playback (headless mpv and the player's model).
   if(UNIX)
     add_subdirectory(tools/syncplay-agent/app)

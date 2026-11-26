@@ -448,6 +448,10 @@
         <translation>Скорость комнаты</translation>
     </message>
     <message>
+        <source>loading</source>
+        <translation>загружается</translation>
+    </message>
+    <message>
         <source>Hide statistics</source>
         <translation>Скрыть статистику</translation>
     </message>

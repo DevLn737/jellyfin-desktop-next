@@ -14,7 +14,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   linux:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: API (ubuntu-24.04, ${{ matrix.server.name }} in Docker)
     runs-on: ubuntu-24.04
     strategy:
@@ -77,6 +82,8 @@ jobs:
         run: docker logs --tail 200 jfd-test-server || true
 
   windows:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: API (windows-2022)
     runs-on: windows-2022
     steps:

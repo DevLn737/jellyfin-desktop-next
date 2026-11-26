@@ -156,6 +156,12 @@ namespace jfd::syncplay {
   void GroupClient::onConnectionLost() {
     m_connectionLost = true;
     ++m_rejoinSerial;
+    // Requests of the lost membership would only be refused (the rejoin
+    // brings a new epoch); one still in flight must not hold up the rejoined
+    // group's requests until it times out.
+    m_requests.clear();
+    m_requestInFlight = false;
+    ++m_requestSerial;
     if (!m_inGroup) return;
     m_inGroup = false;
     m_sink(group::ConnectionLost{m_epoch});
@@ -212,8 +218,11 @@ namespace jfd::syncplay {
       if (!measurement) return;
       m_offset = measurement->offset;
       m_sink(group::ClockSynced{measurement->offset, measurement->roundTrip});
-      if (m_inGroup)
-        m_transport.request(pingRequest(measurement->roundTrip), [](int, std::string) {});
+      if (m_inGroup) {
+        HttpRequest ping = pingRequest(measurement->roundTrip);
+        ping.timeoutMs = RequestTimeoutMs;
+        m_transport.request(ping, [](int, std::string) {});
+      }
     });
   }
 
@@ -227,9 +236,16 @@ namespace jfd::syncplay {
       return;
     }
     // A seek still waiting its turn is replaced by a newer one: only where
-    // the member stopped pressing matters.
-    if (std::holds_alternative<outgoing::RequestSeek>(message) && !m_requests.empty() &&
-        std::holds_alternative<outgoing::RequestSeek>(m_requests.back()))
+    // the member stopped pressing matters. Likewise a pause or play still
+    // waiting is replaced by the newer one: only the last play state counts.
+    const auto playState = [](const SyncPlayMessage& m) {
+      return std::holds_alternative<outgoing::RequestPause>(m) ||
+             std::holds_alternative<outgoing::RequestUnpause>(m);
+    };
+    if (!m_requests.empty() &&
+        ((std::holds_alternative<outgoing::RequestSeek>(message) &&
+          std::holds_alternative<outgoing::RequestSeek>(m_requests.back())) ||
+         (playState(message) && playState(m_requests.back()))))
       m_requests.back() = message;
     else
       m_requests.push_back(message);
@@ -244,10 +260,11 @@ namespace jfd::syncplay {
       if (!m_inGroup || epoch != m_epoch) continue;
       const bool rateRequest = std::holds_alternative<outgoing::RequestPlaybackRate>(message);
       m_requestInFlight = true;
-      m_transport.request(requestFor(message), [this, epoch, rateRequest,
-                                                alive = std::weak_ptr<int>(m_alive)](int status,
-                                                                                     std::string body) {
-        if (alive.expired()) return;
+      HttpRequest request = requestFor(message);
+      request.timeoutMs = RequestTimeoutMs;
+      m_transport.request(request, [this, epoch, rateRequest, serial = m_requestSerial,
+                                    alive = std::weak_ptr<int>(m_alive)](int status, std::string body) {
+        if (alive.expired() || serial != m_requestSerial) return;
         m_requestInFlight = false;
         if (rateRequest && !succeeded(status))
           m_sink(group::RateChangeRejected{epoch, status, parseUnsupportedParticipants(body)});
@@ -262,7 +279,9 @@ namespace jfd::syncplay {
   void GroupClient::sendReport(const SyncPlayMessage& message, bool retried) {
     const GroupEpoch epoch = m_epoch;
     const std::uint64_t serial = m_reportSerial;
-    m_transport.request(requestFor(message), [this, message, epoch, serial, retried,
+    HttpRequest report = requestFor(message);
+    report.timeoutMs = RequestTimeoutMs;
+    m_transport.request(report, [this, message, epoch, serial, retried,
                                               alive = std::weak_ptr<int>(m_alive)](int status,
                                                                                    std::string) {
       if (alive.expired() || succeeded(status)) return;

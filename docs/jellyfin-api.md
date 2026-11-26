@@ -12,14 +12,15 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `JellyfinClient.h` (library) | Libraries (`UserViews`), "Continue watching" (`UserItems/Resume`), "Next up" (`Shows/NextUp`), latest per library (`Items/Latest`), filtered and sorted pages, filter values (`Items/Filters`), similar items, people (`Persons`), favorites, image URLs, item details with trickplay, media segments, trickplay tile URLs and authorized fetches |
 | `ServerDiscovery.h` | Servers on the local network (UDP broadcast to port 7359) |
 | `SessionSocket.h` | The `/socket` connection: keep-alives with pings and a silence watchdog (2.5 intervals), reconnect with backoff, capabilities re-reported on every connect, raw `SyncPlayCommand` and `SyncPlayGroupUpdate` |
-| `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, `Queue` (next or last), and `GetUtcTime` samples |
+| `SyncPlayApi.h` | SyncPlay routes, including `SetPlaybackRate` and its 409, `Queue` (next or last), `GetUtcTime` samples, and `RoomMembers` (the members' positions and pings, only with the Room Members server plugin in `server-plugin/`; Unsupported without it). SyncPlay requests of the group client time out after 5 s instead of the client's 30 s |
 | `Playback.h` | `PlaybackInfo` to mpv URLs (direct play, static stream, transcode), external subtitles and audio, mpv track ids, report bodies |
 | `DeviceProfile.h` | The 2.x client's device profile and its options |
 | `Downloads.h` | Offline downloads: the original's URL (`Items/{id}/Download`), the default quality from the user's policy, which sources have an original, and the "token only to this server" check (see [offline.md](offline.md)) |
 | `ServerTime.h` | ISO 8601 with seven fractional digits to and from `core::ServerInstant` |
 | `platform/CredentialStore.h` | Tokens in Windows Credential Manager or the Secret Service |
 | `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model (the measurement prototype's) |
-| `library/SignIn.h`, `ServerStore.h` | The login flow: servers on the network and saved ones, version check, password and Quick Connect, token in the credential store, restore at start-up, sign-out, expired sessions |
+| `account/Account.h`, `UserScope.h` | The connection as one user (client, socket, tokens) and the user scope: modules register their per-user state once, and it begins on sign-in from the lowest order up and ends on sign-out (or an expired session) from the highest down |
+| `account/SignIn.h`, `ServerStore.h` | The login flow: servers on the network and saved ones, version check, password and Quick Connect, token in the credential store, restore at start-up, sign-out, expired sessions |
 | `library/HomeModel.h` | Home rows: Continue watching, Next up, latest per video library; reloads keep rows on screen |
 | `library/LibraryModel.h` | A library (or a collection, or a person's films and series by `personIds`) as a grid with every row from the first page and pages loaded as rows are shown; sort and filters |
 | `library/ItemDetails.h` | A movie, series, season or episode page: seasons, episodes, similar, what Play starts, favorite and watched toggles; emits `playRequested` for the session's launcher |

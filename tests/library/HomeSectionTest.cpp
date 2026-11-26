@@ -24,23 +24,23 @@ TEST_CASE("Home sections come in default order, then in the user's order") {
   QSignalSpy changes(&sections, &HomeSections::changed);
   sections.add(section("latest/movies", 30));
   sections.add(section("resume", 10));
-  sections.add(section("seerr.popular", 90));
+  sections.add(section("music.recent", 90));
   sections.add(section("nextUp", 20));
   CHECK(changes.count() == 4);
 
   QStringList defaults;
   for (const HomeSection* s : sections.byDefaultOrder()) defaults << s->id;
   CHECK(defaults == QStringList{QStringLiteral("resume"), QStringLiteral("nextUp"), QStringLiteral("latest/movies"),
-                                QStringLiteral("seerr.popular")});
+                                QStringLiteral("music.recent")});
 
   // No arrangement: the default order.
   CHECK(sections.displayOrder({}) == defaults);
   // The user's list wins; ids that are not registered (a removed module,
   // another server's library) and repeats are skipped; sections the list
   // does not know (a new module) follow in default order.
-  CHECK(sections.displayOrder({QStringLiteral("seerr.popular"), QStringLiteral("gone"), QStringLiteral("resume"),
-                               QStringLiteral("seerr.popular")}) ==
-        QStringList{QStringLiteral("seerr.popular"), QStringLiteral("resume"), QStringLiteral("nextUp"),
+  CHECK(sections.displayOrder({QStringLiteral("music.recent"), QStringLiteral("gone"), QStringLiteral("resume"),
+                               QStringLiteral("music.recent")}) ==
+        QStringList{QStringLiteral("music.recent"), QStringLiteral("resume"), QStringLiteral("nextUp"),
                     QStringLiteral("latest/movies")});
 }
 
@@ -101,7 +101,7 @@ TEST_CASE("The saved order skips unknown sections and puts new ones last") {
   HomeSections sections;
   sections.add(section("resume", 10));
   sections.add(section("nextUp", 20));
-  sections.add(section("seerr.popular", 90));
+  sections.add(section("music.recent", 90));
   const QStringList order = sections.displayOrder(QStringList{QStringLiteral("gone"), QStringLiteral("nextUp"), QStringLiteral("resume"), QStringLiteral("nextUp")});
-  CHECK(order == QStringList{QStringLiteral("nextUp"), QStringLiteral("resume"), QStringLiteral("seerr.popular")});
+  CHECK(order == QStringList{QStringLiteral("nextUp"), QStringLiteral("resume"), QStringLiteral("music.recent")});
 }

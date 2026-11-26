@@ -19,6 +19,7 @@
 #include "../support/FakeServer.h"
 
 #include <jfd/platform/CredentialStore.h>
+#include <jfd/account/Account.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
@@ -88,14 +89,16 @@ namespace {
 
   struct Screens {
     explicit Screens(const QString& profile, std::unique_ptr<platform::CredentialStore> tokens) {
+      account::Account::Config accountConfig;
       ui::LibraryScreens::Config config;
-      config.identity.version = QStringLiteral("0.0.1");
-      config.identity.device = QStringLiteral("bench");
-      config.identity.deviceId = QStringLiteral("jfd-library-bench");
-      config.serversFile = profile + QStringLiteral("/servers.ini");
+      accountConfig.identity.version = QStringLiteral("0.0.1");
+      accountConfig.identity.device = QStringLiteral("bench");
+      accountConfig.identity.deviceId = QStringLiteral("jfd-library-bench");
+      accountConfig.serversFile = profile + QStringLiteral("/servers.ini");
       config.imageDirectory = profile + QStringLiteral("/images");
-      config.tokens = std::move(tokens);
-      screens = std::make_unique<ui::LibraryScreens>(std::move(config));
+      accountConfig.tokens = std::move(tokens);
+      userAccount = std::make_unique<account::Account>(std::move(accountConfig));
+      screens = std::make_unique<ui::LibraryScreens>(*userAccount, std::move(config));
       navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
       navigator->setPlaceholderPage(
           QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
@@ -141,6 +144,7 @@ namespace {
     }
 
     // Destroyed after the engine, which uses it (the application's order).
+    std::unique_ptr<account::Account> userAccount;
     std::unique_ptr<ui::LibraryScreens> screens;
     QQmlApplicationEngine engine;
     ui::Navigator* navigator = nullptr;
@@ -160,19 +164,19 @@ namespace {
 
   int signIn(const QString& profile) {
     QDir().mkpath(profile);
-    library::ServerStore servers(profile + QStringLiteral("/servers.ini"));
+    account::ServerStore servers(profile + QStringLiteral("/servers.ini"));
     FileCredentialStore tokens(profile + QStringLiteral("/tokens.ini"));
     api::ClientIdentity identity;
     identity.version = QStringLiteral("0.0.1");
     identity.device = QStringLiteral("bench");
     identity.deviceId = QStringLiteral("jfd-library-bench");
     api::JellyfinClient client(identity);
-    library::SignIn flow(client, servers, tokens);
+    account::SignIn flow(client, servers, tokens);
     flow.connectToServer(qEnvironmentVariable("JFD_TEST_SERVER_URL"));
-    if (!waitFor([&] { return flow.step() == library::SignIn::Step::Credentials; }))
+    if (!waitFor([&] { return flow.step() == account::SignIn::Step::Credentials; }))
       return fail(QStringLiteral("server not reached: ") + flow.errorText());
     flow.signIn(qEnvironmentVariable("JFD_TEST_USER"), qEnvironmentVariable("JFD_TEST_PASSWORD"));
-    if (!waitFor([&] { return flow.step() == library::SignIn::Step::SignedIn; }))
+    if (!waitFor([&] { return flow.step() == account::SignIn::Step::SignedIn; }))
       return fail(QStringLiteral("sign-in failed: ") + flow.errorText());
     print({{QStringLiteral("signedIn"), true}});
     return 0;
@@ -181,7 +185,7 @@ namespace {
   int startup(const QString& profile) {
     Screens screens(profile,
                     std::make_unique<FileCredentialStore>(profile + QStringLiteral("/tokens.ini")));
-    if (!screens.screens->signIn().restore())
+    if (!screens.userAccount->signIn().restore())
       return fail(QStringLiteral("no saved session; run sign-in first"));
     screens.load();
     if (!screens.waitDrawn([&] {

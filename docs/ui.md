@@ -207,13 +207,15 @@ a step back (from the code to the password form, from there to the
 servers). The address, name and password come from the on-screen keyboard
 or the phone.
 
-The player in TV mode: its display is a focus mode. Hidden, or with nothing
+The player in TV mode, or with a gamepad in use (`Theme.focusDriven`): its
+display is a focus mode. Hidden, or with nothing
 on it focused, Left and Right seek (held: 10, then 30, then 60 s steps
 shown on the timeline, one seek when let go or when a gamepad's repeats
 stop), Up and Down show it with the larger timeline focused (on a channel:
 play/pause), Select plays or pauses; shown, the arrows move between its
-controls. The menus are one row of named buttons, Episodes, Subtitles,
-Audio, Settings; a menu opens with its first row focused and gives the
+controls. In TV mode the menus are one row of named buttons, Episodes,
+Subtitles, Audio, Settings; with TV mode off they are the desktop display's
+icon buttons, reached the same way. A menu opens with its first row focused and gives the
 focus back to its button. Back closes the menu, then the display, then the
 player. Page Up and Down (a gamepad's shoulders) stay the channel keys of
 Live TV. The display keeps out of the outer 5 %.
@@ -280,11 +282,15 @@ To show a message: `shell.showError(text)` through the window's `AppShell`
 ## Library screens
 
 `Jfd.Ui.Library` holds the `login`, `home`, `library/<id>`,
-`collection/<id>`, `item/<id>` and `search` pages. `ui::LibraryScreens` (installed by `installLibrary` in
-`src/desktop`) owns the server connection: the `JellyfinClient` and
-`SessionSocket` in `AppServices::client` and `socket` are the ones the
-session and group modules should use. Signing in opens `home`, signing out
-or a rejected token opens `login`.
+`collection/<id>`, `item/<id>` and `search` pages. The server connection
+belongs to `account::Account` (`src/account`, created by `installLibrary` in
+`src/desktop`): the `JellyfinClient` and `SessionSocket` in
+`AppServices::client` and `socket` are its, and every module that keeps
+per-user state registers it once with `AppServices::account->scope()`
+(`account::UserScope`, ordered: library, session, downloads, group, music,
+player). `ui::LibraryScreens` builds the screens on it. Once the scope has
+begun, `home` opens; once it has ended (sign-out or a rejected token),
+`login`.
 
 From QML, `Library` gives `signIn`, `home`, `search`,
 `createLibrary(id, page)`, `createDetails(id, page)`, `image(url)` and
@@ -325,8 +331,7 @@ already there; nothing is asked again, and empty kinds have no tab.
 Every row of the home screen is a `library::HomeSection` (id, translated
 title, card shape, default order, a model, an optional `reload`). The
 built-in rows (`resume`, `nextUp`, `latest/<library>`) and the ones other
-modules add through `HomeModel::sections()->add(...)` ("music.recent",
-"seerr.popular") are treated alike. The user's arrangement is the hidden
+modules add through `HomeModel::sections()->add(...)` ("music.recent") are treated alike. The user's arrangement is the hidden
 setting `appearance/homeSections`, a JSON array of ids with `-` in front of
 the rows switched off (`["resume","-nextUp"]`); ids that are not registered
 are skipped and new sections come after the arranged ones, so modules can
@@ -433,8 +438,9 @@ physical keyboard keeping it away, text from the phone).
 Select and Back alone: every control of each step reached, none trapping
 the focus, the address and the password typed on the on-screen keyboard,
 Quick Connect first, and Back between the steps.
-`jfd_ui_gamepad_tests` drives the shell in TV mode with SDL's virtual
-gamepad alone.
+`jfd_ui_gamepad_tests` drives the shell with SDL's virtual gamepad alone,
+in TV mode and with TV mode off (a pad on a desktop: the same moves on the
+desktop's layout, `Theme.focusDriven` on, `Theme.tvMode` off).
 `jfd_ui_rooms_tests` drives the rooms tab on a fake server with the keyboard
 alone and in TV mode (arrows, Select, Back, the room's name on the on-screen
 keyboard), checks that a poll keeps the cards of unchanged rooms, the empty,

@@ -3,7 +3,7 @@
 #include "AppServices.h"
 
 #include <jfd/api/JellyfinClient.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/session/GroupModel.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
@@ -106,13 +106,13 @@ namespace jfd::desktop {
   }
 
   void FlowCheck::signIn() {
-    library::SignIn& signIn = *m_services.signIn;
+    account::SignIn& signIn = *m_services.signIn;
     signIn.connectToServer(qEnvironmentVariable("JFD_TEST_SERVER_URL"));
     waitFor(
         QStringLiteral("the server check"),
-        [&signIn] { return signIn.step() == library::SignIn::Step::Credentials || !signIn.errorText().isEmpty(); },
+        [&signIn] { return signIn.step() == account::SignIn::Step::Credentials || !signIn.errorText().isEmpty(); },
         PageMs, [this, &signIn] {
-          if (signIn.step() != library::SignIn::Step::Credentials) {
+          if (signIn.step() != account::SignIn::Step::Credentials) {
             return fail(QStringLiteral("server check: ") + signIn.errorText());
           }
           done(QStringLiteral("server %1 checked").arg(signIn.serverName()));

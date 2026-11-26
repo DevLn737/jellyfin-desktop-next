@@ -8,6 +8,7 @@
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/ServerDiscovery.h>
 #include <jfd/platform/CredentialStore.h>
+#include <jfd/account/Account.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
@@ -39,7 +40,7 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_ShellPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 
 using namespace jfd;
-using jfd::library::SignIn;
+using jfd::account::SignIn;
 using jfd::test::FakeServer;
 using jfd::test::HttpRequest;
 using jfd::test::HttpResponse;
@@ -118,17 +119,19 @@ namespace {
   class Screens {
   public:
     Screens() {
+      account::Account::Config accountConfig;
       ui::LibraryScreens::Config config;
-      config.identity.version = QStringLiteral("0.0.1");
-      config.identity.device = QStringLiteral("ui-test");
-      config.identity.deviceId = QStringLiteral("jfd-ui-login-tv");
-      config.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
+      accountConfig.identity.version = QStringLiteral("0.0.1");
+      accountConfig.identity.device = QStringLiteral("ui-test");
+      accountConfig.identity.deviceId = QStringLiteral("jfd-ui-login-tv");
+      accountConfig.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
       config.imageDirectory = m_dir.filePath(QStringLiteral("images"));
-      config.tokens = std::make_unique<platform::MemoryCredentialStore>();
-      screens = std::make_unique<ui::LibraryScreens>(std::move(config));
-      screens->signIn().setQuickConnectPollMs(20);
+      accountConfig.tokens = std::make_unique<platform::MemoryCredentialStore>();
+      userAccount = std::make_unique<account::Account>(std::move(accountConfig));
+      screens = std::make_unique<ui::LibraryScreens>(*userAccount, std::move(config));
+      userAccount->signIn().setQuickConnectPollMs(20);
       // No broadcast from the test: discovery asks a closed local port.
-      screens->signIn().discovery().setTargets({{QHostAddress(QHostAddress::LocalHost), quint16(9)}});
+      userAccount->signIn().discovery().setTargets({{QHostAddress(QHostAddress::LocalHost), quint16(9)}});
 
       navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
       REQUIRE(navigator != nullptr);
@@ -182,7 +185,7 @@ namespace {
       return field ? field->property("field").value<QQuickItem*>() : nullptr;
     }
 
-    SignIn::Step step() { return screens->signIn().step(); }
+    SignIn::Step step() { return userAccount->signIn().step(); }
 
     bool waitStep(SignIn::Step wanted) {
       return waitFor([&] { return step() == wanted; }, Timeout);
@@ -326,6 +329,7 @@ namespace {
     Routes routes;
     FakeServer server{[this](const HttpRequest& r) { return routes(r); }};
     QTemporaryDir m_dir;
+    std::unique_ptr<account::Account> userAccount;
     std::unique_ptr<ui::LibraryScreens> screens;
     QQmlApplicationEngine engine;
     ui::Navigator* navigator = nullptr;
@@ -339,7 +343,7 @@ TEST_CASE("TV sign-in with arrows, Select and Back only: the address and the pas
   Screens screens;
   QQuickWindow& window = *screens.window;
   REQUIRE(screens.step() == SignIn::Step::ChooseServer);
-  REQUIRE(waitFor([&] { return !screens.screens->signIn().discovering(); }, Timeout));
+  REQUIRE(waitFor([&] { return !screens.userAccount->signIn().discovering(); }, Timeout));
 
   // The server step: the address field has the focus, no keyboard until
   // Select.
@@ -384,7 +388,7 @@ TEST_CASE("TV sign-in with arrows, Select and Back only: the address and the pas
   tap(window, Qt::Key_Escape);
   REQUIRE(screens.waitStep(SignIn::Step::ChooseServer));
   CHECK(screens.navigator->currentRoute() == QLatin1String("login"));
-  screens.screens->signIn().connectToServer(screens.server.url().toString());
+  screens.userAccount->signIn().connectToServer(screens.server.url().toString());
   REQUIRE(screens.waitStep(SignIn::Step::Credentials));
   REQUIRE(waitFor([&] { return screens.focusName() == QLatin1String("quickConnectTvButton"); }, Timeout));
 
@@ -407,7 +411,7 @@ TEST_CASE("TV sign-in with arrows, Select and Back only: the address and the pas
 TEST_CASE("TV sign-in with Quick Connect: Select shows the code, Back cancels it, the code signs in") {
   Screens screens;
   QQuickWindow& window = *screens.window;
-  screens.screens->signIn().connectToServer(screens.server.url().toString());
+  screens.userAccount->signIn().connectToServer(screens.server.url().toString());
   REQUIRE(screens.waitStep(SignIn::Step::Credentials));
   REQUIRE(waitFor([&] { return screens.focusName() == QLatin1String("quickConnectTvButton"); }, Timeout));
 
@@ -437,7 +441,7 @@ TEST_CASE("Who's watching: the server's users fill the name; nothing else change
   QQuickWindow& window = *screens.window;
   screens.routes.publicUsers = R"([{"Id": "u1", "Name": "alice", "HasPassword": true},
                                    {"Id": "u2", "Name": "bob", "HasPassword": false}])";
-  screens.screens->signIn().connectToServer(screens.server.url().toString());
+  screens.userAccount->signIn().connectToServer(screens.server.url().toString());
   REQUIRE(screens.waitStep(SignIn::Step::Credentials));
   REQUIRE(waitFor([&] { return screens.item("loginUser_bob") != nullptr; }, Timeout));
   REQUIRE(screens.item("loginUser_alice") != nullptr);
@@ -470,9 +474,9 @@ TEST_CASE("Who's watching: the server's users fill the name; nothing else change
   REQUIRE(screens.waitStep(SignIn::Step::ChooseServer));
   // A server that hides its users: the plain form.
   screens.routes.publicUsers = "[]";
-  screens.screens->signIn().connectToServer(screens.server.url().toString());
+  screens.userAccount->signIn().connectToServer(screens.server.url().toString());
   REQUIRE(screens.waitStep(SignIn::Step::Credentials));
   waitFor([] { return false; }, 200);
-  CHECK(screens.screens->signIn().publicUsers().isEmpty());
+  CHECK(screens.userAccount->signIn().publicUsers().isEmpty());
   CHECK_FALSE(screens.find("loginUsers")->isVisible());
 }

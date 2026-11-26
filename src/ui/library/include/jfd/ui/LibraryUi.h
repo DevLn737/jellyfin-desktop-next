@@ -9,7 +9,7 @@
 #include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 
 #include <QJsonObject>
 #include <QObject>
@@ -42,7 +42,7 @@ namespace jfd::ui {
     Q_OBJECT
     QML_NAMED_ELEMENT(Library)
     QML_SINGLETON
-    Q_PROPERTY(jfd::library::SignIn* signIn READ signIn NOTIFY attached)
+    Q_PROPERTY(jfd::account::SignIn* signIn READ signIn NOTIFY attached)
     Q_PROPERTY(jfd::library::HomeModel* home READ home NOTIFY attached)
     Q_PROPERTY(jfd::library::SearchModel* search READ search NOTIFY attached)
     // The Live TV channel list (route "livetv").
@@ -61,7 +61,7 @@ namespace jfd::ui {
   public:
     struct Services {
       api::JellyfinClient* client = nullptr;
-      library::SignIn* signIn = nullptr;
+      account::SignIn* signIn = nullptr;
       library::HomeModel* home = nullptr;
       library::SearchModel* search = nullptr;
       library::LiveTvChannels* liveTv = nullptr;
@@ -92,7 +92,7 @@ namespace jfd::ui {
     // live stream has no shared position).
     void setChannelHandler(std::function<void(const QString& channelId)> handler);
 
-    library::SignIn* signIn() const { return m_services.signIn; }
+    account::SignIn* signIn() const { return m_services.signIn; }
     library::HomeModel* home() const { return m_services.home; }
     library::SearchModel* search() const { return m_services.search; }
     library::LiveTvChannels* liveTv() const { return m_services.liveTv; }
@@ -104,6 +104,10 @@ namespace jfd::ui {
     // Called by LibraryScreens as the session socket comes and goes; a
     // change from offline to online emits reconnected().
     void setOnline(bool online);
+    // Which external links item pages show (the settings); open pages
+    // follow a change.
+    void setLinkOptions(const library::ExternalLinkOptions& options);
+    const library::ExternalLinkOptions& linkOptions() const { return m_linkOptions; }
 
     // A grid for one library, owned by `owner` (the page), with the sort
     // and filters it had last time; changes to them are kept. Null before
@@ -172,6 +176,7 @@ namespace jfd::ui {
     // Playing this track would stop the video; the window asks, and calls
     // playTrack again with `confirmed` on yes.
     void trackConfirmationNeeded(const QString& trackId, const QString& albumId);
+    void linkOptionsChanged();
 
   private:
     QString collectionTypeOf(const QString& libraryId) const;
@@ -186,6 +191,7 @@ namespace jfd::ui {
     TrackHandler m_track;
     std::function<void(const QString&)> m_channel;
     bool m_online = true;
+    library::ExternalLinkOptions m_linkOptions;
   };
 
 } // namespace jfd::ui

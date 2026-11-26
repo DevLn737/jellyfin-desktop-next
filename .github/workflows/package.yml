@@ -44,7 +44,12 @@ env:
   RELEASE_NEXT_PUBLIC_KEY: ${{ vars.MINISIGN_NEXT_PUBLIC_KEY }}
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   msi:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: MSI (Windows)
     runs-on: windows-2022
     steps:
@@ -164,6 +169,8 @@ jobs:
           retention-days: 5
 
   appimage:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: AppImage (Linux)
     runs-on: ubuntu-24.04
     steps:
@@ -374,7 +381,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           always="ci.yml app.yml session.yml api.yml library-ui.yml syncplay-drift.yml"
-          when_changed="seerr-api.yml syncplay-harness.yml libmpv-sources.yml"
+          when_changed="syncplay-harness.yml libmpv-sources.yml"
           for workflow in $always $when_changed; do
             for attempt in $(seq 1 60); do
               run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \

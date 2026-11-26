@@ -84,7 +84,6 @@ Everything else works with a stock server, rooms included.
 - **Integrations.**
   - Discord Rich Presence, with privacy options per kind and library.
   - Media keys and the system's now-playing panel.
-  - Requests through Seerr.
 - **Looks after itself.**
   - Signed self-updates.
   - If the app crashes, it says so at the next start and offers a diagnostic
@@ -237,7 +236,7 @@ links to the release page instead.
   (Ctrl+K), музыка, ТВ-каналы и загрузки для просмотра без сети.
 - Геймпад работает везде, не только в режиме ТВ. Режим ТВ рассчитан на пульт
   и диван.
-- Discord, управление с телефона, запросы через Seerr.
+- Discord и управление с телефона.
 - После сбоя приложение предложит сохранить отчёт для диагностики.
 - Интерфейс на русском и английском.
 

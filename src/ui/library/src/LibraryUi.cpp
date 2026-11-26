@@ -162,6 +162,11 @@ namespace jfd::ui {
     return recordings;
   }
 
+  void LibraryUi::setLinkOptions(const library::ExternalLinkOptions& options) {
+    m_linkOptions = options;
+    Q_EMIT linkOptionsChanged();
+  }
+
   library::ItemDetails* LibraryUi::createDetails(const QString& itemId, QObject* owner) {
     if (m_services.client == nullptr) return nullptr;
     library::ItemDetails::Options options;
@@ -170,6 +175,9 @@ namespace jfd::ui {
     QQmlEngine::setObjectOwnership(details, QQmlEngine::CppOwnership);
     details->setUpdates(m_services.updates);
     details->setCollectionIndex(m_services.collections);
+    details->setLinkOptions(m_linkOptions);
+    connect(this, &LibraryUi::linkOptionsChanged, details,
+            [this, details] { details->setLinkOptions(m_linkOptions); });
     connect(details, &library::ItemDetails::playRequested, this,
             [this](const QString& id, qint64 startTicks) { play(id, startTicks); });
     details->setItemId(itemId);
@@ -198,9 +206,6 @@ namespace jfd::ui {
       if (collectionType == QLatin1String("livetv")) return QStringLiteral("livetv");
       return QStringLiteral("library/") + itemId;
     }
-    // A Seerr title (id like "movie:603"), added to the home screen by the
-    // Seerr module.
-    if (type == QLatin1String("SeerrTitle")) return QStringLiteral("seerr-title/") + itemId;
     return QStringLiteral("item/") + itemId;
   }
 

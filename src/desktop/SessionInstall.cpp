@@ -1,8 +1,10 @@
 #include "AppServices.h"
 
+#include <jfd/account/Account.h>
+
 #include <jfd/api/DeviceProfile.h>
 #include <jfd/api/JellyfinClient.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/music/MusicPlayer.h>
 #include <jfd/remote/RemoteSettings.h>
 #include <jfd/session/SessionRuntime.h>
@@ -66,24 +68,23 @@ namespace jfd::desktop {
 
     installRemote(services);
 
-    library::SignIn& signIn = *services.signIn;
+    account::SignIn& signIn = *services.signIn;
     // Signing out mid-film: the Stopped reports (resume position, played
     // mark) and the group leave reach the server before Logout revokes the
     // token they are sent with, as at exit.
     signIn.setBeforeSignOut([&services](std::function<void()> done) { prepareExit(services, std::move(done)); });
-    QObject::connect(&signIn, &library::SignIn::signedIn, &client,
-                     [&services, &client] { reportCapabilities(services, client); });
+    // Each user's session learns what this client can do (begins at once
+    // when installLibrary has restored the saved session).
+    account::Account& account = *services.account;
+    account.scope().add(QStringLiteral("session"), account::UserScope::Session, &client,
+                        [&services, &client] { reportCapabilities(services, client); }, {});
     // Turning remote control off or on tells the server at once.
     QObject::connect(services.settings.get(), &settings::Settings::valueChanged, &client,
-                     [&services, &client, &signIn](const QString& key, const QVariant& value) {
+                     [&services, &client, &account](const QString& key, const QVariant& value) {
                        if (key != remote::keys::AllowServerControl) return;
                        setRemoteEnabled(services, value.toBool());
-                       if (signIn.step() == library::SignIn::Step::SignedIn) reportCapabilities(services, client);
+                       if (account.signedIn()) reportCapabilities(services, client);
                      });
-    // installLibrary restores the saved session before this runs.
-    if (signIn.step() == library::SignIn::Step::SignedIn) {
-      reportCapabilities(services, client);
-    }
   }
 
   void prepareExit(AppServices& services, std::function<void()> done) {

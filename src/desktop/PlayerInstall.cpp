@@ -1,7 +1,9 @@
 #include "AppServices.h"
+
+#include <jfd/account/Account.h>
 #include <jfd/session/GroupModel.h>
 
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/platform/DisplayModeSwitcher.h>
 #include <jfd/platform/DisplayModes.h>
 #include <jfd/playback/PlayerOptions.h>
@@ -668,8 +670,9 @@ namespace jfd::desktop {
 
     // A video playing on (the picture-in-picture window outlives the page)
     // would go on as the next user.
-    if (services.signIn != nullptr)
-      QObject::connect(services.signIn, &library::SignIn::signedOut, &model, [&model] { model.stop(); });
+    if (services.account)
+      services.account->scope().add(QStringLiteral("player"), account::UserScope::Player, &model, {},
+                                    [&model] { model.stop(); });
 
     ui::Navigator& navigator = *services.navigator;
     navigator.registerPage(QStringLiteral("player"), QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Player/PlayerPage.qml")));

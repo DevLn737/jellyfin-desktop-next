@@ -1,4 +1,6 @@
 #include "AppServices.h"
+
+#include <jfd/account/Account.h>
 #include "IntegrationServices.h"
 #include "LegacyInstall.h"
 #include "Logging.h"
@@ -51,7 +53,6 @@ Q_IMPORT_QML_PLUGIN(Jfd_Ui_LibraryPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_GroupPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_PlayerPlugin)
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_MusicPlugin)
-Q_IMPORT_QML_PLUGIN(Jfd_Ui_RequestsPlugin)
 
 using namespace jfd;
 
@@ -106,7 +107,6 @@ namespace {
     ok = desktop::registerGroupSettings(registry) && ok;
     ok = remote::registerRemoteSettings(registry) && ok;
     ok = desktop::registerMusicSettings(registry) && ok;
-    ok = desktop::registerSeerrSettings(registry) && ok;
     ok = desktop::registerInputSettings(registry) && ok;
     ok = desktop::registerDownloadSettings(registry) && ok;
     ok = desktop::registerLegacySettings(registry, legacy) && ok;
@@ -241,6 +241,7 @@ int main(int argc, char* argv[]) {
   }
 
   services.isolatedProfile = smokeProfile.has_value();
+  desktop::forgetRemovedFeatures(settingsFile, services.isolatedProfile);
   services.cacheDirectory =
       smokeProfile ? QString() : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
   services.logDirectory = smokeProfile ? smokeProfile->filePath(QStringLiteral("logs"))
@@ -300,7 +301,6 @@ int main(int argc, char* argv[]) {
     desktop::installGroup(services, engine);
     desktop::installMusic(services, engine);
     desktop::installDownloadScreens(services, engine);
-    desktop::installSeerr(services, engine);
     // Other modules: desktop::install<Module>(services, engine);
 
     // Home when the saved session was restored.
@@ -400,11 +400,11 @@ int main(int argc, char* argv[]) {
   services.playerModel.reset();
   desktop::uninstallGroup(services);
   desktop::uninstallMusic(services);
-  desktop::uninstallSeerr(services);
   desktop::uninstallDownloads(services);
   services.session.reset();
   services.player.reset();
   services.library.reset();
+  services.account.reset();
   services.settings.reset();
   // A clean exit: the next start finds no marker.
   desktop::endCrashGuard(services);

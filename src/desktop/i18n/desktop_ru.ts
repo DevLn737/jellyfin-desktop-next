@@ -374,6 +374,49 @@
     </message>
 </context>
 <context>
+    <name>LinkSettings</name>
+    <message>
+        <source>External links</source>
+        <translation>Внешние ссылки</translation>
+    </message>
+    <message>
+        <source>Shikimori address</source>
+        <translation>Адрес Shikimori</translation>
+    </message>
+    <message>
+        <source>Film and series pages show one Shikimori link, to this address.</source>
+        <translation>На страницах фильмов и сериалов одна ссылка на Shikimori, по этому адресу.</translation>
+    </message>
+    <message>
+        <source>Show Shikimori</source>
+        <translation>Показывать Shikimori</translation>
+    </message>
+    <message>
+        <source>Show MyAnimeList</source>
+        <translation>Показывать MyAnimeList</translation>
+    </message>
+    <message>
+        <source>Show AniList</source>
+        <translation>Показывать AniList</translation>
+    </message>
+    <message>
+        <source>Show AniDB</source>
+        <translation>Показывать AniDB</translation>
+    </message>
+    <message>
+        <source>Show TVDB</source>
+        <translation>Показывать TVDB</translation>
+    </message>
+    <message>
+        <source>Show TMDB</source>
+        <translation>Показывать TMDB</translation>
+    </message>
+    <message>
+        <source>Show IMDb</source>
+        <translation>Показывать IMDb</translation>
+    </message>
+</context>
+<context>
     <name>Main</name>
     <message>
         <source>Stop the video?</source>
@@ -611,45 +654,6 @@
     <message>
         <source>The player speeds the video up or slows it down very slightly so every frame shows for the same time, and adjusts the sound to match. Smoother motion where the display&apos;s rate cannot change (Wayland); uses more of the graphics card.</source>
         <translation>Плеер чуть ускоряет или замедляет видео, чтобы каждый кадр показывался одинаковое время, и подстраивает звук. Движение плавнее там, где частоту дисплея сменить нельзя (Wayland); видеокарта нагружается сильнее.</translation>
-    </message>
-</context>
-<context>
-    <name>SeerrSettings</name>
-    <message>
-        <source>Requests (Seerr)</source>
-        <translation>Запросы (Seerr)</translation>
-    </message>
-    <message>
-        <source>Seerr address</source>
-        <translation>Адрес Seerr</translation>
-    </message>
-    <message>
-        <source>The address of your Seerr server, for example https://seerr.example.org. Empty: no Requests in the sidebar and nothing from Seerr on the home page. You sign in with your Jellyfin account; the password is not saved.</source>
-        <translation>Адрес вашего сервера Seerr, например https://seerr.example.org. Пусто: в боковой панели нет «Запросов», на главной ничего от Seerr. Вход выполняется учётной записью Jellyfin; пароль не сохраняется.</translation>
-    </message>
-    <message>
-        <source>Sign in to Seerr</source>
-        <translation>Войти в Seerr</translation>
-    </message>
-    <message>
-        <source>Check the connection</source>
-        <translation>Проверить подключение</translation>
-    </message>
-    <message>
-        <source>Sign out of Seerr</source>
-        <translation>Выйти из Seerr</translation>
-    </message>
-    <message>
-        <source>Signed out of Seerr.</source>
-        <translation>Вы вышли из Seerr.</translation>
-    </message>
-    <message>
-        <source>Connected to Seerr as %1.</source>
-        <translation>Подключено к Seerr как %1.</translation>
-    </message>
-    <message>
-        <source>Popular in Seerr</source>
-        <translation>Популярное в Seerr</translation>
     </message>
 </context>
 <context>

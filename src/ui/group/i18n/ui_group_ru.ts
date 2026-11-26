@@ -42,6 +42,30 @@
         <translation>Ничего не воспроизводится</translation>
     </message>
     <message>
+        <source>you</source>
+        <translation>вы</translation>
+    </message>
+    <message>
+        <source>loading</source>
+        <translation>загружается</translation>
+    </message>
+    <message>
+        <source>%1, paused</source>
+        <translation>%1, пауза</translation>
+    </message>
+    <message>
+        <source>%1 s ahead</source>
+        <translation>впереди на %1 с</translation>
+    </message>
+    <message>
+        <source>%1 s behind</source>
+        <translation>отстаёт на %1 с</translation>
+    </message>
+    <message>
+        <source>ping %1 ms</source>
+        <translation>пинг %1 мс</translation>
+    </message>
+    <message>
         <source>Connection lost, rejoining…</source>
         <translation>Связь потеряна, возвращаемся в комнату…</translation>
     </message>

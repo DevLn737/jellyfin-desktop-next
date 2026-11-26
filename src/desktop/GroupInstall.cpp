@@ -1,6 +1,8 @@
 #include "AppServices.h"
 
-#include <jfd/library/SignIn.h>
+#include <jfd/account/Account.h>
+
+#include <jfd/account/SignIn.h>
 #include <jfd/session/GroupModel.h>
 #include <jfd/session/RoomsModel.h>
 #include <jfd/session/SessionRuntime.h>
@@ -91,13 +93,17 @@ namespace jfd::desktop {
 
     // Another server may or may not have the playback-rate extension, and
     // another user other rights. Signed out: nobody's rooms.
-    if (services.signIn != nullptr) {
-      QObject::connect(services.signIn, &library::SignIn::signedIn, &group, &session::GroupModel::checkRateSupport);
-      QObject::connect(services.signIn, &library::SignIn::signedIn, &group, &session::GroupModel::checkAccess);
-      QObject::connect(services.signIn, &library::SignIn::signedOut, &rooms, [&group, &rooms] {
-        rooms.clear();
-        group.setAccess({});
-      });
+    if (services.account) {
+      services.account->scope().add(
+          QStringLiteral("group"), account::UserScope::Group, &rooms,
+          [&group] {
+            group.checkRateSupport();
+            group.checkAccess();
+          },
+          [&group, &rooms] {
+            rooms.clear();
+            group.setAccess({});
+          });
     }
 
     // The list waits while the server cannot be reached.

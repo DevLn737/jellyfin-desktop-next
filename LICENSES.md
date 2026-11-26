@@ -149,11 +149,3 @@ only reformatted.
 | `src/ui/player/icons/tune.svg` | Material Icons `tune` | Apache-2.0 |
 | `src/ui/player/icons/volume.svg` | Material Icons `volume_up` | Apache-2.0 |
 | `src/ui/player/icons/volumeOff.svg` | Material Icons `volume_off` | Apache-2.0 |
-| `src/ui/requests/icons/partial.svg` | Part of this program: a plain geometric shape, no Material Icons match found | GPL-2.0-or-later |
-| `src/ui/requests/icons/pending.svg` | Material Icons `schedule` | Apache-2.0 |
-| `src/ui/requests/icons/processing.svg` | Material Icons `sync` | Apache-2.0 |
-| `src/ui/requests/icons/requests.svg` | Material Icons `add_circle_outline` | Apache-2.0 |
-| `src/ui/requests/icons-dark/partial.svg` | Part of this program: a plain geometric shape, no Material Icons match found (dark fill) | GPL-2.0-or-later |
-| `src/ui/requests/icons-dark/pending.svg` | Material Icons `schedule` (dark fill) | Apache-2.0 |
-| `src/ui/requests/icons-dark/processing.svg` | Material Icons `sync` (dark fill) | Apache-2.0 |
-| `src/ui/requests/icons-dark/requests.svg` | Material Icons `add_circle_outline` (dark fill) | Apache-2.0 |

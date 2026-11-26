@@ -1,5 +1,6 @@
 #pragma once
 
+#include <jfd/api/Models.h>
 #include <jfd/session/SessionHub.h>
 
 #include <QHash>
@@ -7,6 +8,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QVariantList>
 
 #include <memory>
@@ -50,10 +52,19 @@ namespace jfd::session {
     Q_PROPERTY(int driftMs READ driftMs NOTIFY changed)
     // "", "speed" or "skip": how we are catching up right now.
     Q_PROPERTY(QString correction READ correction NOTIFY changed)
-    // Our round trip to the server in ms, -1 until measured. Only our own:
-    // the server does not share the other members' (GroupInfoDto and the
-    // group updates carry user names only).
+    // Our round trip to the server in ms, -1 until measured. Stock
+    // Jellyfin does not share the other members' (GroupInfoDto and the group
+    // updates carry user names only); see members for the plugin's.
     Q_PROPERTY(int pingMs READ pingMs NOTIFY changed)
+    // The members with where each is and their ping, from the server's Room
+    // Members plugin (stock Jellyfin shares neither):
+    // [{name, device, self, pingMs, buffering, paused, hasPosition,
+    //   positionMs, positionText, hasOffset, offsetMs}], offsetMs being how
+    // far ahead of us the member is. Empty without the plugin or a group;
+    // refreshed every second while in a group.
+    Q_PROPERTY(QVariantList members READ members NOTIFY membersChanged)
+    // The server has the plugin (known after the first answer in a group).
+    Q_PROPERTY(bool membersSupported READ membersSupported NOTIFY membersChanged)
     // The group's queue: [{playlistItemId, itemId, name, current}].
     Q_PROPERTY(QVariantList queue READ queue NOTIFY queueChanged)
     // The user's SyncPlayAccess policy: "CreateAndJoinGroups", "JoinGroups"
@@ -83,6 +94,8 @@ namespace jfd::session {
     int driftMs() const;
     QString correction() const;
     int pingMs() const;
+    QVariantList members() const;
+    bool membersSupported() const { return m_membersSupport == Support::Yes; }
     QVariantList queue() const;
     QString access() const { return m_access; }
     // None closes watching together altogether; JoinGroups only creating.
@@ -115,6 +128,7 @@ namespace jfd::session {
 
   Q_SIGNALS:
     void changed();
+    void membersChanged();
     void queueChanged();
     void accessChanged();
     void busyChanged();
@@ -144,6 +158,8 @@ namespace jfd::session {
     void setRateSupported(bool supported);
     void startBusy();
     void endBusy();
+    void membersTick();
+    void updateMembersTimer(bool joinedNow);
 
     struct QueueEntry {
       QString playlistItemId;
@@ -163,8 +179,21 @@ namespace jfd::session {
     QHash<QString, QString> m_names;
     QString m_access;
     int m_busy = 0;
+    // Joins the user asked for whose reply has not come yet. The automatic
+    // rejoin after a lost connection uses the same request; its failures are
+    // retried and reported once by the group client, not here.
+    int m_userJoins = 0;
     QString m_errorText;
     bool m_rateSupported = false;
+    // Room Members plugin: asked again whenever we join a group, so a plugin
+    // installed meanwhile is found without a restart.
+    enum class Support { Unknown, Yes, No };
+    Support m_membersSupport = Support::Unknown;
+    std::optional<api::RoomMembers> m_members;
+    core::LocalInstant m_membersAt;
+    bool m_membersRequested = false;
+    int m_membersTicks = 0;
+    QTimer m_membersTimer;
     // Set while we create a group for watchTogether: the item to queue once
     // the server put us in it.
     std::optional<std::pair<QString, qint64>> m_pendingQueue;

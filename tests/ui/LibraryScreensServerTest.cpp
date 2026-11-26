@@ -11,6 +11,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/platform/CredentialStore.h>
+#include <jfd/account/Account.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
@@ -46,14 +47,16 @@ namespace {
   class Screens {
   public:
     Screens() {
+      account::Account::Config accountConfig;
       ui::LibraryScreens::Config config;
-      config.identity.version = QStringLiteral("0.0.1");
-      config.identity.device = QStringLiteral("ui-test");
-      config.identity.deviceId = QStringLiteral("jfd-ui-screens");
-      config.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
+      accountConfig.identity.version = QStringLiteral("0.0.1");
+      accountConfig.identity.device = QStringLiteral("ui-test");
+      accountConfig.identity.deviceId = QStringLiteral("jfd-ui-screens");
+      accountConfig.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
       config.imageDirectory = m_dir.filePath(QStringLiteral("images"));
-      config.tokens = std::make_unique<platform::MemoryCredentialStore>();
-      screens = std::make_unique<ui::LibraryScreens>(std::move(config));
+      accountConfig.tokens = std::make_unique<platform::MemoryCredentialStore>();
+      userAccount = std::make_unique<account::Account>(std::move(accountConfig));
+      screens = std::make_unique<ui::LibraryScreens>(*userAccount, std::move(config));
 
       navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
       REQUIRE(navigator != nullptr);
@@ -141,6 +144,7 @@ namespace {
     // models and the image loader thread use the services until the engine
     // is gone (issue #70: a reload in flight at the end of a test reached a
     // destroyed client and image cache).
+    std::unique_ptr<account::Account> userAccount;
     std::unique_ptr<ui::LibraryScreens> screens;
     QQmlApplicationEngine engine;
     ui::Navigator* navigator = nullptr;
@@ -258,7 +262,7 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   QMetaObject::invokeMethod(palette, "close");
 
   // Signing out goes back to the login page.
-  screens.screens->signIn().signOut();
+  screens.userAccount->signIn().signOut();
   REQUIRE(screens.waitShowing(QStringLiteral("login")));
 }
 

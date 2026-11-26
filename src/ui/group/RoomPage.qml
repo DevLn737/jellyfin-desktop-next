@@ -21,6 +21,25 @@ FocusScope {
         }
     }
 
+    // One member's line under the name (Room Members plugin): where they
+    // are, how far from us, whether the room waits for them, their ping.
+    function memberDetail(member) {
+        const parts = []
+        if (member.self)
+            parts.push(qsTr("you"))
+        if (member.buffering)
+            parts.push(qsTr("loading"))
+        else if (member.hasPosition)
+            parts.push(member.paused ? qsTr("%1, paused").arg(member.positionText) : member.positionText)
+        // Positions come from reports every few seconds: smaller gaps are noise.
+        if (member.hasOffset && Math.abs(member.offsetMs) >= 2000) {
+            const seconds = Math.round(Math.abs(member.offsetMs) / 1000)
+            parts.push(member.offsetMs > 0 ? qsTr("%1 s ahead").arg(seconds) : qsTr("%1 s behind").arg(seconds))
+        }
+        parts.push(qsTr("ping %1 ms").arg(member.pingMs))
+        return parts.join(" · ")
+    }
+
     function syncText() {
         if (!group.connected)
             return qsTr("Connection lost, rejoining…")
@@ -151,24 +170,28 @@ FocusScope {
                         font.pixelSize: Theme.fontSizeBody
                     }
 
-                    // The members: initials and names; the delay only for
-                    // ourselves, as the server shares no other member's.
+                    // The members: initials and names. With the server's Room
+                    // Members plugin also where each one is and their ping;
+                    // without it only our own delay (below), as stock
+                    // Jellyfin shares no other member's.
                     Flow {
                         width: parent.width
                         spacing: Theme.spacingSmall
                         Repeater {
                             objectName: "memberList"
-                            model: root.group.participants
+                            model: root.group.members.length > 0 ? root.group.members : root.group.participants
                             Rectangle {
                                 id: chip
-                                required property string modelData
+                                required property var modelData
                                 required property int index
+                                readonly property string name: typeof modelData === "string" ? modelData : modelData.name
+                                readonly property string detail: typeof modelData === "string" ? "" : root.memberDetail(modelData)
                                 width: chipRow.implicitWidth + 2 * 6 + 8
-                                height: 36
-                                radius: 18
+                                height: detail.length > 0 ? 48 : 36
+                                radius: height / 2
                                 color: Qt.alpha(Theme.text, 0.06)
                                 Accessible.role: Accessible.StaticText
-                                Accessible.name: modelData
+                                Accessible.name: detail.length > 0 ? name + ", " + detail : name
                                 Row {
                                     id: chipRow
                                     x: 4
@@ -178,21 +201,31 @@ FocusScope {
                                         width: 28
                                         height: 28
                                         radius: 14
-                                        color: Qt.hsla(chip.modelData.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7) / 360, 0.45, 0.45, 1)
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: Qt.hsla(chip.name.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7) / 360, 0.45, 0.45, 1)
                                         Text {
                                             anchors.centerIn: parent
-                                            text: chip.modelData.charAt(0).toUpperCase()
+                                            text: chip.name.charAt(0).toUpperCase()
                                             color: "white"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.weight: Font.ExtraBold
                                         }
                                     }
-                                    Text {
+                                    Column {
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: chip.modelData
-                                        color: Theme.text
-                                        font.pixelSize: Theme.fontSizeBody
-                                        font.weight: Font.Bold
+                                        Text {
+                                            text: chip.name
+                                            color: Theme.text
+                                            font.pixelSize: Theme.fontSizeBody
+                                            font.weight: Font.Bold
+                                        }
+                                        Text {
+                                            objectName: "memberDetail"
+                                            visible: chip.detail.length > 0
+                                            text: chip.detail
+                                            color: Theme.textSecondary
+                                            font.pixelSize: Theme.fontSizeSmall
+                                        }
                                     }
                                 }
                             }
@@ -201,7 +234,7 @@ FocusScope {
                     Text {
                         objectName: "pingText"
                         width: parent.width
-                        visible: root.group.pingMs >= 0
+                        visible: root.group.pingMs >= 0 && root.group.members.length === 0
                         text: qsTr("Your delay to the server: %1 ms").arg(root.group.pingMs)
                         color: Theme.textSecondary
                         font.pixelSize: Theme.fontSizeSmall
