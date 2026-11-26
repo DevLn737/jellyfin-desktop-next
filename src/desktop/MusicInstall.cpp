@@ -1,7 +1,9 @@
 #include "AppServices.h"
+
+#include <jfd/account/Account.h>
 #include "IntegrationServices.h"
 
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/music/MusicPlayer.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/settings/Settings.h>
@@ -140,15 +142,14 @@ namespace jfd::desktop {
       if (settings.value(ContinueKey).toBool()) settings.setValue(QueueKey, QString::fromUtf8(state));
       else settings.setValue(QueueKey, QString());
     });
-    if (services.signIn != nullptr) {
-      QObject::connect(services.signIn, &library::SignIn::signedIn, &player, restore);
-      // The queue is the user's: it stops and goes with them, so the next
-      // user neither hears it nor reports it as theirs.
-      QObject::connect(services.signIn, &library::SignIn::signedOut, &player, [&player, saving] {
-        *saving = false;
-        player.clear();
-      });
-      if (services.signIn->step() == library::SignIn::Step::SignedIn) restore();
+    // The queue is the user's: it stops and goes with them, so the next
+    // user neither hears it nor reports it as theirs.
+    if (services.account) {
+      services.account->scope().add(QStringLiteral("music"), account::UserScope::Music, &player, restore,
+                                    [&player, saving] {
+                                      *saving = false;
+                                      player.clear();
+                                    });
     }
 
     // The media controls' next and previous follow the music queue.

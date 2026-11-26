@@ -2,7 +2,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/music/MusicPlayer.h>
 #include <jfd/remote/RemoteControl.h>
 #include <jfd/remote/RemoteSettings.h>
@@ -186,7 +186,7 @@ namespace jfd::desktop {
       a.toggleFullscreen = [&remote] { callShell(remote.window.data(), "toggleFullScreen"); };
       a.goTo = [&services](remote::Destination destination) {
         if (services.navigator == nullptr || services.signIn == nullptr ||
-            services.signIn->step() != library::SignIn::Step::SignedIn)
+            services.signIn->step() != account::SignIn::Step::SignedIn)
           return;
         switch (destination) {
         case remote::Destination::Home: services.navigator->navigate(QStringLiteral("home")); break;

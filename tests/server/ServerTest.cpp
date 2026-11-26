@@ -13,7 +13,7 @@
 #include <jfd/library/LibraryModel.h>
 #include <jfd/library/RecommendationRows.h>
 #include <jfd/library/SearchModel.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/platform/CredentialStore.h>
 
 #include <QJsonArray>
@@ -372,19 +372,19 @@ TEST_CASE("Favorites, details with trickplay, tiles and media segments") {
 TEST_CASE("Sign-in, home, series, season, episode and Play through the library models") {
   auto client = makeClient(QStringLiteral("jfd-screens"));
   QTemporaryDir dir;
-  library::ServerStore servers(dir.filePath(QStringLiteral("servers.ini")));
+  account::ServerStore servers(dir.filePath(QStringLiteral("servers.ini")));
   platform::MemoryCredentialStore tokens;
-  library::SignIn signIn(*client, servers, tokens);
+  account::SignIn signIn(*client, servers, tokens);
   signIn.connectToServer(env("JFD_TEST_SERVER_URL"));
-  REQUIRE(waitFor([&] { return signIn.step() == library::SignIn::Step::Credentials; }, 20000));
+  REQUIRE(waitFor([&] { return signIn.step() == account::SignIn::Step::Credentials; }, 20000));
   // Quick Connect is on by default in 12.x.
   CHECK(signIn.quickConnectAvailable());
   signIn.signIn(env("JFD_TEST_USER"), env("JFD_TEST_PASSWORD"));
-  REQUIRE(waitFor([&] { return signIn.step() == library::SignIn::Step::SignedIn; }, 20000));
+  REQUIRE(waitFor([&] { return signIn.step() == account::SignIn::Step::SignedIn; }, 20000));
 
   // A second start restores the session without the password.
   auto restarted = makeClient(QStringLiteral("jfd-screens"));
-  library::SignIn again(*restarted, servers, tokens);
+  account::SignIn again(*restarted, servers, tokens);
   REQUIRE(again.restore());
   CHECK(restarted->accessToken() == client->accessToken());
 

@@ -132,9 +132,11 @@ if(TARGET jfd_jellyfin_api)
     library/LiveTvChannelsTest.cpp
     library/LiveTvGuideTest.cpp
     library/LiveTvRecordingsTest.cpp
-    library/SignInTest.cpp
     library/ExternalLinksTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
+
+  jfd_add_qt_test(jfd_account_tests account/SignInTest.cpp account/AccountTest.cpp)
+  target_link_libraries(jfd_account_tests PRIVATE jfd::account)
 
   jfd_add_qt_test(jfd_playback_tests playback/TrackTableTest.cpp playback/PlaybackReporterTest.cpp
     playback/StreamPlanTest.cpp playback/TrackControllerTest.cpp
@@ -244,7 +246,7 @@ if(TARGET jfd_jellyfin_api)
   if(JFD_SERVER_TESTS)
     # Needs JFD_TEST_SERVER_URL and friends; see scripts/test-server/README.md.
     jfd_add_qt_test(jfd_server_tests server/ServerTest.cpp)
-    target_link_libraries(jfd_server_tests PRIVATE jfd::jellyfin_api jfd::library)
+    target_link_libraries(jfd_server_tests PRIVATE jfd::jellyfin_api jfd::account jfd::library)
 
     # The session runtime in a live group, on a virtual backend.
     jfd_add_qt_test(jfd_session_server_tests session/SessionRuntimeServerTest.cpp)

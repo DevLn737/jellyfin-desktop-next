@@ -9,7 +9,7 @@
 #include <jfd/library/LiveTvRecordings.h>
 #include <jfd/library/LiveTvSchedule.h>
 #include <jfd/library/SearchModel.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 
 #include <QJsonObject>
 #include <QObject>
@@ -42,7 +42,7 @@ namespace jfd::ui {
     Q_OBJECT
     QML_NAMED_ELEMENT(Library)
     QML_SINGLETON
-    Q_PROPERTY(jfd::library::SignIn* signIn READ signIn NOTIFY attached)
+    Q_PROPERTY(jfd::account::SignIn* signIn READ signIn NOTIFY attached)
     Q_PROPERTY(jfd::library::HomeModel* home READ home NOTIFY attached)
     Q_PROPERTY(jfd::library::SearchModel* search READ search NOTIFY attached)
     // The Live TV channel list (route "livetv").
@@ -61,7 +61,7 @@ namespace jfd::ui {
   public:
     struct Services {
       api::JellyfinClient* client = nullptr;
-      library::SignIn* signIn = nullptr;
+      account::SignIn* signIn = nullptr;
       library::HomeModel* home = nullptr;
       library::SearchModel* search = nullptr;
       library::LiveTvChannels* liveTv = nullptr;
@@ -92,7 +92,7 @@ namespace jfd::ui {
     // live stream has no shared position).
     void setChannelHandler(std::function<void(const QString& channelId)> handler);
 
-    library::SignIn* signIn() const { return m_services.signIn; }
+    account::SignIn* signIn() const { return m_services.signIn; }
     library::HomeModel* home() const { return m_services.home; }
     library::SearchModel* search() const { return m_services.search; }
     library::LiveTvChannels* liveTv() const { return m_services.liveTv; }

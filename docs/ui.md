@@ -280,11 +280,15 @@ To show a message: `shell.showError(text)` through the window's `AppShell`
 ## Library screens
 
 `Jfd.Ui.Library` holds the `login`, `home`, `library/<id>`,
-`collection/<id>`, `item/<id>` and `search` pages. `ui::LibraryScreens` (installed by `installLibrary` in
-`src/desktop`) owns the server connection: the `JellyfinClient` and
-`SessionSocket` in `AppServices::client` and `socket` are the ones the
-session and group modules should use. Signing in opens `home`, signing out
-or a rejected token opens `login`.
+`collection/<id>`, `item/<id>` and `search` pages. The server connection
+belongs to `account::Account` (`src/account`, created by `installLibrary` in
+`src/desktop`): the `JellyfinClient` and `SessionSocket` in
+`AppServices::client` and `socket` are its, and every module that keeps
+per-user state registers it once with `AppServices::account->scope()`
+(`account::UserScope`, ordered: library, session, downloads, group, music,
+player). `ui::LibraryScreens` builds the screens on it. Once the scope has
+begun, `home` opens; once it has ended (sign-out or a rejected token),
+`login`.
 
 From QML, `Library` gives `signIn`, `home`, `search`,
 `createLibrary(id, page)`, `createDetails(id, page)`, `image(url)` and

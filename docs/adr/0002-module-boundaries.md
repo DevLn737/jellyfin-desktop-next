@@ -12,6 +12,7 @@ Each module is a CMake target.
 | `jellyfin-api` | Typed HTTP/WebSocket client, auth, items, `PlaybackInfo`, device profile, playback reporting, server capability discovery | mpv, UI |
 | `syncplay` | Group protocol, `TimeSync` (server clock offset), mapping of server messages to session inputs | mpv, UI |
 | `media-backend` | mpv implementation of `core::MediaBackend`, fake implementation for tests | network, UI |
+| `account` | The connection to one server as one user: client, session socket, saved servers, tokens, sign-in, and the user scope that begins and ends every module's per-user state in a fixed order | mpv, UI |
 | `library` | Requests, cache and QML models for library screens | mpv |
 | `platform` | Power/sleep inhibition, media keys and system media controls, taskbar, display refresh switching, single instance, paths and profiles, credential storage (Windows Credential Manager, Keychain, Secret Service), input devices | UI |
 | `integrations` | Read-only subscribers to `SessionSnapshot` with a narrow command set; Discord first | session internals |
@@ -23,8 +24,9 @@ Each module is a CMake target.
 Dependency graph (an arrow points from a module to what it uses):
 
 ```text
-app -> ui, integrations, syncplay, media-backend, library, platform
-ui -> library, core
+app -> ui, integrations, syncplay, media-backend, account, library, platform
+ui -> account, library, core
+account -> jellyfin-api, platform
 library -> jellyfin-api, core
 syncplay -> jellyfin-api, core
 media-backend -> core

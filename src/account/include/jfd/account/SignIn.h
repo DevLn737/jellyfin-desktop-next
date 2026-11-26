@@ -1,7 +1,7 @@
 #pragma once
 
 #include <jfd/api/Models.h>
-#include <jfd/library/ServerStore.h>
+#include <jfd/account/ServerStore.h>
 
 #include <QObject>
 #include <QString>
@@ -19,7 +19,7 @@ namespace jfd::platform {
   class CredentialStore;
 }
 
-namespace jfd::library {
+namespace jfd::account {
 
   // The way into a server, for the login screen:
   //
@@ -156,4 +156,4 @@ namespace jfd::library {
     BeforeSignOut m_beforeSignOut;
   };
 
-} // namespace jfd::library
+} // namespace jfd::account

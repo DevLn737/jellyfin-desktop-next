@@ -50,7 +50,7 @@ qt_add_qml_module(jfd_ui_library
     icons/livetv.svg
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell Jfd.Ui.Settings)
 target_link_libraries(jfd_ui_library
-  PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::library jfd::offline jfd_ui_shell
+  PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::account jfd::library jfd::offline jfd_ui_shell
   PRIVATE jfd_ui_theme jfd_ui_controls jfd_ui_settings)
 target_compile_definitions(jfd_ui_library PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 target_compile_options(jfd_ui_library PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)

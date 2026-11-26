@@ -24,8 +24,6 @@ add_library(jfd_library STATIC
   src/LiveTvSchedule.cpp
   src/RecommendationRows.cpp
   src/SearchModel.cpp
-  src/ServerStore.cpp
-  src/SignIn.cpp
   include/jfd/library/CardImages.h
   include/jfd/library/CollectionIndex.h
   include/jfd/library/ErrorText.h
@@ -46,9 +44,7 @@ add_library(jfd_library STATIC
   include/jfd/library/LiveTvRecordings.h
   include/jfd/library/LiveTvSchedule.h
   include/jfd/library/RecommendationRows.h
-  include/jfd/library/SearchModel.h
-  include/jfd/library/ServerStore.h
-  include/jfd/library/SignIn.h)
+  include/jfd/library/SearchModel.h)
 add_library(jfd::library ALIAS jfd_library)
 target_include_directories(jfd_library PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(jfd_library PUBLIC jfd::jellyfin_api jfd::platform Qt6::Core Qt6::Gui)

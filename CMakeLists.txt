@@ -48,6 +48,7 @@ if(Qt6_FOUND)
   include(cmake/JfdTranslations.cmake)
   add_subdirectory(src/platform)
   add_subdirectory(src/jellyfin-api)
+  add_subdirectory(src/account)
   add_subdirectory(src/library)
   # Qt Core modules without Qt Quick or mpv. Each joins the build once its
   # directory has a CMakeLists.txt (see cmake/JfdModules.cmake).

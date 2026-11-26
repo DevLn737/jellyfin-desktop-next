@@ -1,4 +1,4 @@
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/ServerDiscovery.h>
@@ -7,7 +7,7 @@
 #include <QPointer>
 #include <QVariantMap>
 
-namespace jfd::library {
+namespace jfd::account {
 
   SignIn::SignIn(api::JellyfinClient& client, ServerStore& servers,
                  platform::CredentialStore& tokens, QObject* parent)
@@ -349,4 +349,4 @@ namespace jfd::library {
     Q_EMIT signedOut();
   }
 
-} // namespace jfd::library
+} // namespace jfd::account

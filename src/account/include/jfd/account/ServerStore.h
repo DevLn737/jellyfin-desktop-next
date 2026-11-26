@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace jfd::library {
+namespace jfd::account {
 
   // A server the user has signed in to. The access token is not here: it
   // lives in the system credential store under platform::accessTokenKey.
@@ -45,4 +45,4 @@ namespace jfd::library {
     QString m_path;
   };
 
-} // namespace jfd::library
+} // namespace jfd::account

@@ -17,6 +17,7 @@
 #include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/library/HomeModel.h>
 #include <jfd/platform/CredentialStore.h>
+#include <jfd/account/Account.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/settings/CommonSections.h>
@@ -594,14 +595,16 @@ namespace {
       // for the system's rasteriser.
       QQuickWindow::setTextRenderType(qgetenv("JFD_TEXT_RENDERING") == "sharp" ? QQuickWindow::NativeTextRendering
                                                                               : QQuickWindow::QtTextRendering);
+      account::Account::Config accountConfig;
       ui::LibraryScreens::Config config;
-      config.identity.version = QStringLiteral("0.0.1");
-      config.identity.device = QStringLiteral("showcase");
-      config.identity.deviceId = QStringLiteral("jfd-ui-showcase");
-      config.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
+      accountConfig.identity.version = QStringLiteral("0.0.1");
+      accountConfig.identity.device = QStringLiteral("showcase");
+      accountConfig.identity.deviceId = QStringLiteral("jfd-ui-showcase");
+      accountConfig.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
       config.imageDirectory = m_dir.filePath(QStringLiteral("images"));
-      config.tokens = std::make_unique<platform::MemoryCredentialStore>();
-      screens = std::make_unique<ui::LibraryScreens>(std::move(config));
+      accountConfig.tokens = std::make_unique<platform::MemoryCredentialStore>();
+      userAccount = std::make_unique<account::Account>(std::move(accountConfig));
+      screens = std::make_unique<ui::LibraryScreens>(*userAccount, std::move(config));
       navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
       REQUIRE(navigator != nullptr);
       navigator->setPlaceholderPage(QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
@@ -715,6 +718,7 @@ namespace {
     settings::SettingsRegistry m_registry;
     std::unique_ptr<settings::Settings> m_settings;
     test::FakeServer server;
+    std::unique_ptr<account::Account> userAccount;
     std::unique_ptr<ui::LibraryScreens> screens;
     QQmlApplicationEngine engine;
     ui::Navigator* navigator = nullptr;
