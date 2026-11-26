@@ -396,6 +396,31 @@ namespace jfd::api::json {
     return g;
   }
 
+  Result<RoomMembers> roomMembers(const QJsonObject& o) {
+    RoomMembers r;
+    r.groupId = text(o, "GroupId");
+    const auto serverTime = text(o, "ServerTimeUtc");
+    if (!serverTime.isEmpty()) r.serverTime = parseServerInstant(serverTime);
+    for (const auto& value : o.value(QLatin1String("Members")).toArray()) {
+      const QJsonObject m = value.toObject();
+      RoomMember member;
+      member.userName = text(m, "UserName");
+      member.deviceName = text(m, "DeviceName");
+      member.client = text(m, "Client");
+      member.self = m.value(QLatin1String("IsSelf")).toBool();
+      member.pingMs = static_cast<std::int64_t>(m.value(QLatin1String("PingMs")).toDouble());
+      member.buffering = m.value(QLatin1String("IsBuffering")).toBool();
+      member.itemId = text(m, "ItemId");
+      const QJsonValue position = m.value(QLatin1String("PositionTicks"));
+      if (position.isDouble()) member.positionTicks = static_cast<std::int64_t>(position.toDouble());
+      member.paused = m.value(QLatin1String("IsPaused")).toBool(true);
+      const auto updated = text(m, "PositionUpdatedUtc");
+      if (!updated.isEmpty()) member.positionUpdatedAt = parseServerInstant(updated);
+      r.members.append(member);
+    }
+    return r;
+  }
+
 } // namespace jfd::api::json
 
 namespace jfd::api {

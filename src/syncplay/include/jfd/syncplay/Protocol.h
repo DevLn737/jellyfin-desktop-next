@@ -90,6 +90,8 @@ namespace jfd::syncplay {
     std::string path;
     // JSON; empty for requests without a body.
     std::string body;
+    // Milliseconds; 0 keeps the HTTP client's own timeout.
+    int timeoutMs = 0;
   };
 
   HttpRequest requestFor(const SyncPlayMessage& message);

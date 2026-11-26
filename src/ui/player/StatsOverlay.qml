@@ -76,6 +76,16 @@ Rectangle {
             add(qsTr("Catching up"), g.correction === "speed" ? qsTr("by speed")
                 : g.correction === "skip" ? qsTr("by a jump") : qsTr("no"))
             add(qsTr("Room speed"), "×" + number(g.rate, 2))
+            // Other members, from the server's Room Members plugin.
+            for (const m of g.members) {
+                if (m.self) continue
+                const parts = []
+                if (m.buffering) parts.push(qsTr("loading"))
+                else if (m.hasPosition) parts.push(m.positionText)
+                if (m.hasOffset) parts.push((m.offsetMs >= 0 ? "+" : "−") + qsTr("%1 s").arg(number(Math.abs(m.offsetMs) / 1000, 1)))
+                parts.push(qsTr("%1 ms").arg(m.pingMs))
+                add(m.name, parts.join(" · "))
+            }
         }
         return out
     }

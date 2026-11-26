@@ -167,6 +167,57 @@ TEST_CASE("Requests go one at a time, so the server takes them in order; a waiti
   CHECK(f.transport.pending[0].request.path == "/SyncPlay/Pause");
 }
 
+TEST_CASE("A waiting pause or play gives way to the newer one; requests have a short timeout") {
+  Fixture f;
+  f.joined();
+  const GroupEpoch epoch = f.client.epoch();
+  f.client.send(outgoing::RequestSeek{epoch, *MediaTicks::fromMilliseconds(5000)});
+  f.client.send(outgoing::RequestPause{epoch});
+  f.client.send(outgoing::RequestUnpause{epoch});
+  f.client.send(outgoing::RequestPause{epoch});
+  f.client.send(outgoing::RequestUnpause{epoch});
+  REQUIRE(f.transport.pending.size() == 1);
+  CHECK(f.transport.pending[0].request.timeoutMs == GroupClient::RequestTimeoutMs);
+  f.reply(204);
+  // Only the last play state pressed while the seek was on its way.
+  REQUIRE(f.transport.pending.size() == 1);
+  CHECK(f.transport.pending[0].request.path == "/SyncPlay/Unpause");
+  CHECK(f.transport.pending[0].request.timeoutMs == GroupClient::RequestTimeoutMs);
+  f.reply(204);
+  CHECK(f.transport.pending.empty());
+  // Ready and Buffering reports give up as soon.
+  outgoing::Ready ready;
+  ready.epoch = epoch;
+  f.client.send(ready);
+  REQUIRE(f.transport.pending.size() == 1);
+  CHECK(f.transport.pending[0].request.timeoutMs == GroupClient::RequestTimeoutMs);
+}
+
+TEST_CASE("A lost connection drops waiting requests; the stalled one does not hold up the rejoined group") {
+  Fixture f;
+  f.joined();
+  const GroupEpoch first = f.client.epoch();
+  f.client.send(outgoing::RequestPause{first});
+  f.client.send(outgoing::RequestSeek{first, *MediaTicks::fromMilliseconds(5000)});
+  REQUIRE(f.transport.pending.size() == 1);
+  f.client.onConnectionLost();
+  f.client.onConnectionRestored();
+  // The stalled Pause, then the rejoin.
+  REQUIRE(f.transport.pending.size() == 2);
+  CHECK(f.transport.pending[1].request.path == "/SyncPlay/Join");
+  f.joined();
+  const GroupEpoch second = f.client.epoch();
+  REQUIRE(second != first);
+  f.client.send(outgoing::RequestUnpause{second});
+  // Sent at once, without waiting for the old Pause.
+  REQUIRE(f.transport.pending.size() == 3);
+  CHECK(f.transport.pending[2].request.path == "/SyncPlay/Unpause");
+  // The old Pause times out: neither the dropped seek nor anything else follows.
+  f.reply(0);
+  CHECK(f.transport.pending.size() == 2);
+  for (const auto& p : f.transport.pending) CHECK(p.request.path != "/SyncPlay/Seek");
+}
+
 TEST_CASE("A failed rejoin ends the membership the session still holds") {
   Fixture f;
   f.joined();

@@ -307,6 +307,35 @@ namespace jfd::api {
     std::optional<core::ServerInstant> lastUpdatedAt;
   };
 
+  // GET RoomMembers, from the Room Members server plugin (server-plugin/ in
+  // this repository): the members of our SyncPlay group, one per session,
+  // with what each last reported. Stock Jellyfin has no such route.
+  struct RoomMember {
+    QString userName;
+    QString deviceName;
+    QString client;
+    // Our own session.
+    bool self = false;
+    // The round trip the member last reported to the group (SyncPlay/Ping).
+    std::int64_t pingMs = 0;
+    // The group waits for this member.
+    bool buffering = false;
+    // What the member plays and where it was at its last progress report;
+    // empty and unset when it plays nothing.
+    QString itemId;
+    std::optional<std::int64_t> positionTicks;
+    bool paused = true;
+    std::optional<core::ServerInstant> positionUpdatedAt;
+  };
+
+  struct RoomMembers {
+    // Empty when we are in no group (as the server sees it).
+    QString groupId;
+    // When the server made the answer, to age the positions with.
+    std::optional<core::ServerInstant> serverTime;
+    QList<RoomMember> members;
+  };
+
   // One GetUtcTime round trip. Local monotonic times are taken immediately
   // before the request is sent and when the reply arrives; TimeSync in the
   // syncplay module turns samples into a core::ClockOffset.
@@ -335,6 +364,7 @@ namespace jfd::api {
     Result<MediaSource> mediaSource(const QJsonObject& object);
     Result<PlaybackInfo> playbackInfo(const QJsonObject& object);
     Result<SyncPlayGroup> syncPlayGroup(const QJsonObject& object);
+    Result<RoomMembers> roomMembers(const QJsonObject& object);
   } // namespace json
 
 } // namespace jfd::api

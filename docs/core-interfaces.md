@@ -149,7 +149,8 @@ diagnostics subscribe to it. A new subscriber gets the latest snapshot at once.
 modules) wires one session to a signed-in server: the input queue, Qt timers
 on the steady clock, the SyncPlay `GroupClient` on `JellyfinClient::rawRequest`
 and the session WebSocket (rejoining after a reconnect and polling server
-time), and `PlaybackLauncher`, which resolves an item through PlaybackInfo
+time; member requests go one at a time with a 5 s timeout, a waiting seek or
+pause/play gives way to a newer one, and a lost connection drops the queue), and `PlaybackLauncher`, which resolves an item through PlaybackInfo
 and `playback::mediaRequest` into `intent::Open`, alone or for the group's
 item (`notice::GroupItemRequested`) and again on `StreamReopenNeeded` and
 `ReopenAfterError`; it leaves the group on `GroupItemFailed`. The
@@ -163,7 +164,8 @@ network (ordered WebSocket, reordering HTTP) and a modelled SyncPlay server
 (waiting, buffering, seek, rate, 409 for unsupported rates, join while
 playing, next item, participants). External audio is added and tracks are
 switched while the group plays; mpv answers with a refresh seek, a short wait
-for data or nothing. Seeds are portable.
+for data or nothing. A seek issued before a refresh seek restarts replaces it
+(one restart, for the newer seek), as in mpv. Seeds are portable.
 
 Invariants checked on every input:
 
