@@ -1,19 +1,108 @@
-# Jellyfin Desktop Next
+<p align="center">
+  <img src="packaging/icons/jellyfin-desktop-next.svg" width="128" alt="">
+</p>
 
-A cross-platform Jellyfin desktop client designed around watching together.
-SyncPlay is part of the playback state model from the start, not an add-on.
+<h1 align="center">Jellyfin Desktop Next</h1>
 
-**Status:** early development (phase 1 prototype). Nothing here is usable yet. The
-current Windows client is [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop).
+<p align="center">
+  A native desktop client for <a href="https://jellyfin.org">Jellyfin</a> on Windows and Linux,<br>
+  built around watching together.
+</p>
 
-## Goals
+<p align="center">
+  <a href="https://github.com/DevLn737/jellyfin-desktop-next/releases"><img alt="Latest pre-release" src="https://img.shields.io/github/v/release/DevLn737/jellyfin-desktop-next?include_prereleases&label=download&color=3f93ad"></a>
+  <a href="https://github.com/DevLn737/jellyfin-desktop-next/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/DevLn737/jellyfin-desktop-next/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <img alt="Windows | Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-555">
+  <a href="LICENSE"><img alt="GPL-2.0-or-later" src="https://img.shields.io/badge/license-GPL--2.0--or--later-555"></a>
+</p>
 
-- Playback through libmpv: hardware decoding, ASS/PGS subtitles, external audio tracks.
-- SyncPlay with synchronized position and speed, with each participant choosing
-  their own audio and subtitles.
-- A native Qt Quick interface. No embedded Jellyfin Web and no Chromium.
-- Windows and Linux from the first build, with HDR on Windows.
-- Discord Rich Presence and other integrations behind a small, stable interface.
+<p align="center">
+  <a href="#download">Download</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#building">Building</a> ·
+  <a href="#по-русски">По-русски</a>
+</p>
+
+> **Beta.** The client is in active development and ships as pre-releases.
+> Things change from one beta to the next; please report what breaks in
+> [Issues](https://github.com/DevLn737/jellyfin-desktop-next/issues).
+
+## Download
+
+Get the newest build from the **[Releases page](https://github.com/DevLn737/jellyfin-desktop-next/releases)**
+(the latest pre-release is at the top).
+
+| System | File | How to install |
+| --- | --- | --- |
+| Windows 10 (1903) or newer, 64-bit | `jellyfin-desktop-next-<version>-x64.msi` | Run it. It installs for your user, without administrator rights. The installer is not code-signed, so SmartScreen warns on first run: **More info → Run anyway**. |
+| Linux (glibc 2.39+: Ubuntu 24.04, Fedora 40, Debian 13, Arch and newer) | `jellyfin-desktop-next-x86_64.AppImage` | `chmod +x jellyfin-desktop-next-x86_64.AppImage`, then run it. |
+
+After that the app updates itself. It checks for new releases, checks the
+download's signature against the release key built into the app, and offers
+**Restart and update** once nothing is playing.
+
+The client is tested against Jellyfin server 12.2. Changing the speed for the
+whole room needs the server fork listed under [Related repositories](#related-repositories).
+Everything else works with a stock server, rooms included.
+
+## Features
+
+- **Native and light.** C++20, Qt 6 Quick and libmpv. No embedded browser,
+  no Chromium, no Jellyfin Web inside.
+- **Playback by mpv.**
+  - Hardware decoding, ASS/SSA and PGS subtitles, external audio and subtitle
+    files.
+  - Chapters, Skip intro, audio and subtitle delays, and speed.
+  - Picture in picture and stats for nerds (right-click or I).
+  - Switching the display to the film's frame rate.
+  - Direct Play first, transcoding only when the server has to.
+- **Rooms.** Watch together on your server (SyncPlay) with friends on this
+  client or in Jellyfin Web.
+  - Everyone shares the position, pause and speed, and each person picks their
+    own audio track and subtitles.
+  - Drift is corrected by a gentle speed nudge, not by jumps.
+  - A member whose stream or connection drops reopens it and rejoins on their
+    own.
+- **Your library.**
+  - Home with a banner and rows.
+  - Films and series with seasons and episodes; long seasons stay fast.
+  - Filters and sorting, collections and people.
+  - Search across everything (Ctrl+K), favourites and watched marks.
+- **Music.** Albums, artists, playlists, genres, lyrics, a queue and a
+  mini-player.
+- **Live TV.** Channels and the guide; Page Up and Down change the channel.
+- **Downloads.** Films and episodes for offline viewing, with their external
+  audio and subtitles, in a readable Series/Season folder layout. Finished
+  files are checked again before they play.
+- **Gamepad and TV.**
+  - Xbox, PlayStation and 8BitDo gamepads work everywhere, with an on-screen
+    keyboard, at the desk too.
+  - TV mode is for the sofa: large text, arrow navigation on every screen and
+    Quick Connect sign-in.
+- **Remote control.** "Play on" from Jellyfin Web and the phone apps.
+- **Integrations.**
+  - Discord Rich Presence, with privacy options per kind and library.
+  - Media keys and the system's now-playing panel.
+  - Requests through Seerr.
+- **Looks after itself.**
+  - Signed self-updates.
+  - If the app crashes, it says so at the next start and offers a diagnostic
+    report with the crash details, private data removed.
+  - The window remembers its size, including maximized and full screen.
+- **Russian and English** interface, with dark and light themes and your own
+  accent colour.
+
+## Screenshots
+
+<!-- Screenshots of the current beta go here: home, series, player, rooms,
+     library, music and settings, one image each in docs/screenshots. -->
+
+| Home | Series | Player |
+| :---: | :---: | :---: |
+| _coming soon_ | _coming soon_ | _coming soon_ |
+| **Rooms** | **Music** | **Settings** |
+| _coming soon_ | _coming soon_ | _coming soon_ |
 
 ## Architecture
 
@@ -32,7 +121,7 @@ The plan and its exit criteria are in [docs/roadmap.md](docs/roadmap.md).
 | [DevLn737/jellyfin](https://github.com/DevLn737/jellyfin/tree/syncplay-rate/12.2) | Server fork with the SyncPlay playback-rate extension |
 | [DevLn737/jellyfin-web](https://github.com/DevLn737/jellyfin-web/tree/syncplay-rate/12.2) | Web fork with the same extension, for browser participants |
 | [DevLn737/jellyfin-syncplay-speed](https://github.com/DevLn737/jellyfin-syncplay-speed) | Server image build, release manifest and protocol documentation |
-| [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop) | Current Windows client (maintenance only) |
+| [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop) | The previous Windows client, based on Jellyfin Media Player (fixes only) |
 
 ## Testing SyncPlay
 
@@ -84,10 +173,10 @@ Any platform can point CMake at a specific libmpv with `-DMPV_INCLUDE_DIR=... -D
 
 ## Packages
 
-CI builds both packages on every pull request (`.github/workflows/package.yml`)
-and keeps them as workflow artifacts for 30 days. Nothing is published as a
-release yet. See [packaging/README.md](packaging/README.md) for how they are
-built.
+Releases are built and signed by `.github/workflows/package.yml`; CI also
+builds both packages on every pull request and keeps them as workflow
+artifacts for 30 days. See [packaging/README.md](packaging/README.md) for how
+they are built.
 
 - **Windows:** `jellyfin-desktop-next-<version>-x64.msi`. Installs for the
   current user without administrator rights into
@@ -121,6 +210,36 @@ links to the release page instead.
   the old version, which is started and reports that the new version did not
   install (the installer log is `update-install.log` in the app's
   `update` data folder). Only a copy installed by the MSI updates itself.
+
+## По-русски
+
+**Jellyfin Desktop Next** — нативный клиент Jellyfin для Windows и Linux,
+сделанный вокруг совместного просмотра. Сейчас это бета. Новые версии выходят
+на [странице релизов](https://github.com/DevLn737/jellyfin-desktop-next/releases).
+
+**Как установить.**
+
+- **Windows.** Скачайте `.msi` и запустите. Права администратора не нужны.
+  При первом запуске SmartScreen предупредит: нажмите «Подробнее» →
+  «Выполнить в любом случае».
+- **Linux.** Скачайте `.AppImage`, сделайте его исполняемым (`chmod +x`) и
+  запустите.
+
+Дальше приложение обновляется само.
+
+**Что умеет.**
+
+- Воспроизведение через mpv: аппаратное декодирование, ASS и PGS субтитры,
+  внешние дорожки, главы, пропуск заставки, картинка в картинке.
+- «Комнаты»: совместный просмотр на вашем сервере. Позиция, пауза и скорость
+  у всех общие, а озвучку и субтитры каждый выбирает себе сам.
+- Главная, библиотека с фильтрами, страницы фильмов и сериалов, поиск
+  (Ctrl+K), музыка, ТВ-каналы и загрузки для просмотра без сети.
+- Геймпад работает везде, не только в режиме ТВ. Режим ТВ рассчитан на пульт
+  и диван.
+- Discord, управление с телефона, запросы через Seerr.
+- После сбоя приложение предложит сохранить отчёт для диагностики.
+- Интерфейс на русском и английском.
 
 ## License
 
