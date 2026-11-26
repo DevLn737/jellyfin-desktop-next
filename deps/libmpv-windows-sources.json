@@ -23,6 +23,10 @@
       "include/ffnvcodec/nvEncodeAPI.h:26"
     ]
   },
+  "licenseFromComment": "Libraries whose source carries no licence file of its own and is published under another library's licence: opus-dnn is the model data of Opus, released by Xiph under the Opus licence.",
+  "licenseFrom": {
+    "opus-dnn": "opus"
+  },
   "toolchain": [
     {
       "name": "llvm-runtimes",

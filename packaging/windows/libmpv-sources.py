@@ -450,8 +450,11 @@ def bundle(args):
             if not args.licenses_only:
                 mtime = int(parse_time(component["date"]).timestamp())
                 deterministic_tar(tree, assets / asset, mtime)
+        # A release tarball unpacks into one folder: its licences are there.
+        top = [p for p in tree.iterdir() if p.name != ".git"]
+        root = top[0] if "url" in component and len(top) == 1 and top[0].is_dir() else tree
         texts = [(str(p.relative_to(tree)), p.read_text(encoding="utf-8", errors="replace"))
-                 for p in licence_files(tree)]
+                 for p in licence_files(root)]
         # Licences that are only in source files: "path:N" is its first N lines.
         for item in manifest.get("licenseFiles", {}).get(name, []):
             path, _, lines = item.partition(":")
@@ -459,7 +462,7 @@ def bundle(args):
             if lines:
                 text = "".join(text.splitlines(keepends=True)[:int(lines)])
             texts.append((item, text))
-        if not texts:
+        if not texts and name not in manifest.get("licenseFrom", {}):
             # Reported with the others at the end, with what the tree has.
             top = sorted(p.name + ("/" if p.is_dir() else "") for p in tree.iterdir() if p.name != ".git")
             missing.append(f"{name}: {' '.join(top)}")
@@ -470,6 +473,11 @@ def bundle(args):
     missing = []
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         results = list(pool.map(one, components))
+    # Data that a library publishes under its own licence (Opus's models).
+    for name, other in manifest.get("licenseFrom", {}).items():
+        index = next(i for i, result in enumerate(results) if result[0] == name)
+        source = next(result for result in results if result[0] == other)
+        results[index] = (name, results[index][1], results[index][2] + source[2])
     if missing:
         raise SystemExit("No licence file found for these libraries; name the files in the manifest's "
                          "\"licenseFiles\" (\"path\" or \"path:first-lines\"):\n  " + "\n  ".join(missing))
