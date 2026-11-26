@@ -2,6 +2,8 @@
 
 #include <jfd/account/Account.h>
 #include <jfd/integrations/IntegrationsSettings.h>
+#include <jfd/library/ExternalLinks.h>
+#include <jfd/settings/Settings.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
@@ -22,6 +24,54 @@ namespace jfd::desktop {
   namespace {
     const QString DeviceIdKey = QStringLiteral("library/deviceId");
     const QString FiltersKey = QStringLiteral("library/filters");
+    const QString LinksPrefix = QStringLiteral("links/");
+    const QString ShikimoriDomainKey = QStringLiteral("links/shikimoriDomain");
+
+    // The links section: the Shikimori domain, then a switch per site.
+    bool registerLinkSettings(settings::SettingsRegistry& registry) {
+      settings::SectionDescriptor section;
+      section.id = QStringLiteral("links");
+      section.context = "LinkSettings";
+      section.title = QT_TRANSLATE_NOOP("LinkSettings", "External links");
+      section.order = 130;
+
+      settings::SettingDescriptor domain;
+      domain.key = QStringLiteral("shikimoriDomain");
+      domain.type = settings::SettingType::Choice;
+      domain.defaultValue = QStringLiteral("io");
+      domain.label = QT_TRANSLATE_NOOP("LinkSettings", "Shikimori address");
+      domain.description = QT_TRANSLATE_NOOP(
+          "LinkSettings", "Film and series pages show one Shikimori link, to this address.");
+      domain.choices = {{QStringLiteral("io"), "shikimori.io"}, {QStringLiteral("rip"), "shikimori.rip"}};
+      section.settings.append(domain);
+
+      const std::pair<const char*, const char*> sites[] = {
+          {"shikimori", QT_TRANSLATE_NOOP("LinkSettings", "Show Shikimori")},
+          {"myanimelist", QT_TRANSLATE_NOOP("LinkSettings", "Show MyAnimeList")},
+          {"anilist", QT_TRANSLATE_NOOP("LinkSettings", "Show AniList")},
+          {"anidb", QT_TRANSLATE_NOOP("LinkSettings", "Show AniDB")},
+          {"tvdb", QT_TRANSLATE_NOOP("LinkSettings", "Show TVDB")},
+          {"tmdb", QT_TRANSLATE_NOOP("LinkSettings", "Show TMDB")},
+          {"imdb", QT_TRANSLATE_NOOP("LinkSettings", "Show IMDb")},
+      };
+      for (const auto& [site, label] : sites) {
+        settings::SettingDescriptor shown;
+        shown.key = QLatin1String(site);
+        shown.type = settings::SettingType::Bool;
+        shown.defaultValue = true;
+        shown.label = label;
+        section.settings.append(shown);
+      }
+      return registry.registerSection(std::move(section));
+    }
+
+    library::ExternalLinkOptions linkOptions(settings::Settings& settings) {
+      library::ExternalLinkOptions options;
+      options.shikimoriDomain = settings.value(ShikimoriDomainKey).toString();
+      for (const QString& site : library::externalLinkSites())
+        if (!settings.value(LinksPrefix + site).toBool()) options.hidden.insert(site);
+      return options;
+    }
 
     api::ClientIdentity identity(settings::Settings& settings) {
       api::ClientIdentity identity;
@@ -66,7 +116,8 @@ namespace jfd::desktop {
     filters.defaultValue = QString();
     filters.label = "filters";
     section.settings.append(filters);
-    return registry.registerSection(std::move(section));
+    const bool ok = registry.registerSection(std::move(section));
+    return registerLinkSettings(registry) && ok;
   }
 
   void installLibrary(AppServices& services, QQmlEngine& engine) {
@@ -132,6 +183,13 @@ namespace jfd::desktop {
                        if (key == settings::keys::HomeSections) {
                          home.setArrangement(library::parseArrangement(value.toString()));
                        }
+                     });
+
+    ui::LibraryUi* libraryUi = services.libraryUi;
+    libraryUi->setLinkOptions(linkOptions(*settingsStore));
+    QObject::connect(settingsStore, &settings::Settings::valueChanged, libraryUi,
+                     [libraryUi, settingsStore](const QString& key, const QVariant&) {
+                       if (key.startsWith(LinksPrefix)) libraryUi->setLinkOptions(linkOptions(*settingsStore));
                      });
 
     ui::Navigator* navigator = services.navigator;

@@ -74,6 +74,9 @@ namespace jfd::library {
     if (!m_item || !is(*m_item, "Episode") || !m_item->indexNumber) return {};
     return episodeNumber(m_item->parentIndexNumber, m_item->indexNumber);
   }
+  QVariant ItemDetails::indexNumber() const {
+    return m_item && m_item->indexNumber ? QVariant(*m_item->indexNumber) : QVariant();
+  }
   bool ItemDetails::played() const {
     return m_item && m_item->userData.played;
   }
@@ -188,6 +191,21 @@ namespace jfd::library {
     }
     return parts.join(QStringLiteral(" · "));
   }
+  QVariantList ItemDetails::externalLinks() const {
+    QVariantList out;
+    if (!m_item) return out;
+    for (const ExternalLink& link : library::externalLinks(m_item->type, m_item->providerIds, m_linkOptions))
+      out.append(QVariantMap{{QStringLiteral("site"), link.site},
+                             {QStringLiteral("label"), link.label},
+                             {QStringLiteral("url"), link.url}});
+    return out;
+  }
+
+  void ItemDetails::setLinkOptions(const ExternalLinkOptions& options) {
+    m_linkOptions = options;
+    Q_EMIT externalLinksChanged();
+  }
+
   int ItemDetails::episodeCount() const {
     return m_item ? m_item->recursiveItemCount.value_or(0) : 0;
   }
@@ -242,6 +260,7 @@ namespace jfd::library {
       setTarget(std::nullopt);
       m_posterUrl = m_backdropUrl = m_logoUrl = QUrl();
       Q_EMIT itemChanged();
+      Q_EMIT externalLinksChanged();
       Q_EMIT userDataChanged();
       Q_EMIT seasonIdChanged();
     }
@@ -268,6 +287,7 @@ namespace jfd::library {
         m_client, item, cardImageSize(CardShape::Thumb, m_options.backdropWidth, dpr));
     m_logoUrl = library::logoUrl(m_client, item, static_cast<int>(600 * dpr));
     Q_EMIT itemChanged();
+    Q_EMIT externalLinksChanged();
     Q_EMIT userDataChanged();
     if (isPlayable(item)) setTarget(item);
   }

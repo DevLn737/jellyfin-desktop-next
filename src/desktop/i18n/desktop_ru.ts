@@ -374,6 +374,49 @@
     </message>
 </context>
 <context>
+    <name>LinkSettings</name>
+    <message>
+        <source>External links</source>
+        <translation>Внешние ссылки</translation>
+    </message>
+    <message>
+        <source>Shikimori address</source>
+        <translation>Адрес Shikimori</translation>
+    </message>
+    <message>
+        <source>Film and series pages show one Shikimori link, to this address.</source>
+        <translation>На страницах фильмов и сериалов одна ссылка на Shikimori, по этому адресу.</translation>
+    </message>
+    <message>
+        <source>Show Shikimori</source>
+        <translation>Показывать Shikimori</translation>
+    </message>
+    <message>
+        <source>Show MyAnimeList</source>
+        <translation>Показывать MyAnimeList</translation>
+    </message>
+    <message>
+        <source>Show AniList</source>
+        <translation>Показывать AniList</translation>
+    </message>
+    <message>
+        <source>Show AniDB</source>
+        <translation>Показывать AniDB</translation>
+    </message>
+    <message>
+        <source>Show TVDB</source>
+        <translation>Показывать TVDB</translation>
+    </message>
+    <message>
+        <source>Show TMDB</source>
+        <translation>Показывать TMDB</translation>
+    </message>
+    <message>
+        <source>Show IMDb</source>
+        <translation>Показывать IMDb</translation>
+    </message>
+</context>
+<context>
     <name>Main</name>
     <message>
         <source>Stop the video?</source>

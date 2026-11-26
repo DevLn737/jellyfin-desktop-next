@@ -14,12 +14,16 @@ import Jfd.Ui.Library
 // or the title, genres, year, seasons, episodes, length, age rating, score,
 // quality and studio, the description, then Play or Resume, From the
 // beginning, favorite and watched, Download and a menu (Refresh, Go to
-// series). The episode Play starts shows under the buttons.
+// series). The episode Play starts shows under the buttons, then a movie's
+// or series' pages on other sites (Shikimori, IMDb, ...), which open in the
+// browser.
 //
 // A series or season then lists its episodes in a grid, four across on a
-// wide page, by season (tabs with the number of episodes); a season of
-// more than 24 episodes is split into ranges (1–24, 25–48, ...) and opens
-// at the range of the next episode to watch. Then the cast, the details
+// wide page, by season (tabs named "Season N" from the season's number,
+// whatever the server calls it, with the number of episodes); a season of
+// more than 24 episodes is split into ranges (1–24, 25–48, ...; a last few
+// episodes join the range before) and opens at the range of the next
+// episode to watch. Then the cast, the details
 // (studio, genres, audio, subtitles, quality), the collections and similar
 // items.
 RoutePage {
@@ -32,10 +36,38 @@ RoutePage {
     readonly property bool isEpisode: details && details.type === "Episode"
     readonly property bool inSeries: details !== null && details.seriesId.length > 0
                                      && (details.type === "Season" || details.type === "Episode")
-    // Episodes per range of a long season.
+    // Episodes per range of a long season; a last range of this many or
+    // fewer joins the one before (1–24, 25–49 rather than 49–49).
     readonly property int rangeSize: 24
+    readonly property int rangeTail: 6
 
-    title: loaded ? details.name : ""
+    // How many ranges a season of `total` episodes has, and where one
+    // starts and ends (0-based, end exclusive).
+    function rangeCountFor(total) {
+        const n = Math.ceil(total / rangeSize)
+        return n > 1 && total - (n - 1) * rangeSize <= rangeTail ? n - 1 : n
+    }
+    function rangeStart(index) {
+        return index * rangeSize
+    }
+    function rangeEnd(index, total) {
+        return index >= rangeCountFor(total) - 1 ? total : Math.min(total, (index + 1) * rangeSize)
+    }
+
+    // A season's tab: "Season N" from its number, the same for every
+    // series however the server names its seasons ("Сезон 1", "Season 2",
+    // "Kingdom Season 3", "[ТВ-2]"); season 0 is the specials. A season
+    // without a number keeps its own name.
+    function seasonLabel(indexNumber, name) {
+        if (indexNumber === undefined || indexNumber === null || indexNumber < 0)
+            return name
+        return indexNumber === 0 ? qsTr("Specials") : qsTr("Season %1").arg(indexNumber)
+    }
+
+    // A season by its number, as its tab on the series page.
+    readonly property string displayName: !loaded ? ""
+        : details.type === "Season" ? seasonLabel(details.indexNumber, details.name) : details.name
+    title: displayName
     hasTopBar: true
     underTopBar: true
     topBarTransparent: flick.contentY < Theme.spacingLarge
@@ -198,7 +230,7 @@ RoutePage {
             TitleLogo {
                 objectName: "itemName"
                 width: parent.width
-                text: page.details ? page.details.name : ""
+                text: page.displayName
                 // A season or episode has its own name, not the series' logo.
                 source: page.details && !page.isEpisode && page.details.type !== "Season"
                         && String(page.details.logoUrl).length > 0 ? Library.image(page.details.logoUrl) : ""
@@ -446,6 +478,19 @@ RoutePage {
                     font.pixelSize: Theme.fontSizeSmall + 1
                 }
             }
+
+            // The film or series on other sites, in the browser.
+            Flow {
+                objectName: "externalLinks"
+                width: parent.width
+                spacing: Theme.spacingSmall
+                visible: linkRepeater.count > 0
+                Repeater {
+                    id: linkRepeater
+                    model: page.details ? page.details.externalLinks : []
+                    ExternalLinkButton {}
+                }
+            }
         }
 
         // --- Below the backdrop --------------------------------------------
@@ -509,6 +554,7 @@ RoutePage {
                             model: page.details ? page.details.seasons : null
                             currentIndex: page.details && page.details.seasons ? Math.max(0, page.details.seasons.rowOf(page.details.seasonId)) : 0
                             delegate: SeasonTab {
+                                objectName: "seasonTab_" + index
                                 selected: page.details !== null && page.details.seasonId === itemId
                                 onClicked: page.details.seasonId = itemId
                             }
@@ -576,8 +622,7 @@ RoutePage {
                                 id: rangeText
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                text: (rangeTab.index * page.rangeSize + 1) + "–"
-                                      + Math.min(episodes.total, (rangeTab.index + 1) * page.rangeSize)
+                                text: (page.rangeStart(rangeTab.index) + 1) + "–" + page.rangeEnd(rangeTab.index, episodes.total)
                                 color: rangeTab.selected || rangeTab.hovered ? Theme.text : Theme.textSecondary
                                 font.pixelSize: Theme.fontSizeSmall + 1
                                 font.weight: Font.Bold
@@ -612,13 +657,13 @@ RoutePage {
                         property int range: 0
                         // How many are watched, kept up by the model.
                         readonly property int watched: all ? all.playedCount : 0
-                        readonly property int rangeCount: Math.ceil(total / page.rangeSize)
+                        readonly property int rangeCount: page.rangeCountFor(total)
                         // Only the range shown has cards (and loads stills):
                         // a season of 600 episodes makes 24.
                         model: ItemRangeModel {
                             sourceModel: episodes.all
-                            offset: episodes.range * page.rangeSize
-                            limit: page.rangeSize
+                            offset: page.rangeStart(episodes.range)
+                            limit: page.rangeEnd(episodes.range, episodes.total) - offset
                         }
                         function openAtNext() {
                             const at = all ? all.firstUnplayedRow() : 0
@@ -747,8 +792,11 @@ RoutePage {
     // the one shown.
     component SeasonTab: T.ItemDelegate {
         id: tab
+        required property int index
         required property string itemId
         required property string name
+        required property var indexNumber
+        readonly property string label: page.seasonLabel(indexNumber, name)
         required property var childCount
         required property var unplayedCount
         required property bool favorite
@@ -759,7 +807,7 @@ RoutePage {
         rightPadding: 14
         focusPolicy: Qt.StrongFocus
         hoverEnabled: true
-        Accessible.name: name
+        Accessible.name: label
         Accessible.role: Accessible.PageTab
         Keys.onReturnPressed: tab.clicked()
         Keys.onEnterPressed: tab.clicked()
@@ -767,7 +815,7 @@ RoutePage {
             spacing: Theme.spacingSmall
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: tab.name
+                text: tab.label
                 color: tab.selected || tab.hovered ? Theme.text : Theme.textSecondary
                 font.pixelSize: Theme.fontSizeBody
                 font.weight: Font.Bold
@@ -785,6 +833,55 @@ RoutePage {
             radius: Theme.radius + 3
             color: tab.selected ? Qt.alpha(Theme.text, 0.12) : tab.hovered ? Qt.alpha(Theme.text, 0.05) : "transparent"
             FocusFrame { shown: tab.visualFocus; inset: 0 }
+        }
+        // The server's own name, when it says more than the number.
+        ToolTipLabel {
+            text: tab.name !== tab.label ? tab.name : ""
+            shown: tab.hovered && text.length > 0
+        }
+    }
+
+    // A site with the film or series: its name, opened in the browser.
+    component ExternalLinkButton: T.AbstractButton {
+        id: linkButton
+        required property var modelData
+        objectName: "externalLink_" + modelData.site
+        implicitWidth: linkRow.implicitWidth + 24
+        implicitHeight: Theme.tvMode ? 44 : 32
+        focusPolicy: Qt.StrongFocus
+        hoverEnabled: true
+        Accessible.role: Accessible.Link
+        Accessible.name: modelData.label
+        Keys.onReturnPressed: linkButton.clicked()
+        Keys.onEnterPressed: linkButton.clicked()
+        onClicked: Qt.openUrlExternally(modelData.url)
+        contentItem: Row {
+            id: linkRow
+            spacing: 6
+            Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                source: Icons.link
+                size: Theme.iconSize - 8
+                color: linkButton.hovered ? Theme.text : Theme.textSecondary
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: linkButton.modelData.label
+                color: linkButton.hovered ? Theme.text : Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSmall + 1
+                font.weight: Font.Bold
+            }
+        }
+        background: Rectangle {
+            radius: height / 2
+            color: linkButton.down || linkButton.hovered ? Qt.alpha(Theme.text, 0.1) : Qt.alpha(Theme.text, 0.04)
+            border.width: 1
+            border.color: Theme.glassBorder
+            FocusFrame { shown: linkButton.visualFocus; inset: 0 }
+        }
+        ToolTipLabel {
+            text: qsTr("Open on %1").arg(linkButton.modelData.label)
+            shown: linkButton.hovered && !linkButton.down
         }
     }
 

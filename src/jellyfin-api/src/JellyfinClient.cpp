@@ -20,7 +20,7 @@ namespace jfd::api {
     // A detail page also needs trickplay and chapters for the seek bar,
     // and the people, studios, streams and episode count of its tables.
     const QString DetailFields =
-        ItemFields + QStringLiteral(",Trickplay,Chapters,People,Studios,MediaStreams,RecursiveItemCount");
+        ItemFields + QStringLiteral(",Trickplay,Chapters,People,Studios,MediaStreams,RecursiveItemCount,ProviderIds");
     const QString Fields = QStringLiteral("fields");
 
     QString joinNumbers(const QList<int>& numbers) {
@@ -165,11 +165,12 @@ namespace jfd::api {
   }
 
   QNetworkReply* JellyfinClient::startRequest(Method method, const QUrl& target, const QByteArray* payload,
-                                              const QByteArray& authorization) {
+                                              const QByteArray& authorization, int timeoutMs) {
+    const int timeout = timeoutMs > 0 ? timeoutMs : m_timeoutMs;
     QNetworkRequest request(target);
     request.setRawHeader("Authorization", authorization);
     request.setRawHeader("Accept", "application/json");
-    if (m_timeoutMs > 0) request.setTransferTimeout(m_timeoutMs);
+    if (timeout > 0) request.setTransferTimeout(timeout);
     if (payload || method == Method::Post)
       request.setHeader(QNetworkRequest::ContentTypeHeader, QByteArrayLiteral("application/json"));
 
@@ -188,12 +189,12 @@ namespace jfd::api {
     }
     // A transfer timeout surfaces as OperationCanceledError; tell it apart from
     // an abort on destruction by marking replies that ran out of time.
-    if (m_timeoutMs > 0) {
+    if (timeout > 0) {
       auto* timer = new QTimer(reply);
       timer->setSingleShot(true);
       connect(timer, &QTimer::timeout, reply,
               [reply]() { reply->setProperty("jfdTimedOut", true); });
-      timer->start(m_timeoutMs > 50 ? m_timeoutMs - 50 : m_timeoutMs);
+      timer->start(timeout > 50 ? timeout - 50 : timeout);
     }
     return reply;
   }
@@ -288,12 +289,14 @@ namespace jfd::api {
 
   void JellyfinClient::rawRequest(Method method, const QString& pathAndQuery,
                                   const QByteArray& jsonBody, QObject* context,
-                                  std::function<void(int status, QByteArray body)> done) {
+                                  std::function<void(int status, QByteArray body)> done,
+                                  int timeoutMs) {
     const qsizetype mark = pathAndQuery.indexOf(QLatin1Char('?'));
     const QString path = mark < 0 ? pathAndQuery : pathAndQuery.left(mark);
     const QUrlQuery query(mark < 0 ? QString() : pathAndQuery.mid(mark + 1));
     QNetworkReply* reply =
-        startRequest(method, url(path, query), jsonBody.isEmpty() ? nullptr : &jsonBody);
+        startRequest(method, url(path, query), jsonBody.isEmpty() ? nullptr : &jsonBody,
+                     authorizationHeader(), timeoutMs);
 
     const QString token = m_accessToken;
     const QPointer<QObject> guard(context);

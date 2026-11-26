@@ -50,6 +50,13 @@ namespace jfd::session {
       return hours > 0 ? QStringLiteral("%1:%2").arg(hours).arg(mmss) : mmss;
     }
 
+    QString clockText(qint64 milliseconds) {
+      return clockText(core::MediaTicks::fromMilliseconds(std::max<qint64>(milliseconds, 0)).value_or(core::MediaTicks{}));
+    }
+
+    // Members are asked every this many seconds; their times tick every second.
+    constexpr int MembersPollTicks = 3;
+
     QString rateText(double rate) { return QLocale().toString(rate, 'g', 3) + QStringLiteral("×"); }
   } // namespace
 
@@ -69,6 +76,8 @@ namespace jfd::session {
                   m_group->playlistItem == request.playlistItem)
                 Q_EMIT notice(tr("The group's item could not be opened, so you left the group."), true);
             });
+    m_membersTimer.setInterval(1000);
+    connect(&m_membersTimer, &QTimer::timeout, this, &GroupModel::membersTick);
     checkRateSupport();
     checkAccess();
   }
@@ -100,6 +109,93 @@ namespace jfd::session {
 
   int GroupModel::pingMs() const {
     return m_group && m_group->pingMilliseconds ? int(*m_group->pingMilliseconds) : -1;
+  }
+
+  QVariantList GroupModel::members() const {
+    QVariantList result;
+    if (!m_group || !m_members) return result;
+    const double rate = m_group->baseRate.value();
+    const qint64 sinceAnswerMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(m_runtime.clock().now() - m_membersAt).count();
+    // Where a member is now: its last report, moved on by the time since
+    // then when it was playing.
+    const auto estimate = [&](const api::RoomMember& m) -> std::optional<qint64> {
+      if (!m.positionTicks || m.itemId.isEmpty()) return std::nullopt;
+      qint64 ms = *m.positionTicks / 10'000;
+      if (!m.paused && !m.buffering && m.positionUpdatedAt && m_members->serverTime) {
+        const qint64 ageMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 *m_members->serverTime - *m.positionUpdatedAt)
+                                 .count() +
+                             sinceAnswerMs;
+        ms += static_cast<qint64>(static_cast<double>(std::max<qint64>(ageMs, 0)) * rate);
+      }
+      return ms;
+    };
+    std::optional<qint64> ours;
+    QString ourItem;
+    for (const auto& m : m_members->members)
+      if (m.self) {
+        ours = estimate(m);
+        ourItem = m.itemId;
+      }
+    for (const auto& m : m_members->members) {
+      const auto position = estimate(m);
+      const bool hasOffset = !m.self && position && ours && m.itemId == ourItem;
+      result.append(QVariantMap{{QStringLiteral("name"), m.userName},
+                                {QStringLiteral("device"), m.deviceName},
+                                {QStringLiteral("self"), m.self},
+                                {QStringLiteral("pingMs"), qint64(m.pingMs)},
+                                {QStringLiteral("buffering"), m.buffering},
+                                {QStringLiteral("paused"), m.paused},
+                                {QStringLiteral("hasPosition"), position.has_value()},
+                                {QStringLiteral("positionMs"), position.value_or(0)},
+                                {QStringLiteral("positionText"), position ? clockText(*position) : QString()},
+                                {QStringLiteral("hasOffset"), hasOffset},
+                                {QStringLiteral("offsetMs"), hasOffset ? *position - *ours : 0}});
+    }
+    return result;
+  }
+
+  void GroupModel::updateMembersTimer(bool joinedNow) {
+    if (!m_group) {
+      m_membersTimer.stop();
+      m_membersRequested = false;
+      if (m_members) {
+        m_members.reset();
+        Q_EMIT membersChanged();
+      }
+      return;
+    }
+    if (joinedNow && m_membersSupport == Support::No) m_membersSupport = Support::Unknown;
+    if (m_membersSupport == Support::No || m_membersTimer.isActive()) return;
+    m_membersTicks = 0;
+    m_membersTimer.start();
+    membersTick();
+  }
+
+  void GroupModel::membersTick() {
+    if (!m_group) return;
+    if (m_members) Q_EMIT membersChanged();
+    if (m_membersTicks++ % MembersPollTicks != 0 || m_membersRequested) return;
+    m_membersRequested = true;
+    m_api->roomMembers(this, [this](api::Result<api::RoomMembers> result) {
+      m_membersRequested = false;
+      if (!m_group) return;
+      if (!result) {
+        if (result.error().kind == api::ApiError::Kind::Unsupported) {
+          qCInfo(lcGroup) << "No Room Members plugin on the server: members' positions are not shown";
+          m_membersSupport = Support::No;
+          m_membersTimer.stop();
+          m_members.reset();
+          Q_EMIT membersChanged();
+        }
+        return;
+      }
+      m_membersSupport = Support::Yes;
+      m_members = result.value();
+      m_membersAt = m_runtime.clock().now();
+      Q_EMIT membersChanged();
+    });
   }
 
   QString GroupModel::correction() const {
@@ -143,6 +239,7 @@ namespace jfd::session {
     }
     setError({});
     startBusy();
+    ++m_userJoins;
     m_runtime.joinGroup(groupId);
   }
 
@@ -264,6 +361,7 @@ namespace jfd::session {
         if (!result) setError(tr("Could not start the item in the group."));
       });
     }
+    updateMembersTimer(!wasInGroup && m_group.has_value());
     if (changedGroup) Q_EMIT changed();
   }
 
@@ -405,8 +503,13 @@ namespace jfd::session {
   }
 
   void GroupModel::onReplied(const QString& path, int status) {
-    if (status >= 200 && status < 300) return;
+    if (status >= 200 && status < 300) {
+      if (path == QLatin1String("/SyncPlay/Join") && m_userJoins > 0) --m_userJoins;
+      return;
+    }
     if (path == QLatin1String("/SyncPlay/Join")) {
+      if (m_userJoins == 0) return;
+      --m_userJoins;
       if (m_busy > 0) endBusy();
       setError(status == 0 ? tr("The server cannot be reached.") : tr("Could not join the group."));
     } else if (path == QLatin1String("/SyncPlay/New")) {

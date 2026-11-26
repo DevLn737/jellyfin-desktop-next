@@ -91,6 +91,24 @@ namespace jfd::api {
                       });
   }
 
+  void SyncPlayApi::roomMembers(QObject* context, Callback<RoomMembers> done) {
+    m_client.sendJson(Method::Get, QStringLiteral("RoomMembers"), {}, std::nullopt, context,
+                      [done = std::move(done)](Result<QJsonObject> result) {
+                        if (result) {
+                          done(json::roomMembers(result.value()));
+                          return;
+                        }
+                        ApiError error = result.error();
+                        // No such route (404), or a server that answers every
+                        // unknown path with Web's index page (not JSON).
+                        if (error.isNotFound() || error.kind == ApiError::Kind::InvalidResponse) {
+                          error.kind = ApiError::Kind::Unsupported;
+                          error.message = QStringLiteral("The server has no Room Members plugin");
+                        }
+                        done(error);
+                      });
+  }
+
   void SyncPlayApi::setNewQueue(const QStringList& itemIds, int playingItemPosition,
                                 std::int64_t startPositionTicks, QObject* context,
                                 Callback<Empty> done) {

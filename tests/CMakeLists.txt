@@ -131,7 +131,8 @@ if(TARGET jfd_jellyfin_api)
     library/ImageCacheTest.cpp
     library/LiveTvChannelsTest.cpp
     library/LiveTvGuideTest.cpp
-    library/LiveTvRecordingsTest.cpp)
+    library/LiveTvRecordingsTest.cpp
+    library/ExternalLinksTest.cpp)
   target_link_libraries(jfd_library_tests PRIVATE jfd::library)
 
   jfd_add_qt_test(jfd_account_tests account/SignInTest.cpp account/AccountTest.cpp)

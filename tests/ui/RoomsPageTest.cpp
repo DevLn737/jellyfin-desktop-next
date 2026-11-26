@@ -63,6 +63,15 @@ namespace {
     {"GroupId":"a","GroupName":"Movie night","State":"Idle","Participants":["alice"]},
     {"GroupId":"b","GroupName":"Cartoons","State":"Playing","Participants":["bob","alice"]}])";
 
+  // The Room Members plugin's answer: we are paused at 1:58, bob plays 2 s
+  // past us, carol loads.
+  const QByteArray ThreeMembers = R"({"GroupId":"b","ServerTimeUtc":"2026-11-26T10:00:00.0000000Z","Members":[
+    {"UserName":"alice","DeviceName":"pc","IsSelf":true,"PingMs":38,"ItemId":"m1","PositionTicks":1180000000,
+     "IsPaused":true,"PositionUpdatedUtc":"2026-11-26T10:00:00.0000000Z"},
+    {"UserName":"bob","DeviceName":"tv","IsSelf":false,"PingMs":112,"ItemId":"m1","PositionTicks":1210000000,
+     "IsPaused":true,"PositionUpdatedUtc":"2026-11-26T10:00:00.0000000Z"},
+    {"UserName":"carol","DeviceName":"phone","IsSelf":false,"PingMs":240,"IsBuffering":true}]})";
+
   QJsonObject json(const QByteArray& text) { return QJsonDocument::fromJson(text).object(); }
 
   QQuickItem* find(QQuickItem* root, const QString& name) {
@@ -113,6 +122,8 @@ namespace {
     // What SyncPlay/List and Users/Me answer.
     QByteArray list = TwoRooms;
     QString access = QStringLiteral("CreateAndJoinGroups");
+    // What the Room Members plugin answers; empty: no plugin (404).
+    QByteArray roomMembers;
 
     test::FakeServer server{[this](const test::HttpRequest& request) {
       test::HttpResponse response;
@@ -124,6 +135,11 @@ namespace {
         response.body = QStringLiteral(R"({"Id":"u1","Name":"alice","ServerId":"s1","Policy":{"SyncPlayAccess":"%1"}})")
                             .arg(access)
                             .toUtf8();
+        return response;
+      }
+      if (request.path == QLatin1String("/RoomMembers")) {
+        if (roomMembers.isEmpty()) response.status = 404;
+        response.body = roomMembers;
         return response;
       }
       response.status = 204;
@@ -605,7 +621,8 @@ TEST_CASE("The room card reads well and shows the focus ring in the dark and the
     }
   }
   scene.rooms->select(QString());
-  // Inside a room.
+  // Inside a room, with the Room Members plugin on the server.
+  scene.roomMembers = ThreeMembers;
   scene.window.resize(1280, 720);
   scene.shell->setSize(QSizeF(1280, 720));
   scene.joined("b", "Cartoons");
@@ -669,4 +686,31 @@ TEST_CASE("The rooms tab in TV mode: arrows, Select and Back only, the name from
   SpatialNavigation::focusItem(scene.card("a"));
   tap(window, Qt::Key_Escape);
   CHECK(scene.navigator->depth() == depth - 1);
+}
+
+TEST_CASE("Inside a room: each member's time and ping with the server plugin, our own delay without it") {
+  Scene scene;
+  scene.joined("b", "Cartoons");
+  REQUIRE(waitFor([&] { return shown(scene.item("pingText")) || scene.group->pingMs() < 0; }, Timeout));
+  CHECK_FALSE(shown(scene.item("memberDetail")));
+  scene.left("b");
+
+  scene.roomMembers = ThreeMembers;
+  scene.joined("b", "Cartoons");
+  REQUIRE(waitFor([&] { return scene.group->members().size() == 3; }, Timeout));
+  pump(200);
+  QStringList details;
+  std::function<void(QQuickItem*)> collect = [&](QQuickItem* node) {
+    if (!node) return;
+    if (node->objectName() == QLatin1String("memberDetail") && node->isVisible())
+      details.append(node->property("text").toString());
+    for (QQuickItem* child : node->childItems()) collect(child);
+  };
+  collect(scene.page());
+  REQUIRE(details.size() == 3);
+  CHECK(details.at(0) == QStringLiteral("you · 1:58, paused · ping 38 ms"));
+  CHECK(details.at(1) == QStringLiteral("2:01, paused · 3 s ahead · ping 112 ms"));
+  CHECK(details.at(2) == QStringLiteral("loading · ping 240 ms"));
+  // Each member's ping is on their chip: no separate line for ours.
+  CHECK_FALSE(shown(scene.item("pingText")));
 }
