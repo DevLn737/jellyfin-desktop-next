@@ -14,6 +14,9 @@
 #include <QJsonDocument>
 #include <QTemporaryDir>
 
+#include <functional>
+#include <utility>
+
 using namespace jfd;
 using namespace jfd::offline;
 using namespace jfd::test;
@@ -75,8 +78,11 @@ namespace {
                                       {QStringLiteral("ETag"), e.eTag}}}}};
     }
 
+    // Runs when an item lookup arrives, before it is answered.
+    std::function<void()> onLookup;
     HttpResponse handle(const HttpRequest& r) {
       if (r.method == "GET" && r.path == QLatin1String("/Items")) {
+        if (onLookup) std::exchange(onLookup, nullptr)();
         QJsonArray found;
         for (const QString& id : r.query.queryItemValue(QStringLiteral("ids")).split(QLatin1Char(',')))
           if (items.contains(id)) found.append(itemJson(id, items[id]));
@@ -403,6 +409,38 @@ TEST_CASE("Items gone from the server and playbacks under 5 % leave the journal 
   REQUIRE(sync(s));
   CHECK(fake.posts == 0);
   CHECK(o.journal.isEmpty());
+}
+
+TEST_CASE("An event journaled while the lookup runs is kept for the next run, not dropped") {
+  Offline o;
+  FakeJellyfin fake;
+  const QString first = itemIdFor(22);
+  const QString late = itemIdFor(23);
+  fake.items[first] = {};
+  fake.items[late] = {};
+  std::int64_t now = T0;
+  JournalReportSink sink(fake.client, o.journal, offlineHooks(now, 0));
+  playOffline(sink, first, 3000 * TicksPerSecond);
+  // While the server looks up `first`, a report for `late` fails and is
+  // journaled (a flaky connection right after reconnecting).
+  fake.onLookup = [&] {
+    now += Minute;
+    playOffline(sink, late, 3000 * TicksPerSecond);
+  };
+
+  OfflineSync s(fake.client, o.journal, o.store, o.catalog);
+  s.setUser(ServerId, UserId);
+  int runs = 0;
+  QObject::connect(&s, &OfflineSync::finished, [&] { ++runs; });
+  s.syncNow();
+  // The first run sends `first` only and leaves `late`; a second run
+  // follows by itself and sends it.
+  REQUIRE(waitFor([&] { return runs >= 2 && o.journal.isEmpty(); }, 10000));
+  CHECK(fake.postsFor[first] == 1);
+  CHECK(fake.postsFor[late] == 1);
+  CHECK(std::llabs(static_cast<std::int64_t>(
+                       fake.items[late].userData.value(QStringLiteral("PlaybackPositionTicks")).toDouble()) -
+                   3000 * TicksPerSecond) <= 10 * TicksPerSecond);
 }
 
 TEST_CASE("Watched marks from other devices reach the manifests; gone and changed items are marked") {

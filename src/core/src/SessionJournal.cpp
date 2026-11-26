@@ -160,6 +160,12 @@ namespace jfd::core {
                      (set.reconciler.useSpeed ? "on" : "off") + " skip " +
                      std::to_string(set.reconciler.skipMinimum.milliseconds()) + "ms";
             },
+            [](const intent::SetAutoNext& set) {
+              return std::string("SetAutoNext ") + (set.enabled ? "on" : "off");
+            },
+            [](const intent::OpenFailed& failed) {
+              return "OpenFailed item " + failed.item.value() + " " + failed.error;
+            },
             [](const backend::SourceOpened& opened) {
               return "SourceOpened " + epoch("media", opened.epoch);
             },
@@ -214,8 +220,8 @@ namespace jfd::core {
               return std::string("QueueChanged ") + name(queue.reason) + " " +
                      epoch("group", queue.epoch) + " playlist " +
                      item(queue.currentPlaylistItem) + " at " + seconds(queue.startPosition) +
-                     (queue.isPlaying ? " playing " : " ") + rate(queue.baseRate) + " updated " +
-                     clock(queue.lastUpdate);
+                     (queue.isPlaying ? " playing " : " ") + rate(queue.baseRate) +
+                     (queue.hasNextItem ? " next" : "") + " updated " + clock(queue.lastUpdate);
             },
             [](const group::RateChangeRejected& rejected) {
               return "RateChangeRejected " + epoch("group", rejected.epoch) + " HTTP " +

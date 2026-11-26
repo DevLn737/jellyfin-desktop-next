@@ -16,6 +16,7 @@ namespace jfd::session {
   namespace {
     // Session messages as they arrive, for tracing a group session.
     Q_LOGGING_CATEGORY(lcWire, "jfd.session.wire", QtWarningMsg)
+    Q_LOGGING_CATEGORY(lcRuntime, "jfd.session.runtime")
   } // namespace
 
   SessionRuntime::SessionRuntime(api::JellyfinClient& client, api::SessionSocket& socket,
@@ -40,11 +41,16 @@ namespace jfd::session {
     m_notices = m_hub.subscribe({}, [this](const core::SessionNotice& notice) { onNotice(notice); });
     // The group waits for our Ready on its item: one we cannot open would
     // keep everyone waiting, so we leave (GroupModel says why).
-    connect(m_launcher, &PlaybackLauncher::openFailed, this, [this](const PlaybackLauncher::Request& request) {
-      const auto& group = m_session->snapshot().group;
-      if (request.playlistItem.isEmpty() || !group || group->playlistItem != request.playlistItem) return;
-      m_group->leaveGroup();
-    });
+    connect(m_launcher, &PlaybackLauncher::openFailed, this,
+            [this](const PlaybackLauncher::Request& request, const QString& message) {
+              // A reopen after a stream error that cannot be resolved ends
+              // the waiting (the session ignores any other).
+              this->post(core::intent::OpenFailed{core::ItemId(request.itemId.toStdString()),
+                                            message.toStdString()});
+              const auto& group = m_session->snapshot().group;
+              if (request.playlistItem.isEmpty() || !group || group->playlistItem != request.playlistItem) return;
+              m_group->leaveGroup();
+            });
 
     // The socket hands over the Data objects; the group client parses whole
     // session messages, as they arrive on the wire.
@@ -127,6 +133,22 @@ namespace jfd::session {
       m_launcher->open(request);
     } else if (const auto* step = std::get_if<core::notice::QueueStepRequested>(&notice)) {
       Q_EMIT queueStepRequested(step->forward);
+    } else if (const auto* failed = std::get_if<core::notice::ReopenAfterError>(&notice)) {
+      // The same item and version where it stopped, with a fresh
+      // PlaybackInfo: a transcode the server dropped starts anew.
+      qCInfo(lcRuntime) << "the stream failed; reopening" << QString::fromStdString(failed->item.value())
+                        << "at" << failed->position.seconds() << "s";
+      PlaybackLauncher::Request request;
+      request.itemId = QString::fromStdString(failed->item.value());
+      request.mediaSourceId = QString::fromStdString(failed->mediaSource.value());
+      request.startTicks = failed->position.ticks();
+      request.playlistItem = failed->playlistItem;
+      request.startPaused = failed->startPaused;
+      m_launcher->open(request);
+    } else if (std::holds_alternative<core::notice::GroupItemFailed>(notice)) {
+      // Everyone else would wait for our Ready (GroupModel says why).
+      qCWarning(lcRuntime) << "the group's item cannot be played here; leaving the group";
+      m_group->leaveGroup();
     }
   }
 

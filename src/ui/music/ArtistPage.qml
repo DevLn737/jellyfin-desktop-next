@@ -23,6 +23,17 @@ RoutePage {
 
     title: item.name || qsTr("Music")
 
+    function retry() {
+        if (item.errorText.length > 0) item.reload()
+        if (list.errorText.length > 0) list.reload()
+    }
+
+    // Back from a lost connection: what failed loads again.
+    Connections {
+        target: Library
+        function onReconnected() { page.retry() }
+    }
+
     PlayGuard { id: guard }
 
     ColumnLayout {
@@ -43,9 +54,12 @@ RoutePage {
                 color: Theme.surfaceRaised
                 clip: true
                 Image {
+                    objectName: "artistImage"
                     anchors.fill: parent
                     asynchronous: true
                     fillMode: Image.PreserveAspectCrop
+                    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
                     source: Library.image(page.item.imageUrl)
                 }
             }
@@ -95,22 +109,50 @@ RoutePage {
             }
         }
 
+        StateMessage {
+            objectName: "musicError"
+            Layout.fillWidth: true
+            Layout.preferredHeight: visible ? implicitHeight : 0
+            visible: description.length > 0
+            kind: Library.online ? "error" : "offline"
+            description: page.item.errorText || page.list.errorText
+            onRetry: page.retry()
+        }
+
         SectionHeader {
             Layout.fillWidth: true
+            visible: page.list.count > 0
             text: qsTr("Albums")
         }
 
-        CardGrid {
-            id: grid
-            objectName: "musicGrid"
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            focus: true
-            model: page.list
-            cardHeight: Math.round(Theme.squareWidth / Theme.squareAspect) + Theme.cardCaptionHeight
-            delegate: MusicCard {
-                listModel: page.list
-                guard: guard
+
+            CardGrid {
+                id: grid
+                objectName: "musicGrid"
+                anchors.fill: parent
+                focus: true
+                model: page.list
+                cardHeight: Math.round(Theme.squareWidth / Theme.squareAspect) + Theme.cardCaptionHeight
+                delegate: MusicCard {
+                    listModel: page.list
+                    guard: guard
+                }
+            }
+            LoadingIndicator {
+                objectName: "musicLoading"
+                anchors.centerIn: parent
+                visible: page.list.loading && page.list.count === 0
+            }
+            StateMessage {
+                objectName: "musicEmpty"
+                anchors.centerIn: parent
+                width: Math.min(parent.width, implicitWidth)
+                visible: page.list.loaded && page.list.count === 0 && page.list.errorText.length === 0
+                kind: "empty"
+                title: qsTr("No albums by this artist.")
             }
         }
     }

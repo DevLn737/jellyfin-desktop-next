@@ -9,7 +9,6 @@
 // JFD_UI_SCREENSHOTS=<dir> saves the tab in both themes at four window sizes.
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
-#include "../support/ShowcaseLook.h"
 #include "../support/VirtualBackend.h"
 
 #include <jfd/api/JellyfinClient.h>
@@ -614,38 +613,6 @@ TEST_CASE("The room card reads well and shows the focus ring in the dark and the
   CHECK(scene.window.grabWindow().save(dir + QStringLiteral("/rooms-light-inside-1280x720.png")));
   scene.left("b");
   scene.theme->setProperty("colors", ui::depthPalette());
-}
-
-// The tab as the README shows it: Russian, the application's font and
-// palette, three rooms, then inside one. Saved only with
-// JFD_UI_SCREENSHOTS=<dir> (readme-rooms-1600.png, readme-room-1600.png).
-TEST_CASE("The rooms tab and a room in Russian, as the README shows them") {
-  test::ShowcaseLook look;
-  Scene scene(QSize(1600, 900));
-  test::ShowcaseLook::apply(scene.engine);
-  scene.list = QByteArray(R"([
-    {"GroupId":"a","GroupName":"Кино по пятницам","State":"Idle","Participants":["anna"]},
-    {"GroupId":"b","GroupName":"Хроники маяка","State":"Playing","Participants":["anna","max","kira"]},
-    {"GroupId":"c","GroupName":"Мультики","State":"Paused","Participants":["max","lev"]}])");
-  REQUIRE(waitFor([&] { return shown(scene.card("a")) && shown(scene.card("b")) && shown(scene.card("c")); }, Timeout));
-  CHECK(scene.item("createButton") != nullptr);
-  const QString dir = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
-  if (!dir.isEmpty()) {
-    QDir().mkpath(dir);
-    pump(400);
-    CHECK(scene.window.grabWindow().save(dir + QStringLiteral("/readme-rooms-1600.png")));
-  }
-  // Inside the playing room.
-  Q_EMIT scene.socket.syncPlayGroupUpdate(json(QStringLiteral(
-      R"({"GroupId":"b","Type":"GroupJoined","Data":{"GroupId":"b","GroupName":"Хроники маяка","State":"Playing",
-          "Participants":["anna","max","kira"]}})").toUtf8()));
-  REQUIRE(waitFor([&] { return scene.group->inGroup(); }, Timeout));
-  REQUIRE(waitFor([&] { return shown(scene.item("roomPanel")); }, Timeout));
-  if (!dir.isEmpty()) {
-    pump(400);
-    CHECK(scene.window.grabWindow().save(dir + QStringLiteral("/readme-room-1600.png")));
-  }
-  scene.left("b");
 }
 
 TEST_CASE("The rooms tab in TV mode: arrows, Select and Back only, the name from the on-screen keyboard") {

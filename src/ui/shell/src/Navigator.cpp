@@ -62,6 +62,8 @@ namespace jfd::ui {
               RouteSpec::Placement::AccountMenu);
     add("player", false, false, false);
     addListed("group", "group", QT_TRANSLATE_NOOP("Sidebar", "Watch together"), 300);
+    // The pill's word: the full one stood out beside the others.
+    m_routes[QStringLiteral("group")].sidebar.shortText = QString::fromUtf8(QT_TRANSLATE_NOOP("Sidebar", "Rooms"));
     addListed("settings", "settings", QT_TRANSLATE_NOOP("Sidebar", "Settings"), 900,
               RouteSpec::Placement::AccountMenu);
   }
@@ -183,8 +185,14 @@ namespace jfd::ui {
       const QString text = sidebar.translationContext
                                ? QCoreApplication::translate(sidebar.translationContext, sidebar.text.toUtf8().constData())
                                : sidebar.text;
+      const QString shortText =
+          sidebar.shortText.isEmpty() ? text
+          : sidebar.translationContext
+              ? QCoreApplication::translate(sidebar.translationContext, sidebar.shortText.toUtf8().constData())
+              : sidebar.shortText;
       entries.append(QVariantMap{{QStringLiteral("route"), entry.spec->name},
                                  {QStringLiteral("text"), text},
+                                 {QStringLiteral("shortText"), shortText},
                                  {QStringLiteral("icon"), sidebar.icon},
                                  {QStringLiteral("order"), sidebar.order},
                                  {QStringLiteral("placement"), placementName(sidebar.placement)}});
@@ -255,6 +263,14 @@ namespace jfd::ui {
         return true;
       }
     }
+    if (m_stack.size() >= MaxDepth) {
+      // The first page and the newest ones; the view rebuilds from them
+      // with only the new page loaded.
+      m_stack.remove(1, m_stack.size() - (TrimmedDepth - 1));
+      m_stack.append(parsed);
+      emitChange(Operation::Rebuild);
+      return true;
+    }
     m_stack.append(parsed);
     emitChange(Operation::Push);
     return true;
@@ -295,6 +311,15 @@ namespace jfd::ui {
     m_stack.removeLast();
     emitChange(Operation::Pop);
     return true;
+  }
+
+  QVariantList Navigator::pages() const {
+    QVariantList out;
+    for (const Route& route : m_stack) {
+      out.append(pageFor(route.name));
+      out.append(propertiesFor(route));
+    }
+    return out;
   }
 
   void Navigator::replay() {

@@ -69,7 +69,7 @@ TEST_CASE("A stalled update download fails, leaves nothing behind, and a later o
     bool done = false;
     QElapsedTimer timer;
     timer.start();
-    download.start(file, signature, path, QStringLiteral("update.bin"), *parsePublicKey(testKey),
+    download.start(file, signature, path, QStringLiteral("update.bin"), parsePublicKeys(testKey),
                    [&](const QString& reason) {
                      error = reason;
                      done = true;

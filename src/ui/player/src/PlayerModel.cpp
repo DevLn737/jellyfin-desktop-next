@@ -186,6 +186,8 @@ namespace jfd::ui {
   void PlayerModel::setAutoNext(bool on) {
     if (on == m_autoNext) return;
     m_autoNext = on;
+    // In a group the session asks the group for the next item.
+    m_runtime.post(core::intent::SetAutoNext{on});
     Q_EMIT autoNextChanged();
   }
 
@@ -262,7 +264,9 @@ namespace jfd::ui {
     const double clamped = std::max(0.0, duration() > 0 ? std::min(seconds, duration()) : seconds);
     if (const auto position =
             core::MediaTicks::fromTicks(static_cast<std::int64_t>(clamped * TicksPerSecond))) {
-      if (inGroup()) {
+      // While the group's connection is lost the seek is not sent (the
+      // group model says so): the bar stays where the file is.
+      if (inGroup() && m_snapshot.group->connected) {
         m_groupSeek = clamped;
         m_groupSeekAge.start();
         Q_EMIT positionChanged();
@@ -333,9 +337,17 @@ namespace jfd::ui {
     if (!m_current->source.container.isEmpty())
       stats.insert(QStringLiteral("container"), m_current->source.container);
     if (!m_player) return stats;
+    // Observed while the overlay is open, so this once-a-second poll reads
+    // the last values mpv sent instead of waiting for its core each time.
+    static const QList<QByteArray> watched{
+        "video-format", "video-params/w", "video-params/h", "estimated-vf-fps", "container-fps", "display-fps",
+        "hwdec-current", "video-bitrate", "audio-codec-name", "audio-params/channel-count", "audio-params/samplerate",
+        "audio-bitrate", "demuxer-cache-duration", "cache-speed", "speed", "frame-drop-count",
+        "decoder-frame-drop-count"};
+    m_player->watch(watched);
     // mpv's name for each value; one it does not have is left out.
     const auto read = [&](const char* key, const char* property) {
-      const QVariant value = m_player->property(property);
+      const QVariant value = m_player->watched(property);
       if (value.isValid() && !value.isNull() && !(value.typeId() == QMetaType::QString && value.toString().isEmpty()))
         stats.insert(QString::fromLatin1(key), value);
     };
@@ -354,11 +366,15 @@ namespace jfd::ui {
     read("cacheSeconds", "demuxer-cache-duration");
     read("cacheSpeed", "cache-speed");
     read("speed", "speed");
-    const QVariant output = m_player->property("frame-drop-count");
-    const QVariant decoder = m_player->property("decoder-frame-drop-count");
+    const QVariant output = m_player->watched("frame-drop-count");
+    const QVariant decoder = m_player->watched("decoder-frame-drop-count");
     if (output.isValid() || decoder.isValid())
       stats.insert(QStringLiteral("droppedFrames"), output.toLongLong() + decoder.toLongLong());
     return stats;
+  }
+
+  void PlayerModel::stopStats() {
+    if (m_player) m_player->unwatchAll();
   }
 
   void PlayerModel::setVolume(int volume) {

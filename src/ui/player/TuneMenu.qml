@@ -6,7 +6,6 @@ import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 import Jfd.Ui.Player
-import Jfd.Ui.Settings
 
 // The player's settings: a list of rows with their values (quality, speed,
 // the subtitles' look and delay, the audio delay), the automatic skip of
@@ -57,18 +56,36 @@ Rectangle {
             : qsTr("Player settings")
     }
 
-    // Keys and the TV mode: the first row of what shows.
-    function focusFirst() {
+    // The last page change came from keys (Return on a row, Escape, a
+    // gamepad), not from the mouse: only then the focus frame shows.
+    property bool keyed: false
+
+    // Keys, TV mode or a gamepad: the first row of what shows, with the
+    // focus frame. `reason` Qt.OtherFocusReason keeps the keys in the menu
+    // without the frame (a page opened by the mouse).
+    function focusFirst(reason) {
         const first = content.nextItemInFocusChain(true)
         for (let item = first; item; item = item.parent) {
             if (item === content) {
-                first.forceActiveFocus(Qt.TabFocusReason)
+                first.forceActiveFocus(reason === undefined ? Qt.TabFocusReason : reason)
                 return
             }
         }
     }
-    // A page opened by keys keeps the keys on its rows.
-    onSectionChanged: if (Theme.tvMode || Window.activeFocusItem && holds(Window.activeFocusItem)) Qt.callLater(focusFirst)
+    // A row or the back button: the page `name` ("" the list). `byKeys`:
+    // the control was used with keys (it showed the focus frame).
+    function show(name, byKeys) {
+        keyed = byKeys || Theme.focusDriven
+        section = name
+    }
+    // A page opened by keys keeps the keys on its rows; one opened by the
+    // mouse keeps them in the menu too, without a frame on the first row.
+    onSectionChanged: {
+        const keys = keyed || Theme.focusDriven
+        keyed = false
+        if (keys || Window.activeFocusItem && holds(Window.activeFocusItem))
+            Qt.callLater(focusFirst, keys ? Qt.TabFocusReason : Qt.OtherFocusReason)
+    }
 
     function holds(item) {
         for (let at = item; at; at = at.parent)
@@ -85,7 +102,7 @@ Rectangle {
 
     Keys.onEscapePressed: (event) => {
         if (menu.section.length === 0) { event.accepted = false; return }
-        menu.section = ""
+        menu.show("", true)
     }
 
     Flickable {
@@ -111,7 +128,7 @@ Rectangle {
                     focusPolicy: Qt.TabFocus
                     iconSource: Icons.back
                     toolTipText: qsTr("Back")
-                    onClicked: menu.section = ""
+                    onClicked: menu.show("", visualFocus)
                 }
                 Icon {
                     anchors.verticalCenter: parent.verticalCenter
@@ -143,26 +160,26 @@ Rectangle {
                     objectName: "tuneQuality"
                     text: PlayerSession.playMethod === "Transcode" ? qsTr("Quality (converted by the server)") : qsTr("Quality")
                     value: menu.qualityText(PlayerSession.maxBitrate)
-                    onClicked: menu.section = "quality"
+                    onClicked: menu.show("quality", visualFocus)
                 }
                 SettingRow {
                     objectName: "tuneSpeed"
                     visible: menu.speedAvailable
                     text: PlayerSession.inGroup ? qsTr("Speed (for everyone)") : qsTr("Speed")
                     value: PlayerSession.baseRate + "×"
-                    onClicked: menu.section = "speed"
+                    onClicked: menu.show("speed", visualFocus)
                 }
                 SettingRow {
                     objectName: "tuneSubtitles"
                     text: qsTr("Subtitles: look and delay")
                     value: menu.sizeText(PlayerSession.subtitleSize)
-                    onClicked: menu.section = "subtitles"
+                    onClicked: menu.show("subtitles", visualFocus)
                 }
                 SettingRow {
                     objectName: "tuneAudio"
                     text: qsTr("Audio delay")
                     value: menu.delayText(PlayerSession.audioDelay)
-                    onClicked: menu.section = "audio"
+                    onClicked: menu.show("audio", visualFocus)
                 }
                 SettingRow {
                     objectName: "tuneAutoSkip"
@@ -172,16 +189,10 @@ Rectangle {
                     onClicked: PlayerSession.autoSkip = !PlayerSession.autoSkip
                 }
                 SettingRow {
-                    objectName: "tuneDiscordHidden"
-                    // Only for those who show their status in Discord.
-                    visible: AppSettings.revision >= 0 && AppSettings.value("integrations/discord") === true
-                    text: qsTr("Hide from Discord")
-                    toggle: true
-                    checked: AppSettings.revision >= 0 && AppSettings.value("integrations/discordHidden") === true
-                    onClicked: AppSettings.setValue("integrations/discordHidden", !checked)
-                }
-                SettingRow {
                     objectName: "tuneStats"
+                    // The mouse has the video's right-click menu and the
+                    // keyboard I; a gamepad or TV mode has only this row.
+                    visible: Theme.focusDriven
                     text: menu.statsShown ? qsTr("Hide stats for nerds") : qsTr("Stats for nerds")
                     value: "I"
                     chevron: false

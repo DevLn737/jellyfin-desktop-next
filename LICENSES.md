@@ -24,6 +24,15 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   `licenses` folder).
 - **doctest** (`third_party/doctest`, tests only), MIT; **nlohmann/json** and
   **Monocypher** under their own licences in `third_party/`.
+- **Bundled with the packages** (not in this repository): Qt, libmpv,
+  FFmpeg, libplacebo, libass, ICU, the Vulkan loader, Mesa llvmpipe and
+  Microsoft's runtime redistributables, plus the build system's libraries in
+  the AppImage. [packaging/licenses/THIRD-PARTY-NOTICES.txt](packaging/licenses/THIRD-PARTY-NOTICES.txt)
+  lists each with its version, licence and source, and the licence texts are
+  next to it (sources of the texts: `SOURCES.txt` there). Both packages ship
+  the folder; the MSI build fails on a DLL and the AppImage build on a
+  library that has no notice, and `licenses_check` fails when a text or a
+  pinned version is missing from the notices.
 
 ## Icons, one row per file
 
@@ -61,7 +70,21 @@ only reformatted.
 | `src/ui/controls/icons/more.svg` | Material Icons `more_horiz` | Apache-2.0 |
 | `src/ui/controls/icons/search.svg` | Material Icons `search` | Apache-2.0 |
 | `src/ui/controls/icons/settings.svg` | Material Icons `settings` | Apache-2.0 |
+| `src/ui/controls/icons/tv.svg` | Material Icons `tv` | Apache-2.0 |
+| `src/ui/controls/icons/logout.svg` | Material Icons `exit_to_app` | Apache-2.0 |
 | `src/ui/controls/icons/up.svg` | Material Icons `keyboard_arrow_up` | Apache-2.0 |
+| `src/ui/controls/icons/subtitles.svg` | Material Icons `subtitles` | Apache-2.0 |
+| `src/ui/controls/icons/audio.svg` | Material Icons `volume_up` | Apache-2.0 |
+| `src/ui/controls/icons/window.svg` | Material Icons `desktop_windows` | Apache-2.0 |
+| `src/ui/controls/icons/music.svg` | Material Icons `music_note` | Apache-2.0 |
+| `src/ui/controls/icons/link.svg` | Material Icons `link` | Apache-2.0 |
+| `src/ui/controls/icons/palette.svg` | Material Icons `palette` | Apache-2.0 |
+| `src/ui/controls/icons-dark/subtitles.svg` | Material Icons `subtitles` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/audio.svg` | Material Icons `volume_up` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/window.svg` | Material Icons `desktop_windows` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/music.svg` | Material Icons `music_note` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/link.svg` | Material Icons `link` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/palette.svg` | Material Icons `palette` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/back.svg` | Material Icons `arrow_back` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/check.svg` | Material Icons `check` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/close.svg` | Material Icons `close` (dark fill) | Apache-2.0 |
@@ -89,6 +112,8 @@ only reformatted.
 | `src/ui/controls/icons-dark/more.svg` | Material Icons `more_horiz` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/search.svg` | Material Icons `search` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/settings.svg` | Material Icons `settings` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/tv.svg` | Material Icons `tv` (dark fill) | Apache-2.0 |
+| `src/ui/controls/icons-dark/logout.svg` | Material Icons `exit_to_app` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/up.svg` | Material Icons `keyboard_arrow_up` (dark fill) | Apache-2.0 |
 | `src/ui/library/icons/livetv.svg` | Material Icons `live_tv` | Apache-2.0 |
 | `src/ui/music/icons/expand.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |

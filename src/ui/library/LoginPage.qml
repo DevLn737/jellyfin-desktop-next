@@ -21,8 +21,10 @@ RoutePage {
 
     title: qsTr("Sign in")
 
-    // TV mode: Quick Connect leads the password form.
-    readonly property bool quickConnectFirst: Theme.tvMode && signIn !== null && signIn.quickConnectAvailable
+    // TV mode or a connected gamepad: Quick Connect leads the password form
+    // (a code is quicker than typing a password with a pad). Not the last
+    // input: the form must not change under a key just pressed.
+    readonly property bool quickConnectFirst: (Theme.tvMode || GamepadStatus.connected) && signIn !== null && signIn.quickConnectAvailable
 
     // Back: one step back; on the first step the shell's Back.
     function stepBack() {

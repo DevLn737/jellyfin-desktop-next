@@ -1,6 +1,5 @@
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
-#include "../support/ShowcaseLook.h"
 #include "../support/VirtualBackend.h"
 
 #include <jfd/api/DeviceProfile.h>
@@ -10,16 +9,13 @@
 #include <jfd/session/GroupModel.h>
 #include <jfd/session/SessionRuntime.h>
 #include <jfd/ui/GroupSession.h>
+#include <jfd/ui/InputMode.h>
+#include <jfd/ui/InputRouter.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/PlayerModel.h>
 #include <jfd/ui/PlayerSession.h>
 
 #include <QDateTime>
-#include <QImage>
-#include <QLinearGradient>
-#include <QPainter>
-#include <QPainterPath>
-#include <QTemporaryDir>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QQmlComponent>
@@ -111,8 +107,7 @@ namespace {
     // What the launcher emits once the server resolved the item, then the
     // intent it posts.
     void open(bool live = false, const QString& itemId = QStringLiteral("episode"),
-              api::PlayMethod method = api::PlayMethod::DirectPlay, const QString& seriesId = {},
-              const QString& title = QStringLiteral("Episode")) {
+              api::PlayMethod method = api::PlayMethod::DirectPlay, const QString& seriesId = {}) {
       session::PlaybackLauncher::Request request;
       request.itemId = itemId;
       api::MediaSource source;
@@ -147,7 +142,7 @@ namespace {
       }
       Q_EMIT runtime->launcher().resolved(request, item, source, played);
       core::MediaRequest media = playback::mediaRequest(played, false, core::MediaTicks(), std::nullopt, false);
-      media.title = title.toStdString();
+      media.title = "Episode";
       runtime->post(core::intent::Open{media});
     }
   };
@@ -326,6 +321,23 @@ TEST_CASE("The episodes panel shows each episode's still, the watched check and 
   const auto entry = [&](int i) { return list[i].toMap(); };
   CHECK(entry(0).value(QStringLiteral("played")).toBool());
   CHECK(entry(1).value(QStringLiteral("current")).toBool());
+  // Under the title: the season, the number and the episode's own name.
+  CHECK(f.page->property("episodeLine").toString() == QStringLiteral("Season 1 · Episode 2 «First storm»"));
+  // A name the server made from the number is left out.
+  const auto placeholder = [&](const QString& name, int number) {
+    QVariant result;
+    QMetaObject::invokeMethod(f.page, "placeholderName", Q_RETURN_ARG(QVariant, result), Q_ARG(QVariant, name),
+                              Q_ARG(QVariant, number));
+    return result.toBool();
+  };
+  CHECK(placeholder(QStringLiteral("Episode 3"), 3));
+  CHECK(placeholder(QString::fromUtf8("Эпизод 3"), 3));
+  CHECK(placeholder(QString::fromUtf8("Серия 03"), 3));
+  CHECK(placeholder(QStringLiteral("Ep. 12"), 12));
+  CHECK_FALSE(placeholder(QStringLiteral("Episode 4"), 3));
+  CHECK_FALSE(placeholder(QStringLiteral("First storm"), 2));
+  CHECK_FALSE(placeholder(QStringLiteral("Chapter 3 begins"), 3));
+  CHECK_FALSE(placeholder(QStringLiteral("1984"), 3));
   CHECK(entry(2).value(QStringLiteral("progress")).toDouble() == doctest::Approx(0.5));
   CHECK(entry(0).value(QStringLiteral("progress")).toDouble() == doctest::Approx(0.0));
   CHECK(entry(0).value(QStringLiteral("runTimeTicks")).toLongLong() == 28800000000LL);
@@ -894,6 +906,212 @@ TEST_CASE("TV mode: Select plays and pauses; on a channel the display focuses pl
   CHECK(f.player->channelName() == QStringLiteral("Test Channel 2"));
 }
 
+namespace {
+
+  // The player as in the application without TV mode: under the shell's
+  // arrow navigation, Theme.gamepadInput following InputMode (as AppShell
+  // binds it), two pages for Back to leave, and a gamepad through the
+  // InputRouter.
+  struct GamepadFixture : Fixture {
+    GamepadFixture() {
+      ui::InputMode::instance()->setGamepad(false);
+      QQmlComponent component(&engine);
+      component.setData(R"(
+import QtQuick
+import Jfd.Ui.Theme
+import Jfd.Ui.Shell
+Item {
+  SpatialNavigation.enabled: true
+  Binding { target: Theme; property: "gamepadInput"; value: InputMode.gamepad }
+}
+)",
+                        QUrl(QStringLiteral("qrc:/gamepad-player.qml")));
+      shell.reset(qobject_cast<QQuickItem*>(component.create()));
+      REQUIRE_MESSAGE(shell != nullptr, component.errorString().toStdString());
+      shell->setParentItem(window.contentItem());
+      shell->setSize(QSizeF(1280, 720));
+      page->setParentItem(shell.get());
+      navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
+      REQUIRE(navigator != nullptr);
+      const QUrl placeholder(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml"));
+      navigator->setPlaceholderPage(placeholder);
+      navigator->registerPage(QStringLiteral("home"), placeholder);
+      navigator->registerPage(QStringLiteral("player"), placeholder);
+      navigator->reset(QStringLiteral("home"));
+      navigator->navigate(QStringLiteral("player"));
+      router.setWindow(&window);
+    }
+    ~GamepadFixture() {
+      ui::InputMode::instance()->setGamepad(false);
+      page->setParentItem(window.contentItem());
+      shell.reset();
+    }
+
+    void press(platform::InputAction action) { router.route(action, false); }
+    QString focused() const {
+      const QQuickItem* item = window.activeFocusItem();
+      return item ? item->objectName() : QString();
+    }
+    // Presses the arrow until the control named has the focus; false after
+    // `most` presses.
+    bool walkTo(platform::InputAction arrow, const char* name, int most = 20) {
+      for (int i = 0; i < most; ++i) {
+        if (focused() == QLatin1String(name)) return true;
+        press(arrow);
+      }
+      return focused() == QLatin1String(name);
+    }
+
+    std::unique_ptr<QQuickItem> shell;
+    ui::Navigator* navigator = nullptr;
+    ui::InputRouter router;
+  };
+
+} // namespace
+
+TEST_CASE("A gamepad without TV mode reaches every control and menu of the player; the keyboard keeps its keys") {
+  test::FakeServer server([](const test::HttpRequest& r) {
+    const auto json = [](const char* body) { return test::HttpResponse{200, QByteArray(body), "application/json", 0}; };
+    if (r.path == QStringLiteral("/Shows/series/Episodes"))
+      return json(R"({"TotalRecordCount": 2, "Items": [
+        {"Id": "episode", "Name": "First storm", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 1,
+         "RunTimeTicks": 28800000000, "UserData": {"Played": false}},
+        {"Id": "e12", "Name": "Fog", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 2,
+         "RunTimeTicks": 28800000000, "UserData": {"Played": false}}]})");
+    return test::HttpResponse{404, {}, {}, 0};
+  });
+  using platform::InputAction;
+  GamepadFixture f;
+  QQuickWindow& window = f.window;
+  f.client.setServerUrl(server.url());
+  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
+  f.open(false, QStringLiteral("episode"), api::PlayMethod::DirectPlay, QStringLiteral("series"));
+  REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading() && f.player->position() > 0.2; }, 5000));
+  REQUIRE(waitFor([&] { return f.player->episodes().size() == 2; }, 5000));
+  window.requestActivate();
+  REQUIRE(QTest::qWaitForWindowActive(&window));
+  f.page->forceActiveFocus();
+  ui::InputMode* mode = ui::InputMode::instance();
+
+  // A keyboard: Down is the volume, as before.
+  CHECK(f.page->property("tvMode").toBool() == false);
+  QTest::keyClick(&window, Qt::Key_Down);
+  CHECK(f.player->volume() == 95);
+  CHECK_FALSE(mode->gamepad());
+  CHECK(window.activeFocusItem() == f.page);
+
+  // The gamepad: A plays and pauses.
+  f.press(InputAction::Select);
+  CHECK(mode->gamepad());
+  CHECK(f.page->property("focusDriven").toBool());
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+  f.press(InputAction::Select);
+  REQUIRE(waitFor([&] { return !f.player->paused(); }, 2000));
+  f.press(InputAction::Select);
+  REQUIRE(waitFor([&] { return f.player->paused(); }, 2000));
+
+  // Down: the display, the timeline focused; the volume stays.
+  f.page->setProperty("osdVisible", false);
+  f.press(InputAction::Down);
+  CHECK(f.page->property("osdVisible").toBool());
+  CHECK(f.focused() == QStringLiteral("timeline"));
+  CHECK(f.player->volume() == 95);
+  // Down again: the row of buttons; along it every control, the volume
+  // slider not a trap.
+  f.press(InputAction::Down);
+  QQuickItem* focused = window.activeFocusItem();
+  REQUIRE(focused != nullptr);
+  CHECK(focused != f.page);
+  CHECK(within(focused, f.page));
+  CHECK(f.walkTo(InputAction::Left, "playPause"));
+  QSet<QString> reached;
+  for (int i = 0; i < 20; ++i) {
+    reached.insert(f.focused());
+    f.press(InputAction::Right);
+  }
+  CAPTURE(QStringList(reached.begin(), reached.end()).join(QLatin1Char(' ')).toStdString());
+  for (const char* name : {"playPause", "stepBack", "stepForward", "mute", "volume", "tracksButton", "speedButton",
+                           "episodes", "tuneButton"})
+    CHECK(reached.contains(QLatin1String(name)));
+  // Up and Down on the volume slider are the volume.
+  REQUIRE(f.walkTo(InputAction::Left, "volume"));
+  f.press(InputAction::Up);
+  CHECK(f.player->volume() == 100);
+  f.press(InputAction::Down);
+  CHECK(f.player->volume() == 95);
+  CHECK(f.focused() == QStringLiteral("volume"));
+
+  // Audio and subtitles: A opens the menu with its first row focused;
+  // Down moves inside it; B closes it, back on the button.
+  REQUIRE(f.walkTo(InputAction::Right, "tracksButton"));
+  QQuickItem* tracks = window.activeFocusItem();
+  f.press(InputAction::Select);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("subtitles"));
+  CHECK(window.activeFocusItem() != tracks);
+  CHECK(within(window.activeFocusItem(), f.page));
+  f.press(InputAction::Down);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("subtitles"));
+  CHECK(window.activeFocusItem() != tracks);
+  CHECK(within(window.activeFocusItem(), f.page));
+  // A on a subtitle chooses it and closes the menu.
+  f.press(InputAction::Select);
+  CHECK(f.page->property("openMenu").toString().isEmpty());
+  CHECK(window.activeFocusItem() == tracks);
+  f.press(InputAction::Select);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("subtitles"));
+  f.press(InputAction::Back);
+  CHECK(f.page->property("openMenu").toString().isEmpty());
+  CHECK(window.activeFocusItem() == tracks);
+  CHECK(f.navigator->depth() == 2);
+
+  // Episodes: the sheet, focused, with the gamepad's hints.
+  REQUIRE(f.walkTo(InputAction::Right, "episodes"));
+  f.press(InputAction::Select);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("episodes"));
+  CHECK(within(window.activeFocusItem(), f.page));
+  CHECK(f.focused() != QStringLiteral("episodes"));
+  QQuickItem* hints = find(f.page, "episodesHints");
+  REQUIRE(hints != nullptr);
+  CHECK(hints->isVisible());
+  f.press(InputAction::Back);
+  CHECK(f.page->property("openMenu").toString().isEmpty());
+  CHECK(f.focused() == QStringLiteral("episodes"));
+
+  // Player settings, from its button and from View (Menu).
+  REQUIRE(f.walkTo(InputAction::Right, "tuneButton"));
+  f.press(InputAction::Select);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("tune"));
+  CHECK(f.focused() != QStringLiteral("tuneButton"));
+  CHECK(within(window.activeFocusItem(), f.page));
+  f.press(InputAction::Back);
+  CHECK(f.focused() == QStringLiteral("tuneButton"));
+  f.press(InputAction::Menu);
+  CHECK(f.page->property("openMenu").toString() == QLatin1String("tune"));
+  CHECK(within(window.activeFocusItem(), find(f.page, "tuneMenu")));
+  // A gamepad has no right click: the statistics stay in the menu.
+  CHECK(find(find(f.page, "tuneMenu"), "tuneStats")->isVisible());
+  f.press(InputAction::Back);
+  CHECK(f.page->property("openMenu").toString().isEmpty());
+
+  // B: off the display, the page has the keys; A plays.
+  f.press(InputAction::Back);
+  CHECK(window.activeFocusItem() == f.page);
+  CHECK(f.navigator->depth() == 2);
+  f.press(InputAction::Select);
+  REQUIRE(waitFor([&] { return !f.player->paused(); }, 2000));
+
+  // A keyboard key hands back: Up is the volume again.
+  QTest::keyClick(&window, Qt::Key_Up);
+  CHECK_FALSE(mode->gamepad());
+  CHECK_FALSE(f.page->property("focusDriven").toBool());
+  CHECK(f.player->volume() == 100);
+
+  // B with the display hidden leaves the player.
+  f.page->setProperty("osdVisible", false);
+  f.press(InputAction::Back);
+  CHECK(f.navigator->depth() == 1);
+}
+
 TEST_CASE("Right-click on the video shows the statistics; I hides them; a transcode names its reasons") {
   Fixture f;
   f.open(false, QStringLiteral("episode"), api::PlayMethod::Transcode);
@@ -955,107 +1173,64 @@ TEST_CASE("Right-click on the video shows the statistics; I hides them; a transc
   CHECK(menu->property("entries").toStringList() == QStringList{QStringLiteral("Hide stats for nerds")});
 }
 
-// The player as the README shows it: a still in place of the video, the
-// application's font, Russian, the display over an episode of a series.
-// Saved only with JFD_UI_SCREENSHOTS=<dir> (readme-player-1600.png).
-TEST_CASE("The display over a series episode, in Russian, as the README shows it") {
-  test::FakeServer server([](const test::HttpRequest& r) {
-    const auto json = [](const char* body) { return test::HttpResponse{200, QByteArray(body), "application/json", 0}; };
-    if (r.path == QStringLiteral("/Items/episode"))
-      return json(R"({"Id": "episode", "Name": "Новый жилец", "Chapters": [
-        {"StartPositionTicks": 0, "Name": "Пролог"},
-        {"StartPositionTicks": 1200000000, "Name": "Шторм"},
-        {"StartPositionTicks": 3600000000, "Name": "Берег"}]})");
-    if (r.path == QStringLiteral("/Shows/series/Episodes"))
-      return json(R"({"TotalRecordCount": 3, "Items": [
-        {"Id": "e1", "Name": "Журнал", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 1,
-         "RunTimeTicks": 28800000000, "UserData": {"Played": true}},
-        {"Id": "e2", "Name": "Первый шторм", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 2,
-         "RunTimeTicks": 28800000000, "UserData": {"Played": true}},
-        {"Id": "episode", "Name": "Новый жилец", "Type": "Episode", "ParentIndexNumber": 1, "IndexNumber": 3,
-         "RunTimeTicks": 28800000000, "UserData": {"Played": false}}]})");
-    if (r.path == QStringLiteral("/MediaSegments/episode")) return json(R"({"Items": []})");
-    return test::HttpResponse{404, {}, {}, 0};
-  });
-
-  test::ShowcaseLook look;
+TEST_CASE("The player settings show the focus frame only after keys, not after the mouse") {
+  // A page of the settings opened with the mouse, then the way back with
+  // the mouse: no row shows the focus frame (it showed on Quality). Escape,
+  // a key, brings the frame back to the list.
+  ui::InputMode::instance()->setGamepad(false);
   Fixture f;
-  test::ShowcaseLook::apply(f.engine);
-  f.client.setServerUrl(server.url());
-  f.client.setSession(QStringLiteral("token"), QStringLiteral("user"));
-  f.open(false, QStringLiteral("episode"), api::PlayMethod::DirectPlay, QStringLiteral("series"),
-         QStringLiteral("Хроники маяка – Новый жилец"));
+  f.open();
   REQUIRE(waitFor([&] { return f.player->active() && !f.player->loading(); }, 5000));
-  REQUIRE(waitFor([&] { return f.player->episodes().size() == 3; }, 5000));
-  REQUIRE(waitFor([&] { return f.player->chapters().size() == 3; }, 5000));
-  CHECK(f.page->property("mainTitle").toString() == QStringLiteral("Хроники маяка"));
-  CHECK(f.page->property("episodeLine").toString().contains(QStringLiteral("«Новый жилец»")));
 
-  const QString shots = qEnvironmentVariable("JFD_UI_SCREENSHOTS");
-  if (shots.isEmpty()) return;
-  // A still under the page in place of the video: the page's black fill
-  // hidden, a night sea scene behind it.
-  constexpr int Width = 1600;
-  constexpr int Height = 900;
-  for (QQuickItem* child : f.page->childItems())
-    if (child->property("color").value<QColor>() == QColor(Qt::black) && child->width() == f.page->width())
-      child->setVisible(false);
-  QImage still(Width, Height, QImage::Format_RGB32);
-  {
-    QPainter p(&still);
-    p.setRenderHint(QPainter::Antialiasing);
-    QLinearGradient sky(0, 0, 0, Height);
-    sky.setColorAt(0, QColor::fromHsv(215, 120, 60));
-    sky.setColorAt(0.55, QColor::fromHsv(200, 90, 140));
-    sky.setColorAt(1, QColor::fromHsv(190, 70, 120));
-    p.fillRect(still.rect(), sky);
-    QRadialGradient glow(Width * 0.68, Height * 0.3, Height * 0.5);
-    glow.setColorAt(0, QColor(255, 240, 220, 210));
-    glow.setColorAt(0.12, QColor(255, 230, 200, 120));
-    glow.setColorAt(1, QColor(255, 255, 255, 0));
-    p.fillRect(still.rect(), glow);
-    for (int layer = 0; layer < 4; ++layer) {
-      QPainterPath hills;
-      const double base = Height * (0.58 + 0.1 * layer);
-      hills.moveTo(0, Height);
-      hills.lineTo(0, base);
-      for (int x = 0; x <= Width; x += Width / 64) {
-        const double y = base - Height * 0.06 * std::sin(1.3 * layer + x * (2.0 + layer) / Width * 3.14) -
-                         Height * 0.02 * std::sin(2.1 * layer + x * 9.0 / Width);
-        hills.lineTo(x, y);
-      }
-      hills.lineTo(Width, Height);
-      hills.closeSubpath();
-      p.fillPath(hills, QColor::fromHsv((205 + 8 * layer) % 360, 110 + 20 * layer, 100 - 20 * layer));
-    }
-    // The lighthouse on the nearest hill, its beam across the sky.
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(20, 26, 36));
-    p.drawPolygon(QPolygonF{{QPointF(300, 640), QPointF(318, 470), QPointF(342, 470), QPointF(360, 640)}});
-    p.setBrush(QColor(255, 236, 190));
-    p.drawRect(QRectF(314, 448, 32, 22));
-    QLinearGradient beam(330, 459, 1100, 360);
-    beam.setColorAt(0, QColor(255, 240, 200, 150));
-    beam.setColorAt(1, QColor(255, 240, 200, 0));
-    p.setBrush(beam);
-    p.drawPolygon(QPolygonF{{QPointF(330, 452), QPointF(1150, 300), QPointF(1150, 440), QPointF(330, 466)}});
-  }
-  QTemporaryDir dir;
-  REQUIRE(dir.isValid());
-  const QString stillFile = dir.filePath(QStringLiteral("still.png"));
-  REQUIRE(still.save(stillFile));
-  QQmlComponent imageComponent(&f.engine);
-  imageComponent.setData("import QtQuick\nImage { fillMode: Image.PreserveAspectCrop; z: -1 }", QUrl());
-  std::unique_ptr<QObject> imageObject(imageComponent.create());
-  auto* image = qobject_cast<QQuickItem*>(imageObject.get());
-  REQUIRE(image != nullptr);
-  image->setProperty("source", QUrl::fromLocalFile(stillFile));
-  image->setParentItem(f.window.contentItem());
-  image->setSize(QSizeF(Width, Height));
-  f.window.resize(Width, Height);
-  f.page->setSize(QSizeF(Width, Height));
-  f.player->seek(252);
-  f.page->setProperty("osdVisible", true);
-  QTest::qWait(600);
-  f.window.grabWindow().save(shots + QStringLiteral("/readme-player-1600.png"));
+  const auto click = [&](QQuickItem* item) {
+    const QPoint at = item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
+    QTest::mouseMove(&f.window, at);
+    QTest::mouseClick(&f.window, Qt::LeftButton, Qt::NoModifier, at);
+  };
+  // Whether a visible row or button of the menu shows the focus frame.
+  const std::function<QString(QQuickItem*)> framed = [&](QQuickItem* item) -> QString {
+    if (item->isVisible() && item->property("visualFocus").toBool())
+      return item->objectName().isEmpty() ? QStringLiteral("(unnamed)") : item->objectName();
+    for (QQuickItem* child : item->childItems())
+      if (const QString name = framed(child); !name.isEmpty()) return name;
+    return {};
+  };
+
+  QQuickItem* tuneButton = find(f.page, "tuneButton");
+  REQUIRE(tuneButton != nullptr);
+  QTest::mouseMove(&f.window, QPoint(640, 300));
+  REQUIRE(waitFor([&] { return tuneButton->isVisible() && tuneButton->opacity() > 0.99; }, 2000));
+  click(tuneButton);
+  QQuickItem* tune = nullptr;
+  REQUIRE(waitFor([&] { return (tune = find(f.page, "tuneMenu")) != nullptr; }, 2000));
+  CHECK(framed(tune).isEmpty());
+  // Discord's switch lives in the main settings; the statistics, with a
+  // mouse, in the video's right-click menu (and I).
+  CHECK(find(tune, "tuneDiscordHidden") == nullptr);
+  REQUIRE(find(tune, "tuneStats") != nullptr);
+  CHECK_FALSE(find(tune, "tuneStats")->isVisible());
+
+  // Speed, then back, both with the mouse.
+  QQuickItem* speedRow = find(tune, "tuneSpeed");
+  REQUIRE(speedRow != nullptr);
+  click(speedRow);
+  CHECK(tune->property("section").toString() == QStringLiteral("speed"));
+  QTest::qWait(50);
+  CHECK(framed(tune).isEmpty());
+  click(find(tune, "tuneBack"));
+  CHECK(tune->property("section").toString().isEmpty());
+  QTest::qWait(50);
+  CHECK(framed(tune).isEmpty());
+
+  // The keys still reach the menu, and a key shows the frame.
+  click(speedRow);
+  QTest::qWait(50);
+  CHECK(tune->property("section").toString() == QStringLiteral("speed"));
+  REQUIRE(f.window.activeFocusItem() != nullptr);
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &escape);
+  QKeyEvent escapeUp(QEvent::KeyRelease, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(&f.window, &escapeUp);
+  CHECK(tune->property("section").toString().isEmpty());
+  CHECK(waitFor([&] { return framed(tune) == QStringLiteral("tuneQuality"); }, 1000));
 }

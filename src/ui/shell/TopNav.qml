@@ -95,7 +95,9 @@ FocusScope {
         objectName: "topNavFill"
         anchors.fill: parent
         color: Theme.background
-        opacity: bar.transparent ? 0 : 0.96
+        // Solid means solid: at 96 % the page's buttons showed through
+        // as ghosts while scrolling under the bar.
+        opacity: bar.transparent ? 0 : 1
         Behavior on opacity { NumberAnimation { duration: Theme.durationNormal } }
         Rectangle {
             anchors.bottom: parent.bottom
@@ -132,6 +134,17 @@ FocusScope {
                 objectName: "topNavLogo"
                 anchors.verticalCenter: parent.verticalCenter
                 size: Theme.tvMode ? 40 : 32
+            }
+            // The name beside the mark, so the corner reads as the app's.
+            Text {
+                objectName: "topNavWordmark"
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !bar.iconsOnly
+                text: "Jellyfin"
+                color: Theme.text
+                font.pixelSize: Theme.tvMode ? 26 : 19
+                font.weight: Font.ExtraBold
+                font.letterSpacing: -0.2
             }
         }
     }
@@ -208,7 +221,7 @@ FocusScope {
                         Text {
                             visible: !bar.iconsOnly
                             anchors.verticalCenter: parent.verticalCenter
-                            text: entry.modelData.text
+                            text: entry.modelData.shortText || entry.modelData.text
                             color: entry.current || entry.hovered ? Theme.text : Theme.textSecondary
                             font.pixelSize: Theme.fontSizeBody - 1
                             font.weight: entry.current ? Font.Bold : Font.DemiBold
@@ -333,6 +346,7 @@ FocusScope {
         alignRight: true
         readonly property var routes: bar.primaryEntries.concat(bar.accountEntries)
         entries: routes.map((entry) => entry.text).concat([qsTr("Sign out")])
+        icons: routes.map((entry) => bar.iconFor(entry.icon)).concat([Icons.logout])
         currentIndex: bar.currentIndexIn(routes)
         onActivated: (index) => {
             if (index === routes.length)
@@ -353,6 +367,7 @@ FocusScope {
         readonly property int tvIndex: bar.accountEntries.length
         entries: bar.accountEntries.map((entry) => entry.text)
                  .concat([Theme.tvMode ? qsTr("Leave TV mode") : qsTr("TV mode"), qsTr("Sign out")])
+        icons: bar.accountEntries.map((entry) => bar.iconFor(entry.icon)).concat([Icons.tv, Icons.logout])
         currentIndex: bar.currentIndexIn(bar.accountEntries)
         onActivated: (index) => {
             if (index < tvIndex)

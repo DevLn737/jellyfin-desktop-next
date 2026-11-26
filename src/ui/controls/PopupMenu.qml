@@ -21,6 +21,9 @@ T.Popup {
     property Item anchorItem
     property var entries: []
     property var disabledIndices: []
+    // An icon per entry (Icons.*), or none.
+    property var icons: []
+    readonly property bool hasIcons: icons.some((url) => String(url).length > 0)
     property int currentIndex: -1
     // Line the menu's right edge up with the button's instead of the left.
     property bool alignRight: false
@@ -104,6 +107,7 @@ T.Popup {
         const room = menu.parent ? menu.parent.width - 2 * Theme.spacingSmall : 100000
         // Text, the entry's padding, the check mark's room, the menu's padding.
         const wanted = menu.widestEntry + 2 * Theme.spacing + Theme.spacingLarge + 2 * Theme.spacingTiny + 2
+                       + (menu.hasIcons ? Theme.iconSize + Theme.spacing : 0)
         return Math.min(room, Math.max(menu.minimumWidth, wanted))
     }
     // A templated Popup has no height of its own: the entries' plus padding.
@@ -180,6 +184,7 @@ T.Popup {
     // soon as the entries are.
     contentItem: Column {
         id: list
+        spacing: 2
         Repeater {
             id: entryRepeater
             model: menu.entries
@@ -192,6 +197,8 @@ T.Popup {
                 width: list.width
                 text: modelData
                 wrapText: true
+                iconSource: menu.icons[index] !== undefined ? menu.icons[index] : ""
+                reserveIcon: menu.hasIcons
                 trailingText: index === menu.currentIndex ? "✓" : ""
                 enabled: menu.disabledIndices.indexOf(index) < 0
                 // The pointer and the keys light one entry: the one focused.
@@ -221,16 +228,6 @@ T.Popup {
                     menu.activated(index)
                 }
                 background: Item {
-                    // A line between this entry and the one above.
-                    Rectangle {
-                        objectName: "popupSeparator"
-                        visible: entry.index > 0
-                        x: Theme.spacingSmall
-                        y: -Math.round(list.spacing / 2) - height / 2
-                        width: parent.width - 2 * Theme.spacingSmall
-                        height: 1
-                        color: Qt.alpha(entry.colors.text, 0.14)
-                    }
                     Rectangle {
                         objectName: "popupHighlight"
                         anchors.fill: parent

@@ -61,6 +61,10 @@ namespace jfd::syncplay {
       MediaTicks startPosition;
       bool isPlaying = false;
       PlaybackRate baseRate = PlaybackRate::normal();
+      // An entry follows the playing one, or RepeatAll wraps over more than
+      // one (RepeatOne would replay the same entry, which every member
+      // reaching the end would ask for again).
+      bool hasNextItem = false;
     };
     // NotInGroup, GroupDoesNotExist, JoinGroupDenied, LibraryAccessDenied, ...
     struct Refused {

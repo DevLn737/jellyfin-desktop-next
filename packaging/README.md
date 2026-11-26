@@ -10,8 +10,9 @@ Built by `.github/workflows/package.yml`; every version used is pinned in
 1. The app is built with the pinned Qt and libmpv (`scripts/fetch-windows-deps.ps1`).
 2. `windeployqt` copies Qt, the QML modules and the MSVC runtime next to the
    executable; libmpv and the Vulkan loader are added, and the licences of
-   what is linked in (`LICENSE`, `LICENSES.md`, [licenses/](licenses)) go to
-   a `licenses` folder. SDL3 (gamepads) needs no DLL: CMake builds the pinned
+   everything bundled (`LICENSE`, `LICENSES.md`, [licenses/](licenses) with
+   `THIRD-PARTY-NOTICES.txt`) go to a `licenses` folder. A DLL next to the
+   executable that the notices do not cover stops the build. SDL3 (gamepads) needs no DLL: CMake builds the pinned
    release statically into the executable (`cmake/JfdSdl3.cmake`).
 3. [windows/build-msi.ps1](windows/build-msi.ps1) builds
    [windows/jellyfin-desktop-next.wxs](windows/jellyfin-desktop-next.wxs) with
@@ -22,7 +23,10 @@ Built by `.github/workflows/package.yml`; every version used is pinned in
    that it needs no elevation, the files, shortcuts and registry key, runs the
    installed app's smoke test with only Windows on `PATH`, reinstalls the same
    version, uninstalls, and checks that nothing is left (and that the profile is
-   kept, or removed with `REMOVEPROFILE=1`).
+   kept, or removed with `REMOVEPROFILE=1`). Uninstalling empties the install
+   folder only when it is the default one: a folder chosen with
+   `INSTALLFOLDER=`, or one the remembered registry value was changed to,
+   keeps the files the installer did not put there (checked too).
 5. [windows/test-msi-update.ps1](windows/test-msi-update.ps1) runs the
    client's own update script ([apply-update.ps1](../src/integrations/apply-update.ps1),
    built into `MsiUpdater`) against real packages: an older MSI of the same
@@ -52,6 +56,44 @@ are `%LOCALAPPDATA%\Jellyfin Desktop Next` and `%APPDATA%\Jellyfin Desktop Next`
 Qt's locations for the application name "Jellyfin Desktop Next" with no
 organization name; keep them in step if the application's names change.
 
+## Release signing
+
+Every package is signed with minisign in the `sign` job; the client installs
+an update only when its `.minisig` verifies against a key built into it
+(`JFD_RELEASE_PUBLIC_KEY`, and during a rotation `JFD_RELEASE_NEXT_PUBLIC_KEY`)
+and its trusted comment names the file.
+
+- Only release runs (a pushed `v*` tag, or a manual run on main with a tag)
+  use the release key, the `MINISIGN_SECRET_KEY` secret, and they run in the
+  `release` environment. Pull requests and plain pushes to main sign with a
+  throwaway key made in the job. The key reaches minisign through a pipe and
+  is never written to disk, and no script from the checkout runs in the step
+  that holds it.
+- Keep `MINISIGN_SECRET_KEY` as a secret of the `release` environment
+  (Settings, Environments; GitHub creates the environment on the first release
+  run), with deployment limited to `main` and `v*` tags, and delete the
+  repository secret of that name. Until then the repository secret is used.
+- The repository variable `MINISIGN_PUBLIC_KEY` is the public key of the
+  current secret key; `sign` refuses a secret key that does not match it.
+
+**Rotating the key.** Clients trust the keys they were built with, so a new
+key must ship in a release before anything is signed with it:
+
+1. Make a new key pair (`minisign -G -W -s next.key -p next.pub`) on a trusted
+   machine. Set the repository variable `MINISIGN_NEXT_PUBLIC_KEY` to the
+   second line of `next.pub`. Keep `next.key` offline.
+2. Publish one or more releases as usual. They are still signed with the
+   current key, and the clients they install trust both keys.
+3. Once users have updated to such a release, switch: `MINISIGN_SECRET_KEY`
+   (in the `release` environment) becomes the content of `next.key`,
+   `MINISIGN_PUBLIC_KEY` becomes the new public key, and
+   `MINISIGN_NEXT_PUBLIC_KEY` is cleared (or set to the key after it). Delete
+   `next.key`. The next release is signed with the new key.
+
+A client older than step 2 does not trust the new key: it reports a failed
+signature check and links to the release page, where the user installs the
+new version by hand once.
+
 ## Linux AppImage
 
 1. [linux/build-libmpv.sh](linux/build-libmpv.sh) builds FFmpeg, libplacebo,
@@ -67,8 +109,11 @@ organization name; keep them in step if the application's names change.
    and its Qt plugin (X11 and Wayland). Libraries that must match the running
    system stay out: Mesa/GL/EGL/Vulkan, VA-API and VDPAU, libdrm/gbm, PipeWire,
    PulseAudio, ALSA, GnuTLS (it knows the distribution's CA store), Wayland,
-   D-Bus, libudev. The licences of what is linked in go to
-   `usr/share/licenses/jellyfin-desktop-next`. The AppImage excludelist also
+   D-Bus, libudev. The licences of everything bundled go to
+   `usr/share/licenses/jellyfin-desktop-next` (`THIRD-PARTY-NOTICES.txt` and
+   the texts in [licenses/](licenses)); each library taken from the build
+   system adds its Ubuntu package's copyright file under `system/`, and a
+   library with neither stops the build. The AppImage excludelist also
    leaves fontconfig, FreeType and HarfBuzz to the system; FriBiDi, which it lists too, ships in the image,
    because systems without a GTK desktop often lack it. The GL dispatch
    library (libOpenGL.so.0 from libglvnd) must be installed; every desktop

@@ -38,6 +38,10 @@ env:
   # The minisign public key built into the client; the matching secret key is
   # the MINISIGN_SECRET_KEY secret. Unset: the client installs no update.
   RELEASE_PUBLIC_KEY: ${{ vars.MINISIGN_PUBLIC_KEY }}
+  # During a key rotation, the next key's public key: clients built with it
+  # also accept releases signed with the next key. Empty otherwise (see
+  # "Release signing" in packaging/README.md).
+  RELEASE_NEXT_PUBLIC_KEY: ${{ vars.MINISIGN_NEXT_PUBLIC_KEY }}
 
 jobs:
   msi:
@@ -71,7 +75,8 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF `
             -DJFD_ENFORCE_PINS=ON "-DMPV_INCLUDE_DIR=$env:MPV_INCLUDE_DIR" "-DMPV_LIBRARY=$env:MPV_LIBRARY" `
-            "-DJFD_VERSION_SUFFIX=${{ steps.version.outputs.suffix }}" "-DJFD_RELEASE_PUBLIC_KEY=$env:RELEASE_PUBLIC_KEY"
+            "-DJFD_VERSION_SUFFIX=${{ steps.version.outputs.suffix }}" "-DJFD_RELEASE_PUBLIC_KEY=$env:RELEASE_PUBLIC_KEY" `
+            "-DJFD_RELEASE_NEXT_PUBLIC_KEY=$env:RELEASE_NEXT_PUBLIC_KEY"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build --parallel --target $env:APP_TARGET
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -89,9 +94,21 @@ jobs:
           windeployqt --release --compiler-runtime --qmldir $env:APP_QML_DIR --no-translations "$stage/$env:APP_EXE.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:JFD_RUNTIME_DIR/*.dll" $stage
-          # Licences of what is linked into the executable (SDL3 for gamepads, see LICENSES.md).
+          # Licences of everything in the package (packaging/licenses/THIRD-PARTY-NOTICES.txt).
           New-Item -ItemType Directory -Force -Path "$stage/licenses" | Out-Null
           Copy-Item LICENSE, LICENSES.md, packaging/licenses/*.txt "$stage/licenses"
+          # Every DLL next to the executable has its notice there: Qt, libmpv,
+          # the Vulkan loader, Mesa and Microsoft's redistributables (the
+          # subfolders are windeployqt's: Qt's plugins and QML modules).
+          # Another DLL stops the build until THIRD-PARTY-NOTICES.txt and a
+          # licence text cover it.
+          $known = @('Qt6*.dll', 'libmpv-2.dll', 'vulkan-1.dll', 'opengl32sw.dll', 'd3dcompiler_47.dll',
+                     'dxcompiler.dll', 'dxil.dll', 'vcruntime140*.dll', 'msvcp140*.dll', 'concrt140.dll',
+                     'vccorlib140.dll')
+          $unlicensed = Get-ChildItem $stage -Filter *.dll | Where-Object {
+            $name = $_.Name; -not ($known | Where-Object { $name -like $_ })
+          }
+          if ($unlicensed) { throw "No licence notice for: $($unlicensed.Name -join ', ') (packaging/licenses/THIRD-PARTY-NOTICES.txt)" }
           @{ commit = '${{ github.sha }}'; ref = '${{ github.ref_name }}'; run = '${{ github.run_id }}' } |
             ConvertTo-Json | Set-Content -Encoding ASCII "$stage/build-info.json"
 
@@ -182,7 +199,8 @@ jobs:
         run: |
           cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DJFD_BUILD_APP=ON -DJFD_BUILD_TESTS=OFF \
             -DCMAKE_BUILD_RPATH="${{ github.workspace }}/build/libmpv/lib" \
-            -DJFD_VERSION_SUFFIX="${{ steps.pins.outputs.suffix }}" -DJFD_RELEASE_PUBLIC_KEY="$RELEASE_PUBLIC_KEY"
+            -DJFD_VERSION_SUFFIX="${{ steps.pins.outputs.suffix }}" -DJFD_RELEASE_PUBLIC_KEY="$RELEASE_PUBLIC_KEY" \
+            -DJFD_RELEASE_NEXT_PUBLIC_KEY="$RELEASE_NEXT_PUBLIC_KEY"
           cmake --build build/app --parallel --target "$APP_TARGET"
 
       - name: Build AppImage
@@ -229,12 +247,23 @@ jobs:
 
   # After the AppImage ran on every distribution: nothing that failed there
   # is signed, and so nothing is published (release needs sign).
+  #
+  # The release key is used only by release runs (RELEASE_TAG set: a pushed
+  # v* tag, or a manual run on main with a tag). Pull requests and plain
+  # pushes to main sign with a throwaway key made here, so they check the same
+  # steps without the key. Release runs use the "release" environment (GitHub
+  # creates it on first use); keep MINISIGN_SECRET_KEY there as an environment
+  # secret, limited to main and v* tags, so a workflow changed in a pull
+  # request cannot read it either. A repository secret of that name still
+  # works until it is moved.
   sign:
     name: Sign packages
     needs: [msi, appimage, appimage-smoke]
     runs-on: ubuntu-24.04
+    # The same condition as RELEASE_TAG (env is not available here).
+    environment: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.tag != '')) && 'release' || '' }}
     outputs:
-      real-key: ${{ steps.key.outputs.real }}
+      real-key: ${{ steps.sign.outputs.real }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
@@ -246,40 +275,39 @@ jobs:
       - name: Install minisign
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends minisign
 
-      # The release key when the secret exists (pushes to this repository),
-      # otherwise a throwaway key made here, so pull requests check the same
-      # steps. Its public key must be the one built into the client.
-      - name: Signing key
-        id: key
+      # Before the key: no script from the checkout runs in a step that has it.
+      - name: Read version
+        id: version
+        run: packaging/release-version.sh >> "$GITHUB_OUTPUT"
+
+      # The key stays in this step's environment and reaches minisign through
+      # a pipe; it is never written to disk. Its public key must be the
+      # current key built into the client (MINISIGN_PUBLIC_KEY).
+      - name: Sign and verify
+        id: sign
         env:
-          SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          SECRET_KEY: ${{ env.RELEASE_TAG != '' && secrets.MINISIGN_SECRET_KEY || '' }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          mkdir -p "$RUNNER_TEMP/minisign"
-          key="$RUNNER_TEMP/minisign/release.key"
           if [ -n "$SECRET_KEY" ]; then
-            printf '%s\n' "$SECRET_KEY" > "$key"
-            minisign -R -s "$key" -p release.pub
+            minisign -R -s <(printf '%s\n' "$SECRET_KEY") -p release.pub
             if [ "$(sed -n 2p release.pub)" != "$RELEASE_PUBLIC_KEY" ]; then
               echo "::error::MINISIGN_SECRET_KEY does not match the MINISIGN_PUBLIC_KEY variable"
               exit 1
             fi
             echo "real=true" >> "$GITHUB_OUTPUT"
           else
-            minisign -G -W -s "$key" -p release.pub
+            throwaway="$(mktemp -d)"
+            minisign -G -W -s "$throwaway/key" -p release.pub
+            SECRET_KEY="$(cat "$throwaway/key")"
+            rm -rf "$throwaway"
             echo "real=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No MINISIGN_SECRET_KEY: signed with a throwaway key"
+            if [ -n "$RELEASE_TAG" ]; then
+              echo "::warning::No MINISIGN_SECRET_KEY: signed with a throwaway key, nothing is published"
+            else
+              echo "::notice::Not a release run: signed with a throwaway key"
+            fi
           fi
-          echo "file=$key" >> "$GITHUB_OUTPUT"
-
-      - name: Read version
-        id: version
-        run: packaging/release-version.sh >> "$GITHUB_OUTPUT"
-
-      - name: Sign and verify
-        env:
-          KEY: ${{ steps.key.outputs.file }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
           cd packages
           # Release name first: the signature names the file.
           mv "$(ls *.AppImage | head -1)" "$APP_PACKAGE-$VERSION-x86_64.AppImage"
@@ -288,9 +316,10 @@ jobs:
           for file in *.msi *.AppImage; do
             # The client accepts a signature only when the trusted comment
             # names the file (ReleaseSignature.cpp).
-            minisign -S -s "$KEY" -m "$file" -t "file:$file"
+            minisign -S -s <(printf '%s\n' "$SECRET_KEY") -m "$file" -t "file:$file"
             minisign -V -p ../release.pub -m "$file"
           done
+          unset SECRET_KEY
           # A changed file must fail.
           cp "$(ls *.AppImage | head -1)" tampered
           printf 'x' | dd of=tampered bs=1 seek=4096 conv=notrunc status=none
@@ -300,7 +329,6 @@ jobs:
             exit 1
           fi
           rm tampered tampered.minisig
-          rm -f "$KEY"
           sha256sum *.msi *.AppImage > SHA256SUMS
           cp ../release.pub minisign.pub
           ls -la
@@ -334,15 +362,20 @@ jobs:
       - name: Require the release key
         if: needs.sign.outputs.real-key != 'true'
         run: |
-          echo "::error::No MINISIGN_SECRET_KEY secret: nothing is published"
+          echo "::error::No MINISIGN_SECRET_KEY secret in the release environment: nothing is published"
           exit 1
-      # The commit's CI, App and Session runs (pushes to main) must have
-      # passed. Runs still going are waited for, up to an hour each.
+      # Every workflow that runs on a push to main must have passed for this
+      # commit. Runs still going are waited for, up to an hour each. Those
+      # with a paths filter run only when their files change: when they ran
+      # for this commit they must have passed, when not they are skipped.
+      # A new workflow that runs on push to main goes in one of the lists.
       - name: Require green CI for this commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for workflow in ci.yml app.yml session.yml; do
+          always="ci.yml app.yml session.yml api.yml library-ui.yml syncplay-drift.yml"
+          when_changed="seerr-api.yml syncplay-harness.yml"
+          for workflow in $always $when_changed; do
             for attempt in $(seq 1 60); do
               run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
                 --jq '.workflow_runs[0] // {} | [.status // "missing", .conclusion // "none", .html_url // ""] | join("|")')
@@ -352,6 +385,11 @@ jobs:
               sleep 60
             done
             if [ "$status" = "missing" ]; then
+              case " $when_changed " in
+                *" $workflow "*)
+                  echo "$workflow: did not run for $GITHUB_SHA (its files did not change)"
+                  continue ;;
+              esac
               echo "::error::$workflow has no run for $GITHUB_SHA on a push to main: release from a commit on main"
               exit 1
             fi

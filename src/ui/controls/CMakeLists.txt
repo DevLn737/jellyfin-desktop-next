@@ -52,6 +52,8 @@ qt_add_qml_module(jfd_ui_controls
     icons/play.svg
     icons/search.svg
     icons/settings.svg
+    icons/tv.svg
+    icons/logout.svg
     icons/up.svg
     icons/down.svg
     icons/delete.svg
@@ -69,6 +71,12 @@ qt_add_qml_module(jfd_ui_controls
     brand/logo.svg
     icons/sort.svg
     icons/filter.svg
+    icons/subtitles.svg
+    icons/audio.svg
+    icons/window.svg
+    icons/music.svg
+    icons/link.svg
+    icons/palette.svg
     icons-dark/favorite.svg
     icons-dark/favorite-border.svg
     icons-dark/info.svg
@@ -85,6 +93,8 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/play.svg
     icons-dark/search.svg
     icons-dark/settings.svg
+    icons-dark/tv.svg
+    icons-dark/logout.svg
     icons-dark/up.svg
     icons-dark/down.svg
     icons-dark/left.svg
@@ -97,6 +107,12 @@ qt_add_qml_module(jfd_ui_controls
     icons-dark/downloaded.svg
     icons-dark/pause.svg
     icons-dark/retry.svg
+    icons-dark/subtitles.svg
+    icons-dark/audio.svg
+    icons-dark/window.svg
+    icons-dark/music.svg
+    icons-dark/link.svg
+    icons-dark/palette.svg
   DEPENDENCIES Jfd.Ui.Theme)
 target_link_libraries(jfd_ui_controls PRIVATE Qt6::Quick jfd_ui_theme)
 jfd_add_translations(jfd_ui_controls)

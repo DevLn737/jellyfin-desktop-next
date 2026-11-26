@@ -2,6 +2,17 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru">
 <context>
+    <name>EpisodeNumber</name>
+    <message>
+        <source>S%1:E%2</source>
+        <translation>С%1:Э%2</translation>
+    </message>
+    <message>
+        <source>E%1</source>
+        <translation>Э%1</translation>
+    </message>
+</context>
+<context>
     <name>ErrorText</name>
     <message>
         <source>The server cannot be reached. Check the network connection.</source>

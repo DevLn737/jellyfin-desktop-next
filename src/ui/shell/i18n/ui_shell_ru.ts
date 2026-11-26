@@ -163,6 +163,10 @@
         <translation>Смотреть вместе</translation>
     </message>
     <message>
+        <source>Rooms</source>
+        <translation>Комнаты</translation>
+    </message>
+    <message>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>

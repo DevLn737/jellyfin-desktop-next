@@ -119,6 +119,8 @@ namespace jfd::ui {
     Q_INVOKABLE void moveDown(const QString& itemId);
     Q_INVOKABLE void pauseAll();
     Q_INVOKABLE void resumeAll();
+    // DownloadsController::verify().
+    Q_INVOKABLE int verify();
     Q_INVOKABLE bool remove(const QString& itemId);
     Q_INVOKABLE int removeWatched();
     Q_INVOKABLE int removeAll();

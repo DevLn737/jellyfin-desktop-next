@@ -97,7 +97,7 @@ TEST_CASE("A signed MSI is downloaded into the state directory") {
     return HttpResponse{200, request.path == QStringLiteral("/a") ? newMsi : msiSignature, "application/octet-stream"};
   });
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKey(testKey));
+  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKeys(testKey));
   REQUIRE(updater.supported());
 
   const Outcome outcome = prepare(updater, release(server, msiSignature));
@@ -123,7 +123,7 @@ TEST_CASE("An MSI downloaded before a restart is checked again, not downloaded a
     return HttpResponse{200, request.path == QStringLiteral("/a") ? newMsi : msiSignature, "application/octet-stream"};
   });
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKey(testKey));
+  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKeys(testKey));
   const Outcome outcome = prepare(updater, release(server, msiSignature));
   CHECK_MESSAGE(outcome.failure.isEmpty(), outcome.failure.toStdString());
   CHECK(outcome.ready == QStringLiteral("0.2.0"));
@@ -139,7 +139,7 @@ TEST_CASE("An MSI downloaded before a restart is checked again, not downloaded a
   QByteArray tampered = newMsi;
   tampered[0] = char(tampered[0] ^ 1);
   REQUIRE(write(broken, tampered));
-  MsiUpdater second(&network, otherFolder + QStringLiteral("/app.exe"), otherFolder, otherState, parsePublicKey(testKey));
+  MsiUpdater second(&network, otherFolder + QStringLiteral("/app.exe"), otherFolder, otherState, parsePublicKeys(testKey));
   CHECK(prepare(second, release(server, msiSignature)).failure.startsWith(QStringLiteral("signature check failed")));
   CHECK_FALSE(QFile::exists(broken));
   asked.clear();
@@ -164,7 +164,7 @@ TEST_CASE("A verified MSI replaces the downloads of older versions, a failed one
     return HttpResponse{200, request.path == QStringLiteral("/a") ? newMsi : signature, "application/octet-stream"};
   });
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKey(testKey));
+  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKeys(testKey));
 
   CHECK(prepare(updater, release(server, signature)).failure.startsWith(QStringLiteral("signature check failed")));
   CHECK(QFile::exists(older));
@@ -194,7 +194,7 @@ TEST_CASE("A tampered MSI or a signature of another file is rejected and removed
       return HttpResponse{200, request.path == QStringLiteral("/a") ? body : signature, "application/octet-stream"};
     });
     QNetworkAccessManager network;
-    MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKey(testKey));
+    MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, state, parsePublicKeys(testKey));
     const Outcome outcome = prepare(updater, release(server, signature));
     CHECK(outcome.failure.startsWith(QStringLiteral("signature check failed")));
     CHECK(updater.readyVersion().isEmpty());
@@ -211,7 +211,7 @@ TEST_CASE("A short download or a release without a signature is not installed") 
   });
   QNetworkAccessManager network;
   MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, dir.filePath(QStringLiteral("state")),
-                     parsePublicKey(testKey));
+                     parsePublicKeys(testKey));
   CHECK(prepare(updater, release(server, msiSignature, 1000)).failure.startsWith(QStringLiteral("download incomplete")));
 
   Release unsigned_ = release(server, msiSignature);
@@ -225,17 +225,17 @@ TEST_CASE("Only an installed application with a release key updates itself") {
   const QString exe = folder + QStringLiteral("/app.exe");
   const QString state = dir.filePath(QStringLiteral("state"));
   QNetworkAccessManager network;
-  CHECK(MsiUpdater(&network, exe, folder, state, parsePublicKey(testKey)).supported());
+  CHECK(MsiUpdater(&network, exe, folder, state, parsePublicKeys(testKey)).supported());
   // Windows paths: other separators, trailing separator, other case.
-  CHECK(MsiUpdater(&network, exe, QString(folder).toUpper() + QStringLiteral("/"), state, parsePublicKey(testKey))
+  CHECK(MsiUpdater(&network, exe, QString(folder).toUpper() + QStringLiteral("/"), state, parsePublicKeys(testKey))
             .supported());
-  CHECK_FALSE(MsiUpdater(&network, exe, folder, state, std::nullopt).supported());
-  CHECK_FALSE(MsiUpdater(&network, exe, QString(), state, parsePublicKey(testKey)).supported());
-  CHECK_FALSE(MsiUpdater(&network, QString(), folder, state, parsePublicKey(testKey)).supported());
+  CHECK_FALSE(MsiUpdater(&network, exe, folder, state, MinisignKeys{}).supported());
+  CHECK_FALSE(MsiUpdater(&network, exe, QString(), state, parsePublicKeys(testKey)).supported());
+  CHECK_FALSE(MsiUpdater(&network, QString(), folder, state, parsePublicKeys(testKey)).supported());
   // Run from somewhere else, like a build folder.
-  CHECK_FALSE(MsiUpdater(&network, exe, dir.filePath(QStringLiteral("Programs/Other")), state, parsePublicKey(testKey))
+  CHECK_FALSE(MsiUpdater(&network, exe, dir.filePath(QStringLiteral("Programs/Other")), state, parsePublicKeys(testKey))
                   .supported());
-  CHECK_FALSE(MsiUpdater(&network, folder + QStringLiteral("/missing.exe"), folder, state, parsePublicKey(testKey))
+  CHECK_FALSE(MsiUpdater(&network, folder + QStringLiteral("/missing.exe"), folder, state, parsePublicKeys(testKey))
                   .supported());
 }
 
@@ -272,7 +272,7 @@ TEST_CASE("Apply does nothing before a verified MSI is ready") {
   QTemporaryDir dir;
   const QString folder = install(dir);
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, dir.path(), parsePublicKey(testKey));
+  MsiUpdater updater(&network, folder + QStringLiteral("/app.exe"), folder, dir.path(), parsePublicKeys(testKey));
   CHECK_FALSE(updater.apply(QStringLiteral("item/42")));
   CHECK_FALSE(QFile::exists(dir.filePath(QStringLiteral("update-pending.json"))));
 }
@@ -282,7 +282,7 @@ TEST_CASE("The updated version confirms and gets the screen to reopen") {
   const QString marker = dir.filePath(QStringLiteral("update-pending.json"));
   pending(marker);
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, QString(), QString(), dir.path(), parsePublicKey(testKey));
+  MsiUpdater updater(&network, QString(), QString(), dir.path(), parsePublicKeys(testKey));
   const auto state = updater.confirmStart(QStringLiteral("0.2.0"));
   CHECK(state.kind == MsiUpdater::StartState::Kind::Updated);
   CHECK(state.route == QStringLiteral("item/42"));
@@ -296,7 +296,7 @@ TEST_CASE("A failed install leaves the old version running and says which one fa
   pending(marker);
   REQUIRE(write(marker + QStringLiteral(".failed"), ""));
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, QString(), QString(), dir.path(), parsePublicKey(testKey));
+  MsiUpdater updater(&network, QString(), QString(), dir.path(), parsePublicKeys(testKey));
   const auto state = updater.confirmStart(QStringLiteral("0.1.0"));
   CHECK(state.kind == MsiUpdater::StartState::Kind::RolledBack);
   CHECK(state.version == QStringLiteral("0.2.0"));
@@ -310,14 +310,14 @@ TEST_CASE("A marker of another version is dropped without a report") {
   const QString marker = dir.filePath(QStringLiteral("update-pending.json"));
   pending(marker);
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, QString(), QString(), dir.path(), parsePublicKey(testKey));
+  MsiUpdater updater(&network, QString(), QString(), dir.path(), parsePublicKeys(testKey));
   CHECK(updater.confirmStart(QStringLiteral("0.1.0")).kind == MsiUpdater::StartState::Kind::None);
   CHECK_FALSE(QFile::exists(marker));
 }
 
 TEST_CASE("Restart links are recognised by their scheme") {
   QNetworkAccessManager network;
-  MsiUpdater updater(&network, QString(), QString(), QString(), std::nullopt);
+  MsiUpdater updater(&network, QString(), QString(), QString(), MinisignKeys{});
   int restarts = 0;
   QObject::connect(&updater, &MsiUpdater::restartRequested, [&] { ++restarts; });
   updater.handleUrl(QUrl(QStringLiteral("jellyfin-desktop-update:restart")));

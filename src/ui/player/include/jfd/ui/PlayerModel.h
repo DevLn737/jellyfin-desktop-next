@@ -258,6 +258,8 @@ namespace jfd::ui {
     // cacheSeconds, cacheSpeed (bytes per second) and speed. A value mpv
     // does not know (yet) is left out. Empty with nothing playing.
     Q_INVOKABLE QVariantMap stats() const;
+    // The overlay closed: mpv stops sending the values stats() reads.
+    Q_INVOKABLE void stopStats();
 
     // The display's refresh rate follows the video (docs/display-refresh-
     // rate.md): with a switcher set and the switch on, a video opened while

@@ -263,6 +263,40 @@ TEST_CASE("The navigator keeps a stack and tells the view what to do") {
   CHECK(changes.at(1).at(0).value<Navigator::Operation>() == Navigator::Operation::Push);
 }
 
+TEST_CASE("A long walk through item pages keeps at most MaxDepth pages, home first and the newest") {
+  Navigator navigator;
+  QSignalSpy changes(&navigator, &Navigator::stackChanged);
+  CHECK(navigator.reset(QStringLiteral("home")));
+  for (int i = 1; i < Navigator::MaxDepth; ++i) CHECK(navigator.navigate(QStringLiteral("item/%1").arg(i)));
+  CHECK(navigator.depth() == Navigator::MaxDepth);
+  CHECK(changes.last().at(0).value<Navigator::Operation>() == Navigator::Operation::Push);
+
+  // One more: the oldest items go, home and the newest stay.
+  CHECK(navigator.navigate(QStringLiteral("item/%1").arg(Navigator::MaxDepth)));
+  CHECK(navigator.depth() == Navigator::TrimmedDepth);
+  CHECK(changes.last().at(0).value<Navigator::Operation>() == Navigator::Operation::Rebuild);
+  const QStringList stack = navigator.stack();
+  CHECK(stack.first() == QStringLiteral("home"));
+  CHECK(stack.last() == QStringLiteral("item/%1").arg(Navigator::MaxDepth));
+  CHECK(stack.at(1) == QStringLiteral("item/%1").arg(Navigator::MaxDepth - Navigator::TrimmedDepth + 2));
+  // The view gets every page with its properties, bottom first.
+  const QVariantList pages = navigator.pages();
+  REQUIRE(pages.size() == 2 * Navigator::TrimmedDepth);
+  CHECK(pages.at(1).toMap().value(QStringLiteral("route")).toString() == QStringLiteral("home"));
+  CHECK(pages.last().toMap().value(QStringLiteral("route")).toString() == stack.last());
+
+  // Back walks the kept pages down to home.
+  for (int i = 1; i < Navigator::TrimmedDepth; ++i) CHECK(navigator.back());
+  CHECK(navigator.currentRoute() == QStringLiteral("home"));
+  CHECK_FALSE(navigator.back());
+
+  // Many more pages never grow it past the limit.
+  for (int i = 0; i < 200; ++i) {
+    CHECK(navigator.navigate(QStringLiteral("item/x%1").arg(i)));
+    CHECK(navigator.depth() <= Navigator::MaxDepth);
+  }
+}
+
 TEST_CASE("Geometry round-trips through the settings text") {
   const QRect rect(-100, 20, 1280, 800);
   CHECK(decodeGeometry(encodeGeometry(rect)) == rect);
@@ -296,6 +330,59 @@ TEST_CASE("The window opens where it was, or on a screen that is still there") {
   // Larger than the screen now: shrunk to fit.
   const QRect huge(0, 0, 4000, 3000);
   CHECK(placeWindow(huge, QStringLiteral("left"), onlyLeft, 0, defaultSize).size() == QSize(1920, 1040));
+}
+
+TEST_CASE("Leaving full screen brings back the window's size and maximized state") {
+  using Restore = WindowShape::Restore;
+  const QRect screen(0, 0, 2560, 1440);
+  const QRect normal(200, 150, 1500, 900);
+
+  // A plain window, resized by the user, goes full screen and back.
+  WindowShape shape;
+  shape.start(QRect(640, 320, 1280, 800), false);
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Nothing);
+  shape.geometryChanged(QWindow::Windowed, normal, screen);
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  // The switch reports the screen-sized rectangle, sometimes still as a
+  // plain window: not the window's own size.
+  shape.geometryChanged(QWindow::Windowed, screen, screen);
+  shape.geometryChanged(QWindow::FullScreen, screen, screen);
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
+  CHECK(shape.normalGeometry() == normal);
+  CHECK_FALSE(shape.maximized());
+
+  // A maximized window goes back to maximized, keeping its normal size.
+  CHECK(shape.visibilityChanged(QWindow::Maximized) == Restore::Nothing);
+  shape.geometryChanged(QWindow::Maximized, QRect(0, 0, 2560, 1400), screen);
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(shape.maximized());
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Maximize);
+  CHECK(shape.normalGeometry() == normal);
+  CHECK(shape.visibilityChanged(QWindow::Maximized) == Restore::Nothing);
+
+  // Un-maximizing by hand is not a full-screen exit: nothing to undo.
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Nothing);
+  CHECK_FALSE(shape.maximized());
+
+  // Minimizing in full screen and coming back keeps the memory.
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(shape.visibilityChanged(QWindow::Minimized) == Restore::Nothing);
+  CHECK(shape.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
+}
+
+TEST_CASE("A window started in full screen leaves it into the saved shape") {
+  using Restore = WindowShape::Restore;
+  WindowShape maximized;
+  maximized.start(QRect(100, 100, 1280, 800), true);
+  CHECK(maximized.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(maximized.visibilityChanged(QWindow::Windowed) == Restore::Maximize);
+
+  WindowShape plain;
+  plain.start(QRect(100, 100, 1280, 800), false);
+  CHECK(plain.visibilityChanged(QWindow::FullScreen) == Restore::Nothing);
+  CHECK(plain.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
+  CHECK(plain.normalGeometry() == QRect(100, 100, 1280, 800));
 }
 
 TEST_CASE("Simplified effects turn on with integrated and software graphics") {

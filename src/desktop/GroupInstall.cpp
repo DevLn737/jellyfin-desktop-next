@@ -62,7 +62,8 @@ namespace jfd::desktop {
     threshold.label = QT_TRANSLATE_NOOP("GroupSettings", "Seek when out of step by more than");
     threshold.description = QT_TRANSLATE_NOOP(
         "GroupSettings",
-        "With speed correction on, differences up to 3 seconds are made up by speed first.");
+        "With speed correction on, differences up to about half a second are made up by speed first "
+        "(at most 10% faster or slower than the group).");
     section.settings.append(threshold);
     return registry.registerSection(std::move(section));
   }

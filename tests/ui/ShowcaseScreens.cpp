@@ -28,6 +28,7 @@
 
 #include <QBuffer>
 #include <QDir>
+#include <QFile>
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -49,6 +50,7 @@
 #include <QTranslator>
 #include <QtQml/qqmlextensionplugin.h>
 
+#include <atomic>
 #include <cmath>
 
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
@@ -120,11 +122,34 @@ namespace {
     return list;
   }
 
+  // Titles outside the libraries, reached by their pages only: w1 is a
+  // daily show whose one season has 600 episodes.
+  const QList<Title>& hiddenTitles() {
+    static const QList<Title> list{
+        {QStringLiteral("w1"), QStringLiteral("Утренний эфир"), QStringLiteral("Series"), QString(), 2024,
+         {QStringLiteral("Ток-шоу")}, QStringLiteral("12+"), 6.4, 24, 30, false,
+         QStringLiteral("Каждое утро в студии новые гости, новости и погода.")},
+    };
+    return list;
+  }
+
+  // Every title, those in the libraries first.
+  const QList<Title>& allTitles() {
+    static const QList<Title> list = titles() + hiddenTitles();
+    return list;
+  }
+
   const Title* titleById(const QString& id) {
-    for (const Title& t : titles())
+    for (const Title& t : allTitles())
       if (t.id == id) return &t;
     return nullptr;
   }
+
+  constexpr int LongSeason = 600;
+  // Its first 30 episodes are watched, so it opens at the range 25-48.
+  constexpr int LongSeasonWatched = 30;
+  // Stills of the long season asked of the server.
+  std::atomic<int> longSeasonStills{0};
 
   const QStringList& episodeNames() {
     static const QStringList names{QStringLiteral("Журнал"),        QStringLiteral("Первый шторм"),
@@ -136,7 +161,10 @@ namespace {
 
   // Series s1 has two seasons of 8; the others one season of 6.
   int seasonsOf(const QString& seriesId) { return seriesId == QLatin1String("s1") ? 2 : 1; }
-  int episodesIn(const QString& seriesId) { return seriesId == QLatin1String("s1") ? 8 : 6; }
+  int episodesIn(const QString& seriesId) {
+    if (seriesId == QLatin1String("w1")) return LongSeason;
+    return seriesId == QLatin1String("s1") ? 8 : 6;
+  }
 
   // "Continue watching": s1 S1E3 at 12:40 of 48 min; m1 at 40 min.
   constexpr qint64 ResumeEpisodeTicks = 12 * TicksPerMinute + 40 * 10'000'000LL;
@@ -218,7 +246,8 @@ namespace {
     const QString id = episodeId(series.id, season, episode);
     const bool s1 = series.id == QLatin1String("s1");
     // s1: season 1 episodes 1-2 watched, 3 in progress.
-    const bool played = s1 && season == 1 && episode < 3;
+    const bool played = (s1 && season == 1 && episode < 3) ||
+                        (series.id == QLatin1String("w1") && episode <= LongSeasonWatched);
     const qint64 position = s1 && season == 1 && episode == 3 ? ResumeEpisodeTicks : 0;
     QJsonObject o{{QStringLiteral("Id"), id},
                   {QStringLiteral("Name"), episodeNames().value((episode - 1 + (season - 1) * 3) % episodeNames().size())},
@@ -260,7 +289,7 @@ namespace {
   // Finds any item by id: a title, a season or an episode.
   std::optional<QJsonObject> itemById(const QString& id) {
     if (const Title* t = titleById(id)) return titleJson(*t);
-    for (const Title& t : titles()) {
+    for (const Title& t : allTitles()) {
       if (t.type != QLatin1String("Series") || !id.startsWith(t.id)) continue;
       for (int s = 1; s <= seasonsOf(t.id); ++s) {
         if (id == QStringLiteral("%1s%2").arg(t.id).arg(s)) return seasonJson(t, s);
@@ -360,7 +389,7 @@ namespace {
 
   QImage episodeThumb(const QString& seriesId, int season, int episode) {
     const Title* t = titleById(seriesId);
-    return scene(640, 360, (t ? t->hue : 200) + episode * 6, qHash(episodeId(seriesId, season, episode)));
+    return scene(640, 360, ((t ? t->hue : 200) + episode * 6) % 360, qHash(episodeId(seriesId, season, episode)));
   }
 
   test::HttpResponse image(const QString& path) {
@@ -368,6 +397,7 @@ namespace {
     const QStringList parts = path.split(QLatin1Char('/'), Qt::SkipEmptyParts);
     const QString id = parts.value(1);
     const QString type = parts.value(3);
+    if (id.startsWith(QLatin1String("w1e"))) ++longSeasonStills;
     static QHash<QString, QByteArray> cache;
     const QString key = id + QLatin1Char('/') + type;
     if (cache.contains(key)) return {200, cache.value(key), type == QLatin1String("Logo") ? "image/png" : "image/jpeg"};
@@ -381,7 +411,7 @@ namespace {
       bytes = encode(poster(*t), "JPEG");
     } else {
       // A season (poster of its series) or an episode (a still).
-      for (const Title& series : titles()) {
+      for (const Title& series : allTitles()) {
         if (!id.startsWith(series.id)) continue;
         const qsizetype e = id.indexOf(QLatin1Char('e'), series.id.size());
         if (e > 0) {
@@ -550,9 +580,10 @@ namespace {
   class Showcase {
   public:
     Showcase() : server(handle) {
-      // As the app draws text (main.cpp); JFD_TEXT_RENDERING=qt for the old look.
-      QQuickWindow::setTextRenderType(qgetenv("JFD_TEXT_RENDERING") == "qt" ? QQuickWindow::QtTextRendering
-                                                                           : QQuickWindow::NativeTextRendering);
+      // As the app draws text by default (main.cpp); JFD_TEXT_RENDERING=sharp
+      // for the system's rasteriser.
+      QQuickWindow::setTextRenderType(qgetenv("JFD_TEXT_RENDERING") == "sharp" ? QQuickWindow::NativeTextRendering
+                                                                              : QQuickWindow::QtTextRendering);
       ui::LibraryScreens::Config config;
       config.identity.version = QStringLiteral("0.0.1");
       config.identity.device = QStringLiteral("showcase");
@@ -857,6 +888,60 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
   show.page()->setProperty("filtersOpen", false);
 }
 
+TEST_CASE("A season of 600 episodes makes the cards and stills of one range only") {
+  Showcase show;
+  REQUIRE(waitFor([&] { return show.screens->home().featured()->count() == 5; }, Timeout));
+  longSeasonStills = 0;
+  show.resize(1600, 900);
+
+  show.navigator->navigate(QStringLiteral("item/w1"));
+  QObject* episodes = nullptr;
+  REQUIRE(waitFor([&] {
+    episodes = show.find("episodes");
+    return episodes != nullptr && episodes->property("total").toInt() == LongSeason;
+  }, Timeout));
+  // It opens at the range of the first episode not watched (31: 25-48),
+  // with 24 cards, and says how many of the 600 are watched.
+  CHECK(waitFor([&] { return episodes->property("range").toInt() == 1; }, Timeout));
+  CHECK(episodes->property("count").toInt() == 24);
+  CHECK(episodes->property("watched").toInt() == LongSeasonWatched);
+  CHECK(episodes->property("rangeCount").toInt() == 25);
+  QQuickItem* card = nullptr;
+  QMetaObject::invokeMethod(episodes, "itemAt", Q_RETURN_ARG(QQuickItem*, card), Q_ARG(int, 0));
+  REQUIRE(card != nullptr);
+  CHECK(card->property("number").toString() == QStringLiteral("25"));
+  QQuickItem* ranges = show.item("episodeRanges");
+  REQUIRE(ranges != nullptr);
+  CHECK(ranges->isVisible());
+
+  QObject* flick = show.find("itemFlick");
+  REQUIRE(flick != nullptr);
+  flick->setProperty("contentY", 560);
+  show.screenshot(QStringLiteral("series-1600-long-season"));
+  // Only that range's stills were asked for, not the season's 600.
+  CHECK(waitFor([&] { return longSeasonStills.load() > 0; }, Timeout));
+  Showcase::settle(500);
+  MESSAGE("stills asked for: ", longSeasonStills.load());
+  CHECK(longSeasonStills.load() <= 2 * 24);
+
+  // Another range replaces the cards (still 24) and their numbers; the
+  // last one has the remaining 24 (577-600).
+  episodes->setProperty("range", 24);
+  CHECK(waitFor([&] { return episodes->property("count").toInt() == 24; }, Timeout));
+  QMetaObject::invokeMethod(episodes, "itemAt", Q_RETURN_ARG(QQuickItem*, card), Q_ARG(int, 23));
+  REQUIRE(card != nullptr);
+  CHECK(card->property("number").toString() == QStringLiteral("600"));
+  // Clicking it plays that episode, not the 24th of the season.
+  QString played;
+  show.screens->ui()->setPlayHandler([&](const QString& id, qint64) { played = id; });
+  QMetaObject::invokeMethod(card, "clicked");
+  CHECK(waitFor([&] { return !played.isEmpty(); }, Timeout));
+  CHECK(played == episodeId(QStringLiteral("w1"), 1, LongSeason));
+  show.screens->ui()->setPlayHandler([](const QString&, qint64) {});
+  Showcase::settle(500);
+  CHECK(longSeasonStills.load() <= 4 * 24);
+}
+
 TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
   Showcase show;
   show.navigator->navigate(QStringLiteral("settings"));
@@ -869,6 +954,27 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
   // The section list: one entry per section; choosing one scrolls to it.
   REQUIRE(waitFor([&] { return show.item("settingsSection_diagnostics") != nullptr; }, Timeout));
   show.screenshot(QStringLiteral("settings-1600"));
+  // Every section the application registers has an icon file (light and
+  // dark), and Interface and Appearance are told apart.
+  QQuickItem* settingsPage = show.page();
+  REQUIRE(settingsPage != nullptr);
+  const auto iconFor = [&](const char* id) {
+    QVariant icon;
+    QMetaObject::invokeMethod(settingsPage, "iconFor", Q_RETURN_ARG(QVariant, icon),
+                              Q_ARG(QVariant, QString::fromLatin1(id)));
+    return icon.toUrl();
+  };
+  for (const char* id : {"playback", "subtitles", "audio", "interface", "appearance", "window", "library", "music",
+                         "input", "syncplay", "downloads", "integrations", "seerr", "remote", "account",
+                         "diagnostics", "legacy"}) {
+    CAPTURE(id);
+    const QUrl icon = iconFor(id);
+    REQUIRE(icon.scheme() == QStringLiteral("qrc"));
+    const QString file = QLatin1Char(':') + icon.path();
+    CHECK(QFile::exists(file));
+    CHECK(QFile::exists(QString(file).replace(QStringLiteral("/icons/"), QStringLiteral("/icons-dark/"))));
+  }
+  CHECK(iconFor("interface") != iconFor("appearance"));
   QMetaObject::invokeMethod(show.item("settingsSection_diagnostics"), "clicked");
   CHECK(waitFor([&] { return list->property("contentY").toDouble() > 100; }, Timeout));
   CHECK(waitFor([&] { return show.item("settingsSection_diagnostics")->property("current").toBool(); }, Timeout));

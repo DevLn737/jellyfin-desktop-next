@@ -210,10 +210,11 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingSmall
 
-            // The gamepad's keys for the sheet.
+            // The gamepad's keys for the sheet, while one is in use.
             Row {
+                objectName: "episodesHints"
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Theme.tvMode
+                visible: Theme.focusDriven
                 spacing: Theme.spacingSmall
                 KeyCap { text: "LB" }
                 KeyCap { text: "RB" }

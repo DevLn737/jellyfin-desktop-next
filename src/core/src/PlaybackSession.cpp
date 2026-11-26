@@ -73,6 +73,8 @@ namespace jfd::core {
             [&](const intent::Next&) { return true; },
             [&](const intent::Previous&) { return true; },
             [&](const intent::SetSyncCorrection&) { return true; },
+            [&](const intent::SetAutoNext&) { return true; },
+            [&](const intent::OpenFailed&) { return true; },
             [&](const intent::PreloadNext&) { return true; },
             [&](const backend::Advanced& advanced) {
               return m_media.has_value() && m_media->epoch == advanced.from && m_preload &&
@@ -126,9 +128,13 @@ namespace jfd::core {
   void PlaybackSession::on(const intent::Open& open) {
     if (m_media) m_ports.backend.stop(m_media->epoch);
     m_preload.reset();
+    // The reopen after an error, or anything else the app opened instead.
+    const bool reopened = m_reopen && m_reopen->item == open.media.item;
+    m_reopen.reset();
     Media media;
     media.epoch = m_mediaEpochs.advance();
     media.request = open.media;
+    media.reopened = reopened;
     media.timeline = Timeline(open.media.timeline, open.media.start);
     media.duration = open.media.runTime;
     media.paused = true;
@@ -164,6 +170,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Play&) {
     if (groupDrives()) {
+      if (groupOffline()) return;
       send(outgoing::RequestUnpause{m_group->epoch});
       return;
     }
@@ -172,6 +179,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Pause&) {
     if (groupDrives()) {
+      if (groupOffline()) return;
       send(outgoing::RequestPause{m_group->epoch});
       return;
     }
@@ -180,6 +188,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::Seek& seek) {
     if (groupDrives()) {
+      if (groupOffline()) return;
       send(outgoing::RequestSeek{m_group->epoch, seek.position});
       return;
     }
@@ -188,6 +197,7 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::SetRate& rate) {
     if (groupDrives()) {
+      if (groupOffline()) return;
       // The group rate is a base rate; the server validates the same range.
       if (const auto base = PlaybackRate::basePerMille(rate.rate.perMille()))
         send(outgoing::RequestPlaybackRate{m_group->epoch, *base});
@@ -199,7 +209,11 @@ namespace jfd::core {
   }
 
   void PlaybackSession::on(const intent::Stop&) {
+    // A reopen still on its way is not wanted any more.
+    if (m_reopen && !m_media) m_endPhase = PlaybackPhase::Idle;
+    m_reopen.reset();
     if (groupDrives()) {
+      if (groupOffline()) return;
       send(outgoing::RequestStop{m_group->epoch});
       return;
     }
@@ -212,12 +226,24 @@ namespace jfd::core {
 
   void PlaybackSession::on(const intent::SetSyncCorrection& set) { m_settings.reconciler = set.reconciler; }
 
+  void PlaybackSession::on(const intent::SetAutoNext& set) { m_autoNext = set.enabled; }
+
+  void PlaybackSession::on(const intent::OpenFailed& failed) {
+    // Only a reopen this session asked for is its business; a group item
+    // the app could not resolve is left by the app itself.
+    if (!m_reopen || m_reopen->item != failed.item || m_media) return;
+    m_endPhase = PlaybackPhase::Failed;
+    m_error = std::move(m_reopen->error);
+    m_reopen.reset();
+  }
+
   void PlaybackSession::stepQueue(bool forward) {
     if (!m_group) {
       m_ports.observer.notify(notice::QueueStepRequested{forward});
       return;
     }
     if (m_group->playlistItem.isEmpty()) return;
+    if (groupOffline()) return;
     if (forward)
       send(outgoing::RequestNextItem{m_group->epoch, m_group->playlistItem});
     else
@@ -279,46 +305,125 @@ namespace jfd::core {
     Media& media = *m_media;
     const auto completed =
         media.readiness.restarted(media.position, restarted.sample.seeking, media.paused);
-    if (!completed) return;
-    const ReadyPurpose purpose = media.purpose;
-    media.purpose = ReadyPurpose::None;
-    media.target.reset();
-    cancel(media.readyDeadline);
-    media.started = true;
-    readyConfirmed(purpose);
+    if (completed) {
+      const ReadyPurpose purpose = media.purpose;
+      media.purpose = ReadyPurpose::None;
+      media.target.reset();
+      media.seekRetried = false;
+      cancel(media.readyDeadline);
+      media.started = true;
+      if (media.seekIssuedAt) {
+        // Clamped, so one stall does not make every later seek aim far ahead.
+        const WallTicks took = std::min<WallTicks>(now() - *media.seekIssuedAt, std::chrono::seconds(3));
+        m_seekLatency = m_seekLatency ? (*m_seekLatency * 3 + took) / 4 : took;
+        media.seekIssuedAt.reset();
+      }
+      readyConfirmed(purpose);
+    }
+    // Pause, seeking and buffering changes that came with the restart are
+    // in this sample only: no Progress may follow while paused.
+    if (m_media && m_group && mediaFollowsGroup() && m_media->started) reportBufferingState();
   }
 
   void PlaybackSession::on(const backend::Progress& progress) {
-    const bool wasBuffering = m_media->buffering;
     applySample(progress.sample);
     if (!m_group || !mediaFollowsGroup() || !m_media->started) return;
-    if (m_media->purpose == ReadyPurpose::None) {
-      if (m_media->buffering != wasBuffering) {
-        // Leaving any correction while the backend waits for data, as Web does.
-        if (m_media->buffering) clearCorrection();
-        reportReady(!m_media->buffering);
-      } else if (!m_media->buffering && m_group->reportedBuffering) {
-        // Buffering ended during a seek (the group's Pause answers our
-        // Buffering with one): the group waits for our Ready until we send it.
-        reportReady(true);
-      }
-    }
+    reportBufferingState();
     synchronize();
+  }
+
+  void PlaybackSession::reportBufferingState() {
+    // A seek of ours reports (or not) when it is ready; until then the
+    // backend's buffering belongs to the seek.
+    if (m_media->purpose != ReadyPurpose::None) return;
+    if (m_media->buffering && !m_group->reportedBuffering) {
+      // Leaving any correction while the backend waits for data, as Web does.
+      clearCorrection();
+      reportReady(false);
+    } else if (!m_media->buffering && m_group->reportedBuffering) {
+      // Buffering ended, perhaps during a seek (the group's Pause answers
+      // our Buffering with one): the group waits for our Ready until we
+      // send it.
+      reportReady(true);
+    }
   }
 
   void PlaybackSession::on(const backend::Ended& ended) {
     switch (ended.reason) {
-    case backend::EndReason::EndOfFile:
+    case backend::EndReason::EndOfFile: {
+      // Nobody hosts a group: every member that reaches the end asks for the
+      // next item, as Jellyfin Web does. The server moves on for the first
+      // and ignores the rest (they name an item that is no longer current).
+      const bool askNext = m_autoNext && mediaFollowsGroup() && m_group->connected &&
+                           m_group->hasNextItem &&
+                           m_group->nextRequestedFor != m_media->request.playlistItem;
+      const PlaylistItemId item = m_media->request.playlistItem;
       stopMedia(PlaybackPhase::Ended);
+      if (askNext) {
+        m_group->nextRequestedFor = item;
+        send(outgoing::RequestNextItem{m_group->epoch, item});
+      }
       break;
+    }
     case backend::EndReason::Stopped:
       stopMedia(PlaybackPhase::Idle);
       break;
-    case backend::EndReason::Error:
-      stopMedia(PlaybackPhase::Failed, ended.error.empty() ? "Playback failed." : ended.error);
+    case backend::EndReason::Error: {
+      std::string error = ended.error.empty() ? "Playback failed." : ended.error;
+      if (reopenAfterError(error)) break;
+      if (mediaFollowsGroup()) {
+        failGroupItem(std::move(error));
+        break;
+      }
+      stopMedia(PlaybackPhase::Failed, std::move(error));
       break;
     }
+    }
   }
+
+  bool PlaybackSession::reopenAfterError(std::string error) {
+    Media& media = *m_media;
+    // Only a file that played: one that never opened will not open now
+    // either. A live stream (no run time) has no position to return to.
+    if (media.reopened || !media.started || !media.position || !media.request.runTime ||
+        media.request.audioOnly)
+      return false;
+    // The group moved on to another item, which the app is opening: a
+    // reopen of the old one would replace it.
+    if (m_group && !media.request.playlistItem.isEmpty() && !mediaFollowsGroup()) return false;
+    notice::ReopenAfterError reopen;
+    reopen.item = media.request.item;
+    reopen.mediaSource = media.request.mediaSource;
+    reopen.playlistItem = media.request.playlistItem;
+    reopen.position = *media.position;
+    reopen.startPaused = media.paused;
+    if (mediaFollowsGroup()) {
+      // The group waits for us as for any member that waits for data: the
+      // reopened file reports Ready like a first load (GroupOpen).
+      if (!m_group->reportedBuffering && media.purpose == ReadyPurpose::None) {
+        clearCorrection();
+        reportReady(false);
+      }
+      reopen.startPaused = true;
+    }
+    stopMedia(PlaybackPhase::Loading);
+    m_reopen = Reopen{reopen.item, reopen.playlistItem, std::move(error)};
+    m_ports.observer.notify(reopen);
+    return true;
+  }
+
+  void PlaybackSession::failGroupItem(std::string error) {
+    stopMedia(PlaybackPhase::Failed, std::move(error));
+    m_ports.observer.notify(notice::GroupItemFailed{});
+  }
+
+  bool PlaybackSession::groupOffline() {
+    if (m_group->connected) return false;
+    m_ports.observer.notify(notice::GroupOffline{});
+    return true;
+  }
+
+  WallTicks PlaybackSession::seekLead() const { return m_seekLatency.value_or(WallTicks(0)); }
 
   void PlaybackSession::on(const backend::RequestFailed& failed) {
     Media& media = *m_media;
@@ -401,6 +506,7 @@ namespace jfd::core {
     }
     group.lastQueueUpdate = queue.lastUpdate;
     group.baseRate = queue.baseRate;
+    group.hasNextItem = queue.hasNextItem;
     applyEffectiveRate();
     if (!changesCurrentItem(queue.reason)) return;
     const bool itemChanged = group.playlistItem != queue.currentPlaylistItem;
@@ -410,9 +516,12 @@ namespace jfd::core {
     if (m_media && m_media->request.playlistItem == group.playlistItem) {
       // Rejoining (or a queue edit) with this occurrence already open: report
       // where we are instead of reloading, now or once a pending seek is done.
-      if (!m_media->started)
+      if (!m_media->started) {
         m_media->purpose = ReadyPurpose::GroupOpen;
-      else if (m_media->purpose == ReadyPurpose::None)
+        // Its own deadline may have passed while it was a file of our own.
+        if (!m_media->readyDeadline)
+          m_media->readyDeadline = arm(TimerPurpose::ReadyDeadline, now() + m_settings.readyDeadline);
+      } else if (m_media->purpose == ReadyPurpose::None)
         reportReady(true);
       else if (m_media->purpose != ReadyPurpose::GroupOpen)
         m_media->purpose = ReadyPurpose::GroupSeek;
@@ -493,6 +602,12 @@ namespace jfd::core {
       // Not another file the user opened on their own while in the group.
       if (command.type == GroupCommandType::Stop && m_media && mediaFollowsGroup())
         stopMedia(PlaybackPhase::Idle);
+      // The group stopped while our reopen is on its way: nothing to wait for.
+      if (command.type == GroupCommandType::Stop && !m_media && m_reopen &&
+          m_reopen->playlistItem == group.playlistItem) {
+        m_reopen.reset();
+        m_endPhase = PlaybackPhase::Idle;
+      }
       return;
     }
 
@@ -547,15 +662,36 @@ namespace jfd::core {
       m_group->syncEnabled = true;
       applyEffectiveRate();
       break;
-    case TimerPurpose::ReadyDeadline:
+    case TimerPurpose::ReadyDeadline: {
       if (!m_media || m_media->readyDeadline != fired.id) break;
       m_media->readyDeadline.reset();
+      const ReadyPurpose purpose = m_media->purpose;
+      if (purpose == ReadyPurpose::Sync) {
+        // A correction seek whose restart never came (mpv merged or dropped
+        // it): stop waiting, so drift correction and the buffering report
+        // go on. A late restart still completes it harmlessly.
+        m_media->purpose = ReadyPurpose::None;
+        m_media->target.reset();
+        m_media->seekIssuedAt.reset();
+        if (m_group && mediaFollowsGroup() && m_media->started) {
+          // Each sends Ready only when the other does not.
+          readyAfterGroupPause();
+          reportBufferingState();
+        }
+        break;
+      }
       m_ports.observer.notify(notice::ReadyTimedOut{m_media->target.value_or(MediaTicks{})});
-      if (m_media->purpose == ReadyPurpose::GroupSeek && m_media->target) {
-        // As Jellyfin Web does after its ready timeout: seek again.
+      if (purpose == ReadyPurpose::GroupSeek && m_media->target && !m_media->seekRetried) {
+        // As Jellyfin Web does after its ready timeout: seek again, once.
+        m_media->seekRetried = true;
         seekTo(*m_media->target, ReadyPurpose::GroupSeek);
+      } else if ((purpose == ReadyPurpose::GroupOpen || purpose == ReadyPurpose::GroupSeek) &&
+                 mediaFollowsGroup()) {
+        // The group would wait for our Ready forever.
+        failGroupItem("The file did not become ready in time.");
       }
       break;
+    }
     }
   }
 
@@ -601,6 +737,10 @@ namespace jfd::core {
       if (const auto position = media.timeline.toMedia(*sample.position)) {
         media.position = position;
         media.sampledAt = sample.sampledAt;
+        // A reopened file that played on for a minute may be reopened again.
+        if (media.reopened && media.started &&
+            *position - media.request.start >= MediaDelta::fromMilliseconds(60'000))
+          media.reopened = false;
       }
     }
   }
@@ -617,9 +757,12 @@ namespace jfd::core {
     media.readiness.begin(request, target, true);
     media.purpose = purpose;
     media.target = target;
+    media.seekIssuedAt = now();
     cancel(media.readyDeadline);
     if (purpose == ReadyPurpose::GroupSeek || purpose == ReadyPurpose::Local)
       media.readyDeadline = arm(TimerPurpose::ReadyDeadline, now() + m_settings.readyDeadline);
+    else if (purpose == ReadyPurpose::Sync)
+      media.readyDeadline = arm(TimerPurpose::ReadyDeadline, now() + m_settings.syncReadyDeadline);
     m_ports.backend.seek(media.epoch, request, *backendTarget);
     return true;
   }
@@ -654,11 +797,26 @@ namespace jfd::core {
     case ReadyPurpose::GroupSeek:
       if (mediaFollowsGroup()) reportReady(true);
       break;
+    case ReadyPurpose::Sync:
+      readyAfterGroupPause();
+      break;
     case ReadyPurpose::None:
     case ReadyPurpose::Local:
-    case ReadyPurpose::Sync:
       break;
     }
+  }
+
+  void PlaybackSession::readyAfterGroupPause() {
+    // The group's Pause while it waits (for us, or for another member): the
+    // server may have marked us not ready (our Buffering and Ready can reach
+    // it in either order), so the paused seek ends with a Ready. The server
+    // takes a Ready from a member it does not wait for as a no-op.
+    if (!m_group || !mediaFollowsGroup() || !m_media->paused || m_media->buffering) return;
+    if (m_group->state != GroupState::Waiting || !m_group->lastCommand ||
+        m_group->lastCommand->type != GroupCommandType::Pause)
+      return;
+    if (m_group->reportedBuffering) return; // reportBufferingState sends it.
+    reportReady(true);
   }
 
   void PlaybackSession::reportReady(bool ready) {
@@ -735,21 +893,29 @@ namespace jfd::core {
       if (late) {
         // The group already started: join at its current position, unless we
         // are already close enough for speed correction to cover the rest.
-        const auto target = groupPosition(
-            GroupTimeline{command.position, command.when, command.baseRate}, serverNow());
-        if (target && (!m_media->position ||
-                       (*target - *m_media->position).abs() >= m_settings.reconciler.speedMinimum))
-          seekTo(*target, ReadyPurpose::Sync);
+        const GroupTimeline timeline{command.position, command.when, command.baseRate};
+        const auto here = groupPosition(timeline, serverNow());
+        if (here && (!m_media->position ||
+                     (*here - *m_media->position).abs() >= m_settings.reconciler.speedMinimum)) {
+          // The group moves on while the seek runs: aim where it will be.
+          const auto target = groupPosition(timeline, serverNow() + seekLead());
+          seekTo(target.value_or(*here), ReadyPurpose::Sync);
+        }
       }
       setPaused(false);
       m_group->cooldownTimer =
           arm(TimerPurpose::CorrectionCooldown, now() + m_settings.correctionCooldown);
       break;
     }
-    case GroupCommandType::Pause:
+    case GroupCommandType::Pause: {
       setPaused(true);
-      seekTo(command.position, ReadyPurpose::Sync);
+      // A group seek still on its way owes the group a Ready (the server
+      // pauses everyone when a member joins, also while others seek): the
+      // new seek keeps that purpose so the Ready is still sent.
+      const bool owesReady = m_media->purpose == ReadyPurpose::GroupSeek;
+      seekTo(command.position, owesReady ? ReadyPurpose::GroupSeek : ReadyPurpose::Sync);
       break;
+    }
     case GroupCommandType::Seek:
       setPaused(true);
       seekTo(command.position, ReadyPurpose::GroupSeek);
@@ -837,7 +1003,9 @@ namespace jfd::core {
                      group.correction = SyncCorrection::Skip;
                      clearCorrection();
                      group.correction = SyncCorrection::Skip;
-                     seekTo(skip.position, ReadyPurpose::Sync);
+                     // Where the group will be once the seek is done.
+                     const auto ahead = groupPosition(timeline, m_offset.toServer(current) + seekLead());
+                     seekTo(ahead.value_or(skip.position), ReadyPurpose::Sync);
                      group.cooldownTimer = arm(TimerPurpose::CorrectionCooldown,
                                                current + m_settings.correctionCooldown);
                    },

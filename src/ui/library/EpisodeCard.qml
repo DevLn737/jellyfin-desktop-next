@@ -17,11 +17,12 @@ T.ItemDelegate {
     required property int index
 
     property real cardWidth: 300
-    // The episode's number in its season ("S1:E3" gives 3).
-    readonly property string number: {
-        const match = /E(\d+)/.exec(model.subtitle || "")
-        return match ? match[1] : String(index + 1)
-    }
+    // The row of the first card of the page's range, so the fallback
+    // number counts from the season's start.
+    property int firstRow: 0
+    // The episode's number in its season; its place in the list without one.
+    readonly property string number: model.indexNumber !== undefined && model.indexNumber !== null
+                                     ? String(model.indexNumber) : String(firstRow + index + 1)
 
     signal playClicked()
 
@@ -50,7 +51,9 @@ T.ItemDelegate {
             Image {
                 anchors.fill: parent
                 source: Library.image(card.model.imageUrl)
-                sourceSize.width: still.width * 2
+                // Decoded at the screen's pixels, in steps of 160, so a
+                // resize does not reload every still.
+                sourceSize.width: Math.ceil(still.width * Screen.devicePixelRatio / 160) * 160
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
             }

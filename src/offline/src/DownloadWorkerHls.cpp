@@ -5,6 +5,7 @@
 #include <jfd/offline/DownloadWorker.h>
 
 #include "DownloadTransfer.h"
+#include "FileSync.h"
 
 #include <jfd/api/Downloads.h>
 
@@ -222,7 +223,7 @@ namespace jfd::offline {
       if (!t.file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
           t.file.write(body) != body.size() || !t.file.flush()) {
         t.file.close();
-        finish(t.job.key, TransferOutcome::DiskError);
+        finish(t.job.key, writeFailure(m_guard.get(), t.job.partPath));
         return;
       }
       t.file.close();
@@ -255,6 +256,8 @@ namespace jfd::offline {
       finish(t.job.key, TransferOutcome::SizeMismatch);
       return;
     }
+    // On the disk before it takes the final name (see DownloadWorker.cpp).
+    if (!syncFileToDisk(t.job.partPath)) qCWarning(lcTranscode) << "could not flush the copy to the disk";
     if (QFileInfo::exists(t.job.finalPath)) QFile::remove(t.job.finalPath);
     if (!QDir().mkpath(QFileInfo(t.job.finalPath).path()) ||
         !QFile::rename(t.job.partPath, t.job.finalPath)) {
@@ -278,7 +281,7 @@ namespace jfd::offline {
         t.file.write(body) != body.size() || !t.file.flush() ||
         !t.file.resize(t.partBytes + body.size())) {
       t.file.close();
-      finish(t.job.key, TransferOutcome::DiskError);
+      finish(t.job.key, writeFailure(m_guard.get(), t.job.partPath));
       return;
     }
     t.file.close();

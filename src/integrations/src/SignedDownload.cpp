@@ -82,19 +82,19 @@ namespace jfd::integrations {
   }
 
   void SignedDownload::start(const ReleaseAsset& file, const ReleaseAsset& signature, const QString& path,
-                             const QString& assetName, const MinisignPublicKey& key, Done done) {
+                             const QString& assetName, MinisignKeys keys, Done done) {
     m_path = path;
     m_done = std::move(done);
     const QString signaturePath = path + QStringLiteral(".minisig");
     const QUrl signatureUrl = signature.url;
     const qint64 signatureSize = signature.size;
-    auto checkSignature = [this, path, signaturePath, signatureUrl, signatureSize, assetName, key] {
-      download(signatureUrl, signaturePath, signatureSize, [this, path, signaturePath, assetName, key] {
+    auto checkSignature = [this, path, signaturePath, signatureUrl, signatureSize, assetName, keys] {
+      download(signatureUrl, signaturePath, signatureSize, [this, path, signaturePath, assetName, keys] {
         QFile signatureFile(signaturePath);
         QFile data(path);
         const bool opened = signatureFile.open(QIODevice::ReadOnly) && data.open(QIODevice::ReadOnly);
         const QByteArray signatureText = opened ? signatureFile.read(4096) : QByteArray();
-        const SignatureCheck check = opened ? verifyReleaseFile(data, signatureText, assetName, key)
+        const SignatureCheck check = opened ? verifyReleaseFile(data, signatureText, assetName, keys)
                                             : SignatureCheck{false, QStringLiteral("cannot read the download"), {}};
         data.close();
         signatureFile.close();

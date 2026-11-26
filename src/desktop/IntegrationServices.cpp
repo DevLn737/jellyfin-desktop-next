@@ -146,11 +146,11 @@ namespace jfd::desktop {
 #ifdef Q_OS_WIN
       integrations.msi = std::make_unique<integrations::MsiUpdater>(
           &integrations.network, QCoreApplication::applicationFilePath(), integrations::MsiUpdater::installedFolder(),
-          state, integrations::releasePublicKey());
+          state, integrations::releasePublicKeys());
       startUpdates(services, window, *integrations.msi);
 #else
       integrations.appImage = std::make_unique<integrations::AppImageUpdater>(
-          &integrations.network, qEnvironmentVariable("APPIMAGE"), state, integrations::releasePublicKey());
+          &integrations.network, qEnvironmentVariable("APPIMAGE"), state, integrations::releasePublicKeys());
       startUpdates(services, window, *integrations.appImage);
 #endif
     }

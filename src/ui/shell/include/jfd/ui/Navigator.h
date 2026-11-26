@@ -29,6 +29,9 @@ namespace jfd::ui {
       // Ascending; ties keep the order of registration.
       int order = 0;
       Placement placement = Placement::Primary;
+      // A shorter text for the top bar's pill (same translation context);
+      // empty: `text`.
+      QString shortText = {};
     };
 
     QString name;
@@ -80,8 +83,17 @@ namespace jfd::ui {
     Q_PROPERTY(QVariantList sidebarEntries READ sidebarEntries NOTIFY sidebarChanged)
 
   public:
-    enum class Operation { Push, Pop, Replace, Reset };
+    // Rebuild: the stack was trimmed; the view starts again from pages(),
+    // creating only the top page (the others when Back reaches them).
+    enum class Operation { Push, Pop, Replace, Reset, Rebuild };
     Q_ENUM(Operation)
+
+    // The most pages kept: a push past it drops the oldest pages above the
+    // first (home) down to TrimmedDepth, so an evening of item -> similar ->
+    // person -> item browsing does not keep a hundred live pages with their
+    // models and pictures. Back still walks the newest TrimmedDepth.
+    static constexpr int MaxDepth = 20;
+    static constexpr int TrimmedDepth = 12;
 
     struct Route {
       QString name;
@@ -126,6 +138,9 @@ namespace jfd::ui {
     bool canGoBack() const { return m_stack.size() > 1; }
     bool chromeVisible() const;
     QStringList stack() const;
+    // Every page of the stack, bottom first, as StackView.push() takes an
+    // array: page URL, then its properties, for each.
+    Q_INVOKABLE QVariantList pages() const;
 
     // Opens a route on top of the current page. "login" and "home" are
     // roots: going there clears the stack. Going to the current route does

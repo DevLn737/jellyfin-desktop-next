@@ -31,6 +31,7 @@
 #include <QGuiApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
+#include <QFont>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTimer>
@@ -62,6 +63,9 @@ namespace {
     bool flow = false;
     // --reset-theme: dark theme, blue accent.
     bool resetTheme = false;
+    // --help or --version: printed by QCommandLineParser, also while the
+    // app runs, so no hand-over.
+    bool information = false;
     QString settingsFile;
   };
 
@@ -77,6 +81,10 @@ namespace {
       } else if (arg == QLatin1String("--flow")) {
         options.smoke = true;
         options.flow = true;
+      } else if (arg == QLatin1String("--help") || arg == QLatin1String("-h") || arg == QLatin1String("-?") ||
+                 arg == QLatin1String("--help-all") || arg == QLatin1String("--version") ||
+                 arg == QLatin1String("-v")) {
+        options.information = true;
       } else if (arg == QLatin1String("--reset-theme")) {
         options.resetTheme = true;
       } else if (arg == QLatin1String("--settings-file") && i + 1 < argc) {
@@ -149,10 +157,26 @@ int main(int argc, char* argv[]) {
     settingsFile = smokeProfile->filePath(QStringLiteral("settings.ini"));
   }
 
-  desktop::AppServices services;
   // The 2.x import below logs what it took over; that belongs in the log
   // file and the diagnostic report, which start later.
   desktop::bufferEarlyLog();
+
+  // One copy per user: a second start hands its arguments over and exits
+  // before it opens the settings or the log, both of which belong to the
+  // running copy (a second log start would rotate its live log away). Only
+  // the client side of the socket works before QGuiApplication; listening
+  // waits for it below, where a start race is settled. The smoke test runs
+  // beside a running app.
+  if (!options.smoke && !options.information) {
+    QStringList arguments;
+    for (int i = 0; i < argc; ++i) arguments.append(QString::fromLocal8Bit(argv[i]));
+    if (platform::SingleInstance().sendToPrimary(arguments)) {
+      desktop::stopLogFile();
+      return 0;
+    }
+  }
+
+  desktop::AppServices services;
   desktop::LegacyImport legacy = desktop::findLegacyImport(options.smoke);
   if (settingsFile.isEmpty()) {
     settingsFile = settings::Settings::defaultFilePath();
@@ -205,6 +229,17 @@ int main(int argc, char* argv[]) {
     return 2;
   }
 
+  // Becomes the primary copy, before the log file starts. Hands over after
+  // all when another copy started at the same moment and won.
+  std::optional<platform::SingleInstance> instance;
+  if (!options.smoke) {
+    instance.emplace();
+    if (!instance->start(app.arguments())) {
+      desktop::stopLogFile();
+      return 0;
+    }
+  }
+
   services.isolatedProfile = smokeProfile.has_value();
   services.cacheDirectory =
       smokeProfile ? QString() : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
@@ -213,6 +248,9 @@ int main(int argc, char* argv[]) {
                                              QStringLiteral("/logs");
   desktop::setLogLevel(services.settings->value(settings::keys::LogLevel).toString());
   desktop::startLogFile(services.logDirectory);
+  // The "running" marker and the crash handler; tells when the previous
+  // session crashed.
+  desktop::startCrashGuard(services);
   QObject::connect(services.settings.get(), &settings::Settings::valueChanged,
                    [](const QString& key, const QVariant& value) {
                      if (key == settings::keys::LogLevel) {
@@ -223,26 +261,24 @@ int main(int argc, char* argv[]) {
   desktop::installTranslations(app,
                                desktop::resolveLanguage(services.settings->value(settings::keys::Language).toString()));
 
-  // One copy per user: a second start hands its arguments over and exits.
-  // The smoke test runs beside a running app.
-  std::optional<platform::SingleInstance> instance;
-  if (!options.smoke) {
-    instance.emplace();
-    if (!instance->start(app.arguments())) {
-      desktop::stopLogFile();
-      return 0;
-    }
+  // How text is drawn (Appearance > Text rendering; JFD_TEXT_RENDERING
+  // overrides it for a comparison). Qt's distance-field text is the default:
+  // the system rasteriser with full hinting made Nunito uneven on Windows.
+  QString textRendering = qEnvironmentVariable("JFD_TEXT_RENDERING");
+  if (textRendering.isEmpty()) textRendering = services.settings->value(settings::keys::TextRendering).toString();
+  if (textRendering == QLatin1String("sharp") || textRendering == QLatin1String("hinted") ||
+      textRendering == QLatin1String("native")) {
+    QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+    // Unhinted keeps the letters' own widths and spacing.
+    QFont font = QGuiApplication::font();
+    font.setHintingPreference(textRendering == QLatin1String("hinted") ? QFont::PreferFullHinting
+                                                                       : QFont::PreferNoHinting);
+    QGuiApplication::setFont(font);
+  } else if (textRendering == QLatin1String("curve")) {
+    QQuickWindow::setTextRenderType(QQuickWindow::CurveTextRendering);
+  } else {
+    QQuickWindow::setTextRenderType(QQuickWindow::QtTextRendering);
   }
-
-  // Text drawn by the system's rasteriser (DirectWrite on Windows, FreeType
-  // on Linux), hinted to the pixel grid: Qt Quick's default distance-field
-  // text is soft at body sizes, regular and lighter weights most, and more
-  // so at fractional scales (125 %, 150 %). JFD_TEXT_RENDERING=qt (or curve)
-  // brings the other renderers back for a comparison.
-  const QByteArray textRendering = qgetenv("JFD_TEXT_RENDERING");
-  QQuickWindow::setTextRenderType(textRendering == "qt"      ? QQuickWindow::QtTextRendering
-                                  : textRendering == "curve" ? QQuickWindow::CurveTextRendering
-                                                             : QQuickWindow::NativeTextRendering);
 
   int exitCode = 0;
   QElapsedTimer shutdown;
@@ -370,6 +406,8 @@ int main(int argc, char* argv[]) {
   services.player.reset();
   services.library.reset();
   services.settings.reset();
+  // A clean exit: the next start finds no marker.
+  desktop::endCrashGuard(services);
   desktop::stopLogFile();
 
   const qint64 shutdownMs = shutdown.elapsed();

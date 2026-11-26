@@ -166,6 +166,14 @@
         <translation>Серия %1 «%2»</translation>
     </message>
     <message>
+        <source>Season %1 · Episode %2</source>
+        <translation>Сезон %1 · Серия %2</translation>
+    </message>
+    <message>
+        <source>Episode %1</source>
+        <translation>Серия %1</translation>
+    </message>
+    <message>
         <source>On</source>
         <translation>Вкл.</translation>
     </message>
@@ -508,10 +516,6 @@
     <message>
         <source>Skip intros and credits</source>
         <translation>Пропускать заставки и титры</translation>
-    </message>
-    <message>
-        <source>Hide from Discord</source>
-        <translation>Скрыть из Discord</translation>
     </message>
     <message>
         <source>Hide stats for nerds</source>

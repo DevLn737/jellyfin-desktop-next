@@ -56,6 +56,7 @@ namespace jfd::playback {
     request.start = start;
     request.runTime = runTime;
     request.startPaused = startPaused;
+    request.audioOnly = audioOnly;
     return request;
   }
 

@@ -1,6 +1,7 @@
 # Installs the MSI for the current user without a UI, checks the files,
 # shortcuts and registry key, runs the installed application's smoke test,
-# then uninstalls (with REMOVEPROFILE=1) and checks that nothing is left.
+# then uninstalls (with REMOVEPROFILE=1) and checks that nothing is left, and
+# that uninstalling never empties a folder that is not its own.
 #
 #   packaging/windows/test-msi.ps1 -Msi build/jellyfin-desktop-next.msi -Logs build/msi-logs
 [CmdletBinding()]
@@ -103,3 +104,29 @@ Invoke-Msiexec @('/x', "`"$Msi`"", 'REMOVEPROFILE=1') (Join-Path $Logs 'uninstal
 Assert (-not (Test-Path -LiteralPath $installFolder)) 'install folder removed again'
 Assert (-not (Test-Path -LiteralPath $localProfile)) 'local profile removed with REMOVEPROFILE=1'
 Assert (-not (Test-Path -LiteralPath $roamingProfile)) 'roaming profile removed with REMOVEPROFILE=1'
+
+# Uninstalling never empties a folder that is not our own: neither one the
+# remembered registry value was changed to point at, nor a folder chosen with
+# INSTALLFOLDER that held other files before.
+$decoy = Join-Path $env:TEMP 'jfd-msi-decoy'
+$custom = Join-Path $env:TEMP 'jfd-msi-custom'
+foreach ($folder in @($decoy, $custom)) {
+    Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $folder | Out-Null
+    Set-Content -Path (Join-Path $folder 'keep-me.txt') -Value 'not the installer''s'
+}
+try {
+    Invoke-Msiexec @('/i', "`"$Msi`"") (Join-Path $Logs 'install-decoy.log')
+    Set-ItemProperty -Path $registryKey -Name InstallFolder -Value "$decoy\"
+    Invoke-Msiexec @('/x', "`"$Msi`"") (Join-Path $Logs 'uninstall-decoy.log')
+    Assert (Test-Path -LiteralPath (Join-Path $decoy 'keep-me.txt')) 'a changed remembered folder is not emptied'
+    Assert (-not (Test-Path -LiteralPath $exe)) 'the installed files are removed anyway'
+
+    Invoke-Msiexec @('/i', "`"$Msi`"", "INSTALLFOLDER=`"$custom`"") (Join-Path $Logs 'install-custom.log')
+    Assert (Test-Path -LiteralPath (Join-Path $custom $ExeName)) 'installed into the chosen folder'
+    Invoke-Msiexec @('/x', "`"$Msi`"") (Join-Path $Logs 'uninstall-custom.log')
+    Assert (Test-Path -LiteralPath (Join-Path $custom 'keep-me.txt')) 'files already in a chosen folder are kept'
+    Assert (-not (Test-Path -LiteralPath (Join-Path $custom $ExeName))) 'the installed files leave the chosen folder'
+} finally {
+    Remove-Item -LiteralPath $decoy, $custom -Recurse -Force -ErrorAction SilentlyContinue
+}

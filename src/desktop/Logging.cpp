@@ -1,5 +1,6 @@
 #include "Logging.h"
 
+#include <jfd/diagnostics/LogFile.h>
 #include <jfd/diagnostics/Redact.h>
 
 #include <QDateTime>
@@ -7,15 +8,22 @@
 #include <QFile>
 #include <QList>
 #include <QLoggingCategory>
+#include <QTimer>
 
 #include <cstdio>
+#include <filesystem>
+#include <string_view>
 #include <mutex>
 
 namespace jfd::desktop {
 
   namespace {
     std::mutex logMutex;
-    QFile* logFile = nullptr;
+    // At most 10 MiB, then moved aside to the old file (one is kept);
+    // flushed at once for warnings and errors, within a second otherwise.
+    diagnostics::LogFile* logFile = nullptr;
+    // Flushes the quiet lines that no later line takes along.
+    QTimer* flushTimer = nullptr;
     QtMessageHandler previousHandler = nullptr;
     bool installed = false;
     // Lines logged before the log file starts (bufferEarlyLog()), written
@@ -23,6 +31,16 @@ namespace jfd::desktop {
     bool buffering = false;
     QList<QByteArray> earlyLines;
     constexpr qsizetype MaxEarlyLines = 500;
+
+    // The path as the standard library takes it, without a round trip
+    // through the C locale.
+    std::filesystem::path nativePath(const QString& path) {
+#ifdef Q_OS_WIN
+      return std::filesystem::path(QDir::toNativeSeparators(path).toStdWString());
+#else
+      return std::filesystem::path(QFile::encodeName(path).toStdString());
+#endif
+    }
 
     const char* levelName(QtMsgType type) {
       switch (type) {
@@ -53,8 +71,10 @@ namespace jfd::desktop {
       {
         std::lock_guard lock(logMutex);
         if (logFile != nullptr) {
-          logFile->write(line);
-          logFile->flush();
+          // Warnings, errors and fatal messages reach the disk at once, with
+          // every line before them: a crash right after loses no more than
+          // a second of debug and info lines.
+          logFile->write(std::string_view(line.constData(), static_cast<size_t>(line.size())), type != QtDebugMsg && type != QtInfoMsg);
         } else if (buffering && type != QtDebugMsg && earlyLines.size() < MaxEarlyLines) {
           earlyLines.append(line);
         }
@@ -80,21 +100,29 @@ namespace jfd::desktop {
     QDir().mkpath(directory);
     const QString path = directory + QStringLiteral("/jellyfin-desktop.log");
     const QString old = directory + QStringLiteral("/jellyfin-desktop.old.log");
-    QFile::remove(old);
-    QFile::rename(path, old);
-    auto* file = new QFile(path);
-    if (!file->open(QIODevice::WriteOnly | QIODevice::Text)) {
+    auto* file = new diagnostics::LogFile;
+    if (!file->open(nativePath(path), nativePath(old))) {
       std::fprintf(stderr, "Cannot write the log file %s\n", qPrintable(path));
       delete file;
       return;
     }
     {
       std::lock_guard lock(logMutex);
-      for (const QByteArray& line : earlyLines) file->write(line);
+      for (const QByteArray& line : earlyLines)
+        file->write(std::string_view(line.constData(), static_cast<size_t>(line.size())), false);
       file->flush();
       earlyLines.clear();
       buffering = false;
       logFile = file;
+    }
+    if (flushTimer == nullptr) {
+      flushTimer = new QTimer;
+      flushTimer->setInterval(1000);
+      QObject::connect(flushTimer, &QTimer::timeout, [] {
+        std::lock_guard lock(logMutex);
+        if (logFile != nullptr) logFile->flushIfDue();
+      });
+      flushTimer->start();
     }
     if (!installed) {
       previousHandler = qInstallMessageHandler(writeLine);
@@ -102,11 +130,18 @@ namespace jfd::desktop {
     }
   }
 
+  void flushLogFile() {
+    std::lock_guard lock(logMutex);
+    if (logFile != nullptr) logFile->flush();
+  }
+
   void stopLogFile() {
     if (installed) {
       qInstallMessageHandler(previousHandler);
       installed = false;
     }
+    delete flushTimer;
+    flushTimer = nullptr;
     std::lock_guard lock(logMutex);
     buffering = false;
     earlyLines.clear();

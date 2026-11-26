@@ -24,7 +24,8 @@ add_test(NAME qml_literals_check
   COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/i18n/QmlLiterals.cmake")
 
 # Every file in an icons*/ folder has its line in LICENSES.md, and every
-# line there names a file that exists.
+# line there names a file that exists; the packages' third-party licence
+# texts and notices are complete (licenses/BundledLicenses.cmake).
 add_test(NAME licenses_check
   COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/licenses/IconLicenses.cmake")
 
@@ -43,9 +44,11 @@ endif()
 
 add_executable(jfd_diagnostics_tests
   core/main.cpp
+  diagnostics/CrashTest.cpp
   diagnostics/FrameStatsTest.cpp
   diagnostics/ProcessStatsTest.cpp
   diagnostics/RedactTest.cpp
+  diagnostics/LogFileTest.cpp
   diagnostics/ReportTest.cpp)
 target_link_libraries(jfd_diagnostics_tests PRIVATE jfd::diagnostics doctest)
 add_test(NAME jfd_diagnostics_tests COMMAND jfd_diagnostics_tests)
@@ -237,7 +240,7 @@ if(TARGET jfd_jellyfin_api)
 
   if(TARGET jfd_session_runtime)
     jfd_add_qt_test(jfd_session_runtime_tests session/SleepDetectorTest.cpp session/GroupModelTest.cpp
-      session/OpenGateTest.cpp session/RoomsModelTest.cpp)
+      session/OpenGateTest.cpp session/RoomsModelTest.cpp session/RoomRecoveryTest.cpp)
     target_link_libraries(jfd_session_runtime_tests PRIVATE jfd::session_runtime)
   endif()
 
@@ -438,7 +441,7 @@ if(JFD_BUILD_APP)
     target_include_directories(jfd_ui_player_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_player_tests PRIVATE
       jfd_ui_player jfd_ui_playerplugin jfd_ui_group jfd_ui_groupplugin
-      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shell jfd_ui_shellplugin
+      jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shell jfd_ui_shellplugin
       jfd::session_runtime Qt6::Gui Qt6::Quick doctest Qt6::Test)
     target_compile_options(jfd_ui_player_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_player_tests COMMAND jfd_ui_player_tests)
@@ -453,7 +456,7 @@ if(JFD_BUILD_APP)
     target_include_directories(jfd_ui_music_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jfd_ui_music_tests PRIVATE
       jfd_ui_music jfd_ui_musicplugin jfd_ui_library jfd_ui_libraryplugin
-      jfd_ui_theme jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
+      jfd_ui_themeplugin jfd_ui_controlsplugin jfd_ui_shellplugin
       jfd::session_runtime Qt6::Gui Qt6::Quick Qt6::WebSockets doctest Qt6::Test)
     target_compile_options(jfd_ui_music_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4702>)
     add_test(NAME jfd_ui_music_tests COMMAND jfd_ui_music_tests)

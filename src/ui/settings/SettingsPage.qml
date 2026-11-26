@@ -29,8 +29,9 @@ RoutePage {
         case "playback": return Icons.play
         case "subtitles": return Icons.subtitles
         case "audio": return Icons.audio
-        case "interface": case "appearance": return Icons.tune
-        case "window": return Icons.fullscreen
+        case "interface": return Icons.tune
+        case "appearance": return Icons.palette
+        case "window": return Icons.window
         case "library": return Icons.library
         case "music": return Icons.music
         case "input": return Icons.gamepad

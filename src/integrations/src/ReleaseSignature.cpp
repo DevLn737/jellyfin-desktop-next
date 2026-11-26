@@ -7,6 +7,7 @@
 #include <QIODevice>
 #include <QRegularExpression>
 
+#include <algorithm>
 #include <cstring>
 
 #include <monocypher-ed25519.h>
@@ -51,12 +52,32 @@ namespace jfd::integrations {
     return key;
   }
 
-  std::optional<MinisignPublicKey> releasePublicKey() {
-    static const std::optional<MinisignPublicKey> key = parsePublicKey(QByteArrayView(JFD_RELEASE_PUBLIC_KEY));
-    return key;
+  MinisignKeys parsePublicKeys(QByteArrayView text) {
+    static const QRegularExpression separators(QStringLiteral("[\\s,;]+"));
+    MinisignKeys keys;
+    for (const QString& entry : QString::fromLatin1(text).split(separators, Qt::SkipEmptyParts)) {
+      const auto key = parsePublicKey(entry.toLatin1());
+      if (!key) return {};
+      const bool known = std::any_of(keys.begin(), keys.end(), [&key](const MinisignPublicKey& other) {
+        return other.keyId == key->keyId && other.key == key->key;
+      });
+      if (!known) keys.push_back(*key);
+    }
+    return keys;
+  }
+
+  const MinisignKeys& releasePublicKeys() {
+    static const MinisignKeys keys =
+        parsePublicKeys(QByteArrayView(JFD_RELEASE_PUBLIC_KEY " " JFD_RELEASE_NEXT_PUBLIC_KEY));
+    return keys;
   }
 
   SignatureCheck verifySignature(QIODevice& data, QByteArrayView signatureFile, const MinisignPublicKey& key) {
+    return verifySignature(data, signatureFile, std::span<const MinisignPublicKey>(&key, 1));
+  }
+
+  SignatureCheck verifySignature(QIODevice& data, QByteArrayView signatureFile,
+                                 std::span<const MinisignPublicKey> keys) {
     const QByteArrayList sigLines = lines(signatureFile);
     static constexpr QByteArrayView trustedPrefix("trusted comment: ");
     if (sigLines.size() != 4 || !sigLines[0].startsWith("untrusted comment:") ||
@@ -67,8 +88,11 @@ namespace jfd::integrations {
     if (!signature || !globalSignature) return failed("malformed signature file");
     if (signature->startsWith("Ed")) return failed("legacy signature without prehashing");
     if (!signature->startsWith("ED")) return failed("unknown signature algorithm");
-    if (std::memcmp(signature->constData() + 2, key.keyId.data(), key.keyId.size()) != 0)
-      return failed("signed with another key");
+    const auto match = std::find_if(keys.begin(), keys.end(), [&signature](const MinisignPublicKey& candidate) {
+      return std::memcmp(signature->constData() + 2, candidate.keyId.data(), candidate.keyId.size()) == 0;
+    });
+    if (match == keys.end()) return failed("signed with another key");
+    const MinisignPublicKey& key = *match;
 
     crypto_blake2b_ctx context;
     crypto_blake2b_init(&context, hashSize);
@@ -96,7 +120,12 @@ namespace jfd::integrations {
 
   SignatureCheck verifyReleaseFile(QIODevice& data, QByteArrayView signatureFile, const QString& fileName,
                                    const MinisignPublicKey& key) {
-    SignatureCheck check = verifySignature(data, signatureFile, key);
+    return verifyReleaseFile(data, signatureFile, fileName, std::span<const MinisignPublicKey>(&key, 1));
+  }
+
+  SignatureCheck verifyReleaseFile(QIODevice& data, QByteArrayView signatureFile, const QString& fileName,
+                                   std::span<const MinisignPublicKey> keys) {
+    SignatureCheck check = verifySignature(data, signatureFile, keys);
     if (!check.valid) return check;
     static const QRegularExpression separators(QStringLiteral("\\s+"));
     if (!check.trustedComment.split(separators).contains(QStringLiteral("file:") + fileName))

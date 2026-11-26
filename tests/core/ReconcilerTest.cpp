@@ -37,14 +37,55 @@ TEST_CASE("Medium drift corrects speed relative to the base rate") {
   const auto decision = reconcile(group, at(10'000ms), ms(12'200), {});
   const auto* speed = std::get_if<drift::SpeedCorrection>(&decision.action);
   REQUIRE(speed);
-  CHECK(speed->rate.perMille() == 1550);
-  CHECK(speed->duration == WallTicks(1000ms));
+  // Within 10 % of the group's 1.25x, for as long as 300 ms need at that.
+  CHECK(speed->rate.perMille() == 1375);
+  CHECK(speed->duration == WallTicks(2400ms));
 
   // Ahead by 300 ms: slow down.
   const auto ahead = reconcile(group, at(10'000ms), ms(12'800), {});
   const auto* slow = std::get_if<drift::SpeedCorrection>(&ahead.action);
   REQUIRE(slow);
-  CHECK(slow->rate.perMille() == 950);
+  CHECK(slow->rate.perMille() == 1125);
+  CHECK(slow->duration == WallTicks(2400ms));
+
+  // 80 ms over 1 s fit in the band: the plain formula applies.
+  const auto small = reconcile(group, at(10'000ms), ms(12'420), {});
+  const auto* gentle = std::get_if<drift::SpeedCorrection>(&small.action);
+  REQUIRE(gentle);
+  CHECK(gentle->rate.perMille() == 1330);
+  CHECK(gentle->duration == WallTicks(1000ms));
+}
+
+TEST_CASE("Speed stays within 10 % of the group rate; drift it cannot make up in 5 s is skipped") {
+  const GroupTimeline group{ms(0), at(0ms), PlaybackRate::normal()};
+  // 500 ms behind: 1.1x for 5 s, the longest correction.
+  const auto edge = reconcile(group, at(10'000ms), ms(9'500), {});
+  const auto* speed = std::get_if<drift::SpeedCorrection>(&edge.action);
+  REQUIRE(speed);
+  CHECK(speed->rate.perMille() == 1100);
+  CHECK(speed->duration == WallTicks(5000ms));
+  // 2.5 s ahead: Web's formula asks 0.2x; capped at 0.9x it would take
+  // 25 s, so it is a skip.
+  const auto ahead = reconcile(group, at(10'000ms), ms(12'500), {});
+  const auto* skip = std::get_if<drift::SkipTo>(&ahead.action);
+  REQUIRE(skip);
+  CHECK(skip->position.milliseconds() == 10'000);
+  // 800 ms behind, under the speed maximum: skipped too.
+  CHECK(std::holds_alternative<drift::SkipTo>(reconcile(group, at(10'000ms), ms(9'200), {}).action));
+  // The band follows the group rate: 0.45x-0.55x at 0.5x.
+  const GroupTimeline slow{ms(0), at(0ms), *PlaybackRate::base(0.5)};
+  const auto halfDecision = reconcile(slow, at(10'000ms), ms(4'900), {});
+  const auto* half = std::get_if<drift::SpeedCorrection>(&halfDecision.action);
+  REQUIRE(half);
+  CHECK(half->rate.perMille() == 550);
+  CHECK(half->duration == WallTicks(2000ms));
+  // Without a band, Web's range.
+  ReconcilerSettings web;
+  web.speedBandPerMille = 0;
+  const auto fastDecision = reconcile(group, at(10'000ms), ms(7'500), web);
+  const auto* fast = std::get_if<drift::SpeedCorrection>(&fastDecision.action);
+  REQUIRE(fast);
+  CHECK(fast->rate.perMille() == 3500);
 }
 
 TEST_CASE("Large drift skips to the group position") {

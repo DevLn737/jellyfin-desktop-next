@@ -467,7 +467,7 @@ RoutePage {
                 // How many episodes of the season shown, and how many are
                 // watched.
                 readonly property var season: page.isSeries ? seasons.currentItem : null
-                readonly property int total: episodes.count
+                readonly property int total: episodes.total
                 readonly property int unwatched: total - episodes.watched
                 readonly property string seasonId: page.isSeries ? (page.details ? page.details.seasonId : "")
                                                                  : (page.details ? page.details.itemId : "")
@@ -577,7 +577,7 @@ RoutePage {
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 text: (rangeTab.index * page.rangeSize + 1) + "–"
-                                      + Math.min(episodes.count, (rangeTab.index + 1) * page.rangeSize)
+                                      + Math.min(episodes.total, (rangeTab.index + 1) * page.rangeSize)
                                 color: rangeTab.selected || rangeTab.hovered ? Theme.text : Theme.textSecondary
                                 font.pixelSize: Theme.fontSizeSmall + 1
                                 font.weight: Font.Bold
@@ -605,45 +605,36 @@ RoutePage {
                     Repeater {
                         id: episodes
                         objectName: "episodes"
+                        // The whole season (the grid shows one range of it).
+                        readonly property var all: page.details ? page.details.episodes : null
+                        readonly property int total: all ? all.count : 0
                         // The range shown of a long season.
                         property int range: 0
-                        // How many are watched, kept up as their state changes.
-                        property int watched: 0
-                        function countWatched() {
-                            let n = 0
-                            for (let i = 0; i < count; ++i) {
-                                const item = itemAt(i)
-                                if (item && item.model.played === true)
-                                    ++n
-                            }
-                            watched = n
-                        }
-                        readonly property int rangeCount: Math.ceil(count / page.rangeSize)
-                        model: page.details ? page.details.episodes : null
-                        // A new season opens at the range of its first
-                        // episode not watched.
-                        onCountChanged: {
-                            Qt.callLater(episodes.openAtNext)
-                            Qt.callLater(episodes.countWatched)
+                        // How many are watched, kept up by the model.
+                        readonly property int watched: all ? all.playedCount : 0
+                        readonly property int rangeCount: Math.ceil(total / page.rangeSize)
+                        // Only the range shown has cards (and loads stills):
+                        // a season of 600 episodes makes 24.
+                        model: ItemRangeModel {
+                            sourceModel: episodes.all
+                            offset: episodes.range * page.rangeSize
+                            limit: page.rangeSize
                         }
                         function openAtNext() {
-                            let at = 0
-                            for (let i = 0; i < count; ++i) {
-                                const item = itemAt(i)
-                                if (item && item.model.played !== true) {
-                                    at = i
-                                    break
-                                }
-                            }
-                            range = Math.floor(at / page.rangeSize)
+                            const at = all ? all.firstUnplayedRow() : 0
+                            range = Math.max(0, Math.min(rangeCount - 1, Math.floor(at / page.rangeSize)))
                         }
                         EpisodeCard {
-                            readonly property bool played: model.played === true
-                            onPlayedChanged: Qt.callLater(episodes.countWatched)
                             cardWidth: episodeGrid.cardWidth
-                            visible: Math.floor(index / page.rangeSize) === episodes.range
-                            onPlayClicked: page.details.playEpisode(index)
+                            firstRow: episodes.range * page.rangeSize
+                            onPlayClicked: page.details.playEpisode(episodes.range * page.rangeSize + index)
                         }
+                    }
+                    // A new season opens at the range of its first episode
+                    // not watched.
+                    Connections {
+                        target: episodes.all
+                        function onCountChanged() { Qt.callLater(episodes.openAtNext) }
                     }
                 }
             }

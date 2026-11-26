@@ -5,13 +5,14 @@
 #include <QQuickWindow>
 #include <qqmlintegration.h>
 
-// Text entry without a keyboard, for the on-screen keyboard of TV mode
-// (OnScreenKeyboard.qml draws it; this decides when it shows and where its
-// keys go). Watches the window it is in:
+// Text entry without a keyboard, for the on-screen keyboard of TV mode and
+// of a gamepad in use, Theme.focusDriven (OnScreenKeyboard.qml draws it;
+// this decides when it shows and where its keys go). Watches the window it
+// is in:
 //
 // - the focused editable text field (a TextInput, as in InputField) is
 //   `field`;
-// - while `active` (TV mode), the keyboard opens when the focus reaches a
+// - while `active` (focus-driven, or open), the keyboard opens when the focus reaches a
 //   field by an arrow, Tab or a page key, and on Select (Enter) on the
 //   field, unless the field's `keyboardOnSelect` property (InputField's) is
 //   false;

@@ -178,10 +178,13 @@ TEST_CASE("Drift is corrected by speed after the cooldown, then the base rate re
   h.post(backend::Progress{epoch, h.sample(1.7, false)});
   CHECK(h.snapshot().group->driftMilliseconds == 300);
   CHECK(h.snapshot().group->correction == SyncCorrection::Speed);
-  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1300);
-  CHECK(h.snapshot().effectiveRate.perMille() == 1300);
+  // At most 10 % faster than the group: 300 ms take 3 s at 1.1x.
+  CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1100);
+  CHECK(h.snapshot().effectiveRate.perMille() == 1100);
 
-  h.advance(1000ms);
+  h.advance(2900ms);
+  CHECK(h.snapshot().group->correction == SyncCorrection::Speed);
+  h.advance(100ms);
   CHECK(h.backend.last<command::SetRate>()->rate.perMille() == 1000);
   CHECK(h.snapshot().group->correction == SyncCorrection::None);
 }
@@ -427,11 +430,12 @@ TEST_CASE("Buffering that ends during the group's pause seek is followed by Read
   h.post(backend::Progress{epoch, h.sample(1.0, true, false)});
   CHECK(h.outbox.all<outgoing::Ready>().empty());
   h.post(backend::SeekStarted{epoch});
+  // While paused mpv may report nothing after the restart: Ready goes now.
   h.post(backend::PlaybackRestarted{epoch, h.sample(1.0, true)});
-  h.post(backend::Progress{epoch, h.sample(1.0, true)});
   const auto ready = h.outbox.all<outgoing::Ready>();
   REQUIRE(ready.size() == 1);
   CHECK_FALSE(ready[0].isPlaying);
+  CHECK(ready[0].position.milliseconds() == 1'000);
   h.post(backend::Progress{epoch, h.sample(1.0, true)});
   CHECK(h.outbox.all<outgoing::Ready>().size() == 1);
 }
@@ -571,4 +575,358 @@ TEST_CASE("A failed group request of the current membership is a notice; a stale
   CHECK(h.observer.all<notice::GroupRequestFailed>().size() == 1);
   h.post(group::RequestFailed{GroupEpoch{}, group::Request::Create, 403});
   CHECK(h.observer.all<notice::GroupRequestFailed>().size() == 2);
+}
+
+namespace {
+  MediaRequest withRunTime(MediaRequest request) {
+    request.runTime = SessionHarness::ms(600'000);
+    return request;
+  }
+
+  // Plays the group's item p1 from 0 s and lets the cooldown pass.
+  MediaEpoch playInGroup(SessionHarness& h) {
+    h.join("p1");
+    const auto epoch = h.open(withRunTime(h.media("p1")), true);
+    h.post(h.command(GroupCommandType::Unpause, 0));
+    h.post(backend::Progress{epoch, h.sample(0.0, false)});
+    return epoch;
+  }
+
+  void queueGoesOn(SessionHarness& h, bool hasNext = true) {
+    group::QueueChanged queue;
+    queue.epoch = h.group;
+    queue.reason = QueueChangeReason::Queue;
+    queue.lastUpdate = h.serverNow() + 1ms;
+    queue.currentPlaylistItem = PlaylistItemId("p1");
+    queue.currentItem = ItemId("item");
+    queue.hasNextItem = hasNext;
+    h.post(queue);
+  }
+} // namespace
+
+TEST_CASE("A stream error while playing reopens the file once where it was, then fails") {
+  SessionHarness h;
+  const auto request = withRunTime(h.media());
+  const auto epoch = h.open(request);
+  h.advance(10s);
+  h.post(backend::Progress{epoch, h.sample(10.0, false)});
+
+  h.post(backend::Ended{epoch, backend::EndReason::Error, "network"});
+  // Waiting for the reopen, not failed.
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+  CHECK(h.snapshot().error.empty());
+  const auto reopen = h.observer.all<notice::ReopenAfterError>();
+  REQUIRE(reopen.size() == 1);
+  CHECK(reopen[0].item == ItemId("item"));
+  CHECK(reopen[0].mediaSource == MediaSourceId("source"));
+  CHECK(reopen[0].position.milliseconds() == 10'000);
+  CHECK_FALSE(reopen[0].startPaused);
+  CHECK(reopen[0].playlistItem.isEmpty());
+
+  auto again = request;
+  again.start = SessionHarness::ms(10'000);
+  const auto second = h.open(again);
+  CHECK(h.snapshot().phase == PlaybackPhase::Playing);
+  CHECK(h.snapshot().media == second);
+
+  // The reopened file fails too: now the viewer is told.
+  h.advance(5s);
+  h.post(backend::Progress{second, h.sample(15.0, false)});
+  h.post(backend::Ended{second, backend::EndReason::Error, "network again"});
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+  CHECK(h.snapshot().error == "network again");
+  CHECK(h.observer.all<notice::ReopenAfterError>().size() == 1);
+}
+
+TEST_CASE("A reopened file may be reopened again once it played on for a minute") {
+  SessionHarness h;
+  auto request = withRunTime(h.media({}, 10'000));
+  const auto first = h.open(request);
+  h.post(backend::Ended{first, backend::EndReason::Error, {}});
+  REQUIRE(h.observer.all<notice::ReopenAfterError>().size() == 1);
+  const auto second = h.open(request);
+  h.advance(61s);
+  h.post(backend::Progress{second, h.sample(71.0, false)});
+  h.post(backend::Ended{second, backend::EndReason::Error, {}});
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+  const auto reopen = h.observer.all<notice::ReopenAfterError>();
+  REQUIRE(reopen.size() == 2);
+  CHECK(reopen[1].position.milliseconds() == 71'000);
+}
+
+TEST_CASE("A reopen that cannot be resolved fails with the stream's error; Stop cancels a reopen") {
+  SessionHarness h;
+  const auto epoch = h.open(withRunTime(h.media({}, 20'000)));
+  h.post(backend::Ended{epoch, backend::EndReason::Error, "network"});
+  REQUIRE(h.snapshot().phase == PlaybackPhase::Loading);
+  // Another item's failure is not ours.
+  h.post(intent::OpenFailed{ItemId("other"), "not found"});
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+  h.post(intent::OpenFailed{ItemId("item"), "server down"});
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+  CHECK(h.snapshot().error == "network");
+
+  SessionHarness stop;
+  const auto played = stop.open(withRunTime(stop.media({}, 20'000)));
+  stop.post(backend::Ended{played, backend::EndReason::Error, "network"});
+  stop.post(intent::Stop{});
+  CHECK(stop.snapshot().phase == PlaybackPhase::Idle);
+  stop.post(intent::OpenFailed{ItemId("item"), "server down"});
+  CHECK(stop.snapshot().phase == PlaybackPhase::Idle);
+}
+
+TEST_CASE("Music, live streams and files that never started are not reopened") {
+  SessionHarness h;
+  auto music = withRunTime(h.media());
+  music.audioOnly = true;
+  auto epoch = h.open(music);
+  h.post(backend::Ended{epoch, backend::EndReason::Error, {}});
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+
+  epoch = h.open(h.media());
+  h.post(backend::Ended{epoch, backend::EndReason::Error, {}});
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+
+  h.post(intent::Open{withRunTime(h.media())});
+  h.post(backend::Ended{h.currentEpoch(), backend::EndReason::Error, {}});
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+  CHECK(h.observer.all<notice::ReopenAfterError>().empty());
+  CHECK(h.observer.all<notice::GroupItemFailed>().empty());
+}
+
+TEST_CASE("In a group a stream error tells the group we buffer, reopens paused and reports Ready") {
+  SessionHarness h;
+  const auto epoch = playInGroup(h);
+  h.advance(5s);
+  h.post(backend::Progress{epoch, h.sample(5.0, false)});
+  h.outbox.sent.clear();
+
+  h.post(backend::Ended{epoch, backend::EndReason::Error, "network"});
+  const auto buffering = h.outbox.all<outgoing::Buffering>();
+  REQUIRE(buffering.size() == 1);
+  CHECK(buffering[0].position.milliseconds() == 5'000);
+  CHECK(buffering[0].playlistItem == PlaylistItemId("p1"));
+  const auto reopen = h.observer.all<notice::ReopenAfterError>();
+  REQUIRE(reopen.size() == 1);
+  CHECK(reopen[0].startPaused);
+  CHECK(reopen[0].playlistItem == PlaylistItemId("p1"));
+  CHECK(h.snapshot().group);
+  CHECK(h.snapshot().phase == PlaybackPhase::Loading);
+
+  // The group pauses everyone meanwhile; the command waits for the file.
+  h.post(h.command(GroupCommandType::Pause, 5'000));
+  auto again = withRunTime(h.media("p1", 5'000));
+  again.startPaused = true;
+  h.post(intent::Open{again});
+  CHECK(h.backend.last<command::Load>()->request.startPaused);
+  h.post(backend::SourceOpened{h.currentEpoch(), 0.0, 600.0});
+  h.post(backend::PlaybackRestarted{h.currentEpoch(), h.sample(5.0, true)});
+  const auto ready = h.outbox.all<outgoing::Ready>();
+  REQUIRE(ready.size() == 1);
+  CHECK(ready[0].position.milliseconds() == 5'000);
+  CHECK(h.observer.all<notice::GroupItemFailed>().empty());
+
+  // Failing again: the group must not wait for us any longer.
+  h.post(backend::Ended{h.currentEpoch(), backend::EndReason::Error, "network"});
+  CHECK(h.observer.all<notice::GroupItemFailed>().size() == 1);
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+}
+
+TEST_CASE("The group's item that fails to load or never becomes ready asks the app to leave") {
+  SessionHarness h;
+  h.join("p1");
+  h.post(intent::Open{withRunTime(h.media("p1"))});
+  h.post(backend::SourceOpened{h.currentEpoch(), 0.0, 600.0});
+  h.post(backend::Ended{h.currentEpoch(), backend::EndReason::Error, "codec"});
+  CHECK(h.observer.all<notice::GroupItemFailed>().size() == 1);
+  CHECK(h.observer.all<notice::ReopenAfterError>().empty());
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+
+  // An HLS playlist that never yields a segment.
+  SessionHarness stuck;
+  stuck.join("p1");
+  stuck.post(intent::Open{withRunTime(stuck.media("p1"))});
+  stuck.advance(29s);
+  CHECK(stuck.observer.all<notice::GroupItemFailed>().empty());
+  stuck.advance(1s);
+  CHECK(stuck.observer.all<notice::ReadyTimedOut>().size() == 1);
+  CHECK(stuck.observer.all<notice::GroupItemFailed>().size() == 1);
+  CHECK(stuck.snapshot().phase == PlaybackPhase::Failed);
+  CHECK(stuck.backend.last<command::Stop>());
+
+  // A file of one's own in the group only times out.
+  SessionHarness own;
+  own.join("p1");
+  own.post(intent::Open{withRunTime(own.media())});
+  own.advance(30s);
+  CHECK(own.observer.all<notice::ReadyTimedOut>().size() == 1);
+  CHECK(own.observer.all<notice::GroupItemFailed>().empty());
+}
+
+TEST_CASE("A group seek that never becomes ready is tried once more, then the group is left") {
+  SessionHarness h;
+  h.join("p1");
+  h.open(withRunTime(h.media("p1")), true);
+  h.post(h.command(GroupCommandType::Seek, 30'000));
+  REQUIRE(h.backend.all<command::Seek>().size() == 1);
+  h.advance(30s);
+  CHECK(h.backend.all<command::Seek>().size() == 2);
+  CHECK(h.observer.all<notice::GroupItemFailed>().empty());
+  h.advance(30s);
+  CHECK(h.observer.all<notice::GroupItemFailed>().size() == 1);
+  CHECK(h.snapshot().phase == PlaybackPhase::Failed);
+}
+
+TEST_CASE("A correction seek whose restart never comes stops blocking after 5 s and reports Ready") {
+  SessionHarness h;
+  const auto epoch = playInGroup(h);
+  h.advance(1000ms);
+  h.post(backend::Progress{epoch, h.sample(1.0, false, true)});
+  REQUIRE(h.outbox.all<outgoing::Buffering>().size() == 1);
+  h.outbox.sent.clear();
+
+  h.post(h.command(GroupCommandType::Pause, 1'000));
+  h.post(backend::Progress{epoch, h.sample(1.0, true, false)});
+  CHECK(h.outbox.all<outgoing::Ready>().empty());
+  CHECK(h.timers.isArmed(TimerPurpose::ReadyDeadline));
+  // mpv merged the seek: no SEEK, no restart.
+  h.advance(5s);
+  const auto ready = h.outbox.all<outgoing::Ready>();
+  REQUIRE(ready.size() == 1);
+  CHECK_FALSE(ready[0].isPlaying);
+  CHECK(h.snapshot().phase == PlaybackPhase::Paused);
+  CHECK(h.observer.all<notice::ReadyTimedOut>().empty());
+}
+
+TEST_CASE("Buffering that comes with a correction seek's restart is reported") {
+  SessionHarness h;
+  const auto epoch = playInGroup(h);
+  h.advance(3000ms);
+  // 2 s behind: more than 10 % can make up in 5 s, so a skip.
+  h.post(backend::Progress{epoch, h.sample(1.0, false)});
+  CHECK(h.snapshot().group->correction == SyncCorrection::Skip);
+  const auto seek = h.backend.last<command::Seek>();
+  REQUIRE(seek);
+  CHECK(seek->target.value == doctest::Approx(3.0));
+  h.outbox.sent.clear();
+  h.post(backend::SeekStarted{epoch});
+  h.post(backend::PlaybackRestarted{epoch, h.sample(3.0, false, true)});
+  const auto buffering = h.outbox.all<outgoing::Buffering>();
+  REQUIRE(buffering.size() == 1);
+  CHECK(buffering[0].isPlaying);
+
+  h.post(backend::Progress{epoch, h.sample(3.0, false, false)});
+  CHECK(h.outbox.all<outgoing::Ready>().size() == 1);
+}
+
+TEST_CASE("A late join aims ahead by the time seeks take") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(withRunTime(h.media("p1")), true);
+  h.outbox.sent.clear();
+  // A paused group seek that takes 800 ms to become ready.
+  h.post(h.command(GroupCommandType::Seek, 10'000));
+  h.advance(800ms);
+  h.post(backend::SeekStarted{epoch});
+  h.post(backend::PlaybackRestarted{epoch, h.sample(10.0, true)});
+  REQUIRE(h.outbox.all<outgoing::Ready>().size() == 1);
+
+  // The group started 2 s ago at 10 s: it is at 12 s now and at 12.8 s once
+  // our seek is done.
+  h.post(h.command(GroupCommandType::Unpause, 10'000, -2000ms));
+  const auto seek = h.backend.last<command::Seek>();
+  REQUIRE(seek);
+  CHECK(seek->target.value == doctest::Approx(12.8));
+}
+
+TEST_CASE("At the end of the group's item the group is asked for the next one, once") {
+  SessionHarness h;
+  auto epoch = playInGroup(h);
+  queueGoesOn(h);
+  h.outbox.sent.clear();
+  h.post(backend::Ended{epoch, backend::EndReason::EndOfFile, {}});
+  CHECK(h.snapshot().phase == PlaybackPhase::Ended);
+  auto next = h.outbox.all<outgoing::RequestNextItem>();
+  REQUIRE(next.size() == 1);
+  CHECK(next[0].playlistItem == PlaylistItemId("p1"));
+  CHECK(next[0].epoch == h.group);
+
+  // The same occurrence ending again (opened anew) does not ask twice.
+  epoch = h.open(withRunTime(h.media("p1")), true);
+  h.post(backend::Ended{epoch, backend::EndReason::EndOfFile, {}});
+  CHECK(h.outbox.all<outgoing::RequestNextItem>().size() == 1);
+
+  // The last item of the queue, auto-next off, or a file of one's own: nothing.
+  SessionHarness last;
+  epoch = playInGroup(last);
+  queueGoesOn(last, false);
+  last.post(backend::Ended{epoch, backend::EndReason::EndOfFile, {}});
+  CHECK(last.outbox.all<outgoing::RequestNextItem>().empty());
+
+  SessionHarness off;
+  off.post(intent::SetAutoNext{false});
+  epoch = playInGroup(off);
+  queueGoesOn(off);
+  off.post(backend::Ended{epoch, backend::EndReason::EndOfFile, {}});
+  CHECK(off.outbox.all<outgoing::RequestNextItem>().empty());
+
+  SessionHarness own;
+  own.join("p1");
+  queueGoesOn(own);
+  epoch = own.open(withRunTime(own.media()));
+  own.post(backend::Ended{epoch, backend::EndReason::EndOfFile, {}});
+  CHECK(own.outbox.all<outgoing::RequestNextItem>().empty());
+}
+
+TEST_CASE("Group controls while the connection is lost are not sent and say why") {
+  SessionHarness h;
+  playInGroup(h);
+  h.post(group::ConnectionLost{h.group});
+  h.outbox.sent.clear();
+  h.post(intent::Pause{});
+  h.post(intent::Play{});
+  h.post(intent::Seek{SessionHarness::ms(60'000)});
+  h.post(intent::Next{});
+  CHECK(h.outbox.sent.empty());
+  CHECK(h.observer.all<notice::GroupOffline>().size() == 4);
+  CHECK(h.snapshot().group);
+  CHECK_FALSE(h.snapshot().group->connected);
+
+  // Back in the group (the group client rejoined): requests go out again.
+  h.join("p1");
+  h.post(intent::Pause{});
+  CHECK(h.outbox.all<outgoing::RequestPause>().size() == 1);
+  CHECK(h.observer.all<notice::GroupOffline>().size() == 4);
+}
+
+TEST_CASE("A Pause that arrives while a group seek runs still ends with the seek's Ready") {
+  SessionHarness h;
+  h.join("p1");
+  const auto epoch = h.open(withRunTime(h.media("p1")), true);
+  h.outbox.sent.clear();
+  h.post(h.command(GroupCommandType::Seek, 30'000));
+  // Someone joins: the server pauses everyone, also those still seeking.
+  h.post(h.command(GroupCommandType::Pause, 30'000));
+  CHECK(h.backend.all<command::Seek>().size() == 2);
+  h.post(backend::SeekStarted{epoch});
+  h.post(backend::PlaybackRestarted{epoch, h.sample(30.0, true)});
+  const auto ready = h.outbox.all<outgoing::Ready>();
+  REQUIRE(ready.size() == 1);
+  CHECK(ready[0].position.milliseconds() == 30'000);
+}
+
+TEST_CASE("The paused seek of a group Pause while the group waits ends with Ready") {
+  // Our Buffering and Ready can reach the server in either order: if the
+  // Ready came first, the server still waits for one after its Pause.
+  for (const auto state : {GroupState::Waiting, GroupState::Paused}) {
+    SessionHarness h;
+    const auto epoch = playInGroup(h);
+    h.advance(1000ms);
+    h.post(group::StateChanged{h.group, state});
+    h.outbox.sent.clear();
+    h.post(h.command(GroupCommandType::Pause, 1'000));
+    h.post(backend::SeekStarted{epoch});
+    h.post(backend::PlaybackRestarted{epoch, h.sample(1.0, true)});
+    CHECK(h.outbox.all<outgoing::Ready>().size() == (state == GroupState::Waiting ? 1u : 0u));
+  }
 }

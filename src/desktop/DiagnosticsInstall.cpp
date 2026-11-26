@@ -1,6 +1,8 @@
 #include "AppServices.h"
+#include "Logging.h"
 
 #include <jfd/api/JellyfinClient.h>
+#include <jfd/diagnostics/Crash.h>
 #include <jfd/diagnostics/FrameStats.h>
 #include <jfd/diagnostics/ProcessStats.h>
 #include <jfd/diagnostics/Report.h>
@@ -17,6 +19,7 @@
 #include <QFile>
 #include <QLocale>
 #include <QLoggingCategory>
+#include <QRegularExpression>
 #include <QQuickWindow>
 #include <QScreen>
 #include <QSysInfo>
@@ -25,6 +28,7 @@
 
 #include <chrono>
 #include <deque>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -40,6 +44,33 @@ namespace jfd::desktop {
     constexpr std::size_t MaxSnapshots = 60;
     constexpr int ServerWaitMs = 3'000;
     constexpr int KeptReports = 5;
+    // The toast that offers a report after a crash comes once the start-up
+    // messages are through.
+    constexpr int CrashNoticeDelayMs = 1500;
+    // The toast's button opens this address, which the app handles itself.
+    constexpr const char* ActionScheme = "jfd-app";
+    constexpr const char* SaveReportAction = "save-report";
+
+    std::filesystem::path toPath(const QString& path) {
+#ifdef Q_OS_WIN
+      return std::filesystem::path(path.toStdWString());
+#else
+      return std::filesystem::path(QFile::encodeName(path).toStdString());
+#endif
+    }
+
+    QString fromPath(const std::filesystem::path& path) {
+#ifdef Q_OS_WIN
+      return QString::fromStdWString(path.wstring());
+#else
+      return QFile::decodeName(QByteArray::fromStdString(path.string()));
+#endif
+    }
+
+    QString crashDirectory(const AppServices& services) {
+      return services.logDirectory + QStringLiteral("/crashes");
+    }
+
     // A pause in presentation (nothing to draw) is not one long frame.
     constexpr std::int64_t IdleGapUs = 500'000;
 
@@ -142,6 +173,57 @@ namespace jfd::desktop {
     }
   } // namespace
 
+  // Opens the jfd-app: addresses of the toast's buttons (QDesktopServices).
+  class AppActionHandler : public QObject {
+    Q_OBJECT
+
+  public:
+    explicit AppActionHandler(std::function<void(const QString&)> run, QObject* parent)
+        : QObject(parent), m_run(std::move(run)) {}
+
+  public Q_SLOTS:
+    void open(const QUrl& url) { m_run(url.path()); }
+
+  private:
+    std::function<void(const QString&)> m_run;
+  };
+
+  void startCrashGuard(AppServices& services) {
+    const QString pid = QString::number(QCoreApplication::applicationPid());
+    const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss-")) + pid;
+    const QString info = QStringLiteral("version %1, started %2, process %3")
+                             .arg(QCoreApplication::applicationVersion(),
+                                  QDateTime::currentDateTime().toString(Qt::ISODate), pid);
+    const auto previous = diagnostics::beginSession(
+        toPath(services.logDirectory), (info + QStringLiteral("\nstamp=") + stamp).toStdString());
+    const QString crashes = crashDirectory(services);
+    if (previous) {
+      const QStringList lines = QString::fromStdString(*previous).split(QLatin1Char('\n'));
+      QString previousStamp;
+      for (const QString& line : lines)
+        if (line.startsWith(QLatin1String("stamp="))) previousStamp = line.mid(6);
+      services.previousSessionCrashed = true;
+      services.previousSessionInfo = lines.value(0);
+      qCWarning(lcDiagnostics).noquote() << "the previous session ended unexpectedly:" << services.previousSessionInfo;
+      // Its log, which the next start would rotate away, next to its crash
+      // file (same name up to the extension).
+      static const QRegularExpression safeStamp(QStringLiteral("^[0-9]{8}-[0-9]{6}-[0-9]+$"));
+      if (!safeStamp.match(previousStamp).hasMatch()) previousStamp = stamp + QStringLiteral("-previous");
+      QDir().mkpath(crashes);
+      QFile::copy(services.logDirectory + QStringLiteral("/jellyfin-desktop.old.log"),
+                  crashes + QStringLiteral("/crash-") + previousStamp + QStringLiteral(".log"));
+    }
+    const std::string header = "Jellyfin Desktop Next " + QCoreApplication::applicationVersion().toStdString() +
+                               " crashed (" + info.toStdString() + ")";
+    if (!diagnostics::installCrashHandler(toPath(crashes), stamp.toStdString(), header))
+      qCWarning(lcDiagnostics) << "the crash handler could not be installed";
+    diagnostics::pruneCrashFiles(toPath(crashes));
+  }
+
+  void endCrashGuard(const AppServices& services) {
+    diagnostics::endSession(toPath(services.logDirectory));
+  }
+
   void installDiagnostics(AppServices& services, QQuickWindow& window) {
     auto statistics = std::make_shared<Statistics>();
 
@@ -208,10 +290,27 @@ namespace jfd::desktop {
               input.settings.emplace_back(std8(full), std8(services.settings->value(full).toString()));
             }
           }
+          // The lines still buffered go in too.
+          flushLogFile();
           input.log = readTail(services.logDirectory + QStringLiteral("/jellyfin-desktop.log"));
           input.previousLog = readTail(services.logDirectory + QStringLiteral("/jellyfin-desktop.old.log"));
           if (services.session) {
             input.sessionJournal = services.session->journal().lines();
+          }
+          input.previousSessionCrashed = services.previousSessionCrashed;
+          input.previousSessionInfo = std8(services.previousSessionInfo);
+          const std::vector<std::filesystem::path> crashes = diagnostics::crashFiles(toPath(crashDirectory(services)));
+          for (const std::filesystem::path& file : crashes) {
+            const QFileInfo crash(fromPath(file));
+            input.crashFiles.push_back(
+                std8(QStringLiteral("%1 (%2 KB)").arg(crash.fileName()).arg((crash.size() + 1023) / 1024)));
+          }
+          // The newest crash's backtrace (Linux); a minidump stays in the
+          // folder, for whoever asks for it.
+          if (!crashes.empty()) {
+            const QString newest = fromPath(crashes.front());
+            const QString text = newest.left(newest.size() - QFileInfo(newest).suffix().size()) + QStringLiteral("txt");
+            input.crashText = readTail(text);
           }
           {
             std::lock_guard lock(statistics->mutex);
@@ -254,6 +353,31 @@ namespace jfd::desktop {
           });
           QTimer::singleShot(ServerWaitMs, &window, [finish] { (*finish)(QString()); });
         });
+
+    // After a crash: say so, with a button that saves the report.
+    auto* actions = new AppActionHandler(
+        [&services](const QString& action) {
+          if (action == QLatin1String(SaveReportAction)) services.settings->trigger(settings::keys::SaveReport);
+        },
+        &window);
+    QDesktopServices::setUrlHandler(QLatin1String(ActionScheme), actions, "open");
+    QObject::connect(actions, &QObject::destroyed, [] { QDesktopServices::unsetUrlHandler(QLatin1String(ActionScheme)); });
+    if (services.previousSessionCrashed) {
+      QTimer::singleShot(CrashNoticeDelayMs, &window, [&window] {
+        QObject* shell = window.findChild<QObject*>(QStringLiteral("shell"));
+        if (shell == nullptr) return;
+        QMetaObject::invokeMethod(
+            shell, "showLink",
+            Q_ARG(QVariant, QVariant(QCoreApplication::translate(
+                                "Diagnostics",
+                                "The previous session ended unexpectedly. A diagnostic report helps to find out why."))),
+            Q_ARG(QVariant, QVariant(QCoreApplication::translate("Diagnostics", "Save report"))),
+            Q_ARG(QVariant, QVariant(QStringLiteral("%1:%2").arg(QLatin1String(ActionScheme),
+                                                                  QLatin1String(SaveReportAction)))));
+      });
+    }
   }
 
 } // namespace jfd::desktop
+
+#include "DiagnosticsInstall.moc"

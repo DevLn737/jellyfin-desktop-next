@@ -1,0 +1,103 @@
+Jellyfin Desktop Next: third-party software in the packages
+=============================================================
+
+The program itself is GPL-2.0-or-later (LICENSE). The AppImage and the MSI
+also carry the third-party software below, each under its own licence. The
+licence texts are the files named here, in this folder (AppImage:
+usr/share/licenses/jellyfin-desktop-next; MSI: the "licenses" folder of the
+installation). Versions and source locations are the pins in
+deps/versions.json of the release's commit.
+
+Where the sources are
+---------------------
+Every component below is unmodified. For the LGPL and GPL components the
+corresponding source is the upstream source at the version or commit named
+here; the build recipes are packaging/linux/build-libmpv.sh (Linux libmpv)
+and scripts/fetch-windows-deps.ps1 (Windows) in this program's source
+repository, at the tag of the release.
+
+Both packages
+-------------
+Qt 6.11.3 (https://download.qt.io, sources https://github.com/qt, tag
+  v6.11.3): Qt Core, Gui, Network, Qml, Quick, Quick Controls, Svg,
+  WebSockets and their plugins, used under the LGPL-3.0 (LGPL-3.0.txt, with
+  GPL-3.0.txt, which it builds on). Qt's libraries contain third-party
+  components with their own notices: Qt-third-party.txt.
+SDL3 3.4.20 (https://github.com/libsdl-org/SDL, tag release-3.4.20),
+  statically linked for gamepads: zlib licence, SDL3.txt. It contains HIDAPI,
+  used under its BSD-style licence: HIDAPI.txt.
+mpv (libmpv), commit 01e2533f3143b8940857ca419b0b367f583e05ca
+  (https://github.com/mpv-player/mpv): built as GPL (the default), so
+  GPL-2.0-or-later as a whole; mpv.txt has its copyright summary and the
+  licence texts.
+Nunito typeface and the interface icons: see LICENSES.md.
+
+AppImage (Linux) only
+---------------------
+FFmpeg n9.0.2 (https://github.com/FFmpeg/FFmpeg, tag n9.0.2), shared
+  libraries libavcodec, libavformat, libavutil, libavfilter, libavdevice,
+  libswscale, libswresample, built as LGPL (no --enable-gpl):
+  LGPL-2.1-or-later, FFmpeg.txt and LGPL-2.1.txt.
+libplacebo v7.360.1 (https://github.com/haasn/libplacebo, tag v7.360.1):
+  LGPL-2.1-or-later, libplacebo.txt.
+libass 0.17.5 (https://github.com/libass/libass, tag 0.17.5): ISC licence,
+  libass.txt.
+nv-codec-headers n12.2.72.0 (https://github.com/FFmpeg/nv-codec-headers):
+  headers only, compiled into FFmpeg; MIT licence, quoted in its headers.
+ICU 73.2, which Qt's Linux libraries are built with (libicu*): Unicode
+  licence, ICU.txt (https://github.com/unicode-org/icu, tag release-73-2).
+Libraries of the build system (Ubuntu 24.04) that linuxdeploy copies into
+  the image, such as FriBiDi, HarfBuzz, FreeType, dav1d, LuaJIT and Little
+  CMS: their Debian copyright files (with the licence texts) are collected
+  when the AppImage is made, one per package, under system/ next to this
+  file, with system/README.txt naming the package and version of each
+  library. Graphics drivers, audio servers, GnuTLS, Wayland, D-Bus and udev
+  stay the system's and are not in the image.
+
+MSI (Windows) only
+------------------
+libmpv-2.dll, the libmpv package of shinchiro/mpv-winbuild-cmake,
+  20261018-git-01e2533f31 (https://github.com/shinchiro/mpv-winbuild-cmake;
+  the build recipe is that repository at commit
+  1f8d2e76255abc48f0456d9be99b4cab9c6566e6, its last before the build): mpv at
+  the commit above with a statically linked FFmpeg built with --enable-gpl
+  --enable-version3, so the DLL as a whole is GPL-3.0-or-later
+  (GPL-3.0.txt; FFmpeg.txt, mpv.txt). The recipe links in, among others,
+  libplacebo (libplacebo.txt), libass (libass.txt), FreeType, HarfBuzz,
+  FriBiDi, Little CMS, LuaJIT, uchardet, libarchive, libbluray, libdvdnav,
+  libdvdread, libjpeg, libpng, zlib, shaderc, SPIRV-Cross, dav1d, mujs,
+  rubberband, OpenAL Soft, SDL2 and curl; their sources and licences are
+  listed in the recipe's packages/ folder at that commit.
+Vulkan loader (vulkan-1.dll) 1.4.363.0 from the LunarG Vulkan runtime
+  components (https://github.com/KhronosGroup/Vulkan-Loader, tag
+  vulkan-sdk-1.4.363.0): Apache-2.0, Vulkan-Loader.txt.
+Mesa llvmpipe (opengl32sw.dll), Qt's build of Mesa 11.2.2, the software
+  OpenGL fallback: MIT licence, Mesa.txt; it is linked with LLVM,
+  LLVM.txt (University of Illinois/NCSA licence of the LLVM 3.x releases).
+Microsoft Visual C++ runtime (its installer vc_redist.x64.exe, or the
+  vcruntime140*.dll and msvcp140*.dll files, as windeployqt
+  --compiler-runtime deploys it), the Direct3D shader compiler
+  d3dcompiler_47.dll and the DirectX shader compiler dxcompiler.dll and
+  dxil.dll:
+  redistributed under Microsoft's terms for redistributable code of Visual
+  Studio and the Windows SDK; they are not open source.
+
+Files in this folder
+--------------------
+THIRD-PARTY-NOTICES.txt  this file
+GPL-2.0.txt              GNU General Public License version 2
+GPL-3.0.txt              GNU General Public License version 3
+LGPL-2.1.txt             GNU Lesser General Public License version 2.1
+LGPL-3.0.txt             GNU Lesser General Public License version 3
+Qt-third-party.txt       components inside Qt's libraries
+SDL3.txt                 SDL3
+HIDAPI.txt               HIDAPI (inside SDL3)
+mpv.txt                  mpv
+FFmpeg.txt               FFmpeg
+libplacebo.txt           libplacebo
+libass.txt               libass
+ICU.txt                  ICU (AppImage)
+Vulkan-Loader.txt        Vulkan loader (MSI)
+Mesa.txt                 Mesa llvmpipe (MSI)
+LLVM.txt                 LLVM (inside Mesa llvmpipe, MSI)
+SOURCES.txt              where each licence text was taken from

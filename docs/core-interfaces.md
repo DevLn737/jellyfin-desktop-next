@@ -109,16 +109,32 @@ wall time to cover a media distance is `round(mediaTicks ÷ baseRate)`
   item finishes loading (paused, `IsPlaying=false`), when a group `Seek` or rate
   change completes, on rejoin with the item already open, and when buffering
   starts and ends while the group plays, also when it ends during the seek
-  that answers our Buffering. A playing position is moved to the report's
-  instant.
+  that answers our Buffering or comes with that seek's restart (no Progress
+  need follow a paused restart). The paused seek of a group `Pause` while the
+  group waits ends with a Ready, and a `Pause` during a group seek keeps the
+  Ready that seek owes. A playing position is moved to the report's instant.
+- **Failures** never leave the group waiting: a stream that dies while it
+  plays is reopened once at its position (`notice::ReopenAfterError`; in a
+  group after a Buffering, then Ready like a first load); a file reopened so
+  fails for good unless it played on for a minute. The group's item that fails
+  to load, fails again, or is not ready 30 s after the load (or after a group
+  seek tried twice) gives `notice::GroupItemFailed`, and the app leaves the
+  group. A correction seek gives up waiting after 5 s. Group controls while
+  the connection is lost send nothing and give `notice::GroupOffline`.
+- **Next item**: at the end of the group's item, with auto-next on and a next
+  entry in the group's queue, the member asks for it (`RequestNextItem`), once
+  per item; the server takes the first such request.
 - **Commands** run at their `When`, converted with the latest `ClockOffset`.
   A late `Unpause` joins at the projected group position. A repeated command is
   re-applied only when the local state no longer matches it.
 - **Drift** (`Reconciler.h`) is a pure function of the last `Unpause`, the
   sample's server instant and the sample's position. Defaults follow Jellyfin
   Web: speed correction between 60 ms and 3 s over 1 s, relative to the group
-  base rate and clamped to 0.2–5×; a skip from 400 ms, or when the correction
-  would take longer than 5 s. Correction pauses for 1.5 s after a command or skip.
+  base rate, but kept within 10 % of it (Web reaches 0.2–3.9×) and lasting up
+  to 5 s; a skip from 400 ms, or when the correction would take longer than
+  5 s (at 1× anything past about 500 ms). A late `Unpause` and a skip aim
+  ahead by the measured seek time (a moving average of seek-to-ready times).
+  Correction pauses for 1.5 s after a command or skip.
 - **Rates**: effective = group base rate, or the temporary correction. Outside a
   group the personal rate applies. Leaving cancels every group timer before the
   personal rate is restored.
@@ -135,7 +151,8 @@ on the steady clock, the SyncPlay `GroupClient` on `JellyfinClient::rawRequest`
 and the session WebSocket (rejoining after a reconnect and polling server
 time), and `PlaybackLauncher`, which resolves an item through PlaybackInfo
 and `playback::mediaRequest` into `intent::Open`, alone or for the group's
-item (`notice::GroupItemRequested`) and again on `StreamReopenNeeded`. The
+item (`notice::GroupItemRequested`) and again on `StreamReopenNeeded` and
+`ReopenAfterError`; it leaves the group on `GroupItemFailed`. The
 media backend comes from a factory: mpv in the app, a virtual file in tests.
 
 ## Simulator
@@ -155,7 +172,9 @@ Invariants checked on every input:
 - every backend command is for the current file;
 - every Ready names the loaded queue item and a position within 500 ms of
   where the backend really is;
-- outside a group the backend rate is always the personal rate.
+- outside a group the backend rate is always the personal rate;
+- the group never waits more than 45 s for one member (chaos runs inject
+  loads that fail or never open and streams that die while playing).
 
 `ctest` runs 10,000 chaos scenarios, 30-minute drift runs at 1×, 1.25× and
 1.5× with a cold second client, a 10-minute drift run in which every client

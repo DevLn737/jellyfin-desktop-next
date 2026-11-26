@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packaging/icons/jellyfin-desktop-next.svg" width="112" alt="">
+  <img src="packaging/icons/jellyfin-desktop-next.svg" width="128" alt="">
 </p>
 
 <h1 align="center">Jellyfin Desktop Next</h1>
@@ -24,10 +24,6 @@
   <a href="#по-русски">По-русски</a>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/home.jpg" alt="Home screen: a banner with what you are watching and rows of films and series">
-</p>
-
 > **Beta.** The client is in active development and ships as pre-releases.
 > Things change from one beta to the next; please report what breaks in
 > [Issues](https://github.com/DevLn737/jellyfin-desktop-next/issues).
@@ -42,59 +38,71 @@ Get the newest build from the **[Releases page](https://github.com/DevLn737/jell
 | Windows 10 (1903) or newer, 64-bit | `jellyfin-desktop-next-<version>-x64.msi` | Run it. It installs for your user, without administrator rights. The installer is not code-signed, so SmartScreen warns on first run: **More info → Run anyway**. |
 | Linux (glibc 2.39+: Ubuntu 24.04, Fedora 40, Debian 13, Arch and newer) | `jellyfin-desktop-next-x86_64.AppImage` | `chmod +x jellyfin-desktop-next-x86_64.AppImage`, then run it. |
 
-After that the app updates itself: it checks for new releases, verifies the
-download's signature and offers **Restart and update**.
+After that the app updates itself. It checks for new releases, checks the
+download's signature against the release key built into the app, and offers
+**Restart and update** once nothing is playing.
 
 The client is tested against Jellyfin server 12.2. Changing the speed for the
-whole room needs the server fork listed under [Related repositories](#related-repositories);
-everything else, watching together included, works with a stock server.
+whole room needs the server fork listed under [Related repositories](#related-repositories).
+Everything else works with a stock server, rooms included.
 
 ## Features
 
 - **Native and light.** C++20, Qt 6 Quick and libmpv. No embedded browser,
   no Chromium, no Jellyfin Web inside.
-- **Playback by mpv.** Hardware decoding, ASS/SSA and PGS subtitles, external
-  audio and subtitle files, chapters, Skip intro, audio and subtitle delays,
-  speed, picture in picture, stats for nerds, and switching the display's
-  refresh rate to the film's frame rate. Direct Play first, transcoding when
-  the server has to.
-- **Watch together.** Rooms on your server (SyncPlay) with friends on this
-  client or in Jellyfin Web: the same position, pause and speed for everyone,
-  while each person picks their own audio track and subtitles. Drift is
-  corrected by a gentle speed nudge, not by jumps.
-- **Your library, redesigned.** Home with a banner and rows, films and series
-  with seasons and episodes, filters and sorting, collections, people,
-  search across everything (Ctrl+K), favourites and watched marks.
+- **Playback by mpv.**
+  - Hardware decoding, ASS/SSA and PGS subtitles, external audio and subtitle
+    files.
+  - Chapters, Skip intro, audio and subtitle delays, and speed.
+  - Picture in picture and stats for nerds (right-click or I).
+  - Switching the display to the film's frame rate.
+  - Direct Play first, transcoding only when the server has to.
+- **Rooms.** Watch together on your server (SyncPlay) with friends on this
+  client or in Jellyfin Web.
+  - Everyone shares the position, pause and speed, and each person picks their
+    own audio track and subtitles.
+  - Drift is corrected by a gentle speed nudge, not by jumps.
+  - A member whose stream or connection drops reopens it and rejoins on their
+    own.
+- **Your library.**
+  - Home with a banner and rows.
+  - Films and series with seasons and episodes; long seasons stay fast.
+  - Filters and sorting, collections and people.
+  - Search across everything (Ctrl+K), favourites and watched marks.
 - **Music.** Albums, artists, playlists, genres, lyrics, a queue and a
   mini-player.
 - **Live TV.** Channels and the guide; Page Up and Down change the channel.
 - **Downloads.** Films and episodes for offline viewing, with their external
-  audio and subtitles, in a readable Series/Season folder layout.
-- **On the sofa.** TV mode for a remote or a gamepad (Xbox, PlayStation,
-  8BitDo): large text, arrow navigation everywhere, an on-screen keyboard and
-  Quick Connect sign-in.
+  audio and subtitles, in a readable Series/Season folder layout. Finished
+  files are checked again before they play.
+- **Gamepad and TV.**
+  - Xbox, PlayStation and 8BitDo gamepads work everywhere, with an on-screen
+    keyboard, at the desk too.
+  - TV mode is for the sofa: large text, arrow navigation on every screen and
+    Quick Connect sign-in.
 - **Remote control.** "Play on" from Jellyfin Web and the phone apps.
-- **Integrations.** Discord Rich Presence (with privacy options per kind and
-  library), media keys and the system's now-playing panel, and requests
-  through Seerr.
-- **Russian and English** interface.
+- **Integrations.**
+  - Discord Rich Presence, with privacy options per kind and library.
+  - Media keys and the system's now-playing panel.
+  - Requests through Seerr.
+- **Looks after itself.**
+  - Signed self-updates.
+  - If the app crashes, it says so at the next start and offers a diagnostic
+    report with the crash details, private data removed.
+  - The window remembers its size, including maximized and full screen.
+- **Russian and English** interface, with dark and light themes and your own
+  accent colour.
 
 ## Screenshots
 
-| | |
-| --- | --- |
-| ![A series page: title, details, seasons and episodes](docs/screenshots/series.jpg) | ![A film page](docs/screenshots/movie.jpg) |
-| **Series** with seasons, episodes and what is left to watch | **Film** page |
-| ![The player with the controls shown](docs/screenshots/player.jpg) | ![Watch together: rooms on the server](docs/screenshots/watch-together.jpg) |
-| **Player** with chapters and the episode line | **Watch together**: rooms on your server |
-| ![A library with the filters panel open](docs/screenshots/library.jpg) | ![Music overview with albums](docs/screenshots/music.jpg) |
-| **Library** with filters and sorting | **Music** |
-| ![Settings with sections on the left](docs/screenshots/settings.jpg) | |
-| **Settings** with search | |
+<!-- Screenshots of the current beta go here: home, series, player, rooms,
+     library, music and settings, one image each in docs/screenshots. -->
 
-The screenshots are taken by the UI tests on a demo catalogue whose pictures
-are drawn by the tests themselves; [scripts/readme-screenshots.sh](scripts/readme-screenshots.sh)
-takes them again.
+| Home | Series | Player |
+| :---: | :---: | :---: |
+| _coming soon_ | _coming soon_ | _coming soon_ |
+| **Rooms** | **Music** | **Settings** |
+| _coming soon_ | _coming soon_ | _coming soon_ |
 
 ## Architecture
 
@@ -206,23 +214,31 @@ links to the release page instead.
 ## По-русски
 
 **Jellyfin Desktop Next** — нативный клиент Jellyfin для Windows и Linux,
-сделанный вокруг совместного просмотра. Сейчас это бета: новые версии выходят
+сделанный вокруг совместного просмотра. Сейчас это бета. Новые версии выходят
 на [странице релизов](https://github.com/DevLn737/jellyfin-desktop-next/releases).
 
-**Как установить.** Windows: скачайте `.msi` и запустите (права администратора
-не нужны; при первом запуске SmartScreen предупредит, нажмите «Подробнее» →
-«Выполнить в любом случае»). Linux: скачайте `.AppImage`, сделайте его
-исполняемым (`chmod +x`) и запустите. Дальше приложение обновляется само.
+**Как установить.**
+
+- **Windows.** Скачайте `.msi` и запустите. Права администратора не нужны.
+  При первом запуске SmartScreen предупредит: нажмите «Подробнее» →
+  «Выполнить в любом случае».
+- **Linux.** Скачайте `.AppImage`, сделайте его исполняемым (`chmod +x`) и
+  запустите.
+
+Дальше приложение обновляется само.
 
 **Что умеет.**
 
 - Воспроизведение через mpv: аппаратное декодирование, ASS и PGS субтитры,
   внешние дорожки, главы, пропуск заставки, картинка в картинке.
-- «Смотреть вместе»: комнаты на вашем сервере, общая позиция, пауза и
-  скорость, а озвучку и субтитры каждый выбирает себе сам.
+- «Комнаты»: совместный просмотр на вашем сервере. Позиция, пауза и скорость
+  у всех общие, а озвучку и субтитры каждый выбирает себе сам.
 - Главная, библиотека с фильтрами, страницы фильмов и сериалов, поиск
-  (Ctrl+K), музыка, ТВ-каналы, загрузки для просмотра без сети.
-- Режим ТВ для пульта и геймпада, Discord, управление с телефона, Seerr.
+  (Ctrl+K), музыка, ТВ-каналы и загрузки для просмотра без сети.
+- Геймпад работает везде, не только в режиме ТВ. Режим ТВ рассчитан на пульт
+  и диван.
+- Discord, управление с телефона, запросы через Seerr.
+- После сбоя приложение предложит сохранить отчёт для диагностики.
 - Интерфейс на русском и английском.
 
 ## License

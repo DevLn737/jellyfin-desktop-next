@@ -135,6 +135,30 @@
         <translation>Вида #00a4dc. Применяется, когда выбран свой цвет акцента.</translation>
     </message>
     <message>
+        <source>Text rendering</source>
+        <translation>Отрисовка текста</translation>
+    </message>
+    <message>
+        <source>Try another if the text looks blurry or uneven on your screen.</source>
+        <translation>Попробуйте другой вариант, если текст на вашем экране выглядит размытым или неровным.</translation>
+    </message>
+    <message>
+        <source>Smooth (default)</source>
+        <translation>Сглаженная (по умолчанию)</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Системная</translation>
+    </message>
+    <message>
+        <source>System, snapped to pixels</source>
+        <translation>Системная, по пикселям</translation>
+    </message>
+    <message>
+        <source>Vector</source>
+        <translation>Векторная</translation>
+    </message>
+    <message>
         <source>Simplified effects</source>
         <translation>Упрощённые эффекты</translation>
     </message>

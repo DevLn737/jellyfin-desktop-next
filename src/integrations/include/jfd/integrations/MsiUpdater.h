@@ -48,7 +48,7 @@ namespace jfd::integrations {
     // folder, such as a build run from its build directory, is not updated.
     // stateDirectory: where the download, script, log and marker live.
     MsiUpdater(QNetworkAccessManager* network, QString executable, QString installFolder, QString stateDirectory,
-               std::optional<MinisignPublicKey> key, QObject* parent = nullptr);
+               MinisignKeys keys, QObject* parent = nullptr);
 
     // Installed by the MSI, with a release key built in, and a state directory.
     bool supported() const;
@@ -95,7 +95,7 @@ namespace jfd::integrations {
     QString m_executable;
     QString m_installFolder;
     QString m_stateDirectory;
-    std::optional<MinisignPublicKey> m_key;
+    MinisignKeys m_keys;
     QString m_readyVersion;
     QString m_preparing;
     SignedDownload m_download;
