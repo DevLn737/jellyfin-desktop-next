@@ -212,6 +212,14 @@ namespace {
                               {QStringLiteral("Type"), QStringLiteral("Director")}});
     o.insert(QStringLiteral("People"), people);
     o.insert(QStringLiteral("Studios"), QJsonArray{QJsonObject{{QStringLiteral("Name"), QStringLiteral("Северная студия")}}});
+    // Pages on other sites: s1 as an anime, m1 as a film.
+    if (t.id == QLatin1String("s1"))
+      o.insert(QStringLiteral("ProviderIds"),
+               QJsonObject{{QStringLiteral("Shikimori"), QStringLiteral("5114")}, {QStringLiteral("AniDB"), QStringLiteral("6107")},
+                           {QStringLiteral("Tvdb"), QStringLiteral("85249")}, {QStringLiteral("Imdb"), QStringLiteral("tt1355642")}});
+    else if (t.id == QLatin1String("m1"))
+      o.insert(QStringLiteral("ProviderIds"),
+               QJsonObject{{QStringLiteral("Tmdb"), QStringLiteral("603")}, {QStringLiteral("Imdb"), QStringLiteral("tt0133093")}});
     if (!series)
       o.insert(QStringLiteral("MediaStreams"),
                QJsonArray{QJsonObject{{QStringLiteral("Type"), QStringLiteral("Video")}, {QStringLiteral("Codec"), QStringLiteral("hevc")},
@@ -276,7 +284,9 @@ namespace {
 
   QJsonObject seasonJson(const Title& series, int season) {
     return {{QStringLiteral("Id"), QStringLiteral("%1s%2").arg(series.id).arg(season)},
-            {QStringLiteral("Name"), QStringLiteral("Сезон %1").arg(season)},
+            // Servers name seasons every which way; the tabs use the number.
+            {QStringLiteral("Name"), season == 2 ? QStringLiteral("%1 [ТВ-2]").arg(series.name)
+                                                 : QStringLiteral("Сезон %1").arg(season)},
             {QStringLiteral("Type"), QStringLiteral("Season")},
             {QStringLiteral("IsFolder"), true},
             {QStringLiteral("SeriesId"), series.id},
@@ -814,6 +824,30 @@ TEST_CASE("Series, film and library pages on the demo catalogue") {
     if (list) MESSAGE(list->property("count").toInt());
     return list != nullptr && list->property("count").toInt() == 8;
   }, Timeout));
+  // Season tabs by number, whatever the server calls them; the
+  // series' pages on other sites, anime first.
+  {
+    QQuickItem* second = nullptr;
+    REQUIRE(waitFor([&] { return (second = findItem(show.page(), QStringLiteral("seasonTab_1"))) != nullptr; }, Timeout));
+    const QString expected = QCoreApplication::translate("ItemPage", "Season %1").arg(2);
+    CHECK(second->property("label").toString() == expected);
+    CHECK(findItem(show.page(), QStringLiteral("seasonTab_0"))->property("label").toString() ==
+          QCoreApplication::translate("ItemPage", "Season %1").arg(1));
+    QQuickItem* links = findItem(show.page(), QStringLiteral("externalLinks"));
+    REQUIRE(links != nullptr);
+    CHECK(waitFor([&] { return links->isVisible(); }, Timeout));
+    QStringList shown;
+    for (const char* site : {"shikimori", "myanimelist", "anilist", "anidb", "tvdb", "tmdb", "imdb"})
+      if (findItem(links, QStringLiteral("externalLink_") + QLatin1String(site)) != nullptr) shown << QLatin1String(site);
+    CHECK(shown.join(QLatin1Char(',')) == QLatin1String("shikimori,myanimelist,anidb,tvdb,imdb"));
+    // Turned off in the settings, a site goes from the open page.
+    library::ExternalLinkOptions options;
+    options.hidden = {QStringLiteral("tvdb")};
+    options.shikimoriDomain = QStringLiteral("rip");
+    show.screens->ui()->setLinkOptions(options);
+    CHECK(waitFor([&] { return findItem(links, QStringLiteral("externalLink_tvdb")) == nullptr; }, Timeout));
+    show.screens->ui()->setLinkOptions({});
+  }
   show.screenshot(QStringLiteral("series-1280"));
   show.resize(1600, 900);
   show.screenshot(QStringLiteral("series-1600"));
@@ -906,6 +940,23 @@ TEST_CASE("A season of 600 episodes makes the cards and stills of one range only
   CHECK(episodes->property("count").toInt() == 24);
   CHECK(episodes->property("watched").toInt() == LongSeasonWatched);
   CHECK(episodes->property("rangeCount").toInt() == 25);
+  // A last few episodes join the range before: 25 is one range (1-25),
+  // 73 is 1-24, 25-48, 49-73; 38 keeps 25-38.
+  auto rangeCount = [&](int total) {
+    QVariant out;
+    QMetaObject::invokeMethod(show.page(), "rangeCountFor", Q_RETURN_ARG(QVariant, out), Q_ARG(QVariant, total));
+    return out.toInt();
+  };
+  CHECK(rangeCount(24) == 1);
+  CHECK(rangeCount(25) == 1);
+  CHECK(rangeCount(30) == 1);
+  CHECK(rangeCount(31) == 2);
+  CHECK(rangeCount(38) == 2);
+  CHECK(rangeCount(73) == 3);
+  CHECK(rangeCount(600) == 25);
+  QVariant end;
+  QMetaObject::invokeMethod(show.page(), "rangeEnd", Q_RETURN_ARG(QVariant, end), Q_ARG(QVariant, 2), Q_ARG(QVariant, 73));
+  CHECK(end.toInt() == 73);
   QQuickItem* card = nullptr;
   QMetaObject::invokeMethod(episodes, "itemAt", Q_RETURN_ARG(QQuickItem*, card), Q_ARG(int, 0));
   REQUIRE(card != nullptr);

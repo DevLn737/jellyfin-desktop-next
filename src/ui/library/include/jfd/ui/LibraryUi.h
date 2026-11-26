@@ -104,6 +104,10 @@ namespace jfd::ui {
     // Called by LibraryScreens as the session socket comes and goes; a
     // change from offline to online emits reconnected().
     void setOnline(bool online);
+    // Which external links item pages show (the settings); open pages
+    // follow a change.
+    void setLinkOptions(const library::ExternalLinkOptions& options);
+    const library::ExternalLinkOptions& linkOptions() const { return m_linkOptions; }
 
     // A grid for one library, owned by `owner` (the page), with the sort
     // and filters it had last time; changes to them are kept. Null before
@@ -172,6 +176,7 @@ namespace jfd::ui {
     // Playing this track would stop the video; the window asks, and calls
     // playTrack again with `confirmed` on yes.
     void trackConfirmationNeeded(const QString& trackId, const QString& albumId);
+    void linkOptionsChanged();
 
   private:
     QString collectionTypeOf(const QString& libraryId) const;
@@ -186,6 +191,7 @@ namespace jfd::ui {
     TrackHandler m_track;
     std::function<void(const QString&)> m_channel;
     bool m_online = true;
+    library::ExternalLinkOptions m_linkOptions;
   };
 
 } // namespace jfd::ui
