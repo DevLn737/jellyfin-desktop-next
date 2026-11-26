@@ -20,7 +20,7 @@ namespace jfd::api {
     // A detail page also needs trickplay and chapters for the seek bar,
     // and the people, studios, streams and episode count of its tables.
     const QString DetailFields =
-        ItemFields + QStringLiteral(",Trickplay,Chapters,People,Studios,MediaStreams,RecursiveItemCount");
+        ItemFields + QStringLiteral(",Trickplay,Chapters,People,Studios,MediaStreams,RecursiveItemCount,ProviderIds");
     const QString Fields = QStringLiteral("fields");
 
     QString joinNumbers(const QList<int>& numbers) {

@@ -110,7 +110,10 @@ namespace jfd::library {
     case FeaturedReasonRole:
       return e->featuredReason;
     case IndexNumberRole:
-      return item.type == QLatin1String("Episode") && item.indexNumber ? QVariant(*item.indexNumber) : QVariant();
+      // An episode's or season's number (season tabs are named by it).
+      return (item.type == QLatin1String("Episode") || item.type == QLatin1String("Season")) && item.indexNumber
+                 ? QVariant(*item.indexNumber)
+                 : QVariant();
     default:
       return {};
     }

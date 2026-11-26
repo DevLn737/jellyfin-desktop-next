@@ -738,6 +738,14 @@
         <translation>Следующая: %1</translation>
     </message>
     <message>
+        <source>Specials</source>
+        <translation>Спецвыпуски</translation>
+    </message>
+    <message>
+        <source>Season %1</source>
+        <translation>Сезон %1</translation>
+    </message>
+    <message>
         <source>More actions</source>
         <translation>Другие действия</translation>
     </message>
@@ -792,6 +800,10 @@
     <message>
         <source>More like this</source>
         <translation>Похожее</translation>
+    </message>
+    <message>
+        <source>Open on %1</source>
+        <translation>Открыть на %1</translation>
     </message>
 </context>
 <context>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jfd/api/Models.h>
+#include <jfd/library/ExternalLinks.h>
 #include <jfd/library/ItemListModel.h>
 
 #include <QObject>
@@ -45,6 +46,8 @@ namespace jfd::library {
     Q_PROPERTY(QString seriesId READ seriesId NOTIFY itemChanged)
     Q_PROPERTY(QString seriesName READ seriesName NOTIFY itemChanged)
     Q_PROPERTY(QString subtitle READ subtitle NOTIFY itemChanged)
+    // An episode's or season's number; undefined without one.
+    Q_PROPERTY(QVariant indexNumber READ indexNumber NOTIFY itemChanged)
     Q_PROPERTY(QUrl posterUrl READ posterUrl NOTIFY itemChanged)
     Q_PROPERTY(QUrl backdropUrl READ backdropUrl NOTIFY itemChanged)
     Q_PROPERTY(QUrl logoUrl READ logoUrl NOTIFY itemChanged)
@@ -57,6 +60,9 @@ namespace jfd::library {
     Q_PROPERTY(QStringList audioLanguages READ audioLanguages NOTIFY itemChanged)
     Q_PROPERTY(QStringList subtitleLanguages READ subtitleLanguages NOTIFY itemChanged)
     Q_PROPERTY(QString quality READ quality NOTIFY itemChanged)
+    // A movie's or series' pages on other sites (ExternalLinks.h): maps with
+    // "site", "label" and "url".
+    Q_PROPERTY(QVariantList externalLinks READ externalLinks NOTIFY externalLinksChanged)
     // A series' or season's episodes, and how many are still unwatched.
     Q_PROPERTY(int episodeCount READ episodeCount NOTIFY itemChanged)
     Q_PROPERTY(int unplayedCount READ unplayedCount NOTIFY userDataChanged)
@@ -113,6 +119,7 @@ namespace jfd::library {
     QString seriesName() const;
     // "S1:E3" for an episode, "Season 2" style names come from the server.
     QString subtitle() const;
+    QVariant indexNumber() const;
     QUrl posterUrl() const { return m_posterUrl; }
     QUrl backdropUrl() const { return m_backdropUrl; }
     QUrl logoUrl() const { return m_logoUrl; }
@@ -121,6 +128,9 @@ namespace jfd::library {
     QStringList audioLanguages() const;
     QStringList subtitleLanguages() const;
     QString quality() const;
+    QVariantList externalLinks() const;
+    // Which sites and Shikimori domain the links use (the settings).
+    void setLinkOptions(const ExternalLinkOptions& options);
     int episodeCount() const;
     int unplayedCount() const;
 
@@ -164,6 +174,7 @@ namespace jfd::library {
     void userDataChanged();
     void playTargetChanged();
     void seasonIdChanged();
+    void externalLinksChanged();
     // `startPositionTicks` 0 starts from the beginning.
     void playRequested(const QString& itemId, qint64 startPositionTicks);
 
@@ -182,6 +193,7 @@ namespace jfd::library {
 
     api::JellyfinClient& m_client;
     Options m_options;
+    ExternalLinkOptions m_linkOptions;
     LibraryUpdates* m_updates = nullptr;
     CollectionIndex* m_collectionIndex = nullptr;
     QString m_itemId;
