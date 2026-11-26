@@ -1,0 +1,22 @@
+{
+  "room-members": {
+    "guid": "75234109-bd2e-4b2b-9ee5-3c0943aac752",
+    "name": "Room Members",
+    "description": "Shows SyncPlay group members each other's playback position and ping.",
+    "overview": "Used by Jellyfin Desktop Next to show where everyone in a watch-together room is.",
+    "owner": "DevLn737",
+    "category": "General",
+    "targetAbi": "12.2.0.0",
+    "changelog": "GET /RoomMembers for Jellyfin Desktop Next rooms."
+  },
+  "shikimori": {
+    "guid": "7edb2a28-5b8a-4fe8-ae11-d941315eb862",
+    "name": "Shikimori",
+    "description": "Adds metadata for anime tv and movies",
+    "overview": "Metadata provider for Shikimori",
+    "owner": "DevLn737",
+    "category": "Anime",
+    "targetAbi": "12.2.0.0",
+    "changelog": "Jellyfin 12.2 build of DevLn737/jellyfin-plugin-shikimori (compatibility/12.2)."
+  }
+}

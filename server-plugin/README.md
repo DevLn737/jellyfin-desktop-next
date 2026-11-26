@@ -31,7 +31,28 @@ server-plugin/smoke-test.sh server-plugin/out   # needs Docker; throwaway stock 
 CI (`.github/workflows/server-plugin.yml`) does both and keeps the DLL as the
 `room-members-plugin` artifact.
 
-## Install
+## Plugin repository
+
+The project publishes a Jellyfin plugin repository with Room Members and the
+Jellyfin 12.2 build of the Shikimori metadata plugin
+([DevLn737/jellyfin-plugin-shikimori](https://github.com/DevLn737/jellyfin-plugin-shikimori),
+branch `compatibility/12.2`). In Jellyfin: Dashboard -> Plugins ->
+Repositories -> add
+
+```
+https://github.com/DevLn737/jellyfin-desktop-next/releases/download/jellyfin-plugins/manifest.json
+```
+
+then install from the catalog; new versions show up as updates there.
+`.github/workflows/server-plugin.yml` builds both, installs them from a local
+copy of the repository on a throwaway stock 12.2 server
+(`repository/repository-test.sh`), and on main uploads the zips and
+`manifest.json` (`repository/manifest.py`, metadata in
+`repository/plugins.json`) to the `jellyfin-plugins` pre-release. Run the
+workflow by hand to pick up new Shikimori commits; raise a plugin's version
+for servers to see an update.
+
+## Install by hand
 
 1. Stop Jellyfin.
 2. In the server's configuration folder, create `plugins/RoomMembers_1.0.0.0/`
