@@ -19,9 +19,10 @@ namespace jfd::api {
   struct SessionCapabilities;
 } // namespace jfd::api
 
-namespace jfd::library {
+namespace jfd::account {
+  class Account;
   class SignIn;
-}
+} // namespace jfd::account
 
 namespace jfd::library {
   class HomeSections;
@@ -99,12 +100,16 @@ namespace jfd::desktop {
     bool previousSessionCrashed = false;
     QString previousSessionInfo;
 
-    // The server connection and the library's models (installLibrary). The
-    // session and group modules use the same client and socket.
+    // The server connection as one user (installLibrary): client, socket,
+    // saved servers and tokens, sign-in, and the user scope each module
+    // registers its per-user state with (account->scope()). Declared before
+    // everything that holds the client, so it goes last.
+    std::unique_ptr<account::Account> account;
+    // The library's models and screens (installLibrary), on the account.
     std::shared_ptr<LibraryServices> library;
     api::JellyfinClient* client = nullptr;
     api::SessionSocket* socket = nullptr;
-    library::SignIn* signIn = nullptr;
+    account::SignIn* signIn = nullptr;
     // Play and Watch together from the library screens go to the handlers
     // set on it (setPlayHandler, setWatchTogetherHandler).
     ui::LibraryUi* libraryUi = nullptr;

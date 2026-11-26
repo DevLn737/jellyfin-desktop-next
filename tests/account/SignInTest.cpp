@@ -1,14 +1,14 @@
-#include "LibraryTestSupport.h"
+#include "library/LibraryTestSupport.h"
 
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/platform/CredentialStore.h>
 
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
 using namespace jfd;
-using jfd::library::ServerStore;
-using jfd::library::SignIn;
+using jfd::account::ServerStore;
+using jfd::account::SignIn;
 using jfd::platform::MemoryCredentialStore;
 using namespace jfd::test;
 
@@ -109,7 +109,7 @@ TEST_CASE("Password sign-in checks the server, then stores the token and the ser
 
 TEST_CASE("A saved sign-in is restored at start-up and checked afterwards") {
   Setup s;
-  library::SavedServer saved;
+  account::SavedServer saved;
   saved.id = QStringLiteral("srv1");
   saved.name = QStringLiteral("Home");
   saved.url = s.server.url();
@@ -131,7 +131,7 @@ TEST_CASE("A saved sign-in is restored at start-up and checked afterwards") {
 TEST_CASE("A rejected token brings back the password form for the same server") {
   Setup s;
   s.routes.rejectToken = true;
-  library::SavedServer saved{QStringLiteral("srv1"), QStringLiteral("Home"),  s.server.url(),
+  account::SavedServer saved{QStringLiteral("srv1"), QStringLiteral("Home"),  s.server.url(),
                              QStringLiteral("u1"),   QStringLiteral("alice"), {}};
   s.servers.save(saved);
   const QString key = platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1"));
@@ -159,7 +159,7 @@ TEST_CASE("A rejected token brings back the password form for the same server") 
 TEST_CASE("A token refused for a moment is tried again and works") {
   Setup s;
   s.routes.rejectToken = true;
-  library::SavedServer saved{QStringLiteral("srv1"), QStringLiteral("Home"),  s.server.url(),
+  account::SavedServer saved{QStringLiteral("srv1"), QStringLiteral("Home"),  s.server.url(),
                              QStringLiteral("u1"),   QStringLiteral("alice"), {}};
   s.servers.save(saved);
   const QString key = platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1"));
@@ -178,7 +178,7 @@ TEST_CASE("A token refused for a moment is tried again and works") {
 
 TEST_CASE("Signing in as another user removes the token kept for the expired one") {
   Setup s;
-  library::SavedServer saved{QStringLiteral("srv1"), QStringLiteral("Home"),  s.server.url(),
+  account::SavedServer saved{QStringLiteral("srv1"), QStringLiteral("Home"),  s.server.url(),
                              QStringLiteral("u0"),   QStringLiteral("bob"), {}};
   s.servers.save(saved);
   const QString oldKey = platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u0"));
@@ -285,13 +285,13 @@ TEST_CASE("Signing out sends the playing item's reports first, then revokes the 
 TEST_CASE("Saved servers are listed most recent first") {
   QTemporaryDir dir;
   ServerStore store(dir.filePath(QStringLiteral("s.ini")));
-  library::SavedServer a{QStringLiteral("a"),
+  account::SavedServer a{QStringLiteral("a"),
                          QStringLiteral("A"),
                          QUrl(QStringLiteral("http://a")),
                          {},
                          {},
                          QDateTime::currentDateTimeUtc().addDays(-1)};
-  library::SavedServer b{QStringLiteral("b"),
+  account::SavedServer b{QStringLiteral("b"),
                          QStringLiteral("B"),
                          QUrl(QStringLiteral("http://b")),
                          {},

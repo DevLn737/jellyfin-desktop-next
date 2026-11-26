@@ -1,5 +1,6 @@
 #include "AppServices.h"
 
+#include <jfd/account/Account.h>
 #include <jfd/integrations/IntegrationsSettings.h>
 #include <jfd/settings/CommonSections.h>
 #include <jfd/ui/LibraryScreens.h>
@@ -39,7 +40,8 @@ namespace jfd::desktop {
   } // namespace
 
   struct LibraryServices {
-    explicit LibraryServices(ui::LibraryScreens::Config config) : screens(std::move(config)) {}
+    LibraryServices(account::Account& account, ui::LibraryScreens::Config config)
+        : screens(account, std::move(config)) {}
     ui::LibraryScreens screens;
   };
 
@@ -68,16 +70,23 @@ namespace jfd::desktop {
   }
 
   void installLibrary(AppServices& services, QQmlEngine& engine) {
-    ui::LibraryScreens::Config config;
-    config.identity = identity(*services.settings);
+    account::Account::Config accountConfig;
+    accountConfig.identity = identity(*services.settings);
     // Saved servers sit next to the settings, so the smoke test's temporary
     // profile has its own.
-    config.serversFile =
+    accountConfig.serversFile =
         QFileInfo(services.settings->filePath()).dir().filePath(QStringLiteral("servers.ini"));
+    accountConfig.tokens = services.isolatedProfile ? platform::createUnavailableCredentialStore()
+                                                    : platform::createSystemCredentialStore();
+    services.account = std::make_unique<account::Account>(std::move(accountConfig));
+    account::Account& account = *services.account;
+    services.client = &account.client();
+    services.socket = &account.socket();
+    services.signIn = &account.signIn();
+
+    ui::LibraryScreens::Config config;
     if (!services.cacheDirectory.isEmpty())
       config.imageDirectory = services.cacheDirectory + QStringLiteral("/images");
-    config.tokens = services.isolatedProfile ? platform::createUnavailableCredentialStore()
-                                             : platform::createSystemCredentialStore();
     if (const QScreen* screen = QGuiApplication::primaryScreen())
       config.devicePixelRatio = screen->devicePixelRatio();
     settings::Settings* store = services.settings.get();
@@ -89,11 +98,8 @@ namespace jfd::desktop {
                       QString::fromUtf8(QJsonDocument(filters).toJson(QJsonDocument::Compact)));
     };
 
-    services.library = std::make_shared<LibraryServices>(std::move(config));
+    services.library = std::make_shared<LibraryServices>(account, std::move(config));
     ui::LibraryScreens& screens = services.library->screens;
-    services.client = &screens.client();
-    services.socket = &screens.socket();
-    services.signIn = &screens.signIn();
     const bool installed = screens.install(engine, *services.navigator);
     Q_ASSERT(installed);
     Q_UNUSED(installed);
@@ -130,22 +136,23 @@ namespace jfd::desktop {
 
     ui::Navigator* navigator = services.navigator;
     QObject::connect(services.settings.get(), &settings::Settings::actionTriggered,
-                     services.navigator, [&screens, navigator](const QString& key) {
+                     services.navigator, [&account, navigator](const QString& key) {
                        if (key == settings::keys::CustomizeHome) {
                          navigator->navigate(QStringLiteral("customizeHome"));
                        } else if (key == integrations::keys::DiscordChoose) {
                          navigator->navigate(QStringLiteral("discordPrivacy"));
                        } else if (key == settings::keys::SignOut) {
-                         screens.signIn().signOut();
+                         account.signIn().signOut();
                        } else if (key == settings::keys::ChangeServer) {
-                         screens.signIn().signOut();
-                         screens.signIn().back();
+                         account.signIn().signOut();
+                         account.signIn().back();
                        }
                      });
 
     // Signs in with the saved session, which opens the home page; otherwise
-    // main.cpp opens the login page.
-    screens.signIn().restore();
+    // main.cpp opens the login page. The modules installed after this join
+    // the session as they register with the user scope.
+    account.restore();
   }
 
 } // namespace jfd::desktop

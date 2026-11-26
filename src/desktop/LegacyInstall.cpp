@@ -1,6 +1,6 @@
 #include "LegacyInstall.h"
 
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/playback/PlayerOptions.h>
 #include <jfd/ui/Navigator.h>
 
@@ -52,7 +52,7 @@ namespace jfd::desktop {
     // user picked here comes first.
     void openServer(AppServices& services, const QString& address) {
       if (address.isEmpty() || services.signIn == nullptr ||
-          services.signIn->step() != library::SignIn::Step::ChooseServer) {
+          services.signIn->step() != account::SignIn::Step::ChooseServer) {
         return;
       }
       qCInfo(lcLegacy) << "opening the 2.x server";

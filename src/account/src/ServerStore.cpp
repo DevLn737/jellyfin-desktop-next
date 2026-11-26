@@ -1,10 +1,10 @@
-#include <jfd/library/ServerStore.h>
+#include <jfd/account/ServerStore.h>
 
 #include <QSettings>
 
 #include <algorithm>
 
-namespace jfd::library {
+namespace jfd::account {
 
   namespace {
     const QString Group = QStringLiteral("servers");
@@ -106,4 +106,4 @@ namespace jfd::library {
     write(list, active == id ? QString() : active);
   }
 
-} // namespace jfd::library
+} // namespace jfd::account

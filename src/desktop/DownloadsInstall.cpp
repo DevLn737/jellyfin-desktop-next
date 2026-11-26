@@ -1,8 +1,10 @@
 #include "AppServices.h"
 
+#include <jfd/account/Account.h>
+
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
-#include <jfd/library/SignIn.h>
+#include <jfd/account/SignIn.h>
 #include <jfd/offline/DownloadQueue.h>
 #include <jfd/offline/DownloadSettings.h>
 #include <jfd/offline/DownloadStore.h>
@@ -79,7 +81,7 @@ namespace jfd::desktop {
     void applyAccess(AppServices& services) {
       DownloadServices& downloads = *services.downloads;
       api::JellyfinClient& client = *services.client;
-      const bool signedIn = services.signIn->step() == library::SignIn::Step::SignedIn &&
+      const bool signedIn = services.signIn->step() == account::SignIn::Step::SignedIn &&
                             client.isSignedIn();
       downloads.serverId = signedIn ? services.signIn->serverId() : QString();
       downloads.userId = signedIn ? client.userId() : QString();
@@ -161,20 +163,20 @@ namespace jfd::desktop {
                        }
                      });
 
-    library::SignIn& signIn = *services.signIn;
-    QObject::connect(&signIn, &library::SignIn::signedIn, &downloads.queue, [&services] {
-      applyAccess(services);
-      services.downloads->extras.fetchMissing();
-    });
     // Signing out keeps the downloads (the default the owner chose); they
     // are hidden until the same user signs in again.
-    QObject::connect(&signIn, &library::SignIn::signedOut, &downloads.queue,
-                     [&services] { applyAccess(services); });
+    services.account->scope().add(
+        QStringLiteral("downloads"), account::UserScope::Downloads, &downloads.queue,
+        [&services] {
+          applyAccess(services);
+          services.downloads->extras.fetchMissing();
+        },
+        [&services] { applyAccess(services); });
     // The client gets a new token in place (a second sign-in): the queue
     // needs it.
     QObject::connect(services.client, &api::JellyfinClient::sessionChanged, &downloads.queue,
                      [&services] {
-                       if (services.signIn->step() == library::SignIn::Step::SignedIn) applyAccess(services);
+                       if (services.signIn->step() == account::SignIn::Step::SignedIn) applyAccess(services);
                      });
 
     QObject::connect(services.socket, &api::SessionSocket::stateChanged, &downloads.queue,
@@ -206,13 +208,8 @@ namespace jfd::desktop {
     QObject::connect(&downloads.queue, &offline::DownloadQueue::completed, &downloads.queue,
                      [&services](const QString& itemId) { services.downloads->extras.fetch(itemId); });
 
-    if (signIn.step() == library::SignIn::Step::SignedIn) {
-      applyAccess(services);
-      if (online(services)) {
-        downloads.sync->syncNow();
-        downloads.extras.fetchMissing();
-      }
-    }
+    // Restored before this ran: the scope has given the user access above.
+    if (services.account->signedIn() && online(services)) downloads.sync->syncNow();
   }
 
   std::unique_ptr<playback::ReportSink> downloadsReportSink(AppServices& services) {

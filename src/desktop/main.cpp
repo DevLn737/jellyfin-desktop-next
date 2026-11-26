@@ -1,4 +1,6 @@
 #include "AppServices.h"
+
+#include <jfd/account/Account.h>
 #include "IntegrationServices.h"
 #include "LegacyInstall.h"
 #include "Logging.h"
@@ -402,6 +404,7 @@ int main(int argc, char* argv[]) {
   services.session.reset();
   services.player.reset();
   services.library.reset();
+  services.account.reset();
   services.settings.reset();
   // A clean exit: the next start finds no marker.
   desktop::endCrashGuard(services);

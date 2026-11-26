@@ -40,28 +40,24 @@ namespace jfd::ui {
     }
   } // namespace
 
-  LibraryScreens::LibraryScreens(Config config)
-      : m_devicePixelRatio(config.devicePixelRatio),
-        m_tokens(config.tokens ? std::move(config.tokens)
-                               : platform::createUnavailableCredentialStore()),
-        m_servers(config.serversFile), m_client(config.identity), m_socket(m_client),
-        m_images(m_client, config.imageDirectory), m_signIn(m_client, m_servers, *m_tokens),
-        m_home(m_client, homeOptions(config.devicePixelRatio)),
-        m_search(m_client, searchOptions(config.devicePixelRatio)),
-        m_liveTv(m_client, liveTvOptions(config.devicePixelRatio)),
-        m_onNow(m_client, onNowOptions(config.devicePixelRatio)), m_recorder(m_client),
-        m_collections(m_client),
+  LibraryScreens::LibraryScreens(account::Account& account, Config config)
+      : m_account(account), m_devicePixelRatio(config.devicePixelRatio),
+        m_images(account.client(), config.imageDirectory),
+        m_home(account.client(), homeOptions(config.devicePixelRatio)),
+        m_search(account.client(), searchOptions(config.devicePixelRatio)),
+        m_liveTv(account.client(), liveTvOptions(config.devicePixelRatio)),
+        m_onNow(account.client(), onNowOptions(config.devicePixelRatio)), m_recorder(account.client()),
+        m_collections(account.client()),
         m_readFilters(std::move(config.readFilters)),
         m_writeFilters(std::move(config.writeFilters)),
         m_textures(std::make_shared<TextureBudget>(config.textureBytes)) {
-    m_updates.attach(m_socket);
+    m_updates.attach(account.socket());
     m_home.follow(m_updates);
     m_search.follow(m_updates);
     m_collections.follow(m_updates);
   }
 
   LibraryScreens::~LibraryScreens() {
-    m_socket.stop();
     // When the engine outlives this (it should not; see the header), QML
     // must not reach the services through the singleton, nor the loader
     // thread the image cache through the provider.
@@ -98,8 +94,8 @@ namespace jfd::ui {
                             new LibraryImageProvider(m_images, m_textures));
 
     LibraryUi::Services services;
-    services.client = &m_client;
-    services.signIn = &m_signIn;
+    services.client = &m_account.client();
+    services.signIn = &m_account.signIn();
     services.home = &m_home;
     services.search = &m_search;
     services.liveTv = &m_liveTv;
@@ -113,7 +109,7 @@ namespace jfd::ui {
 
     // Lost while the socket tries again; back once it is up again. The
     // screens reload on the way back.
-    QObject::connect(&m_socket, &api::SessionSocket::stateChanged, m_ui,
+    QObject::connect(&m_account.socket(), &api::SessionSocket::stateChanged, m_ui,
                      [ui = m_ui](api::SessionSocket::State state) {
                        using State = api::SessionSocket::State;
                        if (state == State::Reconnecting) ui->setOnline(false);
@@ -168,21 +164,29 @@ namespace jfd::ui {
     recordings.page = page("RecordingsPage");
     navigator.registerRoute(recordings);
 
-    QObject::connect(&m_signIn, &library::SignIn::signedIn, &navigator, [this, &navigator] {
-      m_collections.invalidate();
-      m_socket.start();
-      m_liveTv.checkAvailable();
-      m_recorder.checkAvailable();
-      navigator.reset(QStringLiteral("home"));
-    });
-    QObject::connect(&m_signIn, &library::SignIn::signedOut, &navigator, [this, &navigator] {
-      m_socket.stop();
-      m_collections.invalidate();
-      m_home.resetSession();
-      m_liveTv.clear();
-      m_recorder.clear();
-      navigator.reset(QStringLiteral("login"));
-    });
+    // The previous user's collections, rows, Live TV and decoded images go
+    // with them; the new user's are asked for.
+    m_account.scope().add(
+        QStringLiteral("library"), account::UserScope::Library, m_ui,
+        [this] {
+          m_collections.invalidate();
+          m_liveTv.checkAvailable();
+          m_recorder.checkAvailable();
+        },
+        [this] {
+          m_collections.invalidate();
+          m_home.resetSession();
+          m_liveTv.clear();
+          m_recorder.clear();
+          m_images.clearMemory();
+        });
+    // Once every module has the new user (or has let the old one go).
+    QObject::connect(&m_account, &account::Account::sessionBegan, &navigator,
+                     [&navigator] { navigator.reset(QStringLiteral("home")); });
+    QObject::connect(&m_account, &account::Account::sessionEnded, &navigator,
+                     [&navigator] { navigator.reset(QStringLiteral("login")); });
+    // Restored before the screens were installed: home at once.
+    if (m_account.signedIn()) navigator.reset(QStringLiteral("home"));
     return true;
   }
 
