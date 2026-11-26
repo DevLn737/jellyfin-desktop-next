@@ -43,6 +43,10 @@ namespace jfd::syncplay {
     static constexpr WallTicks RejoinBackoff = std::chrono::seconds(1);
     // A failed Ready or Buffering report is sent again once after this.
     static constexpr WallTicks ReadyRetryDelay = std::chrono::milliseconds(500);
+    // SyncPlay requests give up after this (the HTTP client's own timeout is
+    // 30 s): one stalled request holds up every later one, and a room control
+    // that answers after half a minute is worse than one that fails.
+    static constexpr int RequestTimeoutMs = 5'000;
 
     GroupClient(Transport& transport, Clock& clock, InputSink sink, Schedule schedule = {});
 
@@ -100,6 +104,9 @@ namespace jfd::syncplay {
     // together, the server may take them in either order.
     std::deque<SyncPlayMessage> m_requests;
     bool m_requestInFlight = false;
+    // Advances when the queue is dropped, so the reply of a request sent
+    // before that does not start the next one.
+    std::uint64_t m_requestSerial = 0;
     bool m_connectionLost = false;
     TimeSync m_timeSync;
     ClockOffset m_offset;

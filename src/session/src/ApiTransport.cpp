@@ -29,7 +29,8 @@ namespace jfd::session {
                           if (traced(path)) qCDebug(lcWire).noquote() << "<-" << path << status;
                           Q_EMIT replied(path, status);
                           reply(status, body.toStdString());
-                        });
+                        },
+                        request.timeoutMs);
   }
 
 } // namespace jfd::session

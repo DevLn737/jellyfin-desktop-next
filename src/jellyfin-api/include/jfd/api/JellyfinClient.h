@@ -276,9 +276,11 @@ namespace jfd::api {
     // server URL ("/SyncPlay/Join", "/Items?ids=1"); a non-empty body is sent
     // as JSON. `done` gets the HTTP status and body of any answer, errors
     // included, or status 0 when no answer arrived (network error, timeout).
-    // A 401 on a signed-in client still clears the session.
+    // A 401 on a signed-in client still clears the session. timeoutMs above 0
+    // replaces the client's timeout for this request.
     void rawRequest(Method method, const QString& pathAndQuery, const QByteArray& jsonBody,
-                    QObject* context, std::function<void(int status, QByteArray body)> done);
+                    QObject* context, std::function<void(int status, QByteArray body)> done,
+                    int timeoutMs = -1);
 
     QByteArray authorizationHeader() const;
 
@@ -296,7 +298,7 @@ namespace jfd::api {
     void storeSession(const AuthenticationResult& result);
     QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload);
     QNetworkReply* startRequest(Method method, const QUrl& target, const QByteArray* payload,
-                                const QByteArray& authorization);
+                                const QByteArray& authorization, int timeoutMs = -1);
     // A 401 for a request sent with token: checks the token once, if it is
     // still the current one.
     void checkTokenAfter401(int status, const QString& token);

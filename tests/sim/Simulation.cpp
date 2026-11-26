@@ -135,6 +135,8 @@ namespace jfd::sim {
       double rate = 1.0;
       ServerInstant updated;
       RequestId latestSeek;
+      // Seeks the backend started (SEEK events of seek requests).
+      int seeksStarted = 0;
       // Ended by an error; the session stops it once it hears.
       bool dead = false;
     };
@@ -395,6 +397,7 @@ namespace jfd::sim {
           if (!file || file->epoch != epoch || file->latestSeek != request) return;
           progress();
           file->seeking = true;
+          ++file->seeksStarted;
           emit(backend::SeekStarted{epoch});
           world.after(world.jitter(40, world.chaos() ? 600 : 250), [this, epoch, request, target] {
             if (!file || file->epoch != epoch || file->latestSeek != request) return;
@@ -448,7 +451,8 @@ namespace jfd::sim {
       // refresh seek at the current position (SEEK, then PLAYBACK_RESTART,
       // losing the time it takes), wait for data briefly, or neither.
       // During a seek mpv repeats that seek instead (issue_refresh_seek), so
-      // nothing new is seen.
+      // nothing new is seen. A seek issued after the refresh seek replaces
+      // it: mpv restarts playback once, for the newer seek.
       void switchTrack(MediaEpoch epoch, TrackKind kind) {
         if (kind != TrackKind::Audio || !file->started || file->seeking) return;
         const auto roll = world.rng.range(1, 10);
@@ -456,8 +460,8 @@ namespace jfd::sim {
           progress();
           file->seeking = true;
           emit(backend::SeekStarted{epoch});
-          world.after(world.jitter(30, 300), [this, epoch] {
-            if (!file || file->epoch != epoch || !file->seeking) return;
+          world.after(world.jitter(30, 300), [this, epoch, started = file->seeksStarted] {
+            if (!file || file->epoch != epoch || !file->seeking || file->seeksStarted != started) return;
             progress();
             file->seeking = false;
             emit(backend::PlaybackRestarted{epoch, sample()});
