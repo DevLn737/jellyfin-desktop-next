@@ -12,7 +12,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   app:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: App (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -153,6 +158,8 @@ jobs:
           retention-days: 5
 
   flow:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # Checkpoint 1 on the Docker stand: jellyfin-desktop --flow signs in,
     # opens home, a series and an episode, plays the episode, plays the
     # movie and switches its audio and subtitles (embedded, external), then

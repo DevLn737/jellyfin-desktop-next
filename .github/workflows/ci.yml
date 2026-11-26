@@ -14,7 +14,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   core:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Core (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -31,6 +36,8 @@ jobs:
         run: ctest --test-dir build --build-config Release --output-on-failure --parallel 4
 
   sanitizers:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Core with ASan and UBSan (Linux)
     runs-on: ubuntu-24.04
     steps:
@@ -49,6 +56,8 @@ jobs:
   # under ASan and UBSan. JFD_REQUIRE_QT makes a missing Qt fail the configure
   # step instead of silently leaving these out, as the job above does.
   sanitizers-qt:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Qt modules and app with ASan and UBSan (Linux)
     runs-on: ubuntu-24.04
     timeout-minutes: 120
