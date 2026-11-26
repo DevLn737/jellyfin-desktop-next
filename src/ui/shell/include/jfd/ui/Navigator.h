@@ -59,7 +59,7 @@ namespace jfd::ui {
   // (a page, whether it takes an argument, a sidebar entry); names without
   // a page show a placeholder, so navigation works before every screen
   // exists. The built-in routes are registered by the constructor; other
-  // packages add theirs ("music", "album/<id>", "requests").
+  // packages add theirs ("music", "album/<id>", "downloads").
   //
   // The shell's StackView follows the stack through stackChanged. The QML
   // singleton is created by the engine; the application registers pages on
@@ -115,7 +115,7 @@ namespace jfd::ui {
     // The page component for a route name; replaces an earlier page.
     void registerPage(const QString& name, const QUrl& page);
     // A route whose sidebar entry shows only while it is available (for
-    // example "requests" once an address is set). Routes are available by
+    // example "music" only while the server has music). Routes are available by
     // default.
     Q_INVOKABLE void setRouteAvailable(const QString& name, bool available);
     bool routeAvailable(const QString& name) const;

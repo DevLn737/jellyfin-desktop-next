@@ -965,7 +965,7 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
     return icon.toUrl();
   };
   for (const char* id : {"playback", "subtitles", "audio", "interface", "appearance", "window", "library", "music",
-                         "input", "syncplay", "downloads", "integrations", "seerr", "remote", "account",
+                         "input", "syncplay", "downloads", "integrations", "remote", "account",
                          "diagnostics", "legacy"}) {
     CAPTURE(id);
     const QUrl icon = iconFor(id);

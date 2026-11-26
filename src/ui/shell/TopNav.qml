@@ -11,7 +11,7 @@ import Jfd.Ui.Shell
 // the middle a floating pill with the main destinations (Navigator
 // navEntries placed "primary": Home, Library, Music, Watch together,
 // Search) and the account, whose menu holds Settings, the other "account"
-// destinations (Downloads, Requests), TV mode and Sign out.
+// destinations (Downloads), TV mode and Sign out.
 //
 // Keys: the pill is a horizontal list that is entered at the current page's
 // entry (enterAtCurrent), whichever entry is nearest; Down leaves the bar

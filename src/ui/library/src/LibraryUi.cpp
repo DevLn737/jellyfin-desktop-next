@@ -198,9 +198,6 @@ namespace jfd::ui {
       if (collectionType == QLatin1String("livetv")) return QStringLiteral("livetv");
       return QStringLiteral("library/") + itemId;
     }
-    // A Seerr title (id like "movie:603"), added to the home screen by the
-    // Seerr module.
-    if (type == QLatin1String("SeerrTitle")) return QStringLiteral("seerr-title/") + itemId;
     return QStringLiteral("item/") + itemId;
   }
 

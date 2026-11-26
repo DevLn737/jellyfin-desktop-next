@@ -325,8 +325,7 @@ already there; nothing is asked again, and empty kinds have no tab.
 Every row of the home screen is a `library::HomeSection` (id, translated
 title, card shape, default order, a model, an optional `reload`). The
 built-in rows (`resume`, `nextUp`, `latest/<library>`) and the ones other
-modules add through `HomeModel::sections()->add(...)` ("music.recent",
-"seerr.popular") are treated alike. The user's arrangement is the hidden
+modules add through `HomeModel::sections()->add(...)` ("music.recent") are treated alike. The user's arrangement is the hidden
 setting `appearance/homeSections`, a JSON array of ids with `-` in front of
 the rows switched off (`["resume","-nextUp"]`); ids that are not registered
 are skipped and new sections come after the arranged ones, so modules can

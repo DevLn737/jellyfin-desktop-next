@@ -95,7 +95,7 @@ TEST_CASE("server addresses are hidden, this computer's are kept")
   CHECK(redactSecrets("ratio 16:9 at 00:01:02") == "ratio 16:9 at 00:01:02");
 }
 
-TEST_CASE("Seerr secrets: API key header, cookies and addresses without a scheme are hidden")
+TEST_CASE("API key header, cookies and addresses without a scheme are hidden")
 {
   const std::string s = Secret;
   for (const std::string& line : {
@@ -115,8 +115,8 @@ TEST_CASE("Seerr secrets: API key header, cookies and addresses without a scheme
   CHECK(redactSecrets("cookies: 3") == "cookies: 3");
 
   CHECK(redactSecrets("connect to 192.168.1.50:5055 failed") == "connect to *** failed");
-  CHECK(redactSecrets("seerr.example.org:5055/api/v1") == "***/api/v1");
-  CHECK(redactSecrets("proxy=Seerr.Home.Lan:443,") == "proxy=***,");
+  CHECK(redactSecrets("media.example.org:5055/api/v1") == "***/api/v1");
+  CHECK(redactSecrets("proxy=Media.Home.Lan:443,") == "proxy=***,");
   CHECK(redactSecrets("http://10.0.0.5:5055/api") == "http://***/api");
   CHECK(redactSecrets("127.0.0.1:18096 up") == "127.0.0.1:18096 up");
   CHECK(redactSecrets("localhost:5055") == "localhost:5055");
@@ -128,12 +128,12 @@ TEST_CASE("Seerr secrets: API key header, cookies and addresses without a scheme
 TEST_CASE("configured addresses are hidden wherever they appear")
 {
   clearProtectedAddresses();
-  addProtectedAddress("https://Seerr.Example.Org/");
+  addProtectedAddress("https://Media.Example.Org/");
   addProtectedAddress("media.lan");
   addProtectedAddress("localhost:5055");
   addProtectedAddress("");
-  CHECK(redactSecrets("redirect to seerr.example.org/login") == "redirect to ***/login");
-  CHECK(redactSecrets("Host: SEERR.EXAMPLE.ORG") == "Host: ***");
+  CHECK(redactSecrets("redirect to media.example.org/login") == "redirect to ***/login");
+  CHECK(redactSecrets("Host: MEDIA.EXAMPLE.ORG") == "Host: ***");
   CHECK(redactSecrets("resolve media.lan failed") == "resolve *** failed");
   CHECK(redactSecrets("localhost:5055") == "localhost:5055");
   CHECK(redactSecrets("nothing here") == "nothing here");

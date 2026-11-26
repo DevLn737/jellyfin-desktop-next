@@ -108,13 +108,33 @@ up() {
   # Quick Connect is on by default in 12.x; make sure for the tests.
   wait_for "the library scan" 180 bash -c \
     "[[ \$(curl -fsS '$URL/Items?recursive=true&includeItemTypes=Movie,Episode' -H 'Authorization: $AUTH, Token=\"$token\"' | jq .TotalRecordCount) -ge 3 ]]"
-  log "generating trickplay tiles"
-  local task
-  task=$(api GET /ScheduledTasks '' "$token" | jq -r '.[] | select(.Key == "RefreshTrickplayImages") | .Id')
-  api POST "/ScheduledTasks/Running/$task" '' "$token" >/dev/null
-  sleep 2
-  wait_for "trickplay tiles" 180 bash -c \
-    "[[ \$(curl -fsS '$URL/ScheduledTasks/$task' -H 'Authorization: $AUTH, Token=\"$token\"' | jq -r .State) == Idle ]]"
+  # The scan has listed the items before it has probed them, and the
+  # trickplay task skips an episode whose video streams are not known yet:
+  # it can go Idle in two seconds having made nothing. So wait for the scan
+  # task, then run the trickplay task until every episode has tiles.
+  local tasks scan task
+  tasks=$(api GET /ScheduledTasks '' "$token")
+  scan=$(jq -r '.[] | select(.Key == "RefreshLibrary") | .Id' <<<"$tasks")
+  task=$(jq -r '.[] | select(.Key == "RefreshTrickplayImages") | .Id' <<<"$tasks")
+  wait_for "the library scan task" 180 bash -c \
+    "[[ \$(curl -fsS '$URL/ScheduledTasks/$scan' -H 'Authorization: $AUTH, Token=\"$token\"' | jq -r .State) == Idle ]]"
+  local missing=1
+  for ((attempt = 1; attempt <= 5; attempt++)); do
+    log "generating trickplay tiles (attempt $attempt)"
+    api POST "/ScheduledTasks/Running/$task" '' "$token" >/dev/null
+    sleep 2
+    wait_for "trickplay tiles" 180 bash -c \
+      "[[ \$(curl -fsS '$URL/ScheduledTasks/$task' -H 'Authorization: $AUTH, Token=\"$token\"' | jq -r .State) == Idle ]]"
+    missing=$(api GET "/Items?recursive=true&includeItemTypes=Episode&fields=Trickplay" '' "$token" |
+      jq 'if (.Items | length) == 0 then 1 else [.Items[] | select((.Trickplay // {}) | length == 0)] | length end')
+    [[ "$missing" == 0 ]] && break
+    log "$missing episode(s) without trickplay tiles yet"
+    sleep 5
+  done
+  if [[ "$missing" != 0 ]]; then
+    log "episodes still without trickplay tiles: $missing"
+    return 1
+  fi
   api POST /Sessions/Logout '' "$token" >/dev/null || true
 
   log "ready"
