@@ -307,8 +307,8 @@ namespace jfd::api {
     std::optional<core::ServerInstant> lastUpdatedAt;
   };
 
-  // GET RoomMembers, from the Room Members server plugin (server-plugin/ in
-  // this repository): the members of our SyncPlay group, one per session,
+  // GET RoomMembers, from the Room Members server plugin
+  // (github.com/DevLn737/jellyfin-plugins): the members of our SyncPlay group, one per session,
   // with what each last reported. Stock Jellyfin has no such route.
   struct RoomMember {
     QString userName;

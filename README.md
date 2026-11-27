@@ -44,7 +44,9 @@ download's signature against the release key built into the app, and offers
 
 The client is tested against Jellyfin server 12.2. Changing the speed for the
 whole room needs the server fork listed under [Related repositories](#related-repositories).
-Everything else works with a stock server, rooms included.
+Everything else works with a stock server, rooms included. To see where
+everyone in a room is and their ping, add the Room Members plugin from
+[DevLn737/jellyfin-plugins](https://github.com/DevLn737/jellyfin-plugins) to the server.
 
 ## Features
 
@@ -120,6 +122,7 @@ The plan and its exit criteria are in [docs/roadmap.md](docs/roadmap.md).
 | [DevLn737/jellyfin](https://github.com/DevLn737/jellyfin/tree/syncplay-rate/12.2) | Server fork with the SyncPlay playback-rate extension |
 | [DevLn737/jellyfin-web](https://github.com/DevLn737/jellyfin-web/tree/syncplay-rate/12.2) | Web fork with the same extension, for browser participants |
 | [DevLn737/jellyfin-syncplay-speed](https://github.com/DevLn737/jellyfin-syncplay-speed) | Server image build, release manifest and protocol documentation |
+| [DevLn737/jellyfin-plugins](https://github.com/DevLn737/jellyfin-plugins) | Jellyfin plugin repository: Room Members (rooms: members' position and ping) and Shikimori Next |
 | [DevLn737/jellyfin-desktop](https://github.com/DevLn737/jellyfin-desktop) | The previous Windows client, based on Jellyfin Media Player (fixes only) |
 
 ## Testing SyncPlay
