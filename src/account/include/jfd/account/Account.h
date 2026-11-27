@@ -6,11 +6,13 @@
 #include <jfd/api/ClientIdentity.h>
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/SessionSocket.h>
+#include <jfd/platform/AsyncCredentialStore.h>
 #include <jfd/platform/CredentialStore.h>
 
 #include <QObject>
 #include <QString>
 
+#include <chrono>
 #include <memory>
 
 namespace jfd::account {
@@ -46,7 +48,13 @@ namespace jfd::account {
     bool signedIn() const { return m_scope.active(); }
 
     // Signs in with the saved server and token, if any (SignIn::restore).
-    bool restore() { return m_signIn.restore(); }
+    // The token is read off this thread; wait bounds how long this call
+    // waits for it, so a store that answers at once (the usual case) signs
+    // in before the window shows, and a slow one (a locked keyring asking
+    // for its password) lets the window show with "Signing in" meanwhile.
+    bool restore(std::chrono::milliseconds wait = std::chrono::milliseconds(0));
+
+    platform::AsyncCredentialStore& tokens() { return m_tokens; }
 
   Q_SIGNALS:
     // After the scope began: every module has the new user.
@@ -58,7 +66,8 @@ namespace jfd::account {
     void begin();
     void end();
 
-    std::unique_ptr<platform::CredentialStore> m_tokens;
+    // First: the worker finishes its writes after everything else is gone.
+    platform::AsyncCredentialStore m_tokens;
     ServerStore m_servers;
     api::JellyfinClient m_client;
     api::SessionSocket m_socket;

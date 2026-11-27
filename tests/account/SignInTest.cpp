@@ -1,8 +1,12 @@
 #include "library/LibraryTestSupport.h"
 
 #include <jfd/account/SignIn.h>
+#include <jfd/platform/AsyncCredentialStore.h>
 #include <jfd/platform/CredentialStore.h>
+#include <chrono>
+#include <thread>
 
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
@@ -58,8 +62,11 @@ namespace {
     QTemporaryDir dir;
     ServerStore servers{dir.filePath(QStringLiteral("servers.ini"))};
     MemoryCredentialStore tokens;
-    SignIn signIn{client, servers, tokens};
+    platform::AsyncCredentialStore queue{tokens};
+    SignIn signIn{client, servers, queue};
     Setup() { signIn.setQuickConnectPollMs(20); }
+    // The store's calls made so far are done and answered.
+    void settle() { REQUIRE(queue.finishPending(std::chrono::seconds(5))); }
   };
 } // namespace
 
@@ -96,6 +103,7 @@ TEST_CASE("Password sign-in checks the server, then stores the token and the ser
   REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::SignedIn; }));
   CHECK(signedIn.count() == 1);
   CHECK(s.signIn.userName() == QStringLiteral("alice"));
+  s.settle();
   CHECK(s.signIn.tokenSaved());
   CHECK(s.client.accessToken() == QStringLiteral("tok-new"));
   CHECK(s.tokens.read(platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1")))
@@ -120,7 +128,11 @@ TEST_CASE("A saved sign-in is restored at start-up and checked afterwards") {
                  QStringLiteral("tok-old"));
 
   REQUIRE(s.signIn.restore());
-  CHECK(s.signIn.step() == SignIn::Step::SignedIn);
+  // The token is read off this thread.
+  CHECK(s.signIn.step() == SignIn::Step::Restoring);
+  CHECK(s.signIn.busy());
+  REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::SignedIn; }));
+  CHECK(s.signIn.tokenSaved());
   CHECK(s.client.accessToken() == QStringLiteral("tok-old"));
   CHECK(s.client.serverUrl() == s.server.url());
   // The server's current user name replaces the saved one.
@@ -153,6 +165,7 @@ TEST_CASE("A rejected token brings back the password form for the same server") 
   s.routes.rejectToken = false;
   s.signIn.signIn(QStringLiteral("alice"), QStringLiteral("secret"));
   REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::SignedIn; }));
+  s.settle();
   CHECK(s.tokens.read(key).secret == QStringLiteral("tok-new"));
 }
 
@@ -171,9 +184,117 @@ TEST_CASE("A token refused for a moment is tried again and works") {
   // server) signs in with the same token, no password needed.
   s.routes.rejectToken = false;
   REQUIRE(s.signIn.restore());
+  s.settle();
   CHECK(s.client.accessToken() == QStringLiteral("tok-old"));
   waitFor([] { return false; }, 200);
   CHECK(s.signIn.step() == SignIn::Step::SignedIn);
+}
+
+namespace {
+  // A keyring that takes its time (D-Bus, an unlock prompt).
+  class SlowStore final : public platform::CredentialStore {
+  public:
+    explicit SlowStore(std::chrono::milliseconds delay) : m_delay(delay) {}
+    bool isAvailable() const override { return true; }
+    ReadResult read(const QString& key) const override {
+      std::this_thread::sleep_for(m_delay);
+      return m_store.read(key);
+    }
+    Status write(const QString& key, const QString& secret) override {
+      std::this_thread::sleep_for(m_delay);
+      return m_store.write(key, secret);
+    }
+    Status remove(const QString& key) override {
+      std::this_thread::sleep_for(m_delay);
+      return m_store.remove(key);
+    }
+
+  private:
+    std::chrono::milliseconds m_delay;
+    MemoryCredentialStore m_store;
+  };
+
+  account::SavedServer savedAlice(const QUrl& url) {
+    return {QStringLiteral("srv1"), QStringLiteral("Home"),  url,
+            QStringLiteral("u1"),   QStringLiteral("alice"), {}};
+  }
+} // namespace
+
+TEST_CASE("A slow credential store never holds up the caller") {
+  Setup s;
+  SlowStore slow(std::chrono::milliseconds(400));
+  platform::AsyncCredentialStore queue(slow);
+  SignIn signIn(s.client, s.servers, queue);
+  s.servers.save(savedAlice(s.server.url()));
+  const QString key = platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1"));
+  queue.write(key, QStringLiteral("tok-old"));
+
+  QElapsedTimer timer;
+  timer.start();
+  REQUIRE(signIn.restore());
+  CHECK(timer.elapsed() < 100);
+  CHECK(signIn.step() == SignIn::Step::Restoring);
+  REQUIRE(waitFor([&] { return signIn.step() == SignIn::Step::SignedIn; }, 5000));
+  CHECK(s.client.accessToken() == QStringLiteral("tok-old"));
+
+  // Signing out and in again: each answer of the store waits 400 ms.
+  signIn.signOut();
+  REQUIRE(waitFor([&] { return signIn.step() == SignIn::Step::Credentials; }));
+  timer.restart();
+  signIn.signIn(QStringLiteral("alice"), QStringLiteral("secret"));
+  REQUIRE(waitFor([&] { return signIn.step() == SignIn::Step::SignedIn; }, 5000));
+  CHECK_FALSE(signIn.tokenSaved());
+  REQUIRE(waitFor([&] { return signIn.tokenSaved(); }, 5000));
+  // The removal at sign-out went first, then the new token.
+  REQUIRE(queue.finishPending(std::chrono::seconds(5)));
+  CHECK(slow.read(key).secret == QStringLiteral("tok-new"));
+}
+
+TEST_CASE("A saved user without a stored token goes back to the server choice at start-up") {
+  Setup s;
+  s.servers.save(savedAlice(s.server.url()));
+  QSignalSpy signedIn(&s.signIn, &SignIn::signedIn);
+  REQUIRE(s.signIn.restore());
+  CHECK(s.signIn.step() == SignIn::Step::Restoring);
+  REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::ChooseServer; }));
+  CHECK(signedIn.isEmpty());
+  CHECK_FALSE(s.client.isSignedIn());
+}
+
+TEST_CASE("Choosing a saved server signs in with its token, or asks for the password") {
+  Setup s;
+  s.servers.save(savedAlice(s.server.url()));
+  const QString key = platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1"));
+
+  // No token: the password form of that server, with the saved name.
+  s.signIn.chooseSavedServer(QStringLiteral("srv1"));
+  CHECK(s.signIn.step() == SignIn::Step::Restoring);
+  REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::Credentials; }));
+  CHECK(s.signIn.serverName() == QStringLiteral("Home"));
+  CHECK(s.signIn.userName() == QStringLiteral("alice"));
+
+  s.tokens.write(key, QStringLiteral("tok-old"));
+  s.signIn.back();
+  s.signIn.chooseSavedServer(QStringLiteral("srv1"));
+  REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::SignedIn; }));
+  CHECK(s.client.accessToken() == QStringLiteral("tok-old"));
+}
+
+TEST_CASE("A server typed while the saved token is read wins over it") {
+  Setup s;
+  SlowStore slow(std::chrono::milliseconds(300));
+  platform::AsyncCredentialStore queue(slow);
+  SignIn signIn(s.client, s.servers, queue);
+  s.servers.save(savedAlice(s.server.url()));
+  queue.write(platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1")),
+              QStringLiteral("tok-old"));
+  REQUIRE(signIn.restore());
+  signIn.connectToServer(s.server.url().toString());
+  REQUIRE(waitFor([&] { return signIn.step() == SignIn::Step::Credentials; }, 5000));
+  REQUIRE(queue.finishPending(std::chrono::seconds(5)));
+  waitFor([] { return false; }, 100);
+  CHECK(signIn.step() == SignIn::Step::Credentials);
+  CHECK_FALSE(s.client.isSignedIn());
 }
 
 TEST_CASE("Signing in as another user removes the token kept for the expired one") {
@@ -187,6 +308,7 @@ TEST_CASE("Signing in as another user removes the token kept for the expired one
   REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::Credentials; }));
   s.signIn.signIn(QStringLiteral("alice"), QStringLiteral("secret"));
   REQUIRE(waitFor([&] { return s.signIn.step() == SignIn::Step::SignedIn; }));
+  s.settle();
   CHECK(s.tokens.read(oldKey).status == platform::CredentialStore::Status::NotFound);
   CHECK(s.tokens.read(platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1"))).secret ==
         QStringLiteral("tok-new"));
@@ -237,6 +359,7 @@ TEST_CASE("Signing out revokes the token and keeps the server; forgetting remove
   CHECK(s.signIn.step() == SignIn::Step::Credentials);
   REQUIRE(waitFor(
       [&] { return s.server.requests().last().path == QLatin1String("/Sessions/Logout"); }));
+  s.settle();
   CHECK(s.tokens.read(platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1")))
             .status == platform::CredentialStore::Status::NotFound);
   REQUIRE(s.servers.servers().size() == 1);

@@ -6,13 +6,19 @@ namespace jfd::account {
       : QObject(parent),
         m_tokens(config.tokens ? std::move(config.tokens) : platform::createUnavailableCredentialStore()),
         m_servers(config.serversFile), m_client(config.identity), m_socket(m_client),
-        m_signIn(m_client, m_servers, *m_tokens) {
+        m_signIn(m_client, m_servers, m_tokens) {
     connect(&m_signIn, &SignIn::signedIn, this, &Account::begin);
     connect(&m_signIn, &SignIn::signedOut, this, &Account::end);
   }
 
   Account::~Account() {
     m_socket.stop();
+  }
+
+  bool Account::restore(std::chrono::milliseconds wait) {
+    if (!m_signIn.restore()) return false;
+    if (wait.count() > 0) m_tokens.finishPending(wait);
+    return true;
   }
 
   void Account::begin() {

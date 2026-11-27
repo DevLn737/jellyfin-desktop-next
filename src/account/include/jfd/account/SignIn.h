@@ -16,7 +16,7 @@ namespace jfd::api {
 } // namespace jfd::api
 
 namespace jfd::platform {
-  class CredentialStore;
+  class AsyncCredentialStore;
 }
 
 namespace jfd::account {
@@ -27,10 +27,14 @@ namespace jfd::account {
   //   CheckingServer  the server's version and whether Quick Connect is on
   //   Credentials  user name and password, or Quick Connect
   //   SigningIn / QuickConnect  waiting for the server
+  //   Restoring  reading the saved token (restore())
   //   SignedIn
   //
   // A successful sign-in stores the token in the system credential store and
-  // the server in ServerStore; restore() signs in with them at start-up. When
+  // the server in ServerStore; restore() signs in with them at start-up. The
+  // store is never waited for on this thread: its answers come back later
+  // (AsyncCredentialStore), so a slow keyring or its unlock prompt does not
+  // stop the window. When
   // the server later rejects the token, the screen goes back to Credentials
   // for the same server. The saved token is removed only by signOut() or
   // replaced by the next successful sign-in, never because of a 401: a proxy
@@ -49,8 +53,9 @@ namespace jfd::account {
     // hasPassword }; empty when it hides them or cannot say.
     Q_PROPERTY(QVariantList publicUsers READ publicUsers NOTIFY publicUsersChanged)
     // False when the system has no credential store: the next start asks
-    // for the password again.
-    Q_PROPERTY(bool tokenSaved READ tokenSaved NOTIFY stepChanged)
+    // for the password again. Known a moment after the sign-in, once the
+    // store has answered.
+    Q_PROPERTY(bool tokenSaved READ tokenSaved NOTIFY tokenSavedChanged)
     Q_PROPERTY(bool discovering READ discovering NOTIFY discoveringChanged)
     // [{id, name, address}]
     Q_PROPERTY(QVariantList discoveredServers READ discoveredServers NOTIFY discoveredChanged)
@@ -64,12 +69,13 @@ namespace jfd::account {
       Credentials,
       SigningIn,
       QuickConnect,
-      SignedIn
+      SignedIn,
+      Restoring
     };
     Q_ENUM(Step)
 
-    SignIn(api::JellyfinClient& client, ServerStore& servers, platform::CredentialStore& tokens,
-           QObject* parent = nullptr);
+    SignIn(api::JellyfinClient& client, ServerStore& servers,
+           platform::AsyncCredentialStore& tokens, QObject* parent = nullptr);
     ~SignIn() override;
 
     Step step() const { return m_step; }
@@ -92,9 +98,11 @@ namespace jfd::account {
     api::ServerDiscovery& discovery() { return *m_discovery; }
 
     // Signs in with the active saved server and its stored token. Returns
-    // false (and stays on ChooseServer) when there is nothing to restore. A
-    // server that cannot be reached still counts as signed in: the screens
-    // show the error and retry, as they would after a dropped connection.
+    // false (and stays where it was) when no user is saved for it. Otherwise
+    // the step is Restoring until the store has answered: then SignedIn, or
+    // ChooseServer when no token was found. A server that cannot be reached
+    // still counts as signed in: the screens show the error and retry, as
+    // they would after a dropped connection.
     Q_INVOKABLE bool restore();
     Q_INVOKABLE void discover();
     // A typed address or one from the lists.
@@ -126,11 +134,16 @@ namespace jfd::account {
     void discoveringChanged();
     void discoveredChanged();
     void savedChanged();
+    void tokenSavedChanged();
     void signedIn();
     void signedOut();
 
   private:
     void setStep(Step step);
+    // toCredentials: without a stored token, the password form of the saved
+    // server follows instead of the server choice.
+    bool restoreSaved(bool toCredentials);
+    void setTokenSaved(bool saved);
     void setError(const QString& text);
     void checkServer(const QUrl& url, const QString& preferredUserName);
     void finishSignIn(const api::AuthenticationResult& result);
@@ -140,7 +153,7 @@ namespace jfd::account {
 
     api::JellyfinClient& m_client;
     ServerStore& m_servers;
-    platform::CredentialStore& m_tokens;
+    platform::AsyncCredentialStore& m_tokens;
     api::ServerDiscovery* m_discovery = nullptr;
     Step m_step = Step::ChooseServer;
     QString m_errorText;

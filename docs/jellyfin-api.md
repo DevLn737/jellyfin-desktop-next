@@ -18,6 +18,7 @@ clock come from `core` (`ServerInstant`, `LocalInstant`, `Clock`).
 | `Downloads.h` | Offline downloads: the original's URL (`Items/{id}/Download`), the default quality from the user's policy, which sources have an original, and the "token only to this server" check (see [offline.md](offline.md)) |
 | `ServerTime.h` | ISO 8601 with seven fractional digits to and from `core::ServerInstant` |
 | `platform/CredentialStore.h` | Tokens in Windows Credential Manager or the Secret Service |
+| `platform/AsyncCredentialStore.h` | The credential store on its own worker thread: calls return at once, answers come back on the calling thread in order, so a slow keyring or its unlock prompt never holds up the window |
 | `library/ItemBrowser.h` | Search, seasons and episodes as a QML list model (the measurement prototype's) |
 | `account/Account.h`, `UserScope.h` | The connection as one user (client, socket, tokens) and the user scope: modules register their per-user state once, and it begins on sign-in from the lowest order up and ends on sign-out (or an expired session) from the highest down |
 | `account/SignIn.h`, `ServerStore.h` | The login flow: servers on the network and saved ones, version check, password and Quick Connect, token in the credential store, restore at start-up, sign-out, expired sessions |

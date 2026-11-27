@@ -7,17 +7,20 @@ namespace jfd::platform {
   }
 
   CredentialStore::ReadResult MemoryCredentialStore::read(const QString& key) const {
+    const std::lock_guard lock(m_mutex);
     const auto it = m_secrets.constFind(key);
     if (it == m_secrets.constEnd()) return {Status::NotFound, {}};
     return {Status::Ok, *it};
   }
 
   CredentialStore::Status MemoryCredentialStore::write(const QString& key, const QString& secret) {
+    const std::lock_guard lock(m_mutex);
     m_secrets.insert(key, secret);
     return Status::Ok;
   }
 
   CredentialStore::Status MemoryCredentialStore::remove(const QString& key) {
+    const std::lock_guard lock(m_mutex);
     m_secrets.remove(key);
     return Status::Ok;
   }

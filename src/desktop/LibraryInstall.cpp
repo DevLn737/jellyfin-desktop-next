@@ -209,8 +209,11 @@ namespace jfd::desktop {
 
     // Signs in with the saved session, which opens the home page; otherwise
     // main.cpp opens the login page. The modules installed after this join
-    // the session as they register with the user scope.
-    account.restore();
+    // the session as they register with the user scope. The token is read
+    // on the credential store's thread: a quick answer still opens home
+    // before the window shows; a slow one (a locked keyring's unlock
+    // prompt) shows the login page saying "Signing in" until it comes.
+    account.restore(std::chrono::milliseconds(250));
   }
 
 } // namespace jfd::desktop

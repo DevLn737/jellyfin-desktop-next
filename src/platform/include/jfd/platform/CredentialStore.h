@@ -4,6 +4,7 @@
 #include <QString>
 
 #include <memory>
+#include <mutex>
 #include <optional>
 
 // Secrets (access tokens) in the operating system's credential storage:
@@ -21,6 +22,9 @@ namespace jfd::platform {
     };
 
     virtual ~CredentialStore() = default;
+
+    // The calls block until the system answers (D-Bus, an unlock prompt):
+    // the application goes through AsyncCredentialStore, not the GUI thread.
 
     // False when the platform has no usable store (for example no Secret
     // Service running); the app then asks the user to sign in each time.
@@ -42,6 +46,7 @@ namespace jfd::platform {
   QString accessTokenKey(const QString& serverId, const QString& userId);
 
   // Keeps secrets in memory only; for tests and as a session-only fallback.
+  // Thread-safe: tests read it while AsyncCredentialStore's worker writes.
   class MemoryCredentialStore final : public CredentialStore {
   public:
     bool isAvailable() const override { return true; }
@@ -50,6 +55,7 @@ namespace jfd::platform {
     Status remove(const QString& key) override;
 
   private:
+    mutable std::mutex m_mutex;
     QHash<QString, QString> m_secrets;
   };
 
