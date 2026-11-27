@@ -45,12 +45,9 @@ TEST_CASE("Cards lead to a library or an item page") {
   CHECK(ui.routeFor(QStringLiteral("c"), QStringLiteral("Series")) == QStringLiteral("item/c"));
   CHECK(ui.routeFor(QStringLiteral("d"), QStringLiteral("Episode")) == QStringLiteral("item/d"));
   // Music found by a search opens the music screens.
-  CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) ==
-        QStringLiteral("album/e"));
-  CHECK(ui.routeFor(QStringLiteral("f"), QStringLiteral("MusicArtist")) ==
-        QStringLiteral("artist/f"));
-  CHECK(ui.routeFor(QStringLiteral("g"), QStringLiteral("Playlist")) ==
-        QStringLiteral("playlist/g"));
+  CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) == QStringLiteral("album/e"));
+  CHECK(ui.routeFor(QStringLiteral("f"), QStringLiteral("MusicArtist")) == QStringLiteral("artist/f"));
+  CHECK(ui.routeFor(QStringLiteral("g"), QStringLiteral("Playlist")) == QStringLiteral("playlist/g"));
   // A person lists their films and series.
   CHECK(ui.routeFor(QStringLiteral("h"), QStringLiteral("Person")) == QStringLiteral("person/h"));
 }
@@ -103,8 +100,7 @@ TEST_CASE("A track goes to the music player, asking first while a video plays") 
   bool available = true;
   LibraryUi::TrackHandler handler;
   handler.play = [&](const QString& track, const QString& album) {
-    if (!available)
-      return false;
+    if (!available) return false;
     played << track + QLatin1Char('@') + album;
     return true;
   };
@@ -134,8 +130,7 @@ TEST_CASE("A track goes to the music player, asking first while a video plays") 
 
 TEST_CASE("Live TV: a channel leads to its page and plays on this device only") {
   LibraryUi ui;
-  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) ==
-        QStringLiteral("channel/ch"));
+  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) == QStringLiteral("channel/ch"));
   CHECK(ui.liveTv() == nullptr);
   // Without a client there is no guide or channel page to make.
   CHECK(ui.createGuide(nullptr) == nullptr);
