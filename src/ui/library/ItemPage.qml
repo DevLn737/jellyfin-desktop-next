@@ -841,13 +841,28 @@ RoutePage {
         }
     }
 
-    // A site with the film or series: its name, opened in the browser.
+    // A site with the film or series: a small badge with the site's mark
+    // (its colour and initial) and name, opened in the browser. Quiet
+    // until pointed at or focused.
     component ExternalLinkButton: T.AbstractButton {
         id: linkButton
         required property var modelData
+        // The site's colour, and the mark's letter and its colour on it.
+        readonly property var brand: ({
+            shikimori: { color: "#e4e6eb", ink: "#1b1d22", mark: "S" },
+            myanimelist: { color: "#2e51a2", ink: "#ffffff", mark: "M" },
+            anilist: { color: "#02a9ff", ink: "#ffffff", mark: "A" },
+            anidb: { color: "#d43b3b", ink: "#ffffff", mark: "a" },
+            tvdb: { color: "#6cd491", ink: "#10301c", mark: "tv" },
+            tmdb: { color: "#01b4e4", ink: "#0d253f", mark: "tm" },
+            imdb: { color: "#f5c518", ink: "#000000", mark: "i" }
+        })[modelData.site] || { color: Theme.textSecondary, ink: Theme.background, mark: "" }
+        readonly property bool lit: hovered || visualFocus || down
         objectName: "externalLink_" + modelData.site
-        implicitWidth: linkRow.implicitWidth + 24
-        implicitHeight: Theme.tvMode ? 44 : 32
+        leftPadding: Theme.tvMode ? 6 : 4
+        rightPadding: Theme.tvMode ? 12 : 9
+        implicitWidth: leftPadding + linkRow.implicitWidth + rightPadding
+        implicitHeight: Theme.tvMode ? 36 : 26
         focusPolicy: Qt.StrongFocus
         hoverEnabled: true
         Accessible.role: Accessible.Link
@@ -857,26 +872,37 @@ RoutePage {
         onClicked: Qt.openUrlExternally(modelData.url)
         contentItem: Row {
             id: linkRow
-            spacing: 6
-            Icon {
+            spacing: Theme.tvMode ? 8 : 6
+            Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
-                source: Icons.link
-                size: Theme.iconSize - 8
-                color: linkButton.hovered ? Theme.text : Theme.textSecondary
+                width: Math.max(height, markText.implicitWidth + 6)
+                height: Theme.tvMode ? 24 : 18
+                radius: Theme.tvMode ? 6 : 5
+                color: linkButton.brand.color
+                opacity: linkButton.lit ? 1 : 0.85
+                Text {
+                    id: markText
+                    anchors.centerIn: parent
+                    text: linkButton.brand.mark
+                    color: linkButton.brand.ink
+                    font.pixelSize: Theme.tvMode ? 14 : 11
+                    font.weight: Font.Black
+                }
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: linkButton.modelData.label
-                color: linkButton.hovered ? Theme.text : Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall + 1
-                font.weight: Font.Bold
+                color: linkButton.lit ? Theme.text : Theme.textSecondary
+                font.pixelSize: Theme.tvMode ? Theme.fontSizeSmall + 2 : Theme.fontSizeSmall
+                font.weight: Font.DemiBold
             }
         }
         background: Rectangle {
-            radius: height / 2
-            color: linkButton.down || linkButton.hovered ? Qt.alpha(Theme.text, 0.1) : Qt.alpha(Theme.text, 0.04)
+            radius: Theme.tvMode ? 9 : 7
+            color: Qt.alpha(Theme.text, linkButton.down ? 0.16 : linkButton.lit ? 0.11 : 0.05)
             border.width: 1
-            border.color: Theme.glassBorder
+            border.color: Qt.alpha(Theme.text, linkButton.lit ? 0.18 : 0.08)
+            Behavior on color { ColorAnimation { duration: 120 } }
             FocusFrame { shown: linkButton.visualFocus; inset: 0 }
         }
         ToolTipLabel {
