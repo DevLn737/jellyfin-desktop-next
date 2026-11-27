@@ -10,6 +10,8 @@
 #include <QLoggingCategory>
 #include <QQmlEngine>
 
+#include <memory>
+
 namespace jfd::ui {
 
   namespace {
@@ -85,16 +87,42 @@ namespace jfd::ui {
     const QJsonObject saved = m_services.readFilters ? m_services.readFilters() : m_filters;
     model->applyFilters(saved.value(libraryId).toObject());
     rememberLibrary(libraryId);
-    connect(model, &library::LibraryModel::queryChanged, this, [this, model, libraryId] {
-      QJsonObject all = m_services.readFilters ? m_services.readFilters() : m_filters;
+    // What this page last saved or took. queryChanged also comes from a
+    // reload (the server's library changed, the socket came back): only a
+    // change of the page's own choices is saved, so an older page of the
+    // same library, still in the back history, does not write its old sort
+    // over the one chosen since.
+    struct Kept {
+      QJsonObject filters;
+      bool taking = false; // taking another page's, one property at a time
+    };
+    auto known = std::make_shared<Kept>(Kept{model->filters()});
+    qCInfo(lcLibraryUi) << "library" << libraryId << "opens with" << known->filters;
+    connect(model, &library::LibraryModel::queryChanged, this, [this, model, libraryId, known] {
+      if (known->taking) return;
       const QJsonObject filters = model->filters();
+      if (filters == known->filters) return;
+      known->filters = filters;
+      QJsonObject all = m_services.readFilters ? m_services.readFilters() : m_filters;
       if (all.value(libraryId).toObject() == filters) return;
+      qCInfo(lcLibraryUi) << "library" << libraryId << "saves" << filters << "was"
+                          << all.value(libraryId).toObject();
       all.insert(libraryId, filters);
       if (m_services.writeFilters)
         m_services.writeFilters(all);
       else
         m_filters = all;
+      Q_EMIT libraryFiltersSaved(libraryId, filters, model);
     });
+    connect(this, &LibraryUi::libraryFiltersSaved, model,
+            [model, libraryId, known](const QString& id, const QJsonObject& filters,
+                                      const QObject* from) {
+              if (id != libraryId || from == model) return;
+              known->taking = true;
+              model->applyFilters(filters);
+              known->taking = false;
+              known->filters = model->filters();
+            });
     return model;
   }
 

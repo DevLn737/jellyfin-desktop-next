@@ -177,6 +177,10 @@ namespace jfd::ui {
     // playTrack again with `confirmed` on yes.
     void trackConfirmationNeeded(const QString& trackId, const QString& albumId);
     void linkOptionsChanged();
+    // A library's sort and filters were saved from `from`: the other open
+    // pages of that library take them, so none of them saves stale ones.
+    void libraryFiltersSaved(const QString& libraryId, const QJsonObject& filters,
+                             const QObject* from);
 
   private:
     QString collectionTypeOf(const QString& libraryId) const;

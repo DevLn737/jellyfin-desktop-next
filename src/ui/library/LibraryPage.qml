@@ -170,7 +170,12 @@ RoutePage {
                     toolTipText: qsTr("Filters")
                     Accessible.name: active > 0 ? qsTr("Filters · %1").arg(active) : qsTr("Filters")
                     highlighted: page.filtersOpen || active > 0
-                    onClicked: page.filtersOpen = !page.filtersOpen
+                    toolTipSuppressed: page.filtersOpen
+                    // One drop-down at a time: the sort menu gives way.
+                    onClicked: {
+                        sortMenu.close()
+                        page.filtersOpen = !page.filtersOpen
+                    }
                     Rectangle {
                         visible: filtersButton.active > 0
                         anchors.right: parent.right
@@ -212,7 +217,17 @@ RoutePage {
                     toolTipText: qsTr("Sort: %1").arg(fields[page.library ? indexOfValue(page.library.sortBy) : 0].label)
                     Accessible.name: toolTipText
                     highlighted: sortMenu.visible
-                    onClicked: sortMenu.visible ? sortMenu.close() : sortMenu.open()
+                    toolTipSuppressed: sortMenu.visible
+                    // One drop-down at a time: the filters give way (their
+                    // panel does not close on a press outside it).
+                    onClicked: {
+                        if (sortMenu.visible) {
+                            sortMenu.close()
+                            return
+                        }
+                        page.filtersOpen = false
+                        sortMenu.open()
+                    }
                     PopupMenu {
                         id: sortMenu
                         objectName: "librarySort"
