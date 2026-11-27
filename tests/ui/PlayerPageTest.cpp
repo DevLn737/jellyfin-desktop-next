@@ -265,7 +265,10 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   f.player->setRate(1.25);
   REQUIRE(waitFor([&] { return speed->property("text").toString() == QStringLiteral("1.25×"); }, 3000));
   CHECK(find(speed, "speedValue")->property("text").toString() == QStringLiteral("1.25"));
-  CHECK(find(speed, "speedValue")->property("contentWidth").toDouble() <= find(speed, "speedValue")->width() + 0.5);
+  {
+    QQuickItem* value = find(speed, "speedValue");
+    CHECK(value->implicitWidth() * value->scale() <= value->property("room").toDouble() + 0.5);
+  }
   shoot("player-1280-speed-125");
   f.player->setRate(1);
   REQUIRE(waitFor([&] { return speed->property("text").toString().isEmpty(); }, 3000));

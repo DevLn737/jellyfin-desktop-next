@@ -49,18 +49,18 @@ T.Button {
             }
             Text {
                 objectName: "speedValue"
+                // The room inside the rim.
+                readonly property real room: parent.width * 0.72
                 // Inside the rim: its centre is a little above the middle.
-                x: parent.width * 0.15
-                width: parent.width * 0.7
+                anchors.horizontalCenter: parent.horizontalCenter
                 y: parent.height * 0.565 - height / 2
-                horizontalAlignment: Text.AlignHCenter
                 text: control.value
                 color: control.colors.accent
-                font.pixelSize: Math.round(control.gaugeSize * 0.4)
+                font.pixelSize: Math.round(control.gaugeSize * (control.value.length > 3 ? 0.34 : 0.4))
                 font.weight: Theme.fontWeightBold
                 font.letterSpacing: -0.3
-                fontSizeMode: Text.HorizontalFit
-                minimumPixelSize: Math.round(control.gaugeSize * 0.28)
+                // Any font's width fits: shrunk when it is wider than the room.
+                scale: implicitWidth > room ? room / implicitWidth : 1
                 style: Text.Outline
                 styleColor: "#80000000"
             }
