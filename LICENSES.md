@@ -10,6 +10,9 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   The site icons in `src/ui/library/icons/sites` (links to a film on IMDb,
   TMDB, AniList, MyAnimeList, Shikimori) take their marks from
   [Simple Icons](https://github.com/simple-icons/simple-icons), CC0-1.0;
+  the TVDB icon is from
+  [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons),
+  Apache-2.0;
   the marks are trademarks of their owners, used only to name the site a
   link opens.
   The `licenses_check` test fails when an icon file has no row here or a row
@@ -131,6 +134,7 @@ only reformatted.
 | `src/ui/library/icons/sites/myanimelist.svg` | Simple Icons `myanimelist` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
 | `src/ui/library/icons/sites/shikimori.svg` | Simple Icons `shikimori` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
 | `src/ui/library/icons/sites/tmdb.svg` | Simple Icons `themoviedatabase` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
+| `src/ui/library/icons/sites/tvdb.svg` | [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) `svg/tvdb.svg`, unchanged | Apache-2.0 (the mark is a trademark of its owner) |
 | `src/ui/music/icons/expand.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
 | `src/ui/music/icons/more.svg` | Material Icons `more_vert` | Apache-2.0 |
 | `src/ui/music/icons/music.svg` | Material Icons `music_note` | Apache-2.0 |

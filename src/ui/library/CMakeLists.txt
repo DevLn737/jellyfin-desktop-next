@@ -53,6 +53,7 @@ qt_add_qml_module(jfd_ui_library
     icons/sites/myanimelist.svg
     icons/sites/shikimori.svg
     icons/sites/tmdb.svg
+    icons/sites/tvdb.svg
   DEPENDENCIES Jfd.Ui.Theme Jfd.Ui.Controls Jfd.Ui.Shell Jfd.Ui.Settings)
 target_link_libraries(jfd_ui_library
   PUBLIC Qt6::Core Qt6::Gui Qt6::Quick Qt6::Qml jfd::account jfd::library jfd::offline jfd_ui_shell
