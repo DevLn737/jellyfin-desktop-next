@@ -621,8 +621,9 @@ TEST_CASE("Leaving full screen goes straight back to a maximized window") {
   CHECK(window.visibility() == QWindow::FullScreen);
   CHECK(ui::WindowMode::isFullScreen(&window));
   QList<QWindow::Visibility> seen;
-  QObject::connect(&window, &QWindow::visibilityChanged, [&](QWindow::Visibility v) { seen.append(v); });
+  auto watch = QObject::connect(&window, &QWindow::visibilityChanged, [&](QWindow::Visibility v) { seen.append(v); });
   ui::WindowMode::leaveFullScreen(&window);
+  QObject::disconnect(watch);
   CHECK(window.windowStates() == Qt::WindowMaximized);
   // Never a plain window on the way.
   CHECK_FALSE(seen.contains(QWindow::Windowed));
