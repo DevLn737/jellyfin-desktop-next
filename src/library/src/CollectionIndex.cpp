@@ -118,8 +118,12 @@ namespace jfd::library {
   }
 
   QList<api::Item> CollectionIndex::lookup(const QString& itemId) const {
+    // The collections' lists come back in any order (several are asked at
+    // once): answer in the server's order, by name.
+    QList<int> rows = m_members.value(itemId);
+    std::sort(rows.begin(), rows.end());
     QList<api::Item> out;
-    for (int row : m_members.value(itemId))
+    for (int row : rows)
       out.append(m_collections[row]);
     return out;
   }
