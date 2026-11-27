@@ -841,13 +841,37 @@ RoutePage {
         }
     }
 
-    // A site with the film or series: its name, opened in the browser.
+    // A site with the film or series: a small badge with the site's icon
+    // and name, opened in the browser. Quiet until pointed at or focused.
     component ExternalLinkButton: T.AbstractButton {
         id: linkButton
         required property var modelData
+        // The site's mark, best first: the icon bundled in icons/sites,
+        // then the favicon the site itself serves, then its colour and
+        // letter drawn here. Each one that fails to load gives way to the
+        // next, so a badge never shows an empty or broken picture.
+        readonly property var brand: ({
+            shikimori: { icon: "icons/sites/shikimori.svg", color: "#e9ebef", ink: "#343434", mark: "S" },
+            myanimelist: { icon: "icons/sites/myanimelist.svg", color: "#2e51a2", ink: "#ffffff", mark: "M" },
+            anilist: { icon: "icons/sites/anilist.svg", color: "#02a9ff", ink: "#ffffff", mark: "A" },
+            anidb: { color: "#2a4a7f", ink: "#ffffff", mark: "a" },
+            tvdb: { icon: "icons/sites/tvdb.svg", color: "#6cd491", ink: "#10301c", mark: "tv" },
+            tmdb: { icon: "icons/sites/tmdb.svg", color: "#0d253f", ink: "#01b4e4", mark: "tm" },
+            imdb: { icon: "icons/sites/imdb.svg", color: "#f5c518", ink: "#000000", mark: "i" }
+        })[modelData.site] || { color: Theme.textSecondary, ink: Theme.background, mark: "" }
+        readonly property url faviconUrl: {
+            const origin = /^https?:\/\/[^\/?#]+/i.exec(String(modelData.url))
+            return origin ? origin[0] + "/favicon.ico" : ""
+        }
+        // Which mark the badge is on: 0 the bundled icon, 1 the favicon,
+        // 2 the letter.
+        property int markStage: brand.icon ? 0 : faviconUrl.toString().length > 0 ? 1 : 2
+        readonly property bool lit: hovered || visualFocus || down
         objectName: "externalLink_" + modelData.site
-        implicitWidth: linkRow.implicitWidth + 24
-        implicitHeight: Theme.tvMode ? 44 : 32
+        leftPadding: Theme.tvMode ? 6 : 4
+        rightPadding: Theme.tvMode ? 12 : 9
+        implicitWidth: leftPadding + linkRow.implicitWidth + rightPadding
+        implicitHeight: Theme.tvMode ? 36 : 26
         focusPolicy: Qt.StrongFocus
         hoverEnabled: true
         Accessible.role: Accessible.Link
@@ -857,26 +881,70 @@ RoutePage {
         onClicked: Qt.openUrlExternally(modelData.url)
         contentItem: Row {
             id: linkRow
-            spacing: 6
-            Icon {
+            spacing: Theme.tvMode ? 8 : 6
+            Item {
                 anchors.verticalCenter: parent.verticalCenter
-                source: Icons.link
-                size: Theme.iconSize - 8
-                color: linkButton.hovered ? Theme.text : Theme.textSecondary
+                width: height
+                height: Theme.tvMode ? 24 : 18
+                opacity: linkButton.lit ? 1 : 0.85
+                Image {
+                    id: siteIcon
+                    objectName: "siteIcon"
+                    visible: linkButton.markStage === 0 && status === Image.Ready
+                    anchors.fill: parent
+                    source: linkButton.markStage === 0 ? Qt.resolvedUrl(linkButton.brand.icon) : ""
+                    sourceSize.width: width * 2
+                    sourceSize.height: height * 2
+                    smooth: true
+                    onStatusChanged: if (status === Image.Error) linkButton.markStage = linkButton.faviconUrl.toString().length > 0 ? 1 : 2
+                }
+                // A favicon is often 16 or 32 pixels: loaded at its own
+                // size and scaled by the item.
+                Image {
+                    id: siteFavicon
+                    objectName: "siteFavicon"
+                    visible: linkButton.markStage === 1 && status === Image.Ready
+                    anchors.fill: parent
+                    source: linkButton.markStage === 1 ? linkButton.faviconUrl : ""
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    smooth: true
+                    mipmap: true
+                    onStatusChanged: {
+                        if (status === Image.Error || (status === Image.Ready && sourceSize.width <= 0))
+                            linkButton.markStage = 2
+                    }
+                }
+                Rectangle {
+                    objectName: "siteLetter"
+                    // Under a favicon still on its way, too.
+                    visible: !siteIcon.visible && !siteFavicon.visible
+                    anchors.fill: parent
+                    radius: Theme.tvMode ? 6 : 5
+                    color: linkButton.brand.color
+                    Text {
+                        anchors.centerIn: parent
+                        text: linkButton.brand.mark
+                        color: linkButton.brand.ink
+                        font.pixelSize: Theme.tvMode ? 13 : 10
+                        font.weight: Font.Black
+                    }
+                }
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: linkButton.modelData.label
-                color: linkButton.hovered ? Theme.text : Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall + 1
-                font.weight: Font.Bold
+                color: linkButton.lit ? Theme.text : Theme.textSecondary
+                font.pixelSize: Theme.tvMode ? Theme.fontSizeSmall + 2 : Theme.fontSizeSmall
+                font.weight: Font.DemiBold
             }
         }
         background: Rectangle {
-            radius: height / 2
-            color: linkButton.down || linkButton.hovered ? Qt.alpha(Theme.text, 0.1) : Qt.alpha(Theme.text, 0.04)
+            radius: Theme.tvMode ? 9 : 7
+            color: Qt.alpha(Theme.text, linkButton.down ? 0.16 : linkButton.lit ? 0.11 : 0.05)
             border.width: 1
-            border.color: Theme.glassBorder
+            border.color: Qt.alpha(Theme.text, linkButton.lit ? 0.18 : 0.08)
+            Behavior on color { ColorAnimation { duration: 120 } }
             FocusFrame { shown: linkButton.visualFocus; inset: 0 }
         }
         ToolTipLabel {

@@ -7,6 +7,14 @@ The program is GPL-2.0-or-later (see LICENSE). It includes:
   [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0); the table
   below names the source of each file. An icon in an `icons-dark` folder is
   the same drawing as its twin in `icons`, with a dark fill for light themes.
+  The site icons in `src/ui/library/icons/sites` (links to a film on IMDb,
+  TMDB, AniList, MyAnimeList, Shikimori) take their marks from
+  [Simple Icons](https://github.com/simple-icons/simple-icons), CC0-1.0;
+  the TVDB icon is from
+  [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons),
+  Apache-2.0;
+  the marks are trademarks of their owners, used only to name the site a
+  link opens.
   The `licenses_check` test fails when an icon file has no row here or a row
   names a file that is gone.
 - **Nunito** typeface (`src/ui/theme/fonts`: Regular, Medium, SemiBold, Bold,
@@ -121,6 +129,12 @@ only reformatted.
 | `src/ui/controls/icons-dark/logout.svg` | Material Icons `exit_to_app` (dark fill) | Apache-2.0 |
 | `src/ui/controls/icons-dark/up.svg` | Material Icons `keyboard_arrow_up` (dark fill) | Apache-2.0 |
 | `src/ui/library/icons/livetv.svg` | Material Icons `live_tv` | Apache-2.0 |
+| `src/ui/library/icons/sites/anilist.svg` | Simple Icons `anilist` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
+| `src/ui/library/icons/sites/imdb.svg` | Simple Icons `imdb` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
+| `src/ui/library/icons/sites/myanimelist.svg` | Simple Icons `myanimelist` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
+| `src/ui/library/icons/sites/shikimori.svg` | Simple Icons `shikimori` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
+| `src/ui/library/icons/sites/tmdb.svg` | Simple Icons `themoviedatabase` (16.38.1) on a rounded tile in the site's colours | CC0-1.0 (the mark is a trademark of its owner) |
+| `src/ui/library/icons/sites/tvdb.svg` | [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) `svg/tvdb.svg`, unchanged | Apache-2.0 (the mark is a trademark of its owner) |
 | `src/ui/music/icons/expand.svg` | Material Icons `keyboard_arrow_down` | Apache-2.0 |
 | `src/ui/music/icons/more.svg` | Material Icons `more_vert` | Apache-2.0 |
 | `src/ui/music/icons/music.svg` | Material Icons `music_note` | Apache-2.0 |
