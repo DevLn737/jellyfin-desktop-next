@@ -3,6 +3,7 @@
 #include <jfd/ui/CommandRegistry.h>
 #include <jfd/ui/Navigator.h>
 #include <jfd/ui/ThemePalette.h>
+#include <jfd/ui/WindowMode.h>
 
 #include <QColor>
 #include <QDesktopServices>
@@ -609,6 +610,28 @@ Flickable {
   CHECK(view->property("contentX").toDouble() == doctest::Approx(0.0));
   wheel(Qt::ShiftModifier);
   CHECK(view->property("contentX").toDouble() > 10);
+}
+
+TEST_CASE("Leaving full screen goes straight back to a maximized window") {
+  QQuickWindow window;
+  window.resize(800, 500);
+  window.showMaximized();
+  REQUIRE(window.windowStates() == Qt::WindowMaximized);
+  ui::WindowMode::toggleFullScreen(&window);
+  CHECK(window.visibility() == QWindow::FullScreen);
+  CHECK(ui::WindowMode::isFullScreen(&window));
+  QList<QWindow::Visibility> seen;
+  QObject::connect(&window, &QWindow::visibilityChanged, [&](QWindow::Visibility v) { seen.append(v); });
+  ui::WindowMode::leaveFullScreen(&window);
+  CHECK(window.windowStates() == Qt::WindowMaximized);
+  // Never a plain window on the way.
+  CHECK_FALSE(seen.contains(QWindow::Windowed));
+  // A plain window comes back plain.
+  window.showNormal();
+  ui::WindowMode::toggleFullScreen(&window);
+  CHECK(window.windowStates() == Qt::WindowFullScreen);
+  ui::WindowMode::toggleFullScreen(&window);
+  CHECK(window.windowStates() == Qt::WindowNoState);
 }
 
 TEST_CASE("The wheel scrolls a page smoothly and by a fixed step per notch") {

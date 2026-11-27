@@ -43,7 +43,10 @@ namespace jfd::ui {
     m_shape.start(rect, m_settings.value(keys::WindowMaximized).toBool());
 
     if (m_settings.value(keys::WindowFullScreen).toBool()) {
-      m_window->showFullScreen();
+      // Maximized stays under full screen, so leaving it is one step.
+      m_window->setWindowStates(fullScreenToggled(
+          m_settings.value(keys::WindowMaximized).toBool() ? Qt::WindowMaximized : Qt::WindowNoState, true));
+      m_window->setVisible(true);
     } else if (m_settings.value(keys::WindowMaximized).toBool()) {
       m_window->showMaximized();
     } else {

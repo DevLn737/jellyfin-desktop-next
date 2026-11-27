@@ -3,10 +3,11 @@ import QtQuick.Templates as T
 import Jfd.Ui.Theme
 import Jfd.Ui.Controls
 
-// A labelled button of the player's bar: plain text like the icon buttons
-// around it ("1.25×", "−10"), with an icon before it when one is set
-// ("Episodes"). `changed` draws the text in the accent colour (a speed that
-// is not normal).
+// The player bar's speed button, as small as the icon buttons around it.
+// At normal speed it is the speedometer icon. At another speed the
+// speedometer's rim holds the speed itself ("1.5"), in the accent colour,
+// instead of a needle and a label beside it. `text` stays the full speed
+// ("1.5×") for screen readers and the tooltip.
 T.Button {
     id: control
     readonly property var colors: Theme.colorsFor(control)
@@ -14,33 +15,52 @@ T.Button {
     property string toolTipText
     property bool changed: false
     property url iconSource
+    property url gaugeSource
+    // The number drawn in the gauge.
+    property string value: text.replace("×", "")
 
-    implicitWidth: Math.max(Theme.controlHeight, content.implicitWidth + Theme.spacing * 2)
+    readonly property int gaugeSize: Theme.iconSize + 6
+
+    implicitWidth: Theme.controlHeight
     implicitHeight: Theme.controlHeight
     focusPolicy: Qt.StrongFocus
-    Accessible.name: toolTipText
+    Accessible.name: text.length > 0 ? toolTipText + " " + text : toolTipText
 
     Keys.onReturnPressed: control.clicked()
     Keys.onEnterPressed: control.clicked()
 
     contentItem: Item {
-        Row {
-            id: content
+        Icon {
             anchors.centerIn: parent
-            spacing: Theme.spacingSmall
+            visible: !control.changed
+            source: control.iconSource
+        }
+        Item {
+            objectName: "speedGauge"
+            anchors.centerIn: parent
+            width: control.gaugeSize
+            height: control.gaugeSize
+            visible: control.changed
+
             Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: control.iconSource.toString().length > 0
-                source: control.iconSource
+                anchors.fill: parent
+                size: control.gaugeSize
+                source: control.gaugeSource
             }
             Text {
-                id: label
-                anchors.verticalCenter: parent.verticalCenter
-                visible: text.length > 0
-                text: control.text
-                color: control.changed ? control.colors.accent : control.colors.text
-                font.pixelSize: Theme.fontSizeBody
+                objectName: "speedValue"
+                // Inside the rim: its centre is a little above the middle.
+                x: parent.width * 0.15
+                width: parent.width * 0.7
+                y: parent.height * 0.565 - height / 2
+                horizontalAlignment: Text.AlignHCenter
+                text: control.value
+                color: control.colors.accent
+                font.pixelSize: Math.round(control.gaugeSize * 0.4)
                 font.weight: Theme.fontWeightBold
+                font.letterSpacing: -0.3
+                fontSizeMode: Text.HorizontalFit
+                minimumPixelSize: Math.round(control.gaugeSize * 0.28)
                 style: Text.Outline
                 styleColor: "#80000000"
             }
@@ -55,7 +75,7 @@ T.Button {
     }
 
     ToolTipLabel {
-        text: control.toolTipText
+        text: control.text.length > 0 ? control.toolTipText + " " + control.text : control.toolTipText
         shown: control.hovered && control.toolTipText.length > 0
     }
 }

@@ -8,13 +8,17 @@ import Jfd.Ui.Theme
 //
 //   ListView { SmoothWheel {} }
 //
+// Or in an item behind the view, with `view` set, so the wheel beside the
+// view scrolls it too.
+//
 // Only the plain vertical wheel is handled; Shift + wheel and sideways
 // swipes stay with the view (CardRow scrolls its row sideways on Shift).
 WheelHandler {
     id: handler
 
     // A handler declared in a Flickable has its content item as parent.
-    readonly property Flickable view: parent && parent.hasOwnProperty("contentY") ? parent : parent.parent
+    // Set it to scroll a view from an item around it (a whole page).
+    property Flickable view: parent && parent.hasOwnProperty("contentY") ? parent : parent.parent
     // Pixels per wheel notch.
     property real notch: 130
     property real goal: 0

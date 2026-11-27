@@ -28,6 +28,12 @@ namespace jfd::ui {
   QRect placeWindow(const std::optional<QRect>& saved, const QString& savedScreen,
                     const QList<ScreenArea>& screens, int primaryScreen, const QSize& defaultSize);
 
+  // The window states for full screen on or off. Maximized stays under
+  // FullScreen, so leaving full screen goes back to maximized in one step
+  // (Qt and the platforms keep both: FullScreen wins while it is set).
+  // Minimized is dropped either way.
+  Qt::WindowStates fullScreenToggled(Qt::WindowStates states, bool fullScreen);
+
   // What the window looked like before it went full screen. Leaving full
   // screen must bring back that size, position and maximized state: the
   // platform alone returns to a plain window, so a maximized window came

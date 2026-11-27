@@ -253,7 +253,20 @@ TEST_CASE("Chapters mark the seek bar and name the part; one menu holds audio an
   CHECK(speed->property("text").toString().isEmpty());
   f.player->setRate(1.5);
   REQUIRE(waitFor([&] { return speed->property("text").toString() == QStringLiteral("1.5×"); }, 3000));
+  // Written in the speedometer, the button as narrow as the icons beside it.
+  {
+    QQuickItem* gauge = find(speed, "speedGauge");
+    REQUIRE(gauge != nullptr);
+    CHECK(gauge->isVisible());
+    CHECK(find(speed, "speedValue")->property("text").toString() == QStringLiteral("1.5"));
+    CHECK(speed->width() == doctest::Approx(speed->height()));
+  }
   shoot("player-1280-chapter");
+  f.player->setRate(1.25);
+  REQUIRE(waitFor([&] { return speed->property("text").toString() == QStringLiteral("1.25×"); }, 3000));
+  CHECK(find(speed, "speedValue")->property("text").toString() == QStringLiteral("1.25"));
+  CHECK(find(speed, "speedValue")->property("contentWidth").toDouble() <= find(speed, "speedValue")->width() + 0.5);
+  shoot("player-1280-speed-125");
   f.player->setRate(1);
   REQUIRE(waitFor([&] { return speed->property("text").toString().isEmpty(); }, 3000));
 

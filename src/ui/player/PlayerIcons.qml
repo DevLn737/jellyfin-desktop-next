@@ -16,6 +16,8 @@ QtObject {
     readonly property url episodes: Qt.resolvedUrl("icons/episodes.svg")
     readonly property url segments: Qt.resolvedUrl("icons/segments.svg")
     readonly property url speed: Qt.resolvedUrl("icons/speed.svg")
+    // The speedometer's rim alone: the speed is written inside it.
+    readonly property url speedGauge: Qt.resolvedUrl("icons/speedGauge.svg")
     readonly property url pip: Qt.resolvedUrl("icons/pip.svg")
     readonly property url volume: Qt.resolvedUrl("icons/volume.svg")
     readonly property url volumeOff: Qt.resolvedUrl("icons/volumeOff.svg")

@@ -75,7 +75,7 @@ FocusScope {
         const window = shell.Window.window
         if (!window)
             return
-        window.visibility = window.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
+        WindowMode.toggleFullScreen(window)
     }
 
     // The Menu key: the bar's current entry, or back to the page.
@@ -93,7 +93,7 @@ FocusScope {
     function goBack() {
         const window = shell.Window.window
         if (window && window.visibility === Window.FullScreen) {
-            window.visibility = Window.Windowed
+            WindowMode.leaveFullScreen(window)
             return true
         }
         if (Navigator.back())

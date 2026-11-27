@@ -77,6 +77,12 @@ namespace jfd::ui {
     return centred(saved->size(), screens[primary].available);
   }
 
+  Qt::WindowStates fullScreenToggled(Qt::WindowStates states, bool fullScreen) {
+    states.setFlag(Qt::WindowMinimized, false);
+    states.setFlag(Qt::WindowFullScreen, fullScreen);
+    return states;
+  }
+
   void WindowShape::start(const QRect& normalGeometry, bool maximized) {
     m_normal = normalGeometry;
     m_maximized = maximized;
