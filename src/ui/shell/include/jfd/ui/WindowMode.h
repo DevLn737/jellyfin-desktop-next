@@ -15,7 +15,7 @@ class QWindow;
 // that stretches back on Windows).
 namespace jfd::ui {
 
-  class WindowMode final : public QObject {
+  class WindowMode : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
