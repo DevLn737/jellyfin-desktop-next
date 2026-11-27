@@ -371,6 +371,19 @@ TEST_CASE("Leaving full screen brings back the window's size and maximized state
   CHECK(shape.visibilityChanged(QWindow::Windowed) == Restore::Geometry);
 }
 
+TEST_CASE("Full screen keeps the maximized state under it") {
+  // A maximized window goes full screen and straight back to maximized.
+  const Qt::WindowStates on = fullScreenToggled(Qt::WindowMaximized, true);
+  CHECK(on == (Qt::WindowFullScreen | Qt::WindowMaximized));
+  CHECK(fullScreenToggled(on, false) == Qt::WindowMaximized);
+  // A plain window back to a plain one.
+  CHECK(fullScreenToggled(Qt::WindowNoState, true) == Qt::WindowFullScreen);
+  CHECK(fullScreenToggled(Qt::WindowFullScreen, false) == Qt::WindowNoState);
+  // Minimized never stays.
+  CHECK(fullScreenToggled(Qt::WindowMinimized | Qt::WindowMaximized, true) ==
+        (Qt::WindowFullScreen | Qt::WindowMaximized));
+}
+
 TEST_CASE("A window started in full screen leaves it into the saved shape") {
   using Restore = WindowShape::Restore;
   WindowShape maximized;

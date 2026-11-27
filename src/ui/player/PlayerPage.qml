@@ -353,7 +353,7 @@ RoutePage {
     function toggleFullscreen() {
         const window = Window.window
         if (!window) return
-        window.visibility = fullscreen ? Window.Windowed : Window.FullScreen
+        WindowMode.toggleFullScreen(window)
     }
 
     // A media segment's name, as the seek bar's line says it.
@@ -1298,14 +1298,15 @@ RoutePage {
                             ? qsTr("Audio and subtitles (%1)").arg(page.subtitleLabel) : qsTr("Audio and subtitles")
                         onClicked: page.toggleMenu(page.openMenu === "audio" ? "audio" : "subtitles")
                     }
-                    // The speed: the icon, with the speed beside it when it
-                    // is not normal. In a group it is everyone's.
+                    // The speed: the speedometer, with the speed written in
+                    // it when it is not normal. In a group it is everyone's.
                     SpeedButton {
                         objectName: "speedButton"
                         focusPolicy: Qt.TabFocus
                         anchors.verticalCenter: parent.verticalCenter
                         visible: page.width >= 720 && (!page.player.inGroup || GroupSession.rateSupported)
                         iconSource: PlayerIcons.speed
+                        gaugeSource: PlayerIcons.speedGauge
                         changed: Math.abs(page.player.baseRate - 1) > 0.001
                         text: changed ? page.player.baseRate + "×" : ""
                         toolTipText: qsTr("Speed")

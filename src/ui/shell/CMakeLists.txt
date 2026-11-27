@@ -16,6 +16,7 @@ qt_add_library(jfd_ui_shell STATIC
   src/Navigator.cpp
   src/SpatialNavigation.cpp
   src/TextEntry.cpp
+  src/WindowMode.cpp
   src/WindowPlacement.cpp
   src/WindowStateKeeper.cpp
   include/jfd/ui/CommandRegistry.h
@@ -26,6 +27,7 @@ qt_add_library(jfd_ui_shell STATIC
   include/jfd/ui/Navigator.h
   include/jfd/ui/SpatialNavigation.h
   include/jfd/ui/TextEntry.h
+  include/jfd/ui/WindowMode.h
   include/jfd/ui/WindowPlacement.h
   include/jfd/ui/WindowStateKeeper.h)
 target_include_directories(jfd_ui_shell PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

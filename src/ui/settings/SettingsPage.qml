@@ -72,6 +72,13 @@ RoutePage {
         onCountChanged: Qt.callLater(page.updateCurrent)
     }
 
+    // The wheel anywhere on the page scrolls the settings: beside the
+    // cards and under the section list too, not only over the cards.
+    Item {
+        anchors.fill: parent
+        SmoothWheel { view: list }
+    }
+
     // The left side: search and sections.
     Item {
         id: side

@@ -29,6 +29,7 @@
 
 #include <QBuffer>
 #include <QDir>
+#include <QWheelEvent>
 #include <QFile>
 #include <QFont>
 #include <QFontDatabase>
@@ -1030,6 +1031,25 @@ TEST_CASE("Settings: the search leaves the matching rows and marks the words") {
     CHECK(QFile::exists(QString(file).replace(QStringLiteral("/icons/"), QStringLiteral("/icons-dark/"))));
   }
   CHECK(iconFor("interface") != iconFor("appearance"));
+  // The wheel scrolls the settings anywhere on the page: in the margin on
+  // the left and under the section list too, not only over the cards.
+  {
+    const auto wheelAt = [&](QPointF at) {
+      const QPointF scene = settingsPage->mapToScene(at);
+      QWheelEvent event(scene, show.window->mapToGlobal(scene), QPoint(), QPoint(0, -120), Qt::NoButton,
+                        Qt::NoModifier, Qt::NoScrollPhase, false);
+      QCoreApplication::sendEvent(show.window, &event);
+      Showcase::settle(500);
+      return list->property("contentY").toDouble();
+    };
+    const double top = list->property("contentY").toDouble();
+    const double margin = wheelAt(QPointF(4, settingsPage->height() / 2));
+    CHECK(margin > top + 50);
+    const double underSections = wheelAt(QPointF(60, settingsPage->height() - 20));
+    CHECK(underSections > margin + 50);
+    list->setProperty("contentY", top);
+    Showcase::settle(200);
+  }
   QMetaObject::invokeMethod(show.item("settingsSection_diagnostics"), "clicked");
   CHECK(waitFor([&] { return list->property("contentY").toDouble() > 100; }, Timeout));
   CHECK(waitFor([&] { return show.item("settingsSection_diagnostics")->property("current").toBool(); }, Timeout));
