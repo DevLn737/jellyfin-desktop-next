@@ -18,6 +18,7 @@
 
 #include "../support/FakeServer.h"
 
+#include <jfd/platform/AsyncCredentialStore.h>
 #include <jfd/platform/CredentialStore.h>
 #include <jfd/account/Account.h>
 #include <jfd/ui/LibraryScreens.h>
@@ -166,12 +167,14 @@ namespace {
     QDir().mkpath(profile);
     account::ServerStore servers(profile + QStringLiteral("/servers.ini"));
     FileCredentialStore tokens(profile + QStringLiteral("/tokens.ini"));
+    // Goes before the return: the token is written by then.
+    platform::AsyncCredentialStore tokenQueue(tokens);
     api::ClientIdentity identity;
     identity.version = QStringLiteral("0.0.1");
     identity.device = QStringLiteral("bench");
     identity.deviceId = QStringLiteral("jfd-library-bench");
     api::JellyfinClient client(identity);
-    account::SignIn flow(client, servers, tokens);
+    account::SignIn flow(client, servers, tokenQueue);
     flow.connectToServer(qEnvironmentVariable("JFD_TEST_SERVER_URL"));
     if (!waitFor([&] { return flow.step() == account::SignIn::Step::Credentials; }))
       return fail(QStringLiteral("server not reached: ") + flow.errorText());
@@ -185,7 +188,7 @@ namespace {
   int startup(const QString& profile) {
     Screens screens(profile,
                     std::make_unique<FileCredentialStore>(profile + QStringLiteral("/tokens.ini")));
-    if (!screens.userAccount->signIn().restore())
+    if (!screens.userAccount->restore(std::chrono::milliseconds(250)))
       return fail(QStringLiteral("no saved session; run sign-in first"));
     screens.load();
     if (!screens.waitDrawn([&] {

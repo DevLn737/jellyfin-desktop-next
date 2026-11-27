@@ -14,6 +14,7 @@
 #include <jfd/library/RecommendationRows.h>
 #include <jfd/library/SearchModel.h>
 #include <jfd/account/SignIn.h>
+#include <jfd/platform/AsyncCredentialStore.h>
 #include <jfd/platform/CredentialStore.h>
 
 #include <QJsonArray>
@@ -373,7 +374,8 @@ TEST_CASE("Sign-in, home, series, season, episode and Play through the library m
   auto client = makeClient(QStringLiteral("jfd-screens"));
   QTemporaryDir dir;
   account::ServerStore servers(dir.filePath(QStringLiteral("servers.ini")));
-  platform::MemoryCredentialStore tokens;
+  platform::MemoryCredentialStore store;
+  platform::AsyncCredentialStore tokens(store);
   account::SignIn signIn(*client, servers, tokens);
   signIn.connectToServer(env("JFD_TEST_SERVER_URL"));
   REQUIRE(waitFor([&] { return signIn.step() == account::SignIn::Step::Credentials; }, 20000));
@@ -386,6 +388,7 @@ TEST_CASE("Sign-in, home, series, season, episode and Play through the library m
   auto restarted = makeClient(QStringLiteral("jfd-screens"));
   account::SignIn again(*restarted, servers, tokens);
   REQUIRE(again.restore());
+  REQUIRE(waitFor([&] { return again.step() == account::SignIn::Step::SignedIn; }, 20000));
   CHECK(restarted->accessToken() == client->accessToken());
 
   library::HomeModel home(*client);

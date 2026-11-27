@@ -978,6 +978,10 @@
         <translation>Быстрое подключение</translation>
     </message>
     <message>
+        <source>Signing in</source>
+        <translation>Выполняется вход</translation>
+    </message>
+    <message>
         <source>Who&apos;s watching?</source>
         <translation>Кто смотрит?</translation>
     </message>

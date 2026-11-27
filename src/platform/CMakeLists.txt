@@ -3,6 +3,7 @@
 # input (SDL3) and display modes (refresh rate switching).
 add_library(jfd_platform STATIC
   src/CredentialStore.cpp
+  src/AsyncCredentialStore.cpp
   src/SleepInhibitor.cpp
   src/SingleInstance.cpp
   src/MediaControls.cpp
@@ -10,6 +11,7 @@ add_library(jfd_platform STATIC
   src/DisplayModes.cpp
   src/DisplayModeSwitcher.cpp
   include/jfd/platform/CredentialStore.h
+  include/jfd/platform/AsyncCredentialStore.h
   include/jfd/platform/SleepInhibitor.h
   include/jfd/platform/SingleInstance.h
   include/jfd/platform/MediaControls.h
@@ -20,7 +22,9 @@ add_library(jfd_platform STATIC
   include/jfd/platform/DisplayModeSwitcher.h)
 add_library(jfd::platform ALIAS jfd_platform)
 target_include_directories(jfd_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(jfd_platform PUBLIC Qt6::Core Qt6::Network)
+# AsyncCredentialStore's worker thread.
+find_package(Threads REQUIRED)
+target_link_libraries(jfd_platform PUBLIC Qt6::Core Qt6::Network PRIVATE Threads::Threads)
 target_compile_definitions(jfd_platform PUBLIC QT_NO_KEYWORDS QT_NO_CAST_FROM_ASCII)
 set_target_properties(jfd_platform PROPERTIES AUTOMOC ON)
 

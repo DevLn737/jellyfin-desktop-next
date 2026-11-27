@@ -167,7 +167,8 @@ TEST_CASE("A part registered after the saved session was restored begins at once
   tokens->write(platform::accessTokenKey(QStringLiteral("srv1"), QStringLiteral("u1")), QStringLiteral("tok"));
   config.tokens = std::move(tokens);
   Account next(std::move(config));
-  REQUIRE(next.restore());
+  // Waits for the store, as at start-up.
+  REQUIRE(next.restore(std::chrono::seconds(5)));
   CHECK(next.signedIn());
   addPart(next.scope(), s.journal, QStringLiteral("session"), UserScope::Session);
   CHECK(s.journal.lines.contains(QStringLiteral("session+")));

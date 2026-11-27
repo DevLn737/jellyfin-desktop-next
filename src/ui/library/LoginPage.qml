@@ -41,10 +41,17 @@ RoutePage {
     Keys.onEscapePressed: (event) => { event.accepted = page.stepBack() }
     Keys.onBackPressed: (event) => { event.accepted = page.stepBack() }
 
-    Component.onCompleted: {
-        if (signIn && step === SignIn.ChooseServer)
-            signIn.discover()
+    // The network is searched once the server choice shows: at once, or
+    // after a saved sign-in turned out to have no token.
+    property bool discoveryStarted: false
+    function discoverOnce() {
+        if (discoveryStarted || !signIn || step !== SignIn.ChooseServer)
+            return
+        discoveryStarted = true
+        signIn.discover()
     }
+    Component.onCompleted: discoverOnce()
+    onStepChanged: discoverOnce()
 
     // A dark gradient lit by two soft glows in the accent's colours.
     Canvas {
@@ -117,6 +124,7 @@ RoutePage {
                     horizontalAlignment: Text.AlignHCenter
                     text: page.step === SignIn.ChooseServer ? qsTr("Connect to a server")
                         : page.step === SignIn.QuickConnect ? qsTr("Quick Connect")
+                        : page.step === SignIn.Restoring ? qsTr("Signing in")
                         : qsTr("Who's watching?")
                 }
                 Text {

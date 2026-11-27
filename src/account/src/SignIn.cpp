@@ -2,7 +2,7 @@
 
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/api/ServerDiscovery.h>
-#include <jfd/platform/CredentialStore.h>
+#include <jfd/platform/AsyncCredentialStore.h>
 
 #include <QPointer>
 #include <QVariantMap>
@@ -10,7 +10,7 @@
 namespace jfd::account {
 
   SignIn::SignIn(api::JellyfinClient& client, ServerStore& servers,
-                 platform::CredentialStore& tokens, QObject* parent)
+                 platform::AsyncCredentialStore& tokens, QObject* parent)
       : QObject(parent), m_client(client), m_servers(servers), m_tokens(tokens),
         m_discovery(new api::ServerDiscovery(this)) {
     m_poll.setInterval(3000);
@@ -23,7 +23,8 @@ namespace jfd::account {
   SignIn::~SignIn() = default;
 
   bool SignIn::busy() const {
-    return m_step == Step::CheckingServer || m_step == Step::SigningIn;
+    return m_step == Step::CheckingServer || m_step == Step::SigningIn ||
+           m_step == Step::Restoring;
   }
 
   bool SignIn::discovering() const {
@@ -53,6 +54,12 @@ namespace jfd::account {
     if (m_step == step) return;
     m_step = step;
     Q_EMIT stepChanged();
+  }
+
+  void SignIn::setTokenSaved(bool saved) {
+    if (m_tokenSaved == saved) return;
+    m_tokenSaved = saved;
+    Q_EMIT tokenSavedChanged();
   }
 
   void SignIn::setError(const QString& text) {
@@ -106,7 +113,7 @@ namespace jfd::account {
     if (!saved) return;
     m_servers.setActive(serverId);
     Q_EMIT savedChanged();
-    if (!saved->userId.isEmpty() && restore()) return;
+    if (!saved->userId.isEmpty() && restoreSaved(true)) return;
     checkServer(saved->url, saved->userName);
   }
 
@@ -266,8 +273,15 @@ namespace jfd::account {
         previous && !previous->userId.isEmpty() && previous->userId != m_server.userId)
       m_tokens.remove(platform::accessTokenKey(previous->id, previous->userId));
     m_servers.save(m_server);
-    m_tokenSaved = m_tokens.write(platform::accessTokenKey(m_server.id, m_server.userId),
-                                  result.accessToken) == platform::CredentialStore::Status::Ok;
+    // Signed in at once; whether the token will be there at the next start
+    // is known when the store answers.
+    setTokenSaved(false);
+    const quint64 attempt = m_attempt;
+    m_tokens.write(platform::accessTokenKey(m_server.id, m_server.userId), result.accessToken,
+                   this, [this, attempt](platform::CredentialStore::Status status) {
+                     if (attempt != m_attempt) return;
+                     setTokenSaved(status == platform::CredentialStore::Status::Ok);
+                   });
     m_userName = result.user.name;
     m_quickConnectCode.clear();
     Q_EMIT quickConnectCodeChanged();
@@ -278,33 +292,54 @@ namespace jfd::account {
   }
 
   bool SignIn::restore() {
+    return restoreSaved(false);
+  }
+
+  bool SignIn::restoreSaved(bool toCredentials) {
     const auto saved = m_servers.active();
     if (!saved || saved->userId.isEmpty()) return false;
-    const auto token = m_tokens.read(platform::accessTokenKey(saved->id, saved->userId));
-    if (token.status != platform::CredentialStore::Status::Ok || token.secret.isEmpty())
-      return false;
     const quint64 attempt = ++m_attempt;
-    m_server = *saved;
-    m_userName = saved->userName;
-    m_tokenSaved = true;
-    m_client.setServerUrl(saved->url);
-    m_client.setSession(token.secret, saved->userId);
-    Q_EMIT serverChanged();
+    m_poll.stop();
+    const Step before = m_step;
     setError({});
-    setStep(Step::SignedIn);
-    Q_EMIT signedIn();
-    // Checked after the fact: a rejected token brings the login back through
-    // sessionExpired.
-    m_client.currentUser(this, [this, attempt](api::Result<api::UserInfo> user) {
-      if (attempt != m_attempt || !user) return;
-      if (user->name != m_userName) {
-        m_userName = user->name;
-        m_server.userName = user->name;
-        m_servers.save(m_server);
-        Q_EMIT stepChanged();
-      }
-    });
-    m_servers.setActive(saved->id);
+    setStep(Step::Restoring);
+    m_tokens.read(
+        platform::accessTokenKey(saved->id, saved->userId), this,
+        [this, attempt, saved = *saved, before,
+         toCredentials](platform::CredentialStore::ReadResult token) {
+          // Something else was chosen meanwhile.
+          if (attempt != m_attempt || m_step != Step::Restoring) return;
+          if (token.status != platform::CredentialStore::Status::Ok || token.secret.isEmpty()) {
+            if (toCredentials) {
+              checkServer(saved.url, saved.userName);
+            } else {
+              // Back to the form it came from; the server choice otherwise
+              // (start-up, as without a saved sign-in).
+              setStep(before == Step::Credentials ? Step::Credentials : Step::ChooseServer);
+            }
+            return;
+          }
+          m_server = saved;
+          m_userName = saved.userName;
+          setTokenSaved(true);
+          m_client.setServerUrl(saved.url);
+          m_client.setSession(token.secret, saved.userId);
+          Q_EMIT serverChanged();
+          setStep(Step::SignedIn);
+          Q_EMIT signedIn();
+          // Checked after the fact: a rejected token brings the login back
+          // through sessionExpired.
+          m_client.currentUser(this, [this, attempt](api::Result<api::UserInfo> user) {
+            if (attempt != m_attempt || !user) return;
+            if (user->name != m_userName) {
+              m_userName = user->name;
+              m_server.userName = user->name;
+              m_servers.save(m_server);
+              Q_EMIT stepChanged();
+            }
+          });
+          m_servers.setActive(saved.id);
+        });
     return true;
   }
 

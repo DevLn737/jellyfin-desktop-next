@@ -207,7 +207,8 @@ if(TARGET jfd_jellyfin_api)
   endif()
 
   # DisplayModesTest also lists the system's display modes (never switches).
-  jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/SingleInstanceTest.cpp
+  jfd_add_qt_test(jfd_platform_tests platform/CredentialStoreTest.cpp platform/AsyncCredentialStoreTest.cpp
+    platform/SingleInstanceTest.cpp
     platform/GamepadMapperTest.cpp platform/DisplayModesTest.cpp platform/DisplayModeSwitcherTest.cpp)
   target_link_libraries(jfd_platform_tests PRIVATE jfd::platform)
   if(TARGET PkgConfig::JFD_XRANDR)
