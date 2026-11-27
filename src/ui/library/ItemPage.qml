@@ -841,21 +841,21 @@ RoutePage {
         }
     }
 
-    // A site with the film or series: a small badge with the site's mark
-    // (its colour and initial) and name, opened in the browser. Quiet
-    // until pointed at or focused.
+    // A site with the film or series: a small badge with the site's icon
+    // and name, opened in the browser. Quiet until pointed at or focused.
     component ExternalLinkButton: T.AbstractButton {
         id: linkButton
         required property var modelData
-        // The site's colour, and the mark's letter and its colour on it.
+        // The site's icon (icons/sites, after the site's own), or, for a
+        // site without one, its colour and letters drawn here.
         readonly property var brand: ({
-            shikimori: { color: "#e4e6eb", ink: "#1b1d22", mark: "S" },
-            myanimelist: { color: "#2e51a2", ink: "#ffffff", mark: "M" },
-            anilist: { color: "#02a9ff", ink: "#ffffff", mark: "A" },
-            anidb: { color: "#d43b3b", ink: "#ffffff", mark: "a" },
+            shikimori: { icon: "icons/sites/shikimori.svg" },
+            myanimelist: { icon: "icons/sites/myanimelist.svg" },
+            anilist: { icon: "icons/sites/anilist.svg" },
+            anidb: { color: "#2a4a7f", ink: "#ffffff", mark: "a" },
             tvdb: { color: "#6cd491", ink: "#10301c", mark: "tv" },
-            tmdb: { color: "#01b4e4", ink: "#0d253f", mark: "tm" },
-            imdb: { color: "#f5c518", ink: "#000000", mark: "i" }
+            tmdb: { icon: "icons/sites/tmdb.svg" },
+            imdb: { icon: "icons/sites/imdb.svg" }
         })[modelData.site] || { color: Theme.textSecondary, ink: Theme.background, mark: "" }
         readonly property bool lit: hovered || visualFocus || down
         objectName: "externalLink_" + modelData.site
@@ -873,20 +873,33 @@ RoutePage {
         contentItem: Row {
             id: linkRow
             spacing: Theme.tvMode ? 8 : 6
-            Rectangle {
+            Item {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(height, markText.implicitWidth + 6)
+                width: linkButton.brand.icon ? height : Math.max(height, markText.implicitWidth + 6)
                 height: Theme.tvMode ? 24 : 18
-                radius: Theme.tvMode ? 6 : 5
-                color: linkButton.brand.color
                 opacity: linkButton.lit ? 1 : 0.85
-                Text {
-                    id: markText
-                    anchors.centerIn: parent
-                    text: linkButton.brand.mark
-                    color: linkButton.brand.ink
-                    font.pixelSize: Theme.tvMode ? 14 : 11
-                    font.weight: Font.Black
+                Image {
+                    objectName: "siteIcon"
+                    visible: !!linkButton.brand.icon
+                    anchors.fill: parent
+                    source: linkButton.brand.icon ? Qt.resolvedUrl(linkButton.brand.icon) : ""
+                    sourceSize.width: width * 2
+                    sourceSize.height: height * 2
+                    smooth: true
+                }
+                Rectangle {
+                    visible: !linkButton.brand.icon
+                    anchors.fill: parent
+                    radius: Theme.tvMode ? 6 : 5
+                    color: linkButton.brand.color || "transparent"
+                    Text {
+                        id: markText
+                        anchors.centerIn: parent
+                        text: linkButton.brand.mark || ""
+                        color: linkButton.brand.ink || Theme.text
+                        font.pixelSize: Theme.tvMode ? 14 : 11
+                        font.weight: Font.Black
+                    }
                 }
             }
             Text {
