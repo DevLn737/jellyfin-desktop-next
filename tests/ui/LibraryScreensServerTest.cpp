@@ -476,6 +476,12 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   REQUIRE(waitFor([&] { return filtersPopup->property("opened").toBool(); }, Timeout));
   CHECK(waitFor([&] { return !sortMenu->property("visible").toBool(); }, Timeout));
 
+  // A sort chosen in the menu: newest first, kept below.
+  QMetaObject::invokeMethod(sortMenu, "activated", Q_ARG(int, 1));
+  CHECK(model->property("sortBy").toString() == QStringLiteral("DateCreated"));
+  CHECK(model->property("descending").toBool());
+  REQUIRE(waitFor([&] { return !model->property("loading").toBool(); }, Timeout));
+
   // Collections instead of movies; a card leads to the collection page.
   QObject* show = screens.find("libraryShow");
   REQUIRE(show != nullptr);
@@ -492,6 +498,11 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   REQUIRE(screens.waitShowing(QStringLiteral("library/") + moviesId));
   REQUIRE(waitFor([&] { return libraryModel(screens) != nullptr; }, Timeout));
   CHECK(libraryModel(screens)->property("showCollections").toBool());
+  CHECK(libraryModel(screens)->property("sortBy").toString() == QStringLiteral("DateCreated"));
+  CHECK(libraryModel(screens)->property("descending").toBool());
+  // Back to by name, as the other checks expect.
+  libraryModel(screens)->setProperty("sortBy", QStringLiteral("SortName"));
+  libraryModel(screens)->setProperty("descending", false);
   REQUIRE(
       waitFor([&] { return cardFor(screens, "libraryGrid", collectionId) != nullptr; }, Timeout));
   Screens::click(cardFor(screens, "libraryGrid", collectionId));
