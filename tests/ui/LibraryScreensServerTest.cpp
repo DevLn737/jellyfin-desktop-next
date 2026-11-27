@@ -9,9 +9,9 @@
 #include "../support/DoctestQt.h"
 #include "../support/FakeServer.h"
 
+#include <jfd/account/Account.h>
 #include <jfd/api/JellyfinClient.h>
 #include <jfd/platform/CredentialStore.h>
-#include <jfd/account/Account.h>
 #include <jfd/ui/LibraryScreens.h>
 #include <jfd/ui/LibraryUi.h>
 #include <jfd/ui/Navigator.h>
@@ -24,8 +24,8 @@
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
-#include <QTest>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QtQml/qqmlextensionplugin.h>
 
 Q_IMPORT_QML_PLUGIN(Jfd_Ui_ThemePlugin)
@@ -38,36 +38,36 @@ using jfd::test::waitFor;
 
 namespace {
 
-  QString env(const char* name) {
-    return qEnvironmentVariable(name);
-  }
+QString env(const char* name) {
+  return qEnvironmentVariable(name);
+}
 
-  constexpr int Timeout = 20000;
+constexpr int Timeout = 20000;
 
-  class Screens {
-  public:
-    Screens() {
-      account::Account::Config accountConfig;
-      ui::LibraryScreens::Config config;
-      accountConfig.identity.version = QStringLiteral("0.0.1");
-      accountConfig.identity.device = QStringLiteral("ui-test");
-      accountConfig.identity.deviceId = QStringLiteral("jfd-ui-screens");
-      accountConfig.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
-      config.imageDirectory = m_dir.filePath(QStringLiteral("images"));
-      accountConfig.tokens = std::make_unique<platform::MemoryCredentialStore>();
-      userAccount = std::make_unique<account::Account>(std::move(accountConfig));
-      screens = std::make_unique<ui::LibraryScreens>(*userAccount, std::move(config));
+class Screens {
+public:
+  Screens() {
+    account::Account::Config accountConfig;
+    ui::LibraryScreens::Config config;
+    accountConfig.identity.version = QStringLiteral("0.0.1");
+    accountConfig.identity.device = QStringLiteral("ui-test");
+    accountConfig.identity.deviceId = QStringLiteral("jfd-ui-screens");
+    accountConfig.serversFile = m_dir.filePath(QStringLiteral("servers.ini"));
+    config.imageDirectory = m_dir.filePath(QStringLiteral("images"));
+    accountConfig.tokens = std::make_unique<platform::MemoryCredentialStore>();
+    userAccount = std::make_unique<account::Account>(std::move(accountConfig));
+    screens = std::make_unique<ui::LibraryScreens>(*userAccount, std::move(config));
 
-      navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
-      REQUIRE(navigator != nullptr);
-      navigator->setPlaceholderPage(
-          QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
-      REQUIRE(screens->install(engine, *navigator));
-      screens->ui()->setPlayHandler(
-          [this](const QString& id, qint64 ticks) { played.append({id, ticks}); });
-      navigator->reset(QStringLiteral("login"));
+    navigator = engine.singletonInstance<ui::Navigator*>("Jfd.Ui.Shell", "Navigator");
+    REQUIRE(navigator != nullptr);
+    navigator->setPlaceholderPage(
+        QUrl(QStringLiteral("qrc:/qt/qml/Jfd/Ui/Shell/PlaceholderPage.qml")));
+    REQUIRE(screens->install(engine, *navigator));
+    screens->ui()->setPlayHandler(
+        [this](const QString& id, qint64 ticks) { played.append({id, ticks}); });
+    navigator->reset(QStringLiteral("login"));
 
-      engine.loadData(R"(
+    engine.loadData(R"(
         import QtQuick
         import Jfd.Ui.Shell
         import Jfd.Ui.Library
@@ -78,79 +78,81 @@ namespace {
             AppShell { objectName: "shell"; anchors.fill: parent; onPaletteRequested: palette.toggle() }
             CommandPalette { id: palette; objectName: "palette"; anchors.fill: parent }
         })");
-      REQUIRE_FALSE(engine.rootObjects().isEmpty());
-      window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
-      REQUIRE(window != nullptr);
-    }
+    REQUIRE_FALSE(engine.rootObjects().isEmpty());
+    window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+    REQUIRE(window != nullptr);
+  }
 
-    QQuickItem* page() const {
-      auto* stack = window->findChild<QQuickItem*>(QStringLiteral("pageStack"));
-      return stack == nullptr ? nullptr : stack->property("currentItem").value<QQuickItem*>();
-    }
+  QQuickItem* page() const {
+    auto* stack = window->findChild<QQuickItem*>(QStringLiteral("pageStack"));
+    return stack == nullptr ? nullptr : stack->property("currentItem").value<QQuickItem*>();
+  }
 
-    // An object on the current page.
-    QObject* find(const char* name) const {
-      QQuickItem* current = page();
-      return current == nullptr ? nullptr : current->findChild<QObject*>(QString::fromLatin1(name));
-    }
+  // An object on the current page.
+  QObject* find(const char* name) const {
+    QQuickItem* current = page();
+    return current == nullptr ? nullptr : current->findChild<QObject*>(QString::fromLatin1(name));
+  }
 
-    bool showing(const QString& route) const {
-      QQuickItem* current = page();
-      return current != nullptr && current->property("route").toString() == route &&
-             navigator->currentRoute() == route;
-    }
+  bool showing(const QString& route) const {
+    QQuickItem* current = page();
+    return current != nullptr && current->property("route").toString() == route &&
+           navigator->currentRoute() == route;
+  }
 
-    bool waitShowing(const QString& route) const {
-      return waitFor([&] { return showing(route); }, Timeout);
-    }
+  bool waitShowing(const QString& route) const {
+    return waitFor([&] { return showing(route); }, Timeout);
+  }
 
-    bool waitCount(const char* name, int atLeast) const {
-      return waitFor(
-          [&] {
-            QObject* object = find(name);
-            return object != nullptr && object->property("count").toInt() >= atLeast;
-          },
-          Timeout);
-    }
+  bool waitCount(const char* name, int atLeast) const {
+    return waitFor(
+        [&] {
+          QObject* object = find(name);
+          return object != nullptr && object->property("count").toInt() >= atLeast;
+        },
+        Timeout);
+  }
 
-    // A delegate of a CardRow or CardGrid.
-    QQuickItem* card(const char* view, int index) const {
-      QObject* owner = find(view);
-      if (owner == nullptr) return nullptr;
-      auto* list = owner->property("view").value<QObject*>();
-      QQuickItem* item = nullptr;
-      QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, item),
-                                Q_ARG(int, index));
-      return item;
-    }
+  // A delegate of a CardRow or CardGrid.
+  QQuickItem* card(const char* view, int index) const {
+    QObject* owner = find(view);
+    if (owner == nullptr)
+      return nullptr;
+    auto* list = owner->property("view").value<QObject*>();
+    QQuickItem* item = nullptr;
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, item),
+                              Q_ARG(int, index));
+    return item;
+  }
 
-    static void click(QObject* button) {
-      REQUIRE(button != nullptr);
-      REQUIRE(button->property("enabled").toBool());
-      QMetaObject::invokeMethod(button, "clicked");
-    }
+  static void click(QObject* button) {
+    REQUIRE(button != nullptr);
+    REQUIRE(button->property("enabled").toBool());
+    QMetaObject::invokeMethod(button, "clicked");
+  }
 
-    void screenshot(const QString& name) const {
-      const QString dir = env("JFD_UI_SCREENSHOTS");
-      if (dir.isEmpty()) return;
-      // Let images arrive and animations settle.
-      waitFor([] { return false; }, 1500);
-      QDir().mkpath(dir);
-      window->grabWindow().save(dir + QLatin1Char('/') + name + QStringLiteral(".png"));
-    }
+  void screenshot(const QString& name) const {
+    const QString dir = env("JFD_UI_SCREENSHOTS");
+    if (dir.isEmpty())
+      return;
+    // Let images arrive and animations settle.
+    waitFor([] { return false; }, 1500);
+    QDir().mkpath(dir);
+    window->grabWindow().save(dir + QLatin1Char('/') + name + QStringLiteral(".png"));
+  }
 
-    QTemporaryDir m_dir;
-    // Before the engine, so it is destroyed after it: the window, the pages'
-    // models and the image loader thread use the services until the engine
-    // is gone (issue #70: a reload in flight at the end of a test reached a
-    // destroyed client and image cache).
-    std::unique_ptr<account::Account> userAccount;
-    std::unique_ptr<ui::LibraryScreens> screens;
-    QQmlApplicationEngine engine;
-    ui::Navigator* navigator = nullptr;
-    QQuickWindow* window = nullptr;
-    QList<QPair<QString, qint64>> played;
-  };
+  QTemporaryDir m_dir;
+  // Before the engine, so it is destroyed after it: the window, the pages'
+  // models and the image loader thread use the services until the engine
+  // is gone (issue #70: a reload in flight at the end of a test reached a
+  // destroyed client and image cache).
+  std::unique_ptr<account::Account> userAccount;
+  std::unique_ptr<ui::LibraryScreens> screens;
+  QQmlApplicationEngine engine;
+  ui::Navigator* navigator = nullptr;
+  QQuickWindow* window = nullptr;
+  QList<QPair<QString, qint64>> played;
+};
 
 } // namespace
 
@@ -167,7 +169,8 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   REQUIRE(waitFor([&] { return screens.find("userName") != nullptr; }, Timeout));
   // Typing a whole name keeps the cursor in the name field (it once jumped
   // to the password after the first character).
-  for (const char letter : {'a', 'l', 'i', 'c', 'e'}) QTest::keyClick(screens.window, letter);
+  for (const char letter : {'a', 'l', 'i', 'c', 'e'})
+    QTest::keyClick(screens.window, letter);
   CHECK(screens.find("userName")->property("text").toString() == QLatin1String("alice"));
   CHECK(screens.find("password")->property("text").toString().isEmpty());
   screens.find("userName")->setProperty("text", env("JFD_TEST_USER"));
@@ -187,7 +190,8 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
   const library::ItemListModel* libraries = screens.screens->home().libraries();
   int shows = -1;
   for (int row = 0; row < libraries->count(); ++row)
-    if (libraries->entry(row)->item.collectionType == QLatin1String("tvshows")) shows = row;
+    if (libraries->entry(row)->item.collectionType == QLatin1String("tvshows"))
+      shows = row;
   REQUIRE(shows >= 0);
   const QString showsId = libraries->entry(shows)->item.id;
   REQUIRE(screens.navigator->navigate(QStringLiteral("library/") + showsId));
@@ -267,39 +271,40 @@ TEST_CASE("Sign in, open a series from the library, an episode from its season, 
 }
 
 namespace {
-  void signInAs(Screens& screens) {
-    REQUIRE(screens.waitShowing(QStringLiteral("login")));
-    screens.find("serverAddress")->setProperty("text", env("JFD_TEST_SERVER_URL"));
-    Screens::click(screens.find("connectButton"));
-    REQUIRE(waitFor([&] { return screens.find("userName") != nullptr; }, Timeout));
-    screens.find("userName")->setProperty("text", env("JFD_TEST_USER"));
-    screens.find("password")->setProperty("text", env("JFD_TEST_PASSWORD"));
-    Screens::click(screens.find("signInButton"));
-    REQUIRE(screens.waitShowing(QStringLiteral("home")));
-    REQUIRE(waitFor([&] { return screens.screens->home().libraries()->count() >= 2; }, Timeout));
-  }
+void signInAs(Screens& screens) {
+  REQUIRE(screens.waitShowing(QStringLiteral("login")));
+  screens.find("serverAddress")->setProperty("text", env("JFD_TEST_SERVER_URL"));
+  Screens::click(screens.find("connectButton"));
+  REQUIRE(waitFor([&] { return screens.find("userName") != nullptr; }, Timeout));
+  screens.find("userName")->setProperty("text", env("JFD_TEST_USER"));
+  screens.find("password")->setProperty("text", env("JFD_TEST_PASSWORD"));
+  Screens::click(screens.find("signInButton"));
+  REQUIRE(screens.waitShowing(QStringLiteral("home")));
+  REQUIRE(waitFor([&] { return screens.screens->home().libraries()->count() >= 2; }, Timeout));
+}
 
-  // Sets a ChoiceBox the way a click on one of its entries does.
-  void choose(QObject* box, int index) {
-    REQUIRE(box != nullptr);
-    box->setProperty("currentIndex", index);
-    QMetaObject::invokeMethod(box, "activated", Q_ARG(int, index));
-  }
+// Sets a ChoiceBox the way a click on one of its entries does.
+void choose(QObject* box, int index) {
+  REQUIRE(box != nullptr);
+  box->setProperty("currentIndex", index);
+  QMetaObject::invokeMethod(box, "activated", Q_ARG(int, index));
+}
 
-  // The card of `view` showing `itemId`, if it has been made.
-  QQuickItem* cardFor(const Screens& screens, const char* view, const QString& itemId) {
-    for (int i = 0; i < 20; ++i) {
-      QQuickItem* card = screens.card(view, i);
-      if (card != nullptr && card->property("itemId").toString() == itemId) return card;
-    }
-    return nullptr;
+// The card of `view` showing `itemId`, if it has been made.
+QQuickItem* cardFor(const Screens& screens, const char* view, const QString& itemId) {
+  for (int i = 0; i < 20; ++i) {
+    QQuickItem* card = screens.card(view, i);
+    if (card != nullptr && card->property("itemId").toString() == itemId)
+      return card;
   }
+  return nullptr;
+}
 
-  QObject* libraryModel(const Screens& screens) {
-    QQuickItem* page = screens.page();
-    REQUIRE(page != nullptr);
-    return page->property("library").value<QObject*>();
-  }
+QObject* libraryModel(const Screens& screens) {
+  QQuickItem* page = screens.page();
+  REQUIRE(page != nullptr);
+  return page->property("library").value<QObject*>();
+}
 } // namespace
 
 TEST_CASE("Year, several genres and collections in the library; the collection page") {
@@ -333,7 +338,8 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
     api::JellyfinClient::RawResponse response;
     client.send(method, path, q, std::nullopt, &client,
                 [&](api::Result<api::JellyfinClient::RawResponse> r) {
-                  if (r) response = r.value();
+                  if (r)
+                    response = r.value();
                   done = true;
                 });
     waitFor([&] { return done; }, Timeout);
@@ -366,7 +372,8 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
                            .value(QStringLiteral("Items"))
                            .toArray();
     for (const QJsonValue& item : items)
-      if (item.toObject().value(QStringLiteral("Id")).toString() == movieId) return true;
+      if (item.toObject().value(QStringLiteral("Id")).toString() == movieId)
+        return true;
     return false;
   };
   for (int attempt = 0; attempt < 4 && collectionId.isEmpty(); ++attempt) {
@@ -380,7 +387,8 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
         call(api::JellyfinClient::Method::Post, QStringLiteral("Collections"), create);
     const QString id =
         QJsonDocument::fromJson(made.body).object().value(QStringLiteral("Id")).toString();
-    if (id.isEmpty()) continue;
+    if (id.isEmpty())
+      continue;
     // Listed with its movie, and found among the collections.
     if (waitFor([&] { return listed(id); }, 8000) &&
         waitFor(

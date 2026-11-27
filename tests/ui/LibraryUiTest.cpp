@@ -1,9 +1,15 @@
 #include "../support/DoctestQt.h"
 
+#include <jfd/api/JellyfinClient.h>
+#include <jfd/library/LibraryModel.h>
+#include <jfd/library/LibraryUpdates.h>
 #include <jfd/ui/LibraryImageProvider.h>
 #include <jfd/ui/LibraryUi.h>
 
+#include <QJsonObject>
 #include <QSignalSpy>
+
+#include <memory>
 
 using namespace jfd::ui;
 
@@ -39,9 +45,12 @@ TEST_CASE("Cards lead to a library or an item page") {
   CHECK(ui.routeFor(QStringLiteral("c"), QStringLiteral("Series")) == QStringLiteral("item/c"));
   CHECK(ui.routeFor(QStringLiteral("d"), QStringLiteral("Episode")) == QStringLiteral("item/d"));
   // Music found by a search opens the music screens.
-  CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) == QStringLiteral("album/e"));
-  CHECK(ui.routeFor(QStringLiteral("f"), QStringLiteral("MusicArtist")) == QStringLiteral("artist/f"));
-  CHECK(ui.routeFor(QStringLiteral("g"), QStringLiteral("Playlist")) == QStringLiteral("playlist/g"));
+  CHECK(ui.routeFor(QStringLiteral("e"), QStringLiteral("MusicAlbum")) ==
+        QStringLiteral("album/e"));
+  CHECK(ui.routeFor(QStringLiteral("f"), QStringLiteral("MusicArtist")) ==
+        QStringLiteral("artist/f"));
+  CHECK(ui.routeFor(QStringLiteral("g"), QStringLiteral("Playlist")) ==
+        QStringLiteral("playlist/g"));
   // A person lists their films and series.
   CHECK(ui.routeFor(QStringLiteral("h"), QStringLiteral("Person")) == QStringLiteral("person/h"));
 }
@@ -94,7 +103,8 @@ TEST_CASE("A track goes to the music player, asking first while a video plays") 
   bool available = true;
   LibraryUi::TrackHandler handler;
   handler.play = [&](const QString& track, const QString& album) {
-    if (!available) return false;
+    if (!available)
+      return false;
     played << track + QLatin1Char('@') + album;
     return true;
   };
@@ -124,7 +134,8 @@ TEST_CASE("A track goes to the music player, asking first while a video plays") 
 
 TEST_CASE("Live TV: a channel leads to its page and plays on this device only") {
   LibraryUi ui;
-  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) == QStringLiteral("channel/ch"));
+  CHECK(ui.routeFor(QStringLiteral("ch"), QStringLiteral("TvChannel")) ==
+        QStringLiteral("channel/ch"));
   CHECK(ui.liveTv() == nullptr);
   // Without a client there is no guide or channel page to make.
   CHECK(ui.createGuide(nullptr) == nullptr);
@@ -144,4 +155,60 @@ TEST_CASE("Live TV: a channel leads to its page and plays on this device only") 
   ui.playChannel(QString());
   CHECK(played == QStringLiteral("ch"));
   CHECK(messages.count() == 1);
+}
+
+TEST_CASE("A library's sort is kept: an older page of it neither resets it nor keeps an old one") {
+  jfd::api::JellyfinClient client{jfd::api::ClientIdentity{}};
+  jfd::library::LibraryUpdates updates;
+  QJsonObject store;
+  int writes = 0;
+  LibraryUi ui;
+  LibraryUi::Services services;
+  services.client = &client;
+  services.updates = &updates;
+  services.readFilters = [&] { return store; };
+  services.writeFilters = [&](const QJsonObject& all) {
+    store = all;
+    ++writes;
+  };
+  ui.attach(services);
+  const QString id = QStringLiteral("lib1");
+  auto sortOf = [&] {
+    return store.value(id).toObject().value(QStringLiteral("sortBy")).toString();
+  };
+
+  // A page of the library, then another one over it (the first stays in
+  // the back history).
+  std::unique_ptr<jfd::library::LibraryModel> older(ui.createLibrary(id, nullptr));
+  std::unique_ptr<jfd::library::LibraryModel> newer(ui.createLibrary(id, nullptr));
+  REQUIRE(older != nullptr);
+  REQUIRE(newer != nullptr);
+  const int opened = writes;
+
+  // Sorted on the newer page: saved, and the older page takes it.
+  newer->setSortBy(QStringLiteral("DateCreated"));
+  newer->setDescending(true);
+  CHECK(sortOf() == QStringLiteral("DateCreated"));
+  CHECK(older->sortBy() == QStringLiteral("DateCreated"));
+  CHECK(older->descending());
+
+  // The server's library changes, or the connection comes back: the pages
+  // load again and nothing is saved.
+  const int sorted = writes;
+  CHECK(sorted > opened);
+  Q_EMIT updates.resynchronize();
+  Q_EMIT updates.libraryChanged({QStringLiteral("new")}, {}, {});
+  CHECK(writes == sorted);
+  CHECK(sortOf() == QStringLiteral("DateCreated"));
+
+  // A change on the older page is saved too, with the sort it took.
+  older->setPlayedFilter(jfd::library::LibraryModel::PlayedFilter::Unplayed);
+  CHECK(sortOf() == QStringLiteral("DateCreated"));
+  CHECK(store.value(id).toObject().value(QStringLiteral("played")).toString() ==
+        QStringLiteral("unplayed"));
+  CHECK(newer->playedFilter() == jfd::library::LibraryModel::PlayedFilter::Unplayed);
+
+  // A new page opens as it was left.
+  std::unique_ptr<jfd::library::LibraryModel> again(ui.createLibrary(id, nullptr));
+  CHECK(again->sortBy() == QStringLiteral("DateCreated"));
 }
