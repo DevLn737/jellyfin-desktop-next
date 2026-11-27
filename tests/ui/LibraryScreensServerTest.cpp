@@ -463,6 +463,19 @@ TEST_CASE("Year, several genres and collections in the library; the collection p
   REQUIRE(waitFor([&] { return model->property("count").toInt() == movies; }, Timeout));
   screens.screenshot(QStringLiteral("library-filters"));
 
+  // One drop-down at a time: Sort closes the filters, Filters the sort menu.
+  QObject* filtersPopup = screens.find("libraryFiltersPopup");
+  QObject* sortMenu = screens.find("librarySort");
+  REQUIRE(filtersPopup != nullptr);
+  REQUIRE(sortMenu != nullptr);
+  CHECK(filtersPopup->property("visible").toBool());
+  Screens::click(screens.find("librarySortButton"));
+  REQUIRE(waitFor([&] { return sortMenu->property("opened").toBool(); }, Timeout));
+  CHECK(waitFor([&] { return !filtersPopup->property("visible").toBool(); }, Timeout));
+  Screens::click(screens.find("libraryFiltersButton"));
+  REQUIRE(waitFor([&] { return filtersPopup->property("opened").toBool(); }, Timeout));
+  CHECK(waitFor([&] { return !sortMenu->property("visible").toBool(); }, Timeout));
+
   // Collections instead of movies; a card leads to the collection page.
   QObject* show = screens.find("libraryShow");
   REQUIRE(show != nullptr);
